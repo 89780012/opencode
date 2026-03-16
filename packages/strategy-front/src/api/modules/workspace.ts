@@ -1,5 +1,7 @@
 import { request } from "@/api/client";
 import type {
+  CreateWorkspaceRequest,
+  CreateWorkspaceResponse,
   LocalWorkspaceResponse,
   WorkspaceFileContentResponse,
   WorkspaceFilesResponse,
@@ -8,6 +10,13 @@ import type {
 export const workspaceApi = {
   getLocalWorkspaces() {
     return request.get<LocalWorkspaceResponse>("/workspace/list");
+  },
+
+  createWorkspace(name: string) {
+    return request.post<CreateWorkspaceResponse, CreateWorkspaceRequest>(
+      "/workspace/create",
+      { name },
+    );
   },
 
   getWorkspaceFiles(workspacePath: string) {

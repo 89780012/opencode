@@ -1,32 +1,20 @@
 import { FolderCode, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAppDispatch } from "@/hooks/useAppDispatch";
-import { useAppSelector } from "@/hooks/useAppSelector";
 import { truncateString } from "@/lib/utils";
-import { setSelectedWorkspace } from "@/store/workspace-view-slice";
 import type { LocalWorkspace } from "@/types/workspace";
 
-interface LocalWorkspaceListProps {
+interface Props {
   basePath: string;
   loading: boolean;
   error: string | null;
   workspaces: LocalWorkspace[];
+  selectedPath: string | null;
   onRetry: () => void;
+  onSelect: (workspace: LocalWorkspace) => void;
 }
 
-export function LocalWorkspaceList({
-  basePath,
-  loading,
-  error,
-  workspaces,
-  onRetry,
-}: LocalWorkspaceListProps) {
-  const dispatch = useAppDispatch();
-  const selectedWorkspacePath = useAppSelector(
-    (state) => state.workspaceView.selectedWorkspace?.path,
-  );
-
-  if (loading) {
+export function LocalWorkspaceList(props: Props) {
+  if (props.loading) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
         正在扫描本地策略目录...
@@ -34,11 +22,11 @@ export function LocalWorkspaceList({
     );
   }
 
-  if (error) {
+  if (props.error) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
-        <p className="text-sm text-destructive">{error}</p>
-        <Button variant="outline" size="sm" onClick={onRetry}>
+        <p className="text-sm text-destructive">{props.error}</p>
+        <Button variant="outline" size="sm" onClick={props.onRetry}>
           <RefreshCw className="size-4" />
           重新加载
         </Button>
@@ -46,27 +34,27 @@ export function LocalWorkspaceList({
     );
   }
 
-  if (workspaces.length === 0) {
+  if (props.workspaces.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-1 px-4 text-center">
         <p className="text-sm text-muted-foreground">未发现本地策略</p>
-        <p className="text-xs text-muted-foreground">{basePath || "-"}</p>
+        <p className="text-xs text-muted-foreground">{props.basePath || "-"}</p>
       </div>
     );
   }
 
   return (
     <div className="custom-scrollbar flex h-full flex-col gap-2 overflow-x-hidden px-1">
-      <p className="px-2 text-xs text-muted-foreground" title={basePath}>
-        扫描目录: {truncateString(basePath, 30)}
+      <p className="px-2 text-xs text-muted-foreground" title={props.basePath}>
+        扫描目录: {truncateString(props.basePath, 30)}
       </p>
-      {workspaces.map((workspace) => (
+      {props.workspaces.map((workspace) => (
         <button
           key={workspace.path}
           type="button"
-          onClick={() => dispatch(setSelectedWorkspace(workspace))}
-          className={`flex w-full items-center gap-2 rounded-md border px-2 py-2 text-left transition-colors hover:bg-muted/40 cursor-pointer ${
-            selectedWorkspacePath === workspace.path
+          onClick={() => props.onSelect(workspace)}
+          className={`flex w-full cursor-pointer items-center gap-2 rounded-md border px-2 py-2 text-left transition-colors hover:bg-muted/40 ${
+            props.selectedPath === workspace.path
               ? "border-primary bg-primary/10"
               : ""
           }`}

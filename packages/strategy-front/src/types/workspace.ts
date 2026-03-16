@@ -9,6 +9,15 @@ export interface LocalWorkspaceResponse {
   workspaces: LocalWorkspace[];
 }
 
+export interface CreateWorkspaceRequest {
+  name: string;
+}
+
+export interface CreateWorkspaceResponse {
+  base_path: string;
+  workspace: LocalWorkspace;
+}
+
 export interface WorkspaceFile {
   path: string;
 }

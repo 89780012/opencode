@@ -1,14 +1,11 @@
 "use client";
 
-import * as React from "react";
 import { Command, MessageSquareText, PlugZap, Wrench } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
-import { ChatSessionTab } from "@/components/chatsession/chat-session-tab";
+import { NavUser } from "@/components/nav-user";
 import { ProviderSidebarPanel } from "@/components/provider/provider-sidebar-panel";
 import { SystemSidebarPanel } from "@/components/system/system-sidebar-panel";
 import { LocalWorkspaceTab } from "@/components/workspace/local-workspace-tab";
-import { NavUser } from "@/components/nav-user";
-import { Button } from "@/components/ui/button";
 import {
   Sidebar,
   SidebarContent,
@@ -20,7 +17,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { cn } from "@/lib/utils";
 
 const data = {
   user: {
@@ -47,18 +43,7 @@ const data = {
   ],
 };
 
-type Tab = "session" | "workspace";
-
-const tabs: Array<{
-  key: Tab;
-  label: string;
-}> = [
-  { key: "session", label: "会话" },
-  { key: "workspace", label: "工作区" },
-];
-
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const [tab, setTab] = React.useState<Tab>("session");
+export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const { pathname } = useLocation();
   const home = pathname === "/";
   const provider = pathname.startsWith("/providers");
@@ -125,28 +110,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
       <Sidebar collapsible="none" className="flex-1">
         {home ? (
-          <>
-            <SidebarHeader className="border-b p-1 h-10 box-border">
-              <div className="grid grid-cols-2 gap-2">
-                {tabs.map((item) => (
-                  <Button
-                    key={item.key}
-                    variant={tab === item.key ? "secondary" : "ghost"}
-                    size="sm"
-                    className={cn(
-                      "justify-center px-2",
-                      tab === item.key && "font-medium",
-                    )}
-                    onClick={() => setTab(item.key)}
-                  >
-                    {item.label}
-                  </Button>
-                ))}
-              </div>
-            </SidebarHeader>
-
-            {tab === "session" ? <ChatSessionTab /> : <LocalWorkspaceTab />}
-          </>
+          <LocalWorkspaceTab />
         ) : provider ? (
           <ProviderSidebarPanel />
         ) : (
