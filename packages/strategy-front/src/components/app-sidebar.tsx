@@ -1,9 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { ArchiveX, Command, File, Inbox, Send, Trash2 } from "lucide-react";
-
+import { Command, MessageSquareText, PlugZap, Wrench } from "lucide-react";
+import { NavLink, useLocation } from "react-router-dom";
 import { ChatSessionTab } from "@/components/chatsession/chat-session-tab";
+import { ProviderSidebarPanel } from "@/components/provider/provider-sidebar-panel";
+import { SystemSidebarPanel } from "@/components/system/system-sidebar-panel";
 import { LocalWorkspaceTab } from "@/components/workspace/local-workspace-tab";
 import { NavUser } from "@/components/nav-user";
 import { Button } from "@/components/ui/button";
@@ -17,68 +19,51 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  useSidebar,
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 
-// This is sample data
 const data = {
   user: {
     name: "shadcn",
     email: "m@example.com",
     avatar: "/avatars/shadcn.jpg",
   },
-  navMain: [
+  nav: [
     {
-      title: "Inbox",
-      url: "#",
-      icon: Inbox,
-      isActive: true,
+      title: "对话",
+      url: "/",
+      icon: MessageSquareText,
     },
     {
-      title: "Drafts",
-      url: "#",
-      icon: File,
-      isActive: false,
+      title: "提供商",
+      url: "/providers",
+      icon: PlugZap,
     },
     {
-      title: "Sent",
-      url: "#",
-      icon: Send,
-      isActive: false,
-    },
-    {
-      title: "Junk",
-      url: "#",
-      icon: ArchiveX,
-      isActive: false,
-    },
-    {
-      title: "Trash",
-      url: "#",
-      icon: Trash2,
-      isActive: false,
+      title: "安装检测",
+      url: "/installer",
+      icon: Wrench,
     },
   ],
 };
 
-type SecondarySidebarTabKey = "session" | "workspace";
+type Tab = "session" | "workspace";
 
-const secondarySidebarTabs: Array<{
-  key: SecondarySidebarTabKey;
+const tabs: Array<{
+  key: Tab;
   label: string;
 }> = [
-  { key: "session", label: "会话列表" },
-  { key: "workspace", label: "工作空间" },
+  { key: "session", label: "会话" },
+  { key: "workspace", label: "工作区" },
 ];
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  // Note: I'm using state to show active item.
-  // IRL you should use the url/router.
-  const [activeItem] = React.useState(data.navMain[0]);
-  const [activeTab, setActiveTab] =
-    React.useState<SecondarySidebarTabKey>("session");
-  const { setOpen } = useSidebar();
+  const [tab, setTab] = React.useState<Tab>("session");
+  const { pathname } = useLocation();
+  const home = pathname === "/";
+  const provider = pathname.startsWith("/providers");
+  const isActive = (url: string) =>
+    url === "/" ? pathname === "/" : pathname.startsWith(url);
 
   return (
     <Sidebar
@@ -86,9 +71,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       className="overflow-hidden *:data-[sidebar=sidebar]:flex-row"
       {...props}
     >
-      {/* This is the first sidebar */}
-      {/* We disable collapsible and adjust width to icon. */}
-      {/* This will make the sidebar appear as icons. */}
       <Sidebar
         collapsible="none"
         className="w-[calc(var(--sidebar-width-icon)+1px)]! border-r"
@@ -97,7 +79,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton size="lg" asChild className="md:h-8 md:p-0">
-                <a href="#">
+                <NavLink to="/">
                   <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
                     <Command className="size-4" />
                   </div>
@@ -105,7 +87,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     <span className="truncate font-medium">Acme Inc</span>
                     <span className="truncate text-xs">Enterprise</span>
                   </div>
-                </a>
+                </NavLink>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
@@ -114,21 +96,21 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarGroup>
             <SidebarGroupContent className="px-1.5 md:px-0">
               <SidebarMenu>
-                {data.navMain.map((item) => (
+                {data.nav.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
+                      asChild
                       tooltip={{
                         children: item.title,
                         hidden: false,
                       }}
-                      onClick={() => {
-                        setOpen(true);
-                      }}
-                      isActive={activeItem?.title === item.title}
+                      isActive={isActive(item.url)}
                       className="px-2.5 md:px-2"
                     >
-                      <item.icon />
-                      <span>{item.title}</span>
+                      <NavLink to={item.url}>
+                        <item.icon />
+                        <span>{item.title}</span>
+                      </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}
@@ -142,26 +124,34 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </Sidebar>
 
       <Sidebar collapsible="none" className="flex-1">
-        <SidebarHeader className="border-b p-1 h-10 box-border">
-          <div className="grid grid-cols-2 gap-2">
-            {secondarySidebarTabs.map((tab) => (
-              <Button
-                key={tab.key}
-                variant={activeTab === tab.key ? "secondary" : "ghost"}
-                size="sm"
-                className={cn(
-                  "justify-center px-2",
-                  activeTab === tab.key && "font-medium",
-                )}
-                onClick={() => setActiveTab(tab.key)}
-              >
-                {tab.label}
-              </Button>
-            ))}
-          </div>
-        </SidebarHeader>
+        {home ? (
+          <>
+            <SidebarHeader className="border-b p-1 h-10 box-border">
+              <div className="grid grid-cols-2 gap-2">
+                {tabs.map((item) => (
+                  <Button
+                    key={item.key}
+                    variant={tab === item.key ? "secondary" : "ghost"}
+                    size="sm"
+                    className={cn(
+                      "justify-center px-2",
+                      tab === item.key && "font-medium",
+                    )}
+                    onClick={() => setTab(item.key)}
+                  >
+                    {item.label}
+                  </Button>
+                ))}
+              </div>
+            </SidebarHeader>
 
-        {activeTab === "session" ? <ChatSessionTab /> : <LocalWorkspaceTab />}
+            {tab === "session" ? <ChatSessionTab /> : <LocalWorkspaceTab />}
+          </>
+        ) : provider ? (
+          <ProviderSidebarPanel />
+        ) : (
+          <SystemSidebarPanel />
+        )}
       </Sidebar>
     </Sidebar>
   );
