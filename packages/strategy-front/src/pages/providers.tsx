@@ -1,5 +1,5 @@
-import { ProviderPage } from "@/components/provider/provider-page";
+import { Outlet } from "react-router-dom";
 
 export default function Page() {
-  return <ProviderPage />;
+  return <Outlet />;
 }

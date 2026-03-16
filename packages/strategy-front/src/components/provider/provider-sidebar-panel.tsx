@@ -1,62 +1,78 @@
-import { PlugZap, ShieldCheck, SlidersHorizontal } from "lucide-react";
+﻿import { Bot, Boxes, PlugZap } from "lucide-react"
+import { NavLink, useLocation } from "react-router-dom"
 import {
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
-} from "@/components/ui/sidebar";
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "@/components/ui/sidebar"
 
-const items = [
+const nav = [
   {
     icon: PlugZap,
-    title: "连接提供商",
-    text: "支持使用 API 密钥、OAuth 授权，或接入自定义兼容 OpenAI 的提供商。",
+    title: "概览",
+    url: "/providers/overview",
+    text: "连接提供商、查看认证方式，并管理自定义的 OpenAI 兼容提供商。",
   },
   {
-    icon: ShieldCheck,
-    title: "认证与断开",
-    text: "可以查看当前接入来源，并断开非环境变量加载的提供商。",
+    icon: Bot,
+    title: "模型",
+    url: "/providers/models",
+    text: "浏览已连接提供商下的模型目录，并控制当前前端展示哪些模型。",
   },
-  {
-    icon: SlidersHorizontal,
-    title: "配置更新",
-    text: "自定义提供商会更新全局配置，并同步处理 disabled_providers。",
-  },
-];
+]
 
 export function ProviderSidebarPanel() {
+  const { pathname } = useLocation()
+
   return (
     <>
       <SidebarHeader className="border-b p-4">
         <div className="space-y-1">
           <div className="text-sm font-semibold">提供商</div>
           <p className="text-muted-foreground text-xs leading-5">
-            管理提供商连接、认证流程，以及自定义提供商配置。
+            管理提供商连接，以及每个已连接提供商对外暴露的模型目录。
           </p>
         </div>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
+          <SidebarGroupLabel>导航</SidebarGroupLabel>
+          <SidebarGroupContent className="px-2">
+            <SidebarMenu>
+              {nav.map((item) => (
+                <SidebarMenuItem key={item.url}>
+                  <SidebarMenuButton asChild isActive={pathname === item.url}>
+                    <NavLink to={item.url}>
+                      <item.icon className="size-4" />
+                      <span>{item.title}</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
           <SidebarGroupLabel>说明</SidebarGroupLabel>
           <SidebarGroupContent className="space-y-3 px-2">
-            {items.map((item) => (
-              <div
-                key={item.title}
-                className="bg-background rounded-xl border px-3 py-3 shadow-xs"
-              >
+            {nav.map((item) => (
+              <div key={item.url} className="bg-background rounded-xl border px-3 py-3 shadow-xs">
                 <div className="mb-2 flex items-center gap-2">
                   <item.icon className="text-primary size-4" />
                   <span className="text-sm font-medium">{item.title}</span>
                 </div>
-                <p className="text-muted-foreground text-xs leading-5">
-                  {item.text}
-                </p>
+                <p className="text-muted-foreground text-xs leading-5">{item.text}</p>
+                {pathname === item.url ? <div className="text-primary mt-3 text-xs font-medium">当前页</div> : null}
               </div>
             ))}
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
     </>
-  );
+  )
 }
