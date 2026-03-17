@@ -22,6 +22,11 @@ func (s *Service) List() (ListResult, error) {
 		return ListResult{}, err
 	}
 
+	err = ensureAll(items)
+	if err != nil {
+		return ListResult{}, err
+	}
+
 	return ListResult{
 		BasePath:   root,
 		Workspaces: items,
@@ -53,6 +58,12 @@ func (s *Service) Create(name string) (CreateResult, error) {
 		return CreateResult{}, err
 	}
 
+	err = ensure(path)
+	if err != nil {
+		_ = os.RemoveAll(path)
+		return CreateResult{}, err
+	}
+
 	return CreateResult{
 		BasePath: root,
 		Workspace: Local{
@@ -70,6 +81,11 @@ func (s *Service) Files(path string) (FilesResult, error) {
 	}
 
 	dir, err := safe(root, path)
+	if err != nil {
+		return FilesResult{}, err
+	}
+
+	err = ensure(dir)
 	if err != nil {
 		return FilesResult{}, err
 	}
@@ -93,6 +109,11 @@ func (s *Service) Content(path string, file string) (FileContentResult, error) {
 	}
 
 	dir, err := safe(root, path)
+	if err != nil {
+		return FileContentResult{}, err
+	}
+
+	err = ensure(dir)
 	if err != nil {
 		return FileContentResult{}, err
 	}
