@@ -1,59 +1,45 @@
-import { Shield } from "lucide-react";
+import { Shield } from "lucide-react"
 import {
   PromptInput,
   PromptInputBody,
   PromptInputFooter,
   PromptInputSubmit,
   PromptInputTextarea,
-} from "@/components/ai-elements/prompt-input";
-import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import type { ComposerModel } from "@/hooks/use-chat-composer";
+} from "@/components/ai-elements/prompt-input"
+import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import type { ComposerModel } from "@/hooks/use-chat-composer"
 
 interface Props {
-  value: string;
-  disabled?: boolean;
-  submitting?: boolean;
-  agents: string[];
-  models: ComposerModel[];
-  agent?: string;
-  model?: string;
-  variant?: string | null;
-  vars: string[];
-  accepting?: boolean;
-  onValueChange: (value: string) => void;
-  onSubmit: (value: string) => void;
-  onAgent: (value: string) => void;
-  onModel: (value: string) => void;
-  onVariant: (value: string) => void;
-  onPermission: () => void;
+  value: string
+  disabled?: boolean
+  submitting?: boolean
+  agents: string[]
+  models: ComposerModel[]
+  agent?: string
+  model?: string
+  variant?: string | null
+  vars: string[]
+  accepting?: boolean
+  onValueChange: (value: string) => void
+  onSubmit: (value: string) => void
+  onAgent: (value: string) => void
+  onModel: (value: string) => void
+  onVariant: (value: string) => void
+  onPermission: () => void
 }
 
-const item = "h-8 min-w-0 rounded-xl border bg-muted/20 px-2 text-xs shadow-none";
+const item = "h-8 min-w-0 rounded-xl border bg-muted/20 px-2 text-xs shadow-none"
 
 export function PromptBar(props: Props) {
   return (
-    <PromptInput
-      onSubmit={(msg) => props.onSubmit(msg.text)}
-      onValueChange={props.onValueChange}
-      value={props.value}
-    >
+    <PromptInput onSubmit={(msg) => props.onSubmit(msg.text)} onValueChange={props.onValueChange} value={props.value}>
       <PromptInputBody>
-        <PromptInputTextarea
-          maxHeight={200}
-          minHeight={72}
-          placeholder="输入你的消息..."
-        />
+        <PromptInputTextarea maxHeight={200} minHeight={72} placeholder="输入你的消息..." />
       </PromptInputBody>
       <PromptInputFooter className="items-end gap-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-          <Select
+          {/* <Select
             disabled={props.disabled || props.agents.length === 0}
             onValueChange={props.onAgent}
             value={props.agent ?? ""}
@@ -68,7 +54,7 @@ export function PromptBar(props: Props) {
                 </SelectItem>
               ))}
             </SelectContent>
-          </Select>
+          </Select> */}
           <Select
             disabled={props.disabled || props.models.length === 0}
             onValueChange={props.onModel}
@@ -85,12 +71,8 @@ export function PromptBar(props: Props) {
               ))}
             </SelectContent>
           </Select>
-          {props.vars.length > 0 ? (
-            <Select
-              disabled={props.disabled}
-              onValueChange={props.onVariant}
-              value={props.variant ?? "default"}
-            >
+          {/* {props.vars.length > 0 ? (
+            <Select disabled={props.disabled} onValueChange={props.onVariant} value={props.variant ?? "default"}>
               <SelectTrigger className={`${item} max-w-[120px]`}>
                 <SelectValue placeholder="默认" />
               </SelectTrigger>
@@ -103,8 +85,8 @@ export function PromptBar(props: Props) {
                 ))}
               </SelectContent>
             </Select>
-          ) : null}
-          <Button
+          ) : null} */}
+          {/* <Button
             type="button"
             variant="ghost"
             size="icon"
@@ -115,7 +97,7 @@ export function PromptBar(props: Props) {
             aria-label={props.accepting ? "已开启自动放行权限" : "开启自动放行权限"}
           >
             <Shield className="size-4" />
-          </Button>
+          </Button> */}
         </div>
         <PromptInputSubmit
           disabled={props.disabled || props.value.trim().length === 0}
@@ -123,5 +105,5 @@ export function PromptBar(props: Props) {
         />
       </PromptInputFooter>
     </PromptInput>
-  );
+  )
 }

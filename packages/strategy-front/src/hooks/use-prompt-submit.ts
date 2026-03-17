@@ -1,55 +1,57 @@
-import { useCallback, useState } from "react";
-import { chatApi } from "@/api/modules";
-import { buildRequestParts } from "@/lib/build-request-parts";
-import type { ChatModelRef } from "@/types/chat";
+import { useCallback, useState } from "react"
+import { chatApi } from "@/api/modules"
+import { buildRequestParts } from "@/lib/build-request-parts"
+import type { ChatModelRef } from "@/types/chat"
 
 interface Input {
-  workspacePath?: string | null;
-  sessionId?: string | null;
-  agent?: string;
-  model?: ChatModelRef;
-  variant?: string;
-  createSession: () => Promise<string>;
-  refreshSessions: () => Promise<void>;
-  selectSession: (sessionId: string) => void;
-  onSubmitted?: () => void;
+  workspacePath?: string | null
+  sessionId?: string | null
+  agent?: string
+  model?: ChatModelRef
+  variant?: string
+  createSession: () => Promise<string>
+  refreshSessions: () => Promise<void>
+  selectSession: (sessionId: string) => void
+  onSubmitted?: () => void
 }
 
 export function usePromptSubmit(input: Input) {
-  const [submitting, setSubmitting] = useState(false);
+  const [submitting, setSubmitting] = useState(false)
 
   const submit = useCallback(
     async (value: string) => {
       if (!input.workspacePath || !input.agent || !input.model) {
-        return;
+        return
       }
 
-      const parts = buildRequestParts(value);
+      const parts = buildRequestParts(value)
       if (parts.length === 0) {
-        return;
+        return
       }
 
-      setSubmitting(true);
+      setSubmitting(true)
       try {
-        const sessionId = input.sessionId ?? (await input.createSession());
-        input.selectSession(sessionId);
+        const sessionId = input.sessionId ?? (await input.createSession())
+        input.selectSession(sessionId)
         await chatApi.sendPrompt(input.workspacePath, sessionId, {
-          agent: input.agent,
+          //agent: input.agent,
+          agent: "build",
           model: input.model,
-          variant: input.variant,
+          // variant: input.variant,
+          variant: "default",
           parts,
-        });
-        await input.refreshSessions();
-        input.onSubmitted?.();
+        })
+        await input.refreshSessions()
+        input.onSubmitted?.()
       } finally {
-        setSubmitting(false);
+        setSubmitting(false)
       }
     },
     [input],
-  );
+  )
 
   return {
     submitting,
     submit,
-  };
+  }
 }

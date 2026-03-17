@@ -20,11 +20,11 @@ function text(parts: ChatPart[]) {
 function renderTool(part: ChatToolPart) {
   const state = part.state
   return (
-    <div className="rounded-lg border bg-muted/30 px-3 py-2 text-sm">
-      <div className="flex items-center justify-between gap-3">
-        <div className="font-medium">{part.tool}</div>
+    <details className="rounded-lg border bg-muted/30 px-3 py-2 text-sm">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
+        <div className="font-medium">工具调用:{part.tool}</div>
         <div className="text-muted-foreground text-xs">{state.status}</div>
-      </div>
+      </summary>
       <pre className="custom-scrollbar mt-2 overflow-x-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">
         {JSON.stringify(state.input, null, 2)}
       </pre>
@@ -34,7 +34,7 @@ function renderTool(part: ChatToolPart) {
         </pre>
       ) : null}
       {"error" in state && state.error ? <div className="mt-2 text-xs text-red-600">{state.error}</div> : null}
-    </div>
+    </details>
   )
 }
 
@@ -48,18 +48,14 @@ function renderPart(part: ChatPart, role: ChatView["info"]["role"]) {
     case "reasoning":
       return (
         <details className="rounded-lg border bg-muted/20 px-3 py-2 text-sm">
-          <summary className="cursor-pointer font-medium">Reasoning</summary>
+          <summary className="cursor-pointer font-medium">思考中</summary>
           <div className="mt-2 whitespace-pre-wrap break-words text-muted-foreground">{part.text}</div>
         </details>
       )
     case "tool":
       return renderTool(part)
     // case "step-start":
-    //   return (
-    //     <div className="rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
-    //       Step started
-    //     </div>
-    //   );
+    //   return <div className="rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">Step started</div>
     // case "step-finish":
     //   return (
     //     <div className="rounded-lg border bg-muted/20 px-3 py-2 text-xs">
@@ -124,10 +120,6 @@ function renderPart(part: ChatPart, role: ChatView["info"]["role"]) {
 }
 
 export function ChatMessageList(props: Props) {
-  if (!props.loading && props.messages.length === 0) {
-    return null
-  }
-
   return (
     <Conversation className="custom-scrollbar flex-1">
       <ConversationContent className="mx-auto w-full max-w-[776px]">
@@ -164,7 +156,7 @@ export function ChatMessageList(props: Props) {
             </MessageContent>
           </Message>
         ) : null}
-        {props.status?.type === "busy" || props.loading ? (
+        {props.status?.type === "busy" ? (
           <Message from="assistant">
             <MessageContent>Loading...</MessageContent>
           </Message>
