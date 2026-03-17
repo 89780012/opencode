@@ -22,6 +22,9 @@ a.out
 target
 .scripts
 .direnv/
+packages/strategy-service/dist/
+packages/strategy-service/.cache/
+packages/strategy-service/internal/http/dist/www/
 
 # Local dev files
 opencode-dev
