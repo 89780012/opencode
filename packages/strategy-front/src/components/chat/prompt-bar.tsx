@@ -1,4 +1,3 @@
-import { Shield } from "lucide-react"
 import {
   PromptInput,
   PromptInputBody,
@@ -6,7 +5,6 @@ import {
   PromptInputSubmit,
   PromptInputTextarea,
 } from "@/components/ai-elements/prompt-input"
-import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { ComposerModel } from "@/hooks/use-chat-composer"
 

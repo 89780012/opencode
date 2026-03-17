@@ -2,10 +2,10 @@
 
 import { Command, MessageSquareText, PlugZap, Wrench } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
+import { HomeSidebarPanel } from "@/components/home/home-sidebar-panel";
 import { NavUser } from "@/components/nav-user";
 import { ProviderSidebarPanel } from "@/components/provider/provider-sidebar-panel";
 import { SystemSidebarPanel } from "@/components/system/system-sidebar-panel";
-import { LocalWorkspaceTab } from "@/components/workspace/local-workspace-tab";
 import {
   Sidebar,
   SidebarContent,
@@ -110,7 +110,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
 
       <Sidebar collapsible="none" className="flex-1">
         {home ? (
-          <LocalWorkspaceTab />
+          <HomeSidebarPanel />
         ) : provider ? (
           <ProviderSidebarPanel />
         ) : (

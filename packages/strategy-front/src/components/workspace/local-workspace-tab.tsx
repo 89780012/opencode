@@ -29,11 +29,15 @@ import {
 } from "@/store/workspace-view-slice";
 import type { LocalWorkspace } from "@/types/workspace";
 
+interface Props {
+  onPick?: () => void;
+}
+
 const pick = (workspace: LocalWorkspace, dispatch: ReturnType<typeof useAppDispatch>) => {
   dispatch(setSelectedWorkspace(workspace));
 };
 
-export function LocalWorkspaceTab() {
+export function LocalWorkspaceTab(props: Props) {
   const dispatch = useAppDispatch();
   const { loading, error, basePath, workspaces, refresh } = useLocalWorkspaces();
   const selectedPath = useAppSelector(
@@ -61,6 +65,7 @@ export function LocalWorkspaceTab() {
   const onPick = (workspace: LocalWorkspace) => {
     pick(workspace, dispatch);
     setOpenOpen(false);
+    props.onPick?.();
   };
 
   const onRefresh = async () => {
@@ -80,6 +85,7 @@ export function LocalWorkspaceTab() {
       const data = await workspaceApi.createWorkspace(value);
       await refresh();
       pick(data.workspace, dispatch);
+      props.onPick?.();
       dispatch(refreshSelectedWorkspace());
       setCreateOpen(false);
       setName("");
