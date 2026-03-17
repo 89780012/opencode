@@ -3,6 +3,8 @@ import type {
   CreateWorkspaceRequest,
   CreateWorkspaceResponse,
   LocalWorkspaceResponse,
+  OpenWorkspaceRequest,
+  OpenWorkspaceResponse,
   WorkspaceFileContentResponse,
   WorkspaceFilesResponse,
 } from "@/types/workspace";
@@ -16,6 +18,13 @@ export const workspaceApi = {
     return request.post<CreateWorkspaceResponse, CreateWorkspaceRequest>(
       "/workspace/create",
       { name },
+    );
+  },
+
+  openWorkspace(path: string) {
+    return request.post<OpenWorkspaceResponse, OpenWorkspaceRequest>(
+      "/workspace/open",
+      { path },
     );
   },
 

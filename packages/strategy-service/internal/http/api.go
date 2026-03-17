@@ -31,6 +31,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/health", a.health)
 	mux.HandleFunc("/api/workspace/list", a.workspaceList)
 	mux.HandleFunc("/api/workspace/create", a.workspaceCreate)
+	mux.HandleFunc("/api/workspace/open", a.workspaceOpen)
 	mux.HandleFunc("/api/workspace/files", a.workspaceFiles)
 	mux.HandleFunc("/api/workspace/file-content", a.workspaceFileContent)
 	mux.HandleFunc("/api/system/tools", a.tools)
@@ -97,6 +98,30 @@ func (a *API) workspaceCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data, err := a.ws.Create(body.Name)
+	if err != nil {
+		write(w, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+
+	write(w, http.StatusOK, "ok", data)
+}
+
+func (a *API) workspaceOpen(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
+		return
+	}
+
+	body := struct {
+		Path string `json:"path"`
+	}{}
+	err := readJSON(r, &body)
+	if err != nil {
+		write(w, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+
+	data, err := a.ws.Open(body.Path)
 	if err != nil {
 		write(w, http.StatusBadRequest, err.Error(), nil)
 		return

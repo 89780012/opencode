@@ -71,6 +71,12 @@ function hasPermissionPromptRules(permission: Config["permission"]) {
   });
 }
 
+function rank(name: string) {
+  if (name === "build") return 0;
+  if (name === "plan") return 1;
+  return 2;
+}
+
 export function useChatComposer(workspacePath?: string | null, sessionID?: string | null) {
   const [ags, setAgs] = useState<Agent[]>([]);
   const [prv, setPrv] = useState<List>({
@@ -113,7 +119,11 @@ export function useChatComposer(workspacePath?: string | null, sessionID?: strin
         if (dead) return;
 
         const list = agent.filter((item) => item.mode === "primary" && !item.hidden);
-        const pref = list.filter((item) => item.name === "build" || item.name === "plan");
+        const ags = [...list].sort((a, b) => {
+          const diff = rank(a.name) - rank(b.name);
+          if (diff !== 0) return diff;
+          return a.name.localeCompare(b.name);
+        });
         const ids = new Set(provider.connected);
         const allRows = provider.all
           .filter((item) => ids.has(item.id))
@@ -133,7 +143,7 @@ export function useChatComposer(workspacePath?: string | null, sessionID?: strin
           }),
         );
 
-        setAgs(pref.length > 0 ? pref : list);
+        setAgs(ags);
         setPrv(provider);
         setAllRows(allRows);
         setRows(next);

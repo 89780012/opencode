@@ -16,6 +16,11 @@ type CreateResult struct {
 	Workspace Local  `json:"workspace"`
 }
 
+type OpenResult struct {
+	BasePath  string `json:"base_path"`
+	Workspace Local  `json:"workspace"`
+}
+
 type File struct {
 	Path string `json:"path"`
 }

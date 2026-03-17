@@ -18,6 +18,15 @@ export interface CreateWorkspaceResponse {
   workspace: LocalWorkspace;
 }
 
+export interface OpenWorkspaceRequest {
+  path: string;
+}
+
+export interface OpenWorkspaceResponse {
+  base_path: string;
+  workspace: LocalWorkspace;
+}
+
 export interface WorkspaceFile {
   path: string;
 }

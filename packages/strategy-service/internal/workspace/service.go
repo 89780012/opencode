@@ -11,6 +11,14 @@ func NewService() *Service {
 	return &Service{}
 }
 
+func local(path string) Local {
+	return Local{
+		Name:     filepath.Base(path),
+		Path:     path,
+		Keywords: []string{},
+	}
+}
+
 func (s *Service) List() (ListResult, error) {
 	root, err := base()
 	if err != nil {
@@ -66,11 +74,40 @@ func (s *Service) Create(name string) (CreateResult, error) {
 
 	return CreateResult{
 		BasePath: root,
-		Workspace: Local{
-			Name:     name,
-			Path:     path,
-			Keywords: []string{},
-		},
+		Workspace: local(path),
+	}, nil
+}
+
+func (s *Service) Open(path string) (OpenResult, error) {
+	root, err := base()
+	if err != nil {
+		return OpenResult{}, err
+	}
+
+	dir, err := safe(root, path)
+	if err != nil {
+		return OpenResult{}, err
+	}
+	if filepath.Clean(dir) == filepath.Clean(root) {
+		return OpenResult{}, os.ErrNotExist
+	}
+
+	info, err := os.Stat(dir)
+	if err != nil {
+		return OpenResult{}, err
+	}
+	if !info.IsDir() {
+		return OpenResult{}, os.ErrInvalid
+	}
+
+	err = ensure(dir)
+	if err != nil {
+		return OpenResult{}, err
+	}
+
+	return OpenResult{
+		BasePath:  root,
+		Workspace: local(dir),
 	}, nil
 }
 

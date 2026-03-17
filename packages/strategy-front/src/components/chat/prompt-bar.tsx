@@ -37,7 +37,7 @@ export function PromptBar(props: Props) {
       </PromptInputBody>
       <PromptInputFooter className="items-end gap-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-          {/* <Select
+          <Select
             disabled={props.disabled || props.agents.length === 0}
             onValueChange={props.onAgent}
             value={props.agent ?? ""}
@@ -52,7 +52,7 @@ export function PromptBar(props: Props) {
                 </SelectItem>
               ))}
             </SelectContent>
-          </Select> */}
+          </Select>
           <Select
             disabled={props.disabled || props.models.length === 0}
             onValueChange={props.onModel}

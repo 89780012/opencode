@@ -34,8 +34,8 @@ export function usePromptSubmit(input: Input) {
         const sessionId = input.sessionId ?? (await input.createSession())
         input.selectSession(sessionId)
         await chatApi.sendPrompt(input.workspacePath, sessionId, {
-          //agent: input.agent,
-          agent: "build",
+          agent: input.agent,
+          //agent: "build",
           model: input.model,
           // variant: input.variant,
           variant: "default",
