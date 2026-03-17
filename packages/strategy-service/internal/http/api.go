@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 
+	"strategy-service/internal/opencode"
 	"strategy-service/internal/tool"
 	"strategy-service/internal/workspace"
 )
@@ -15,12 +16,14 @@ import (
 type API struct {
 	svc *tool.Service
 	ws  *workspace.Service
+	op  *opencode.Manager
 }
 
-func NewAPI(svc *tool.Service) *API {
+func NewAPI(svc *tool.Service, op *opencode.Manager) *API {
 	return &API{
 		svc: svc,
 		ws:  workspace.NewService(),
+		op:  op,
 	}
 }
 
@@ -33,20 +36,30 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/system/tools", a.tools)
 	mux.HandleFunc("/api/system/tools/", a.install)
 	mux.HandleFunc("/api/system/tasks/", a.task)
+	mux.HandleFunc("/api/system/opencode/status", a.opencodeStatus)
+	mux.HandleFunc("/api/system/opencode/logs", a.opencodeLogs)
+	mux.HandleFunc("/api/system/opencode/start", a.opencodeStart)
+	mux.HandleFunc("/api/system/opencode/restart", a.opencodeRestart)
+	mux.HandleFunc("/api/system/opencode/stop", a.opencodeStop)
 }
 
 func (a *API) health(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		write(w, http.StatusMethodNotAllowed, "不允许的方法", nil)
+		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
 		return
 	}
 
-	write(w, http.StatusOK, "ok", map[string]string{"status": "ok"})
+	state := a.op.State()
+	write(w, http.StatusOK, "ok", map[string]any{
+		"status":         "ok",
+		"opencode":       state,
+		"opencode_ready": state.Ready,
+	})
 }
 
 func (a *API) tools(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		write(w, http.StatusMethodNotAllowed, "不允许的方法", nil)
+		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
 		return
 	}
 
@@ -55,7 +68,7 @@ func (a *API) tools(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) workspaceList(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		write(w, http.StatusMethodNotAllowed, "不允许的方法", nil)
+		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
 		return
 	}
 
@@ -70,7 +83,7 @@ func (a *API) workspaceList(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) workspaceCreate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		write(w, http.StatusMethodNotAllowed, "不允许的方法", nil)
+		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
 		return
 	}
 
@@ -94,7 +107,7 @@ func (a *API) workspaceCreate(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) workspaceFiles(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		write(w, http.StatusMethodNotAllowed, "不允许的方法", nil)
+		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
 		return
 	}
 
@@ -109,7 +122,7 @@ func (a *API) workspaceFiles(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) workspaceFileContent(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		write(w, http.StatusMethodNotAllowed, "不允许的方法", nil)
+		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
 		return
 	}
 
@@ -127,19 +140,19 @@ func (a *API) workspaceFileContent(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) install(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		write(w, http.StatusMethodNotAllowed, "不允许的方法", nil)
+		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
 		return
 	}
 
 	id, ok := cut(r.URL.Path, "/api/system/tools/", "/install")
 	if !ok {
-		write(w, http.StatusNotFound, "未找到", nil)
+		write(w, http.StatusNotFound, "task not found", nil)
 		return
 	}
 
 	name, err := url.PathUnescape(id)
 	if err != nil {
-		write(w, http.StatusBadRequest, "无效的工具ID", nil)
+		write(w, http.StatusBadRequest, "invalid tool id", nil)
 		return
 	}
 
@@ -164,24 +177,87 @@ func (a *API) install(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) task(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		write(w, http.StatusMethodNotAllowed, "不允许的方法", nil)
+		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
 		return
 	}
 
 	id := strings.TrimPrefix(r.URL.Path, "/api/system/tasks/")
 	id, err := url.PathUnescape(id)
 	if err != nil || id == "" {
-		write(w, http.StatusBadRequest, "无效的任务ID", nil)
+		write(w, http.StatusBadRequest, "invalid task id", nil)
 		return
 	}
 
 	task, ok := a.svc.Get(id)
 	if !ok {
-		write(w, http.StatusNotFound, "任务未找到", nil)
+		write(w, http.StatusNotFound, "task not found", nil)
 		return
 	}
 
 	write(w, http.StatusOK, "ok", task)
+}
+
+func (a *API) opencodeStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
+		return
+	}
+
+	write(w, http.StatusOK, "ok", a.op.State())
+}
+
+func (a *API) opencodeLogs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
+		return
+	}
+
+	write(w, http.StatusOK, "ok", map[string]any{
+		"log": a.op.State().Log,
+	})
+}
+
+func (a *API) opencodeStart(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
+		return
+	}
+
+	if err := a.op.Ensure(r.Context()); err != nil {
+		write(w, http.StatusServiceUnavailable, err.Error(), a.op.State())
+		return
+	}
+
+	write(w, http.StatusOK, "ok", a.op.State())
+}
+
+func (a *API) opencodeRestart(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
+		return
+	}
+
+	if err := a.op.Restart(r.Context()); err != nil {
+		write(w, http.StatusServiceUnavailable, err.Error(), a.op.State())
+		return
+	}
+
+	write(w, http.StatusOK, "ok", a.op.State())
+}
+
+func (a *API) opencodeStop(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
+		return
+	}
+
+	err := a.op.Stop(r.Context())
+	if err != nil && !errors.Is(err, opencode.ErrExternal()) {
+		write(w, http.StatusServiceUnavailable, err.Error(), a.op.State())
+		return
+	}
+
+	write(w, http.StatusOK, "ok", a.op.State())
 }
 
 func cut(path string, pre string, suf string) (string, bool) {

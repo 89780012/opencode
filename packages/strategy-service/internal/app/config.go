@@ -1,36 +1,92 @@
 package app
 
-import "os"
+import (
+	"os"
+	"strconv"
+	"strings"
+	"time"
+)
 
 type Config struct {
-	Host string
-	Port string
-	Dist string
+	Host     string
+	Port     string
+	Dist     string
+	Opencode OpencodeConfig
+}
+
+type OpencodeConfig struct {
+	Enabled      bool
+	Startup      string
+	Bin          string
+	Host         string
+	Port         int
+	Cwd          string
+	StartTimeout time.Duration
 }
 
 func LoadConfig() Config {
-	host := os.Getenv("HOST")
-	if host == "" {
-		host = "127.0.0.1"
-	}
-
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "5000"
-	}
-
-	dist := os.Getenv("STRATEGY_FRONT_DIST")
-	if dist == "" {
-		dist = "../strategy-front/dist"
-	}
+	host := text("HOST", "127.0.0.1")
+	port := text("PORT", "5000")
+	dist := text("STRATEGY_FRONT_DIST", "../strategy-front/dist")
 
 	return Config{
 		Host: host,
 		Port: port,
 		Dist: dist,
+		Opencode: OpencodeConfig{
+			Enabled:      truth("STRATEGY_OPENCODE_ENABLED", true),
+			Startup:      text("STRATEGY_OPENCODE_STARTUP", "auto"),
+			Bin:          text("STRATEGY_OPENCODE_BIN", "opencode"),
+			Host:         text("STRATEGY_OPENCODE_HOST", "127.0.0.1"),
+			Port:         number("STRATEGY_OPENCODE_PORT", 4096),
+			Cwd:          text("STRATEGY_OPENCODE_CWD", ""),
+			StartTimeout: span("STRATEGY_OPENCODE_START_TIMEOUT", 30*time.Second),
+		},
 	}
 }
 
 func (c Config) Addr() string {
 	return c.Host + ":" + c.Port
+}
+
+func text(key string, fallback string) string {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+	return value
+}
+
+func truth(key string, fallback bool) bool {
+	value := strings.TrimSpace(strings.ToLower(os.Getenv(key)))
+	if value == "" {
+		return fallback
+	}
+	return value == "1" || value == "true" || value == "yes" || value == "on"
+}
+
+func number(key string, fallback int) int {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+
+	out, err := strconv.Atoi(value)
+	if err != nil || out <= 0 {
+		return fallback
+	}
+	return out
+}
+
+func span(key string, fallback time.Duration) time.Duration {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+
+	out, err := time.ParseDuration(value)
+	if err != nil || out <= 0 {
+		return fallback
+	}
+	return out
 }
