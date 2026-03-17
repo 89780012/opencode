@@ -17,7 +17,7 @@ export function LocalWorkspaceList(props: Props) {
   if (props.loading) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-        正在扫描本地策略目录...
+        扫描本地工作区中...
       </div>
     );
   }
@@ -28,7 +28,7 @@ export function LocalWorkspaceList(props: Props) {
         <p className="text-sm text-destructive">{props.error}</p>
         <Button variant="outline" size="sm" onClick={props.onRetry}>
           <RefreshCw className="size-4" />
-          重新加载
+          重试
         </Button>
       </div>
     );
@@ -37,7 +37,7 @@ export function LocalWorkspaceList(props: Props) {
   if (props.workspaces.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-1 px-4 text-center">
-        <p className="text-sm text-muted-foreground">未发现本地策略</p>
+        <p className="text-sm text-muted-foreground">未找到工作区</p>
         <p className="text-xs text-muted-foreground">{props.basePath || "-"}</p>
       </div>
     );
@@ -46,7 +46,7 @@ export function LocalWorkspaceList(props: Props) {
   return (
     <div className="custom-scrollbar flex h-full flex-col gap-2 overflow-x-hidden px-1">
       <p className="px-2 text-xs text-muted-foreground" title={props.basePath}>
-        扫描目录: {truncateString(props.basePath, 30)}
+        根目录: {truncateString(props.basePath, 30)}
       </p>
       {props.workspaces.map((workspace) => (
         <button

@@ -2,8 +2,10 @@ import { opencode } from "@/api/opencode";
 import type { Auth, AuthMap, Config, Grant, List } from "@/types/provider";
 
 export const providerApi = {
-  list() {
-    return opencode.get<List>("/provider");
+  list(directory?: string | null) {
+    return opencode.get<List>("/provider", {
+      params: directory ? { directory } : undefined,
+    });
   },
 
   auth() {
@@ -32,8 +34,11 @@ export const providerApi = {
     );
   },
 
-  config() {
-    return opencode.get<Config>("/global/config");
+  config(directory?: string | null) {
+    const url = directory ? "/config" : "/global/config";
+    return opencode.get<Config>(url, {
+      params: directory ? { directory } : undefined,
+    });
   },
 
   update(cfg: Partial<Config>) {

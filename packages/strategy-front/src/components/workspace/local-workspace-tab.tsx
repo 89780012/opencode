@@ -1,6 +1,7 @@
 import { FolderOpen, Plus, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { workspaceApi } from "@/api/modules/workspace";
 import { LocalWorkspaceList } from "@/components/workspace/local-workspace-list";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,12 +19,12 @@ import {
   SidebarGroupContent,
   SidebarHeader,
 } from "@/components/ui/sidebar";
-import { workspaceApi } from "@/api/modules/workspace";
 import { useAppDispatch } from "@/hooks/useAppDispatch";
 import { useAppSelector } from "@/hooks/useAppSelector";
 import { useLocalWorkspaces } from "@/hooks/use-local-workspaces";
 import {
   clearSelectedWorkspace,
+  refreshSelectedWorkspace,
   setSelectedWorkspace,
 } from "@/store/workspace-view-slice";
 import type { LocalWorkspace } from "@/types/workspace";
@@ -48,11 +49,13 @@ export function LocalWorkspaceTab() {
       return;
     }
 
-    const ok = workspaces.some((workspace) => workspace.path === selectedPath);
-    if (ok) {
+    const current = workspaces.find((workspace) => workspace.path === selectedPath);
+    if (!current) {
+      dispatch(clearSelectedWorkspace());
       return;
     }
-    dispatch(clearSelectedWorkspace());
+
+    dispatch(setSelectedWorkspace(current));
   }, [dispatch, selectedPath, workspaces]);
 
   const onPick = (workspace: LocalWorkspace) => {
@@ -60,21 +63,27 @@ export function LocalWorkspaceTab() {
     setOpenOpen(false);
   };
 
+  const onRefresh = async () => {
+    await refresh();
+    dispatch(refreshSelectedWorkspace());
+  };
+
   const onCreate = async () => {
-    const next = name.trim();
-    if (!next) {
-      toast.error("请输入工作区名称");
+    const value = name.trim();
+    if (!value) {
+      toast.error("工作区名称不能为空");
       return;
     }
 
     setBusy(true);
     try {
-      const data = await workspaceApi.createWorkspace(next);
+      const data = await workspaceApi.createWorkspace(value);
       await refresh();
       pick(data.workspace, dispatch);
+      dispatch(refreshSelectedWorkspace());
       setCreateOpen(false);
       setName("");
-      toast.success(`已创建工作区 ${data.workspace.name}`);
+      toast.success(`工作区已创建: ${data.workspace.name}`);
     } catch (err) {
       console.error("Failed to create workspace", err);
       toast.error("创建工作区失败");
@@ -101,7 +110,7 @@ export function LocalWorkspaceTab() {
           size="sm"
           className="justify-start"
           onClick={() => {
-            void refresh();
+            void onRefresh();
           }}
           disabled={loading}
         >
@@ -109,6 +118,7 @@ export function LocalWorkspaceTab() {
           {loading ? "刷新中..." : "刷新工作区"}
         </Button>
       </SidebarHeader>
+
       <SidebarContent className="overflow-hidden">
         <SidebarGroup className="h-full px-0">
           <SidebarGroupContent className="h-full overflow-hidden">
@@ -119,7 +129,7 @@ export function LocalWorkspaceTab() {
               workspaces={workspaces}
               selectedPath={selectedPath}
               onRetry={() => {
-                void refresh();
+                void onRefresh();
               }}
               onSelect={onPick}
             />
@@ -130,16 +140,16 @@ export function LocalWorkspaceTab() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>新建工作区</DialogTitle>
+            <DialogTitle>创建工作区</DialogTitle>
             <DialogDescription>
-              将在 {basePath || "~/.xtp-smart/plugins"} 下创建一个新文件夹，并立即打开它。
+              在 {basePath || "~/.xtp-smart/plugins"} 下创建一个空文件夹并打开它。
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
             <Input
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="输入工作区名称"
+              placeholder="工作区名称"
               onKeyDown={(event) => {
                 if (event.key !== "Enter") {
                   return;
@@ -148,9 +158,6 @@ export function LocalWorkspaceTab() {
                 void onCreate();
               }}
             />
-            <p className="text-xs text-muted-foreground">
-              建议使用简短目录名，例如 `my-strategy`。
-            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)}>
@@ -168,7 +175,7 @@ export function LocalWorkspaceTab() {
           <DialogHeader>
             <DialogTitle>打开文件夹</DialogTitle>
             <DialogDescription>
-              从 {basePath || "~/.xtp-smart/plugins"} 中选择一个已有工作区。
+              选择 {basePath || "~/.xtp-smart/plugins"} 下的现有工作区。
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-[420px] overflow-hidden rounded-md border">
@@ -179,7 +186,7 @@ export function LocalWorkspaceTab() {
               workspaces={workspaces}
               selectedPath={selectedPath}
               onRetry={() => {
-                void refresh();
+                void onRefresh();
               }}
               onSelect={onPick}
             />

@@ -19,6 +19,11 @@ export interface Model {
     input?: number;
     output: number;
   };
+  capabilities?: {
+    reasoning?: boolean;
+    toolcall?: boolean;
+    [key: string]: unknown;
+  };
   variants?: Record<string, Record<string, unknown>>;
   [key: string]: unknown;
 }
@@ -90,7 +95,15 @@ export interface ProviderCfg {
   [key: string]: unknown;
 }
 
+export type PermissionAction = "allow" | "ask" | "deny";
+
+export type PermissionCfg =
+  | PermissionAction
+  | Record<string, PermissionAction | Record<string, PermissionAction>>;
+
 export interface Config {
+  model?: string;
+  permission?: PermissionCfg;
   disabled_providers?: string[];
   enabled_providers?: string[];
   provider?: Record<string, ProviderCfg>;

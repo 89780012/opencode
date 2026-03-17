@@ -1,4 +1,4 @@
-﻿import { Bot, Boxes, PlugZap } from "lucide-react"
+﻿import { Bot, PlugZap } from "lucide-react"
 import { NavLink, useLocation } from "react-router-dom"
 import {
   SidebarContent,
@@ -76,3 +76,4 @@ export function ProviderSidebarPanel() {
     </>
   )
 }
+

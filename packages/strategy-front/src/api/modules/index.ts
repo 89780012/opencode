@@ -1,4 +1,8 @@
 export { settingsApi } from "@/api/modules/settings";
 export { providerApi } from "@/api/modules/provider";
+export { agentApi } from "@/api/modules/agent";
+export { questionApi } from "@/api/modules/question";
 export { systemApi } from "@/api/modules/system";
 export { workspaceApi } from "@/api/modules/workspace";
+export { chatApi } from "@/api/modules/chat";
+export { permissionApi } from "@/api/modules/permission";
