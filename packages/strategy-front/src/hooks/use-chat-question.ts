@@ -3,7 +3,7 @@ import { questionApi } from "@/api/modules";
 import { useAppDispatch } from "@/hooks/useAppDispatch";
 import { useAppSelector } from "@/hooks/useAppSelector";
 import { sessionQuestionRequest } from "@/lib/session-request-tree";
-import { applyWorkspaceEvent, setPendingQuestions } from "@/store/chat-session-slice";
+import { setPendingQuestions } from "@/store/chat-session-slice";
 import type { ChatQuestionAnswer } from "@/types/chat";
 
 export function useChatQuestion(workspacePath?: string | null, sessionID?: string | null) {
@@ -14,11 +14,17 @@ export function useChatQuestion(workspacePath?: string | null, sessionID?: strin
   );
   const reqs = useAppSelector((state) => state.chatSession.questions);
 
+  const pull = useCallback(async () => {
+    if (!workspacePath) return;
+    const data = await questionApi.list(workspacePath).catch(() => []);
+    dispatch(setPendingQuestions({ items: data }));
+  }, [dispatch, workspacePath]);
+
   useEffect(() => {
     if (!workspacePath) return;
     let dead = false;
     const run = async () => {
-      const data = await questionApi.list().catch(() => []);
+      const data = await questionApi.list(workspacePath).catch(() => []);
       if (dead) return;
       dispatch(setPendingQuestions({ items: data }));
     };
@@ -26,7 +32,7 @@ export function useChatQuestion(workspacePath?: string | null, sessionID?: strin
     return () => {
       dead = true;
     };
-  }, [dispatch, workspacePath, sessionID]);
+  }, [dispatch, workspacePath]);
 
   const req = useMemo(
     () => sessionQuestionRequest(sessions, reqs, sessionID),
@@ -37,46 +43,23 @@ export function useChatQuestion(workspacePath?: string | null, sessionID?: strin
     if (!req || !workspacePath || sending) return;
     setSending(true);
     try {
-      await questionApi.reply(req.id, answers);
-      dispatch(
-        applyWorkspaceEvent({
-          workspace: workspacePath,
-          event: {
-            type: "question.replied",
-            properties: {
-              sessionID: req.sessionID,
-              requestID: req.id,
-              answers,
-            },
-          },
-        }),
-      );
+      await questionApi.reply(workspacePath, req.id, answers);
+      await pull();
     } finally {
       setSending(false);
     }
-  }, [dispatch, req, sending, workspacePath]);
+  }, [pull, req, sending, workspacePath]);
 
   const reject = useCallback(async () => {
     if (!req || !workspacePath || sending) return;
     setSending(true);
     try {
-      await questionApi.reject(req.id);
-      dispatch(
-        applyWorkspaceEvent({
-          workspace: workspacePath,
-          event: {
-            type: "question.rejected",
-            properties: {
-              sessionID: req.sessionID,
-              requestID: req.id,
-            },
-          },
-        }),
-      );
+      await questionApi.reject(workspacePath, req.id);
+      await pull();
     } finally {
       setSending(false);
     }
-  }, [dispatch, req, sending, workspacePath]);
+  }, [pull, req, sending, workspacePath]);
 
   return {
     req,

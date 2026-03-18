@@ -83,7 +83,6 @@ export function WorkspaceEditorPane(props: Props) {
       console.error("failed to load workspace files", err)
       setPaths([])
       setFiles({})
-      setPick(null)
       setError("失败加载工作区文件")
     } finally {
       setLoading(false)
