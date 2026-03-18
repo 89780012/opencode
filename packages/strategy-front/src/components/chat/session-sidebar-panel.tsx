@@ -28,7 +28,6 @@ const fmt = new Intl.DateTimeFormat("zh-CN", {
 
 export function SessionSidebarPanel(props: Props) {
   const workspace = useAppSelector((state) => state.workspaceView.selectedWorkspace)
-  const version = useAppSelector((state) => state.workspaceView.version)
   const path = workspace?.path ?? null
   const { sessions, selectedSessionId, loading, refreshSessions, selectSession } = useChatSessions(path)
 
@@ -37,7 +36,7 @@ export function SessionSidebarPanel(props: Props) {
       return
     }
     void refreshSessions()
-  }, [path, refreshSessions, version])
+  }, [path, refreshSessions])
 
   return (
     <>

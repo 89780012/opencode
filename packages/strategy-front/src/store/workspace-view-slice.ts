@@ -3,32 +3,43 @@ import type { LocalWorkspace } from "@/types/workspace";
 
 interface WorkspaceViewState {
   selectedWorkspace: LocalWorkspace | null;
-  version: number;
 }
 
 const initialState: WorkspaceViewState = {
   selectedWorkspace: null,
-  version: 0,
 };
+
+const same = (a: LocalWorkspace | null, b: LocalWorkspace) => {
+  if (!a) {
+    return false
+  }
+  if (a.path !== b.path || a.name !== b.name) {
+    return false
+  }
+  if (a.keywords.length !== b.keywords.length) {
+    return false
+  }
+  return a.keywords.every((item, i) => item === b.keywords[i])
+}
 
 const workspaceViewSlice = createSlice({
   name: "workspaceView",
   initialState,
   reducers: {
     setSelectedWorkspace(state, action: PayloadAction<LocalWorkspace>) {
+      if (same(state.selectedWorkspace, action.payload)) {
+        return
+      }
       state.selectedWorkspace = action.payload;
-      state.version += 1;
     },
     clearSelectedWorkspace(state) {
+      if (!state.selectedWorkspace) {
+        return
+      }
       state.selectedWorkspace = null;
-      state.version += 1;
-    },
-    refreshSelectedWorkspace(state) {
-      state.version += 1;
     },
   },
 });
 
-export const { setSelectedWorkspace, clearSelectedWorkspace, refreshSelectedWorkspace } =
-  workspaceViewSlice.actions;
+export const { setSelectedWorkspace, clearSelectedWorkspace } = workspaceViewSlice.actions;
 export const workspaceViewReducer = workspaceViewSlice.reducer;

@@ -1,23 +1,19 @@
-import { FolderOpen, MessageSquareText } from "lucide-react";
-import { useState } from "react";
-import { SessionSidebarPanel } from "@/components/chat/session-sidebar-panel";
-import { SidebarHeader } from "@/components/ui/sidebar";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LocalWorkspaceTab } from "@/components/workspace/local-workspace-tab";
-import { useAppSelector } from "@/hooks/useAppSelector";
+import { FolderOpen, MessageSquareText } from "lucide-react"
+import { useState } from "react"
+import { SessionSidebarPanel } from "@/components/chat/session-sidebar-panel"
+import { SidebarHeader } from "@/components/ui/sidebar"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { LocalWorkspaceTab } from "@/components/workspace/local-workspace-tab"
+import { useAppSelector } from "@/hooks/useAppSelector"
 
-type Tab = "workspace" | "session";
+type Tab = "workspace" | "session"
 
 export function HomeSidebarPanel() {
-  const workspace = useAppSelector((state) => state.workspaceView.selectedWorkspace);
-  const [tab, setTab] = useState<Tab>(workspace ? "session" : "workspace");
+  const workspace = useAppSelector((state) => state.workspaceView.selectedWorkspace)
+  const [tab, setTab] = useState<Tab>(workspace ? "session" : "workspace")
 
   return (
-    <Tabs
-      value={tab}
-      onValueChange={(value) => setTab(value as Tab)}
-      className="flex h-full min-h-0 flex-col gap-0"
-    >
+    <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)} className="flex h-full min-h-0 flex-col gap-0">
       <SidebarHeader className="gap-3 border-b p-3">
         <div className="space-y-1">
           <div className="text-sm font-semibold">对话工作台</div>
@@ -44,5 +40,5 @@ export function HomeSidebarPanel() {
         <SessionSidebarPanel onWorkspace={() => setTab("workspace")} />
       </TabsContent>
     </Tabs>
-  );
+  )
 }

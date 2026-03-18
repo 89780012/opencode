@@ -17,7 +17,7 @@ import { SidebarContent, SidebarGroup, SidebarGroupContent, SidebarHeader } from
 import { useAppDispatch } from "@/hooks/useAppDispatch"
 import { useAppSelector } from "@/hooks/useAppSelector"
 import { useLocalWorkspaces } from "@/hooks/use-local-workspaces"
-import { clearSelectedWorkspace, refreshSelectedWorkspace, setSelectedWorkspace } from "@/store/workspace-view-slice"
+import { clearSelectedWorkspace, setSelectedWorkspace } from "@/store/workspace-view-slice"
 import type { LocalWorkspace } from "@/types/workspace"
 
 interface Props {
@@ -28,10 +28,21 @@ const pick = (workspace: LocalWorkspace, dispatch: ReturnType<typeof useAppDispa
   dispatch(setSelectedWorkspace(workspace))
 }
 
+const same = (a: LocalWorkspace, b: LocalWorkspace) => {
+  if (a.path !== b.path || a.name !== b.name) {
+    return false
+  }
+  if (a.keywords.length !== b.keywords.length) {
+    return false
+  }
+  return a.keywords.every((item, i) => item === b.keywords[i])
+}
+
 export function LocalWorkspaceTab(props: Props) {
   const dispatch = useAppDispatch()
-  const { loading, error, basePath, workspaces, refresh } = useLocalWorkspaces()
-  const selectedPath = useAppSelector((state) => state.workspaceView.selectedWorkspace?.path ?? null)
+  const { loading, loaded, error, basePath, workspaces, refresh } = useLocalWorkspaces()
+  const workspace = useAppSelector((state) => state.workspaceView.selectedWorkspace)
+  const selectedPath = workspace?.path ?? null
   const [createOpen, setCreateOpen] = useState(false)
   const [openOpen, setOpenOpen] = useState(false)
   const [name, setName] = useState("")
@@ -41,15 +52,21 @@ export function LocalWorkspaceTab(props: Props) {
     if (!selectedPath) {
       return
     }
+    if (!loaded) {
+      return
+    }
 
     const current = workspaces.find((workspace) => workspace.path === selectedPath)
     if (!current) {
       dispatch(clearSelectedWorkspace())
       return
     }
+    if (workspace && same(workspace, current)) {
+      return
+    }
 
     dispatch(setSelectedWorkspace(current))
-  }, [dispatch, selectedPath, workspaces])
+  }, [dispatch, loaded, selectedPath, workspace, workspaces])
 
   const onPick = async (workspace: LocalWorkspace) => {
     try {
@@ -57,7 +74,6 @@ export function LocalWorkspaceTab(props: Props) {
       pick(data.workspace, dispatch)
       setOpenOpen(false)
       props.onPick?.()
-      dispatch(refreshSelectedWorkspace())
     } catch (err) {
       console.error("Failed to open workspace", err)
       toast.error("Failed to open workspace")
@@ -66,7 +82,6 @@ export function LocalWorkspaceTab(props: Props) {
 
   const onRefresh = async () => {
     await refresh()
-    dispatch(refreshSelectedWorkspace())
   }
 
   const onCreate = async () => {
@@ -83,7 +98,6 @@ export function LocalWorkspaceTab(props: Props) {
       await refresh()
       pick(next.workspace, dispatch)
       props.onPick?.()
-      dispatch(refreshSelectedWorkspace())
       setCreateOpen(false)
       setName("")
       toast.success(`工作区已创建: ${data.workspace.name}`)
