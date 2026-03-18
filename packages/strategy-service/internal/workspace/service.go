@@ -66,6 +66,12 @@ func (s *Service) Create(name string) (CreateResult, error) {
 		return CreateResult{}, err
 	}
 
+	err = seed(path)
+	if err != nil {
+		_ = os.RemoveAll(path)
+		return CreateResult{}, err
+	}
+
 	err = ensure(path)
 	if err != nil {
 		_ = os.RemoveAll(path)
@@ -73,7 +79,7 @@ func (s *Service) Create(name string) (CreateResult, error) {
 	}
 
 	return CreateResult{
-		BasePath: root,
+		BasePath:  root,
 		Workspace: local(path),
 	}, nil
 }

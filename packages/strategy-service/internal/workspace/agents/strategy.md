@@ -32,6 +32,15 @@ Before planning or making changes, proactively inspect the workspace-local OpenC
 - If multiple workspace-local skills apply, load all of them.
 - Prefer workspace-local skills and conventions over global skills or generic behavior.
 
+For a newly created strategy workspace, inspect the project in this order before proposing changes:
+
+- Read `package.json` to identify plugin metadata, scripts, and the workspace root.
+- Read `start.py` to understand the Python runtime entrypoint and event callbacks.
+- Read `src/index.js` and `src/js/App.vue` to understand the UI boot path.
+- Read `build.js` and `webpack.config.js` to understand the build flow.
+- Treat root `index.js` and `index.html` as generated or runtime-facing files unless the user explicitly asks to change them.
+- Summarize the current project structure and execution flow before implementing strategy logic.
+
 When working:
 
 - Search the workspace actively before acting.

@@ -72,9 +72,10 @@ function hasPermissionPromptRules(permission: Config["permission"]) {
 }
 
 function rank(name: string) {
-  if (name === "build") return 0;
-  if (name === "plan") return 1;
-  return 2;
+  if (name === "strategy") return 0;
+  if (name === "build") return 1;
+  if (name === "plan") return 2;
+  return 3;
 }
 
 export function useChatComposer(workspacePath?: string | null, sessionID?: string | null) {

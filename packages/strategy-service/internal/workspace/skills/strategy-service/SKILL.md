@@ -11,6 +11,24 @@ Use this skill when the user wants to write, modify, backtest, or review a tradi
 Treat strategy writing as a structured workflow, not a one-shot code generation task.
 Prefer existing project files, local conventions, and reusable components before creating new files.
 
+If this workspace was bootstrapped from the built-in `plugin_python` template, inspect the template in this order:
+
+- `package.json`: plugin metadata, build script, and workspace identity
+- `start.py`: Python strategy entrypoint and Smart callbacks
+- `src/index.js`: frontend boot path and Python launch hook
+- `src/js/App.vue`: default UI composition
+- `build.js` and `webpack.config.js`: packaging flow
+
+Treat root `index.js` and `index.html` as generated or runtime-facing outputs by default. Prefer editing source files under `src/` and the Python entrypoint unless the user explicitly asks to modify generated assets.
+
+When first entering a template-based workspace, summarize the project as:
+
+- plugin metadata and expected runtime
+- Python execution flow
+- frontend execution flow
+- build path
+- which files are source-of-truth versus generated output
+
 ## Core Rules
 
 1. Inspect the workspace first.
