@@ -68,12 +68,12 @@ const note = (file: WorkspaceFileContentResponse | null) => {
     return null
   }
   if (file.binary) {
-    return "Binary files are not previewable."
+    return "二进制文件不能预览."
   }
   if (file.reason === "too_large") {
-    return "This file is too large to preview."
+    return "预览文件太大."
   }
-  return "This file cannot be previewed."
+  return "这个文件不能预览."
 }
 
 export function WorkspaceCodeEditor(props: Props) {
@@ -100,7 +100,9 @@ export function WorkspaceCodeEditor(props: Props) {
 
   const text = note(props.file)
   if (text) {
-    return <div className="flex h-full items-center justify-center px-6 text-sm text-muted-foreground">{text}</div>
+    return (
+      <div className="flex flex-1 h-full items-center justify-center px-6 text-sm text-muted-foreground">{text}</div>
+    )
   }
 
   return (
