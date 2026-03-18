@@ -31,6 +31,71 @@ go run .
 When `../strategy-front/dist` exists, the service serves files from disk.
 If that directory is missing, it falls back to embedded assets copied into `internal/http/dist/www`.
 
+## Desktop Shell
+
+`strategy-service` now has a thin Wails desktop shell under `cmd/desktop`.
+
+The desktop app does not replace the HTTP service. It starts the same Go service on a local random
+loopback port, waits for `/api/health`, and then redirects the Wails webview to that local URL.
+This keeps the existing `/api`, `/opencode`, and SSE paths unchanged.
+On Windows the shell now hides child console windows for managed commands such as `opencode serve`
+and tool probing, so opening the desktop app should no longer flash a `cmd` window.
+
+Run the desktop shell from `packages/strategy-service/cmd/desktop`:
+
+```bash
+wails dev
+```
+
+Build the desktop shell with the repo script:
+
+```bash
+bun ./packages/strategy-service/script/build-desktop.ts
+```
+
+Wails desktop builds require the Wails CLI, `github.com/wailsapp/wails/v2`, and the native
+toolchain for the target OS. Unlike the pure Go service binary, desktop packaging is not a
+`CGO_ENABLED=0` cross-build flow.
+The build script first tries a local `wails` binary and falls back to
+`go run github.com/wailsapp/wails/v2/cmd/wails build`.
+When it falls back, it also runs `go get github.com/wailsapp/wails/v2/cmd/wails@v2.11.0`
+from `packages/strategy-service` so the required `go.sum` entries exist before build.
+
+Options:
+
+```bash
+bun ./packages/strategy-service/script/build-desktop.ts --skip-front
+bun ./packages/strategy-service/script/build-desktop.ts --clean
+```
+
+Any extra args are passed through to `wails build`.
+
+Output is copied to:
+
+```bash
+packages/strategy-service/dist/desktop/
+```
+
+Build everything in one command:
+
+```bash
+bun run package:strategy-service
+```
+
+This packages:
+
+- all cross-platform `strategy-service` CLI binaries under `packages/strategy-service/dist/`
+- the current host desktop bundle under `packages/strategy-service/dist/desktop/`
+
+Use `bun run package:strategy-service -- --clean` to clear old output first.
+
+The classic CLI flow still works:
+
+```bash
+cd packages/strategy-service
+go run .
+```
+
 ## Build Binaries
 
 Build all supported binaries with embedded frontend assets:

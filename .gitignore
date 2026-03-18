@@ -25,6 +25,7 @@ target
 packages/strategy-service/dist/
 packages/strategy-service/.cache/
 packages/strategy-service/internal/http/dist/www/
+packages/strategy-service/cmd/desktop/build/
 
 # Local dev files
 opencode-dev

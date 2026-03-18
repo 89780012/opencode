@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"strategy-service/internal/proc"
 )
 
 var errBusy = errors.New("installation is already running for this tool")
@@ -73,7 +75,9 @@ func (s *Service) exec(ctx context.Context, id string) {
 		})
 
 		sub, cancel := context.WithTimeout(ctx, 30*time.Minute)
-		out, err := exec.CommandContext(sub, item.cmd, item.args...).CombinedOutput()
+		cmd := exec.CommandContext(sub, item.cmd, item.args...)
+		proc.Hide(cmd)
+		out, err := cmd.CombinedOutput()
 		cancel()
 
 		body := tidy(string(out))

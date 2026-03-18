@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"time"
 
@@ -11,7 +12,14 @@ import (
 	"strategy-service/internal/tool"
 )
 
-func New(cfg Config) (*http.Server, error) {
+type Service struct {
+	cfg Config
+	srv *http.Server
+	op  *opencode.Manager
+	ip  *ipc.Manager
+}
+
+func New(cfg Config) (*Service, error) {
 	mux := http.NewServeMux()
 	op := opencode.New(opencode.Config(cfg.Opencode))
 	ip := ipc.New(ipc.Config{
@@ -35,16 +43,35 @@ func New(cfg Config) (*http.Server, error) {
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-	srv.RegisterOnShutdown(func() {
-		_ = ip.Stop(context.Background())
-		_ = op.Stop(context.Background())
-	})
-
 	if op.Enabled() && op.Startup() == "auto" {
 		go func() {
 			_ = op.Ensure(context.Background())
 		}()
 	}
 
-	return srv, nil
+	return &Service{
+		cfg: cfg,
+		srv: srv,
+		op:  op,
+		ip:  ip,
+	}, nil
+}
+
+func (s *Service) Addr() string {
+	return s.cfg.Addr()
+}
+
+func (s *Service) Serve(ln net.Listener) error {
+	return s.srv.Serve(ln)
+}
+
+func (s *Service) ListenAndServe() error {
+	return s.srv.ListenAndServe()
+}
+
+func (s *Service) Shutdown(ctx context.Context) error {
+	err := s.srv.Shutdown(ctx)
+	_ = s.ip.Stop(context.Background())
+	_ = s.op.Stop(context.Background())
+	return err
 }

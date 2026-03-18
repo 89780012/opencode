@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"strategy-service/internal/proc"
 )
 
 var errTool = errors.New("unsupported tool")
@@ -123,7 +125,9 @@ func (s *Service) version(ctx context.Context, id string) (string, error) {
 	sub, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	out, err := exec.CommandContext(sub, id, "--version").CombinedOutput()
+	cmd := exec.CommandContext(sub, id, "--version")
+	proc.Hide(cmd)
+	out, err := cmd.CombinedOutput()
 	text := strings.TrimSpace(string(out))
 	if err != nil {
 		if text == "" {

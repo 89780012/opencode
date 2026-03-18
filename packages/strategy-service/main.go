@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
 
 	"strategy-service/internal/app"
 )
@@ -15,6 +18,13 @@ func main() {
 	}
 
 	log.Printf("strategy-service listening on http://%s", cfg.Addr())
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt)
+	go func() {
+		<-stop
+		_ = srv.Shutdown(context.Background())
+	}()
 
 	err = srv.ListenAndServe()
 	if err == nil || err == http.ErrServerClosed {

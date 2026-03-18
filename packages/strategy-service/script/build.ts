@@ -5,13 +5,11 @@ import { createHash } from "crypto"
 import fs from "fs/promises"
 import path from "path"
 import { fileURLToPath } from "url"
+import { front } from "./front"
 
 const self = fileURLToPath(import.meta.url)
 const dir = path.dirname(self)
 const root = path.resolve(dir, "..")
-const repo = path.resolve(root, "..", "..")
-const front = path.join(repo, "packages", "strategy-front")
-const web = path.join(root, "internal", "http", "dist", "www")
 const out = path.join(root, "dist")
 const cache = path.join(root, ".cache", "go-build")
 const args = process.argv.slice(2)
@@ -41,15 +39,7 @@ if (!jobs.length) {
 
 console.log(`targets: ${jobs.map((item) => item.id).join(", ")}`)
 
-if (!skip) {
-  console.log("building strategy-front")
-  await $`bun run build`.cwd(front)
-}
-
-console.log("staging embedded frontend")
-await fs.rm(web, { force: true, recursive: true })
-await fs.mkdir(path.dirname(web), { recursive: true })
-await fs.cp(path.join(front, "dist"), web, { recursive: true })
+await front(root, skip)
 
 console.log("building strategy-service")
 if (clean) {

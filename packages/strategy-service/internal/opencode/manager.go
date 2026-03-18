@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"strategy-service/internal/proc"
 )
 
 var errDisabled = errors.New("opencode is disabled")
@@ -49,7 +51,8 @@ func New(cfg Config) *Manager {
 		cfg: cfg,
 		url: target,
 		client: &http.Client{
-			Timeout: 2 * time.Second,
+			Timeout:   2 * time.Second,
+			Transport: &http.Transport{Proxy: nil},
 		},
 		state: State{
 			Enabled: cfg.Enabled,
@@ -226,6 +229,7 @@ func (m *Manager) await(ctx context.Context, ch chan struct{}) error {
 
 func (m *Manager) spawn() error {
 	cmd := exec.Command(m.cfg.Bin, "serve", "--hostname", m.cfg.Host, "--port", fmt.Sprintf("%d", m.cfg.Port))
+	proc.Hide(cmd)
 	if m.cfg.Cwd != "" {
 		cmd.Dir = m.cfg.Cwd
 	}

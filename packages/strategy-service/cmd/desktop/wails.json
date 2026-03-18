@@ -1,0 +1,15 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "strategy-service-desktop",
+  "outputfilename": "strategy-service-desktop",
+  "frontend:dir": ".",
+  "frontend:install": "",
+  "frontend:build": "",
+  "frontend:dev:build": "",
+  "assetdir": "",
+  "build:dir": "build",
+  "info": {
+    "productName": "Strategy Service",
+    "comments": "Desktop shell for strategy-service"
+  }
+}
