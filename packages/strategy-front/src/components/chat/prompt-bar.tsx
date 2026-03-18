@@ -1,3 +1,4 @@
+import { useEffect } from "react"
 import {
   PromptInput,
   PromptInputBody,
@@ -30,6 +31,15 @@ interface Props {
 const item = "h-8 min-w-0 rounded-xl border bg-muted/20 px-2 text-xs shadow-none"
 
 export function PromptBar(props: Props) {
+  const first = props.models[0] ? `${props.models[0].provider.id}/${props.models[0].id}` : ""
+  const value = props.models.some((item) => `${item.provider.id}/${item.id}` === props.model) ? props.model ?? "" : first
+
+  useEffect(() => {
+    if (!value) return
+    if (props.model === value) return
+    props.onModel(value)
+  }, [props.model, props.onModel, value])
+
   return (
     <PromptInput onSubmit={(msg) => props.onSubmit(msg.text)} onValueChange={props.onValueChange} value={props.value}>
       <PromptInputBody>
@@ -56,7 +66,7 @@ export function PromptBar(props: Props) {
           <Select
             disabled={props.disabled || props.models.length === 0}
             onValueChange={props.onModel}
-            value={props.model ?? ""}
+            value={value}
           >
             <SelectTrigger className={`${item} max-w-[220px]`}>
               <SelectValue placeholder="选择模型" />
