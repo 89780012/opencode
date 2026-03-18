@@ -31,14 +31,17 @@ interface Props {
 const item = "h-8 min-w-0 rounded-xl border bg-muted/20 px-2 text-xs shadow-none"
 
 export function PromptBar(props: Props) {
-  const first = props.models[0] ? `${props.models[0].provider.id}/${props.models[0].id}` : ""
-  const value = props.models.some((item) => `${item.provider.id}/${item.id}` === props.model) ? props.model ?? "" : first
+  const model = props.model
+  const models = props.models
+  const onModel = props.onModel
+  const first = models[0] ? `${models[0].provider.id}/${models[0].id}` : ""
+  const pick = models.some((item) => `${item.provider.id}/${item.id}` === model) ? model ?? "" : first
 
   useEffect(() => {
-    if (!value) return
-    if (props.model === value) return
-    props.onModel(value)
-  }, [props.model, props.onModel, value])
+    if (!pick) return
+    if (model === pick) return
+    onModel(pick)
+  }, [model, onModel, pick])
 
   return (
     <PromptInput onSubmit={(msg) => props.onSubmit(msg.text)} onValueChange={props.onValueChange} value={props.value}>
@@ -64,15 +67,15 @@ export function PromptBar(props: Props) {
             </SelectContent>
           </Select>
           <Select
-            disabled={props.disabled || props.models.length === 0}
-            onValueChange={props.onModel}
-            value={value}
+            disabled={props.disabled || models.length === 0}
+            onValueChange={onModel}
+            value={pick}
           >
             <SelectTrigger className={`${item} max-w-[220px]`}>
               <SelectValue placeholder="选择模型" />
             </SelectTrigger>
             <SelectContent>
-              {props.models.map((item) => (
+              {models.map((item) => (
                 <SelectItem key={`${item.provider.id}/${item.id}`} value={`${item.provider.id}/${item.id}`}>
                   {item.name}
                 </SelectItem>
