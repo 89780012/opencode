@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { $ } from "bun"
+import { createHash } from "crypto"
 import fs from "fs/promises"
 import path from "path"
 import { fileURLToPath } from "url"
@@ -13,25 +14,37 @@ const front = path.join(repo, "packages", "strategy-front")
 const web = path.join(root, "internal", "http", "dist", "www")
 const out = path.join(root, "dist")
 const cache = path.join(root, ".cache", "go-build")
-const arg = process.argv.find((x) => x.startsWith("--target="))?.slice("--target=".length)
-const all = process.argv.includes("--all")
+const args = process.argv.slice(2)
+const want = args.find((x) => x.startsWith("--target="))?.slice("--target=".length)
+const list = args.includes("--list")
+const skip = args.includes("--skip-front")
+const clean = args.includes("--clean")
 
 const targets = [
-  {
-    id: "windows-x64",
-    goos: "windows",
-    goarch: "amd64",
-    ext: ".exe",
-  },
+  { id: "windows-x64", goos: "windows", goarch: "amd64", ext: ".exe" },
+  { id: "windows-arm64", goos: "windows", goarch: "arm64", ext: ".exe" },
+  { id: "linux-x64", goos: "linux", goarch: "amd64", ext: "" },
+  { id: "linux-arm64", goos: "linux", goarch: "arm64", ext: "" },
+  { id: "darwin-x64", goos: "darwin", goarch: "amd64", ext: "" },
+  { id: "darwin-arm64", goos: "darwin", goarch: "arm64", ext: "" },
 ]
 
-const list = all ? targets : arg ? targets.filter((item) => item.id === arg) : [targets[0]]
-if (!list.length) {
-  throw new Error(`unknown target: ${arg}`)
+if (list) {
+  console.log(targets.map((item) => `${item.id} (${item.goos}/${item.goarch})`).join("\n"))
+  process.exit(0)
 }
 
-console.log("building strategy-front")
-await $`bun run build`.cwd(front)
+const jobs = want ? targets.filter((item) => item.id === want) : targets
+if (!jobs.length) {
+  throw new Error(`unknown target: ${want}`)
+}
+
+console.log(`targets: ${jobs.map((item) => item.id).join(", ")}`)
+
+if (!skip) {
+  console.log("building strategy-front")
+  await $`bun run build`.cwd(front)
+}
 
 console.log("staging embedded frontend")
 await fs.rm(web, { force: true, recursive: true })
@@ -39,13 +52,20 @@ await fs.mkdir(path.dirname(web), { recursive: true })
 await fs.cp(path.join(front, "dist"), web, { recursive: true })
 
 console.log("building strategy-service")
-await fs.rm(out, { force: true, recursive: true })
+if (clean) {
+  await fs.rm(out, { force: true, recursive: true })
+}
 await fs.mkdir(out, { recursive: true })
 await fs.mkdir(cache, { recursive: true })
 
-for (const item of list) {
-  const bin = path.join(out, item.id, `strategy-service${item.ext}`)
-  await fs.mkdir(path.dirname(bin), { recursive: true })
+const sums = []
+const built = []
+
+for (const item of jobs) {
+  const dir = path.join(out, item.id)
+  const bin = path.join(dir, `strategy-service${item.ext}`)
+  await fs.rm(dir, { force: true, recursive: true })
+  await fs.mkdir(dir, { recursive: true })
   console.log(`go build ${item.id}`)
   await $`go build -o ${bin} .`.cwd(root).env({
     ...process.env,
@@ -54,6 +74,39 @@ for (const item of list) {
     GOARCH: item.goarch,
     GOOS: item.goos,
   })
+  const sum = await hash(bin)
+  await fs.writeFile(`${bin}.sha256`, `${sum}  ${path.basename(bin)}\n`)
+  sums.push(`${sum}  ${slash(path.relative(out, bin))}`)
+  built.push({
+    id: item.id,
+    goos: item.goos,
+    goarch: item.goarch,
+    path: slash(path.relative(root, bin)),
+    sha256: sum,
+  })
 }
 
+await fs.writeFile(path.join(out, "SHA256SUMS"), sums.join("\n") + "\n")
+await fs.writeFile(
+  path.join(out, "manifest.json"),
+  JSON.stringify(
+    {
+      built_at: new Date().toISOString(),
+      targets: built,
+    },
+    null,
+    2,
+  ) + "\n",
+)
+
 console.log("done")
+
+async function hash(file: string) {
+  return createHash("sha256")
+    .update(new Uint8Array(await Bun.file(file).arrayBuffer()))
+    .digest("hex")
+}
+
+function slash(file: string) {
+  return file.replaceAll("\\", "/")
+}

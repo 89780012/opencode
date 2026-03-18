@@ -1,6 +1,6 @@
 # strategy-service
 
-Windows-first Go service for `strategy-front`.
+Cross-platform Go service for `strategy-front`, with Windows-first install flows.
 
 ## What it does
 
@@ -29,21 +29,57 @@ go run .
 When `../strategy-front/dist` exists, the service serves files from disk.
 If that directory is missing, it falls back to embedded assets copied into `internal/http/dist/www`.
 
-## Build EXE
+## Build Binaries
 
-Build a Windows executable with embedded frontend assets:
+Build all supported binaries with embedded frontend assets:
 
 ```bash
 bun ./packages/strategy-service/script/build.ts
+```
+
+Targets:
+
+```bash
+windows-x64
+windows-arm64
+linux-x64
+linux-arm64
+darwin-x64
+darwin-arm64
 ```
 
 Output:
 
 ```bash
 packages/strategy-service/dist/windows-x64/strategy-service.exe
+packages/strategy-service/dist/windows-arm64/strategy-service.exe
+packages/strategy-service/dist/linux-x64/strategy-service
+packages/strategy-service/dist/linux-arm64/strategy-service
+packages/strategy-service/dist/darwin-x64/strategy-service
+packages/strategy-service/dist/darwin-arm64/strategy-service
+packages/strategy-service/dist/SHA256SUMS
+packages/strategy-service/dist/manifest.json
 ```
 
-The script currently builds `windows-x64` only, but the target matrix lives in `packages/strategy-service/script/build.ts` so more platforms can be added without changing the overall flow.
+Build one target only:
+
+```bash
+bun ./packages/strategy-service/script/build.ts --target=linux-x64
+```
+
+List targets:
+
+```bash
+bun ./packages/strategy-service/script/build.ts --list
+```
+
+Skip rebuilding the frontend and reuse the existing `packages/strategy-front/dist`:
+
+```bash
+bun ./packages/strategy-service/script/build.ts --target=windows-x64 --skip-front
+```
+
+Pass `--clean` to remove the full `dist` directory before building.
 
 ## Config
 
@@ -53,6 +89,7 @@ The script currently builds `windows-x64` only, but the target matrix lives in `
 
 ## Install strategy
 
+- Auto-install is still Windows-first. Cross-platform binaries can serve the UI and manage existing tools, but one-click install flows have not been generalized beyond the current package-manager strategy yet.
 - `node` and `npm`: prefer `winget`, then `scoop`, then `choco`
 - `opencode`: prefer `npm install -g opencode-ai`, then `scoop`, then `choco`
 
