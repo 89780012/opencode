@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 
+	"strategy-service/internal/ipc"
 	"strategy-service/internal/opencode"
 	"strategy-service/internal/tool"
 	"strategy-service/internal/workspace"
@@ -17,13 +18,15 @@ type API struct {
 	svc *tool.Service
 	ws  *workspace.Service
 	op  *opencode.Manager
+	ip  *ipc.Manager
 }
 
-func NewAPI(svc *tool.Service, op *opencode.Manager) *API {
+func NewAPI(svc *tool.Service, op *opencode.Manager, ip *ipc.Manager) *API {
 	return &API{
 		svc: svc,
 		ws:  workspace.NewService(),
 		op:  op,
+		ip:  ip,
 	}
 }
 
@@ -42,6 +45,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/system/opencode/start", a.opencodeStart)
 	mux.HandleFunc("/api/system/opencode/restart", a.opencodeRestart)
 	mux.HandleFunc("/api/system/opencode/stop", a.opencodeStop)
+	mux.HandleFunc("/api/system/ipc/status", a.ipcStatus)
 }
 
 func (a *API) health(w http.ResponseWriter, r *http.Request) {
@@ -283,6 +287,15 @@ func (a *API) opencodeStop(w http.ResponseWriter, r *http.Request) {
 	}
 
 	write(w, http.StatusOK, "ok", a.op.State())
+}
+
+func (a *API) ipcStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
+		return
+	}
+
+	write(w, http.StatusOK, "ok", a.ip.State())
 }
 
 func cut(path string, pre string, suf string) (string, bool) {

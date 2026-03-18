@@ -12,6 +12,7 @@ type Config struct {
 	Port     string
 	Dist     string
 	Opencode OpencodeConfig
+	IPC      IPCConfig
 }
 
 type OpencodeConfig struct {
@@ -22,6 +23,12 @@ type OpencodeConfig struct {
 	Port         int
 	Cwd          string
 	StartTimeout time.Duration
+}
+
+type IPCConfig struct {
+	Enabled bool
+	Product string
+	Version string
 }
 
 func LoadConfig() Config {
@@ -41,6 +48,11 @@ func LoadConfig() Config {
 			Port:         number("STRATEGY_OPENCODE_PORT", 4096),
 			Cwd:          text("STRATEGY_OPENCODE_CWD", ""),
 			StartTimeout: span("STRATEGY_OPENCODE_START_TIMEOUT", 30*time.Second),
+		},
+		IPC: IPCConfig{
+			Enabled: truth("STRATEGY_IPC_ENABLED", true),
+			Product: text("STRATEGY_IPC_PRODUCT", "IDE"),
+			Version: text("STRATEGY_IPC_VERSION", ""),
 		},
 	}
 }
