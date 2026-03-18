@@ -41,4 +41,9 @@ export interface WorkspaceFileContentResponse {
   workspace_path: string;
   path: string;
   content: string;
+  size: number;
+  previewable: boolean;
+  binary: boolean;
+  truncated: boolean;
+  reason?: string;
 }

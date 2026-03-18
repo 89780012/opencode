@@ -1,225 +1,117 @@
-import { useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { workspaceApi } from "@/api/modules/workspace";
-import { WorkspaceCodeEditor } from "@/components/workspace/workspace-code-editor";
-import { WorkspaceFileTree } from "@/components/workspace/workspace-file-tree";
-import type { LocalWorkspace } from "@/types/workspace";
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { RefreshCw } from "lucide-react"
+import { workspaceApi } from "@/api/modules/workspace"
+import { Button } from "@/components/ui/button"
+import { WorkspaceCodeEditor } from "@/components/workspace/workspace-code-editor"
+import { WorkspaceFileTree } from "@/components/workspace/workspace-file-tree"
+import type { LocalWorkspace, WorkspaceFileContentResponse } from "@/types/workspace"
 
-interface WorkspaceEditorPaneProps {
-  workspace: LocalWorkspace;
+interface Props {
+  workspace: LocalWorkspace
+  readonly?: boolean
 }
 
-export function WorkspaceEditorPane({ workspace }: WorkspaceEditorPaneProps) {
-  const [workspaceLoading, setWorkspaceLoading] = useState(false);
-  const [workspaceError, setWorkspaceError] = useState<string | null>(null);
-  const [filePaths, setFilePaths] = useState<string[]>([]);
-  const [originalFiles, setOriginalFiles] = useState<Record<string, string>>(
-    {},
-  );
-  const [draftFiles, setDraftFiles] = useState<Record<string, string>>({});
-  const [loadedFiles, setLoadedFiles] = useState<Record<string, true>>({});
-  const loadedFilesRef = useRef<Record<string, true>>({});
-  const [activeFilePath, setActiveFilePath] = useState<string | null>(null);
-  const [activeFileLoading, setActiveFileLoading] = useState(false);
-  const [activeFileError, setActiveFileError] = useState<string | null>(null);
-  const [compareMode, setCompareMode] = useState(false);
+export function WorkspaceEditorPane(props: Props) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [paths, setPaths] = useState<string[]>([])
+  const [files, setFiles] = useState<Record<string, WorkspaceFileContentResponse>>({})
+  const [pick, setPick] = useState<string | null>(null)
+  const [fileLoading, setFileLoading] = useState(false)
+  const [fileError, setFileError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    setFileError(null)
+
+    try {
+      const data = await workspaceApi.getWorkspaceFiles(props.workspace.path)
+      const next = (data.files ?? []).map((item) => item.path).sort()
+      setPaths(next)
+      setFiles({})
+      setPick(next[0] ?? null)
+    } catch (err) {
+      console.error("failed to load workspace files", err)
+      setPaths([])
+      setFiles({})
+      setPick(null)
+      setError("失败加载工作区文件")
+    } finally {
+      setLoading(false)
+    }
+  }, [props.workspace.path])
 
   useEffect(() => {
-    let cancelled = false;
+    void load()
+  }, [load])
 
-    const loadWorkspaceFiles = async () => {
-      setWorkspaceLoading(true);
-      setWorkspaceError(null);
-      setActiveFileError(null);
-      setCompareMode(false);
+  useEffect(() => {
+    if (!pick || files[pick]) {
+      setFileLoading(false)
+      setFileError(null)
+      return
+    }
+
+    let done = false
+
+    const read = async () => {
+      setFileLoading(true)
+      setFileError(null)
 
       try {
-        const data = await workspaceApi.getWorkspaceFiles(workspace.path);
-        if (cancelled) {
-          return;
+        const data = await workspaceApi.getWorkspaceFileContent(props.workspace.path, pick)
+        if (done) {
+          return
         }
 
-        const paths = (data.files ?? []).map((file) => file.path).sort();
-        const firstPath = paths[0] ?? null;
-
-        setFilePaths(paths);
-        setOriginalFiles({});
-        setDraftFiles({});
-        setLoadedFiles({});
-        loadedFilesRef.current = {};
-        setActiveFilePath(firstPath);
-      } catch (error) {
-        console.error("failed to load workspace files", error);
-        if (!cancelled) {
-          setFilePaths([]);
-          setOriginalFiles({});
-          setDraftFiles({});
-          setLoadedFiles({});
-          loadedFilesRef.current = {};
-          setActiveFilePath(null);
-          setWorkspaceError("Failed to load workspace files");
+        setFiles((prev) => ({
+          ...prev,
+          [pick]: data,
+        }))
+      } catch (err) {
+        console.error("failed to load workspace file content", err)
+        if (!done) {
+          setFileError("文件不支持预览.")
         }
       } finally {
-        if (!cancelled) {
-          setWorkspaceLoading(false);
+        if (!done) {
+          setFileLoading(false)
         }
       }
-    };
+    }
 
-    void loadWorkspaceFiles();
+    void read()
     return () => {
-      cancelled = true;
-    };
-  }, [workspace.path]);
-
-  useEffect(() => {
-    loadedFilesRef.current = loadedFiles;
-  }, [loadedFiles]);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!activeFilePath) {
-      setActiveFileLoading(false);
-      setActiveFileError(null);
-      return () => {
-        cancelled = true;
-      };
+      done = true
     }
+  }, [files, pick, props.workspace.path])
 
-    if (loadedFilesRef.current[activeFilePath]) {
-      setActiveFileLoading(false);
-      setActiveFileError(null);
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const currentPath = activeFilePath;
-    const loadFileContent = async () => {
-      setActiveFileLoading(true);
-      setActiveFileError(null);
-      try {
-        const data = await workspaceApi.getWorkspaceFileContent(
-          workspace.path,
-          currentPath,
-        );
-        if (cancelled) {
-          return;
-        }
-
-        setOriginalFiles((prev) => ({
-          ...prev,
-          [currentPath]: data.content ?? "",
-        }));
-        setDraftFiles((prev) => ({
-          ...prev,
-          [currentPath]: data.content ?? "",
-        }));
-        setLoadedFiles((prev) => ({
-          ...prev,
-          [currentPath]: true,
-        }));
-      } catch (error) {
-        console.info("failed to load workspace file content", error);
-        if (!cancelled) {
-          setActiveFileError("文件不支持预览");
-        }
-      } finally {
-        if (!cancelled) {
-          setActiveFileLoading(false);
-        }
-      }
-    };
-
-    void loadFileContent();
-    return () => {
-      cancelled = true;
-    };
-  }, [activeFilePath, workspace.path]);
-
-  const activeDraft = activeFilePath ? (draftFiles[activeFilePath] ?? "") : "";
-  const activeOriginal = activeFilePath
-    ? (originalFiles[activeFilePath] ?? "")
-    : "";
-  const activeChanged =
-    Boolean(activeFilePath) && activeDraft !== activeOriginal;
-
-  const handleRestoreActiveFile = () => {
-    if (!activeFilePath) {
-      return;
-    }
-
-    const originalValue = originalFiles[activeFilePath] ?? "";
-    setDraftFiles((prev) => {
-      if (prev[activeFilePath] === originalValue) {
-        return prev;
-      }
-      return {
-        ...prev,
-        [activeFilePath]: originalValue,
-      };
-    });
-  };
+  const file = useMemo(() => (pick ? (files[pick] ?? null) : null), [files, pick])
 
   return (
-    <div className="h-full w-full min-w-0 border-r bg-background">
-      <div className="flex h-full min-h-0 min-w-0 flex-col">
-        <div className="flex items-center justify-between gap-2 border-b px-4 py-2 text-xs text-muted-foreground">
-          <span className="truncate" title={workspace.path}>
-            {workspace.path}
-          </span>
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant={compareMode ? "secondary" : "outline"}
-              disabled={!activeFilePath}
-              onClick={() => setCompareMode((prev) => !prev)}
-            >
-              {compareMode ? "退出差异比对" : "差异比对"}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={!activeFilePath || !activeChanged}
-              onClick={handleRestoreActiveFile}
-            >
-              恢复
-            </Button>
-            {activeChanged ? (
-              <span className="text-[10px] text-amber-600">已修改</span>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="flex min-h-0 min-w-0 flex-1">
-          <WorkspaceFileTree
-            filePaths={filePaths}
-            draftFiles={draftFiles}
-            originalFiles={originalFiles}
-            activeFilePath={activeFilePath}
-            onSelectFile={setActiveFilePath}
-          />
-          <WorkspaceCodeEditor
-            loading={workspaceLoading || activeFileLoading}
-            error={workspaceError || activeFileError}
-            activeFilePath={activeFilePath}
-            compareMode={compareMode}
-            draftFiles={draftFiles}
-            originalFiles={originalFiles}
-            onContentChange={(path, content) => {
-              setDraftFiles((prev) => {
-                if (prev[path] === content) {
-                  return prev;
-                }
-                return {
-                  ...prev,
-                  [path]: content,
-                };
-              });
-            }}
-          />
+    <div className="flex h-full min-h-0 min-w-0 flex-col bg-background">
+      <div className="flex items-center justify-between gap-2 border-b px-4 py-2 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2">
+          {props.readonly ? (
+            <span className="rounded-md border px-2 py-1 text-[10px] uppercase tracking-[0.16em]">只读</span>
+          ) : null}
+          <Button size="sm" variant="outline" onClick={() => void load()} disabled={loading}>
+            <RefreshCw className="size-4" />
+            {loading ? "刷新中..." : "刷新"}
+          </Button>
         </div>
       </div>
+
+      <div className="flex min-h-0 min-w-0 flex-1">
+        <WorkspaceCodeEditor
+          loading={loading || fileLoading}
+          error={error || fileError}
+          activeFilePath={pick}
+          file={file}
+        />
+        <WorkspaceFileTree filePaths={paths} activeFilePath={pick} onSelectFile={setPick} />
+      </div>
     </div>
-  );
+  )
 }

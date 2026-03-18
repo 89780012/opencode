@@ -1,13 +1,29 @@
 package workspace
 
 import (
+	"bytes"
 	"errors"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"unicode/utf8"
 )
+
+const (
+	limit = 256 * 1024
+	peek  = 8 * 1024
+)
+
+var skip = map[string]bool{
+	".git":         true,
+	"build":        true,
+	"coverage":     true,
+	"dist":         true,
+	"node_modules": true,
+}
 
 func base() (string, error) {
 	home, err := os.UserHomeDir()
@@ -88,6 +104,9 @@ func listFiles(root string) ([]File, error) {
 			return err
 		}
 		if d.IsDir() {
+			if path != root && skip[d.Name()] {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 
@@ -109,4 +128,58 @@ func listFiles(root string) ([]File, error) {
 	})
 
 	return files, nil
+}
+
+func read(path string) ([]byte, int64, bool, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, 0, false, err
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, 0, false, err
+	}
+	defer file.Close()
+
+	body, err := io.ReadAll(io.LimitReader(file, limit+1))
+	if err != nil {
+		return nil, info.Size(), false, err
+	}
+
+	if int64(len(body)) > limit {
+		return body[:limit], info.Size(), true, nil
+	}
+
+	return body, info.Size(), info.Size() > limit, nil
+}
+
+func text(body []byte) bool {
+	if len(body) == 0 {
+		return true
+	}
+	if bytes.IndexByte(body, 0) >= 0 {
+		return false
+	}
+
+	head := body
+	if len(head) > peek {
+		head = head[:peek]
+	}
+	if utf8.Valid(head) {
+		return true
+	}
+
+	var hit int
+	for _, ch := range head {
+		if ch == '\n' || ch == '\r' || ch == '\t' {
+			hit++
+			continue
+		}
+		if ch >= 0x20 && ch <= 0x7e {
+			hit++
+		}
+	}
+
+	return float64(hit)/float64(len(head)) >= 0.9
 }

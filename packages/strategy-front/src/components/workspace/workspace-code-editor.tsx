@@ -1,186 +1,129 @@
-import { useCallback, useEffect, useRef } from "react";
-import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
-import {
-  DiffEditor,
-  Editor,
-  loader,
-  type MonacoDiffEditor,
-} from "@monaco-editor/react";
-import "monaco-editor/esm/vs/basic-languages/html/html.contribution";
-import "monaco-editor/esm/vs/basic-languages/python/python.contribution";
-import "monaco-editor/esm/vs/basic-languages/shell/shell.contribution";
+import * as monaco from "monaco-editor/esm/vs/editor/editor.api"
+import { Editor, loader } from "@monaco-editor/react"
+import "monaco-editor/esm/vs/basic-languages/html/html.contribution"
+import "monaco-editor/esm/vs/basic-languages/python/python.contribution"
+import "monaco-editor/esm/vs/basic-languages/shell/shell.contribution"
+import { Skeleton } from "@/components/ui/skeleton"
+import type { WorkspaceFileContentResponse } from "@/types/workspace"
 
-loader.config({ monaco });
+loader.config({ monaco })
 
-interface WorkspaceCodeEditorProps {
-  loading: boolean;
-  error: string | null;
-  activeFilePath: string | null;
-  compareMode: boolean;
-  draftFiles: Record<string, string>;
-  originalFiles: Record<string, string>;
-  onContentChange: (path: string, content: string) => void;
+interface Props {
+  loading: boolean
+  error: string | null
+  activeFilePath: string | null
+  file: WorkspaceFileContentResponse | null
 }
 
-const detectLanguage = (path: string | null) => {
+const language = (path: string | null) => {
   if (!path) {
-    return "plaintext";
+    return "plaintext"
   }
 
-  const normalizedPath = path.toLowerCase();
-  const filename = normalizedPath.split("/").pop() ?? "";
-  if (filename === "dockerfile") {
-    return "dockerfile";
+  const file = path.toLowerCase().split("/").pop() ?? ""
+  if (file === "dockerfile") {
+    return "dockerfile"
   }
 
-  const ext = filename.split(".").pop()?.toLowerCase();
-  switch (ext) {
+  switch (file.split(".").pop()?.toLowerCase()) {
     case "ts":
     case "tsx":
-      return "typescript";
+      return "typescript"
     case "js":
     case "jsx":
-      return "javascript";
+      return "javascript"
     case "json":
-      return "json";
+      return "json"
     case "py":
     case "pyw":
     case "pyi":
-      return "python";
+      return "python"
     case "vue":
-      return "html";
+      return "html"
     case "md":
-      return "markdown";
+      return "markdown"
     case "yml":
     case "yaml":
-      return "yaml";
+      return "yaml"
     case "css":
-      return "css";
+      return "css"
     case "html":
-      return "html";
+      return "html"
     case "xml":
-      return "xml";
+      return "xml"
     case "sql":
-      return "sql";
+      return "sql"
     case "sh":
     case "bash":
     case "zsh":
     case "ps1":
-      return "shell";
+      return "shell"
     default:
-      return "plaintext";
+      return "plaintext"
   }
-};
+}
 
-export function WorkspaceCodeEditor({
-  loading,
-  error,
-  activeFilePath,
-  compareMode,
-  draftFiles,
-  originalFiles,
-  onContentChange,
-}: WorkspaceCodeEditorProps) {
-  const diffSubscriptionRef = useRef<{ dispose: () => void } | null>(null);
-  const activeFilePathRef = useRef<string | null>(null);
+const note = (file: WorkspaceFileContentResponse | null) => {
+  if (!file || file.previewable) {
+    return null
+  }
+  if (file.binary) {
+    return "Binary files are not previewable."
+  }
+  if (file.reason === "too_large") {
+    return "This file is too large to preview."
+  }
+  return "This file cannot be previewed."
+}
 
-  useEffect(() => {
-    activeFilePathRef.current = activeFilePath;
-  }, [activeFilePath]);
+export function WorkspaceCodeEditor(props: Props) {
+  if (props.loading) {
+    return (
+      <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col gap-3 p-4">
+        <Skeleton className="h-4 w-40" />
+        <Skeleton className="h-full w-full" />
+      </div>
+    )
+  }
 
-  const activeLanguage = detectLanguage(activeFilePath);
-  const activeDraft = activeFilePath ? (draftFiles[activeFilePath] ?? "") : "";
-  const activeOriginal = activeFilePath
-    ? (originalFiles[activeFilePath] ?? "")
-    : "";
+  if (props.error) {
+    return <div className="flex h-full items-center justify-center px-6 text-sm text-destructive">{props.error}</div>
+  }
 
-  const handleEditorChange = (value: string | undefined) => {
-    if (!activeFilePath) {
-      return;
-    }
+  if (!props.activeFilePath) {
+    return (
+      <div className="flex h-full items-center justify-center px-6 text-sm text-muted-foreground">
+        在这个工作区内没有有效文件可以预览。
+      </div>
+    )
+  }
 
-    onContentChange(activeFilePath, value ?? "");
-  };
-
-  const handleDiffMount = useCallback(
-    (editor: MonacoDiffEditor) => {
-      diffSubscriptionRef.current?.dispose();
-      const modifiedEditor = editor.getModifiedEditor();
-      diffSubscriptionRef.current = modifiedEditor.onDidChangeModelContent(
-        () => {
-          const currentPath = activeFilePathRef.current;
-          if (!currentPath) {
-            return;
-          }
-
-          onContentChange(currentPath, modifiedEditor.getValue());
-        },
-      );
-    },
-    [onContentChange],
-  );
-
-  useEffect(() => {
-    if (!compareMode) {
-      diffSubscriptionRef.current?.dispose();
-      diffSubscriptionRef.current = null;
-    }
-  }, [compareMode]);
-
-  useEffect(() => {
-    return () => {
-      diffSubscriptionRef.current?.dispose();
-      diffSubscriptionRef.current = null;
-    };
-  }, []);
+  const text = note(props.file)
+  if (text) {
+    return <div className="flex h-full items-center justify-center px-6 text-sm text-muted-foreground">{text}</div>
+  }
 
   return (
-    <div className="min-h-0 min-w-0 flex-1">
-      {loading ? (
-        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-          工作空间加载中...
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      {props.file?.truncated ? (
+        <div className="border-b bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          This preview was truncated because the file is large.
         </div>
-      ) : error ? (
-        <div className="flex h-full items-center justify-center px-6 text-sm text-destructive">
-          {error}
-        </div>
-      ) : !activeFilePath ? (
-        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-          工作空间内没有有效文件
-        </div>
-      ) : compareMode ? (
-        <DiffEditor
-          height="100%"
-          original={activeOriginal}
-          modified={activeDraft}
-          language={activeLanguage}
-          onMount={handleDiffMount}
-          options={{
-            automaticLayout: true,
-            minimap: { enabled: false },
-            originalEditable: false,
-            readOnly: false,
-            renderSideBySide: true,
-            wordWrap: "off",
-            scrollBeyondLastColumn: 5,
-          }}
-        />
-      ) : (
-        <Editor
-          height="100%"
-          width="100%"
-          path={activeFilePath}
-          value={activeDraft}
-          language={activeLanguage}
-          onChange={handleEditorChange}
-          options={{
-            automaticLayout: true,
-            minimap: { enabled: false },
-            wordWrap: "off",
-            scrollBeyondLastColumn: 5,
-          }}
-        />
-      )}
+      ) : null}
+      <Editor
+        height="100%"
+        width="100%"
+        path={props.activeFilePath}
+        value={props.file?.content ?? ""}
+        language={language(props.activeFilePath)}
+        options={{
+          automaticLayout: true,
+          minimap: { enabled: false },
+          readOnly: true,
+          wordWrap: "off",
+          scrollBeyondLastColumn: 5,
+        }}
+      />
     </div>
-  );
+  )
 }

@@ -3,6 +3,7 @@ package workspace
 import (
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type Service struct{}
@@ -166,7 +167,7 @@ func (s *Service) Content(path string, file string) (FileContentResult, error) {
 		return FileContentResult{}, err
 	}
 
-	body, err := os.ReadFile(target)
+	body, size, cut, err := read(target)
 	if err != nil {
 		return FileContentResult{}, err
 	}
@@ -176,9 +177,23 @@ func (s *Service) Content(path string, file string) (FileContentResult, error) {
 		return FileContentResult{}, err
 	}
 
+	if !text(body) {
+		return FileContentResult{
+			WorkspacePath: dir,
+			Path:          filepath.ToSlash(rel),
+			Size:          size,
+			Previewable:   false,
+			Binary:        true,
+			Reason:        "binary",
+		}, nil
+	}
+
 	return FileContentResult{
 		WorkspacePath: dir,
 		Path:          filepath.ToSlash(rel),
-		Content:       string(body),
+		Content:       strings.ToValidUTF8(string(body), ""),
+		Size:          size,
+		Previewable:   true,
+		Truncated:     cut,
 	}, nil
 }

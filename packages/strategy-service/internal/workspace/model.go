@@ -35,4 +35,9 @@ type FileContentResult struct {
 	WorkspacePath string `json:"workspace_path"`
 	Path          string `json:"path"`
 	Content       string `json:"content"`
+	Size          int64  `json:"size"`
+	Previewable   bool   `json:"previewable"`
+	Binary        bool   `json:"binary"`
+	Truncated     bool   `json:"truncated"`
+	Reason        string `json:"reason,omitempty"`
 }
