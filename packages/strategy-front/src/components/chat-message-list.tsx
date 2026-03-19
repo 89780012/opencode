@@ -1,3 +1,4 @@
+import { memo } from "react"
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation"
 import { Message, MessageContent } from "@/components/ai-elements/message"
 import { Response } from "@/components/ai-elements/response"
@@ -8,6 +9,7 @@ interface Props {
   status?: ChatStatus
   err?: string
   loading?: boolean
+  hasCache?: boolean
 }
 
 function text(parts: ChatPart[]) {
@@ -119,9 +121,9 @@ function renderPart(part: ChatPart, role: ChatView["info"]["role"]) {
   }
 }
 
-export function ChatMessageList(props: Props) {
+export const ChatMessageList = memo(function ChatMessageList(props: Props) {
   return (
-    <Conversation className="custom-scrollbar flex-1">
+    <Conversation className="custom-scrollbar flex-1" initial={props.hasCache ? "instant" : "smooth"}>
       <ConversationContent className="mx-auto w-full max-w-[776px]">
         {props.messages.map((message) => {
           const body =
@@ -172,4 +174,4 @@ export function ChatMessageList(props: Props) {
       <ConversationScrollButton />
     </Conversation>
   )
-}
+})

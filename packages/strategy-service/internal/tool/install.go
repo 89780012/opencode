@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os/exec"
 	"strings"
 	"time"
@@ -24,6 +25,7 @@ type step struct {
 
 func (s *Service) Install(ctx context.Context, id string) (Task, error) {
 	if !known(id) {
+		slog.Warn("tool install: unknown tool", "tool", id)
 		return Task{}, errTool
 	}
 
@@ -38,6 +40,7 @@ func (s *Service) Install(ctx context.Context, id string) (Task, error) {
 	s.mu.Lock()
 	if s.run[id] != "" {
 		s.mu.Unlock()
+		slog.Warn("tool install: already running", "tool", id)
 		return Task{}, errBusy
 	}
 	s.tasks[task.ID] = task
@@ -45,6 +48,7 @@ func (s *Service) Install(ctx context.Context, id string) (Task, error) {
 	s.run[id] = task.ID
 	s.mu.Unlock()
 
+	slog.Info("tool install task created", "tool", id, "task_id", task.ID)
 	go s.exec(ctx, task.ID)
 
 	return cloneTask(task), nil
@@ -58,17 +62,22 @@ func (s *Service) exec(ctx context.Context, id string) {
 
 	task, ok := s.Get(id)
 	if !ok {
+		slog.Error("tool exec: task not found", "task_id", id)
 		return
 	}
 
+	slog.Info("tool install exec started", "tool", task.Tool, "task_id", id)
+
 	steps, err := s.steps(task.Tool)
 	if err != nil {
+		slog.Error("tool install: no steps found", "tool", task.Tool, "error", err)
 		s.fail(id, nil, err.Error(), "")
 		return
 	}
 
-	for _, item := range steps {
+	for i, item := range steps {
 		text := item.cmd + " " + strings.Join(item.args, " ")
+		slog.Info("tool install: running step", "tool", task.Tool, "step", i+1, "command", strings.TrimSpace(text))
 		s.set(id, func(task *Task) {
 			task.Log = push(task.Log, "run: "+strings.TrimSpace(text))
 			task.Output = "running " + item.cmd
@@ -95,9 +104,12 @@ func (s *Service) exec(ctx context.Context, id string) {
 			if body != "" {
 				msg = body
 			}
+			slog.Error("tool install: step failed", "tool", task.Tool, "step", i+1, "error", msg)
 			s.fail(id, code, msg, body)
 			return
 		}
+
+		slog.Info("tool install: step completed", "tool", task.Tool, "step", i+1)
 	}
 
 	state := s.inspect(context.Background(), task.Tool)
@@ -106,10 +118,12 @@ func (s *Service) exec(ctx context.Context, id string) {
 		if msg == "" {
 			msg = "install command finished but tool health check failed"
 		}
+		slog.Error("tool install: post-install check failed", "tool", task.Tool, "message", msg)
 		s.fail(id, nil, msg, "")
 		return
 	}
 
+	slog.Info("tool install completed", "tool", task.Tool, "version", state.Version)
 	s.done(id, state)
 }
 

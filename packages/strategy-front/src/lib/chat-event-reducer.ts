@@ -58,10 +58,27 @@ function add(part: ChatPart, field: string, delta: string) {
   }
 }
 
+function arraysShallowEqual<T extends { id: string }>(a: T[], b: T[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i] && a[i].id !== b[i].id) return false;
+  }
+  return true;
+}
+
 export function hydrateChat(state: ChatStateShape, sessionID: string, list: ChatMessageRecord[]) {
-  state.messages[sessionID] = sortMsg(list.map((item) => item.info));
+  const nextMessages = sortMsg(list.map((item) => item.info));
+  const prevMessages = state.messages[sessionID];
+  if (!prevMessages || !arraysShallowEqual(prevMessages, nextMessages)) {
+    state.messages[sessionID] = nextMessages;
+  }
+
   list.forEach((item) => {
-    state.parts[item.info.id] = sortPart(item.parts);
+    const nextParts = sortPart(item.parts);
+    const prevParts = state.parts[item.info.id];
+    if (!prevParts || !arraysShallowEqual(prevParts, nextParts)) {
+      state.parts[item.info.id] = nextParts;
+    }
     if (item.info.role !== "assistant") return;
     const err = msgErr(item.info.error);
     if (!err) return;

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -91,6 +92,7 @@ func (m *Manager) State() State {
 
 func (m *Manager) Ensure(ctx context.Context) error {
 	if !m.cfg.Enabled {
+		slog.Warn("opencode ensure called but disabled")
 		m.fail("disabled", errDisabled)
 		return errDisabled
 	}
@@ -100,23 +102,29 @@ func (m *Manager) Ensure(ctx context.Context) error {
 		owned := m.cmd != nil || m.state.Owned
 		m.mu.RUnlock()
 		if owned {
+			slog.Debug("opencode already running (owned)")
 			m.live()
 			return nil
 		}
+		slog.Info("opencode detected as external process")
 		m.external()
 		return nil
 	}
 
 	ch, ok := m.begin()
 	if !ok {
+		slog.Debug("opencode start already in progress, waiting")
 		return m.await(ctx, ch)
 	}
 
+	slog.Info("starting opencode process", "bin", m.cfg.Bin, "host", m.cfg.Host, "port", m.cfg.Port)
 	if err := m.spawn(); err != nil {
 		if ping := m.health(ctx); ping == nil {
+			slog.Info("opencode spawn failed but process is reachable externally")
 			m.external()
 			return nil
 		}
+		slog.Error("opencode spawn failed", "error", err)
 		m.fail("failed to start opencode", err)
 		m.done()
 		return err
@@ -124,25 +132,30 @@ func (m *Manager) Ensure(ctx context.Context) error {
 
 	err := m.ready(ctx)
 	if err != nil {
+		slog.Error("opencode did not become ready", "error", err, "timeout", m.cfg.StartTimeout)
 		_ = m.Stop(context.Background())
 		m.fail("opencode did not become ready", err)
 		m.done()
 		return err
 	}
 
+	slog.Info("opencode is ready")
 	m.live()
 	m.done()
 	return nil
 }
 
 func (m *Manager) Restart(ctx context.Context) error {
+	slog.Info("restarting opencode")
 	if err := m.Stop(ctx); err != nil && !errors.Is(err, errExternal) {
+		slog.Error("opencode stop failed during restart", "error", err)
 		return err
 	}
 	return m.Ensure(ctx)
 }
 
 func (m *Manager) Stop(context.Context) error {
+	slog.Info("stopping opencode")
 	m.mu.Lock()
 	cmd := m.cmd
 	owned := m.state.Owned
@@ -150,6 +163,7 @@ func (m *Manager) Stop(context.Context) error {
 	if cmd == nil {
 		m.mu.Unlock()
 		if !owned && m.healthy() {
+			slog.Info("opencode is external, cannot stop")
 			return errExternal
 		}
 		m.mu.Lock()
@@ -164,6 +178,7 @@ func (m *Manager) Stop(context.Context) error {
 		}
 		m.state.Message = ""
 		m.mu.Unlock()
+		slog.Info("opencode stopped (no process)")
 		return nil
 	}
 
@@ -176,6 +191,7 @@ func (m *Manager) Stop(context.Context) error {
 		return nil
 	}
 
+	slog.Info("killing opencode process", "pid", cmd.Process.Pid)
 	return cmd.Process.Kill()
 }
 
@@ -228,6 +244,7 @@ func (m *Manager) await(ctx context.Context, ch chan struct{}) error {
 }
 
 func (m *Manager) spawn() error {
+	slog.Info("spawning opencode", "bin", m.cfg.Bin, "host", m.cfg.Host, "port", m.cfg.Port, "cwd", m.cfg.Cwd)
 	cmd := exec.Command(m.cfg.Bin, "serve", "--hostname", m.cfg.Host, "--port", fmt.Sprintf("%d", m.cfg.Port))
 	proc.Hide(cmd)
 	if m.cfg.Cwd != "" {
@@ -237,15 +254,18 @@ func (m *Manager) spawn() error {
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
+		slog.Error("opencode stdout pipe failed", "error", err)
 		return err
 	}
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
+		slog.Error("opencode stderr pipe failed", "error", err)
 		return err
 	}
 
 	if err := cmd.Start(); err != nil {
+		slog.Error("opencode start failed", "error", err)
 		return err
 	}
 
@@ -256,6 +276,8 @@ func (m *Manager) spawn() error {
 	m.state.PID = cmd.Process.Pid
 	m.state.StartedAt = &now
 	m.mu.Unlock()
+
+	slog.Info("opencode process started", "pid", cmd.Process.Pid)
 
 	go m.scan(stdout)
 	go m.scan(stderr)
@@ -333,20 +355,24 @@ func (m *Manager) fail(msg string, err error) {
 func (m *Manager) watch(cmd *exec.Cmd) {
 	err := cmd.Wait()
 	if err == nil {
+		slog.Info("opencode process exited normally", "pid", cmd.Process.Pid)
 		m.close(cmd, "stopped", "", nil)
 		return
 	}
 
 	if errors.Is(err, os.ErrProcessDone) {
+		slog.Info("opencode process already done", "pid", cmd.Process.Pid)
 		m.close(cmd, "stopped", "", nil)
 		return
 	}
 
 	if exit, ok := err.(*exec.ExitError); ok {
+		slog.Error("opencode process exited with error", "pid", cmd.Process.Pid, "exit_code", exit.ExitCode(), "error", exit.Error())
 		m.close(cmd, "failed", strings.TrimSpace(exit.Error()), err)
 		return
 	}
 
+	slog.Error("opencode process exited unexpectedly", "pid", cmd.Process.Pid, "error", err)
 	m.close(cmd, "failed", "opencode exited unexpectedly", err)
 }
 

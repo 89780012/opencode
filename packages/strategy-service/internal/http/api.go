@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -55,6 +56,7 @@ func (a *API) health(w http.ResponseWriter, r *http.Request) {
 	}
 
 	state := a.op.State()
+	slog.Debug("health check", "opencode_ready", state.Ready, "opencode_status", state.Status)
 	write(w, http.StatusOK, "ok", map[string]any{
 		"status":         "ok",
 		"opencode":       state,
@@ -68,6 +70,7 @@ func (a *API) tools(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	slog.Debug("tools list request")
 	write(w, http.StatusOK, "ok", a.svc.List(r.Context()))
 }
 
@@ -77,12 +80,15 @@ func (a *API) workspaceList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	slog.Debug("workspace list request")
 	data, err := a.ws.List()
 	if err != nil {
+		slog.Error("workspace list failed", "error", err)
 		write(w, http.StatusBadRequest, err.Error(), nil)
 		return
 	}
 
+	slog.Info("workspace list", "count", len(data.Workspaces))
 	write(w, http.StatusOK, "ok", data)
 }
 
@@ -97,16 +103,20 @@ func (a *API) workspaceCreate(w http.ResponseWriter, r *http.Request) {
 	}{}
 	err := readJSON(r, &body)
 	if err != nil {
+		slog.Warn("workspace create bad request", "error", err)
 		write(w, http.StatusBadRequest, err.Error(), nil)
 		return
 	}
 
+	slog.Info("workspace create", "name", body.Name)
 	data, err := a.ws.Create(body.Name)
 	if err != nil {
+		slog.Error("workspace create failed", "name", body.Name, "error", err)
 		write(w, http.StatusBadRequest, err.Error(), nil)
 		return
 	}
 
+	slog.Info("workspace created", "name", body.Name, "path", data.Workspace.Path)
 	write(w, http.StatusOK, "ok", data)
 }
 
@@ -121,12 +131,15 @@ func (a *API) workspaceOpen(w http.ResponseWriter, r *http.Request) {
 	}{}
 	err := readJSON(r, &body)
 	if err != nil {
+		slog.Warn("workspace open bad request", "error", err)
 		write(w, http.StatusBadRequest, err.Error(), nil)
 		return
 	}
 
+	slog.Info("workspace open", "path", body.Path)
 	data, err := a.ws.Open(body.Path)
 	if err != nil {
+		slog.Error("workspace open failed", "path", body.Path, "error", err)
 		write(w, http.StatusBadRequest, err.Error(), nil)
 		return
 	}
@@ -140,12 +153,16 @@ func (a *API) workspaceFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data, err := a.ws.Files(r.URL.Query().Get("workspace_path"))
+	wsPath := r.URL.Query().Get("workspace_path")
+	slog.Debug("workspace files request", "workspace_path", wsPath)
+	data, err := a.ws.Files(wsPath)
 	if err != nil {
+		slog.Error("workspace files failed", "workspace_path", wsPath, "error", err)
 		write(w, http.StatusBadRequest, err.Error(), nil)
 		return
 	}
 
+	slog.Debug("workspace files", "workspace_path", wsPath, "total", data.TotalFiles)
 	write(w, http.StatusOK, "ok", data)
 }
 
@@ -155,15 +172,17 @@ func (a *API) workspaceFileContent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data, err := a.ws.Content(
-		r.URL.Query().Get("workspace_path"),
-		r.URL.Query().Get("file_path"),
-	)
+	wsPath := r.URL.Query().Get("workspace_path")
+	filePath := r.URL.Query().Get("file_path")
+	slog.Debug("workspace file-content request", "workspace_path", wsPath, "file_path", filePath)
+	data, err := a.ws.Content(wsPath, filePath)
 	if err != nil {
+		slog.Error("workspace file-content failed", "workspace_path", wsPath, "file_path", filePath, "error", err)
 		write(w, http.StatusBadRequest, err.Error(), nil)
 		return
 	}
 
+	slog.Debug("workspace file-content", "file_path", filePath, "size", data.Size, "binary", data.Binary)
 	write(w, http.StatusOK, "ok", data)
 }
 
@@ -185,22 +204,27 @@ func (a *API) install(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	slog.Info("tool install request", "tool", name)
 	task, err := a.svc.Install(context.Background(), name)
 	if err == nil {
+		slog.Info("tool install started", "tool", name, "task_id", task.ID)
 		write(w, http.StatusOK, "ok", task)
 		return
 	}
 
 	if errors.Is(err, tool.ErrBusy()) {
+		slog.Warn("tool install busy", "tool", name)
 		write(w, http.StatusConflict, err.Error(), nil)
 		return
 	}
 
 	if errors.Is(err, tool.ErrTool()) {
+		slog.Warn("tool install unsupported", "tool", name)
 		write(w, http.StatusBadRequest, err.Error(), nil)
 		return
 	}
 
+	slog.Error("tool install failed", "tool", name, "error", err)
 	write(w, http.StatusBadRequest, err.Error(), nil)
 }
 
@@ -219,6 +243,7 @@ func (a *API) task(w http.ResponseWriter, r *http.Request) {
 
 	task, ok := a.svc.Get(id)
 	if !ok {
+		slog.Debug("task not found", "task_id", id)
 		write(w, http.StatusNotFound, "task not found", nil)
 		return
 	}
@@ -252,11 +277,14 @@ func (a *API) opencodeStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	slog.Info("opencode start request via API")
 	if err := a.op.Ensure(r.Context()); err != nil {
+		slog.Error("opencode start failed via API", "error", err)
 		write(w, http.StatusServiceUnavailable, err.Error(), a.op.State())
 		return
 	}
 
+	slog.Info("opencode started via API")
 	write(w, http.StatusOK, "ok", a.op.State())
 }
 
@@ -266,11 +294,14 @@ func (a *API) opencodeRestart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	slog.Info("opencode restart request via API")
 	if err := a.op.Restart(r.Context()); err != nil {
+		slog.Error("opencode restart failed via API", "error", err)
 		write(w, http.StatusServiceUnavailable, err.Error(), a.op.State())
 		return
 	}
 
+	slog.Info("opencode restarted via API")
 	write(w, http.StatusOK, "ok", a.op.State())
 }
 
@@ -280,12 +311,15 @@ func (a *API) opencodeStop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	slog.Info("opencode stop request via API")
 	err := a.op.Stop(r.Context())
 	if err != nil && !errors.Is(err, opencode.ErrExternal()) {
+		slog.Error("opencode stop failed via API", "error", err)
 		write(w, http.StatusServiceUnavailable, err.Error(), a.op.State())
 		return
 	}
 
+	slog.Info("opencode stopped via API")
 	write(w, http.StatusOK, "ok", a.op.State())
 }
 

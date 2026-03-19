@@ -3,6 +3,7 @@ package tool
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"os/exec"
 	"strings"
 	"sync"
@@ -94,6 +95,7 @@ func (s *Service) inspect(ctx context.Context, id string) State {
 	}
 
 	if !known(id) {
+		slog.Warn("tool inspect: unknown tool", "tool", id)
 		state.Status = StatusFailed
 		state.Message = errTool.Error()
 		return state
@@ -101,6 +103,7 @@ func (s *Service) inspect(ctx context.Context, id string) State {
 
 	path, err := exec.LookPath(id)
 	if err != nil {
+		slog.Debug("tool not found in PATH", "tool", id)
 		state.Status = StatusMissing
 		state.Message = "command not found"
 		return state
@@ -111,11 +114,13 @@ func (s *Service) inspect(ctx context.Context, id string) State {
 
 	out, err := s.version(ctx, id)
 	if err != nil {
+		slog.Warn("tool version check failed", "tool", id, "error", err)
 		state.Status = StatusFailed
 		state.Message = err.Error()
 		return state
 	}
 
+	slog.Debug("tool inspected", "tool", id, "version", out, "path", path)
 	state.Status = StatusInstalled
 	state.Version = out
 	return state

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(go get gopkg.in/natefinch/lumberjack.v2)",
+      "Bash(go build ./...)"
+    ]
+  }
+}

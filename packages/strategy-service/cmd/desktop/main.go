@@ -4,6 +4,9 @@ import (
 	"embed"
 	"io/fs"
 	"log"
+	"log/slog"
+
+	"strategy-service/internal/logger"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -14,8 +17,16 @@ import (
 var raw embed.FS
 
 func main() {
+	if err := logger.Init(); err != nil {
+		log.Fatal(err)
+	}
+	defer logger.Shutdown()
+
+	slog.Info("desktop app starting")
+
 	ui, err := fs.Sub(raw, "boot")
 	if err != nil {
+		slog.Error("failed to load boot assets", "error", err)
 		log.Fatal(err)
 	}
 
@@ -32,6 +43,8 @@ func main() {
 		OnShutdown:  app.shutdown,
 	})
 	if err != nil {
+		slog.Error("wails app exited with error", "error", err)
 		log.Fatal(err)
 	}
+	slog.Info("desktop app stopped")
 }

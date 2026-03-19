@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net"
 	"os"
 	"strings"
@@ -41,33 +42,41 @@ func New(cfg Config) *Manager {
 
 func (m *Manager) Start(context.Context) error {
 	if !m.cfg.Enabled {
+		slog.Info("ipc disabled, skipping start")
 		return nil
 	}
 
 	m.mu.Lock()
 	if m.smart != nil || m.cont != nil {
 		m.mu.Unlock()
+		slog.Debug("ipc already started")
 		return nil
 	}
 	m.mu.Unlock()
 
 	smartID, err := handle(m.cfg.Product, "IDESmartXServer", m.cfg.Version)
 	if err != nil {
+		slog.Error("ipc smart handle failed", "error", err)
 		return err
 	}
 
 	contID, err := handle(m.cfg.Product, "IDEContinueServer", m.cfg.Version)
 	if err != nil {
+		slog.Error("ipc continue handle failed", "error", err)
 		return err
 	}
 
+	slog.Info("ipc listening", "smart_handle", smartID, "continue_handle", contID)
+
 	smart, err := listen(smartID)
 	if err != nil {
+		slog.Error("ipc smart listen failed", "handle", smartID, "error", err)
 		return err
 	}
 
 	cont, err := listen(contID)
 	if err != nil {
+		slog.Error("ipc continue listen failed", "handle", contID, "error", err)
 		_ = smart.Close()
 		return err
 	}
@@ -82,10 +91,12 @@ func (m *Manager) Start(context.Context) error {
 	m.wg.Add(2)
 	go m.serveSmart(smart)
 	go m.serveCont(cont)
+	slog.Info("ipc started successfully")
 	return nil
 }
 
 func (m *Manager) Stop(ctx context.Context) error {
+	slog.Info("stopping ipc manager")
 	m.mu.Lock()
 	smart := m.smart
 	cont := m.cont
@@ -108,8 +119,10 @@ func (m *Manager) Stop(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
+		slog.Warn("ipc stop timed out")
 		return ctx.Err()
 	case <-done:
+		slog.Info("ipc manager stopped")
 		return nil
 	}
 }
@@ -143,12 +156,15 @@ func (m *Manager) serveSmart(l net.Listener) {
 		conn, err := l.Accept()
 		if err != nil {
 			if closed(err) {
+				slog.Debug("ipc smart listener closed")
 				return
 			}
+			slog.Warn("ipc smart accept error", "error", err)
 			time.Sleep(50 * time.Millisecond)
 			continue
 		}
 
+		slog.Info("ipc smart connection accepted", "remote", conn.RemoteAddr())
 		m.wg.Add(1)
 		go m.smartLoop(conn)
 	}
@@ -161,12 +177,15 @@ func (m *Manager) serveCont(l net.Listener) {
 		conn, err := l.Accept()
 		if err != nil {
 			if closed(err) {
+				slog.Debug("ipc continue listener closed")
 				return
 			}
+			slog.Warn("ipc continue accept error", "error", err)
 			time.Sleep(50 * time.Millisecond)
 			continue
 		}
 
+		slog.Info("ipc continue connection accepted", "remote", conn.RemoteAddr())
 		m.wg.Add(1)
 		go m.contLoop(conn)
 	}
@@ -232,6 +251,7 @@ func (m *Manager) onSmart(conn net.Conn, text string) {
 
 	tag, body := split(text)
 	if tag != msgInfo && tag != msgLogout {
+		slog.Debug("ipc smart unknown tag", "tag", tag)
 		return
 	}
 	if strings.TrimSpace(body) == "" {
@@ -242,6 +262,7 @@ func (m *Manager) onSmart(conn net.Conn, text string) {
 		UserID string `json:"userId"`
 	}{}
 	if json.Unmarshal([]byte(body), &item) != nil || item.UserID == "" {
+		slog.Warn("ipc smart invalid payload", "tag", tag)
 		return
 	}
 
@@ -249,6 +270,7 @@ func (m *Manager) onSmart(conn net.Conn, text string) {
 	defer m.mu.Unlock()
 
 	if tag == msgInfo {
+		slog.Info("ipc smart user login", "user_id", item.UserID)
 		m.account[item.UserID] = Entry{
 			UserID: item.UserID,
 			Info:   json.RawMessage(body),
@@ -258,21 +280,26 @@ func (m *Manager) onSmart(conn net.Conn, text string) {
 		return
 	}
 
+	slog.Info("ipc smart user logout", "user_id", item.UserID)
 	delete(m.account, item.UserID)
 	m.cut(item.UserID)
 }
 
 func (m *Manager) onCont(conn net.Conn, text string) {
 	if text != msgQuery {
+		slog.Debug("ipc continue unknown message", "text", text)
 		return
 	}
 
+	slog.Debug("ipc continue query received")
 	reply := m.reply()
 	if reply == "" {
+		slog.Debug("ipc continue no reply available")
 		return
 	}
 
 	_, _ = conn.Write([]byte(reply))
+	slog.Debug("ipc continue reply sent")
 }
 
 func (m *Manager) reply() string {

@@ -22,12 +22,13 @@ export function useChatSessionDetail(
   );
   const [loading, setLoading] = useState(false);
 
+  const hasCache = messages.length > 0;
+
   const refresh = useCallback(async (target?: string | null) => {
     const id = target ?? sessionId;
     if (!workspacePath || !id) {
       return;
     }
-    setLoading(true);
     try {
       const data = await chatApi.getSessionMessages(workspacePath, id);
       dispatch(hydrateSessionMessages({ sessionId: id, records: data }));
@@ -40,8 +41,11 @@ export function useChatSessionDetail(
     if (!workspacePath || !sessionId) {
       return;
     }
+    if (!hasCache) {
+      setLoading(true);
+    }
     void refresh(sessionId);
-  }, [refresh, sessionId, workspacePath]);
+  }, [refresh, sessionId, workspacePath, hasCache]);
 
   const view = useMemo<ChatView[]>(
     () =>

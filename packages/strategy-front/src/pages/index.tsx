@@ -90,7 +90,7 @@ export default function Home() {
   const chat = (
     <div className="flex h-full min-h-0 min-w-0 w-full flex-col">
       <div className="relative flex min-h-0 flex-1">
-        <ChatMessageList err={err} messages={messages} loading={detail && !!selectedSessionId} status={status} />
+        <ChatMessageList err={err} messages={messages} loading={detail && !!selectedSessionId} status={status} hasCache={messages.length > 0} />
 
         {empty ? (
           <div className="absolute inset-0 flex items-center justify-center px-6">
