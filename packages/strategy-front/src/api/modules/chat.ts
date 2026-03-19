@@ -1,5 +1,5 @@
 import { opencode } from "@/api/opencode";
-import type { ChatMessageRecord, ChatPromptBody, ChatSessionSummary } from "@/types/chat";
+import type { ChatMessageRecord, ChatPromptBody, ChatSessionSummary, ChatTodo } from "@/types/chat";
 
 export const chatApi = {
   listSessions(workspacePath: string) {
@@ -21,6 +21,14 @@ export const chatApi = {
 
   getSessionMessages(workspacePath: string, sessionId: string) {
     return opencode.get<ChatMessageRecord[]>(`/session/${sessionId}/message`, {
+      params: {
+        directory: workspacePath,
+      },
+    });
+  },
+
+  getSessionTodos(workspacePath: string, sessionId: string) {
+    return opencode.get<ChatTodo[]>(`/session/${sessionId}/todo`, {
       params: {
         directory: workspacePath,
       },

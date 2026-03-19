@@ -8,6 +8,7 @@ import { ChatMessageList } from "@/components/chat-message-list"
 import { PermissionPanel } from "@/components/chat/permission-panel"
 import { PromptBar } from "@/components/chat/prompt-bar"
 import { QuestionPanel } from "@/components/chat/question-panel"
+import { TodoPanel } from "@/components/chat/todo-panel"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { useChatComposer } from "@/hooks/use-chat-composer"
@@ -16,6 +17,7 @@ import { useChatPermission } from "@/hooks/use-chat-permission"
 import { useChatQuestion } from "@/hooks/use-chat-question"
 import { useChatSessionDetail } from "@/hooks/use-chat-session-detail"
 import { useChatSessions } from "@/hooks/use-chat-sessions"
+import { useChatTodo } from "@/hooks/use-chat-todo"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { usePromptSubmit } from "@/hooks/use-prompt-submit"
 import { useAppSelector } from "@/hooks/useAppSelector"
@@ -48,6 +50,8 @@ export default function Home() {
     onSubmitted: () => setInput(""),
   })
   const busy = !!selectedSessionId && status.type !== "idle"
+  const live = busy || !!permission.req || !!question.req
+  const todo = useChatTodo(path, selectedSessionId, live)
   const empty = !selectedSessionId || (!detail && status.type !== "busy" && messages.length === 0)
 
   useEffect(() => {
@@ -145,6 +149,14 @@ export default function Home() {
               onReply={(answers) => {
                 void question.reply(answers)
               }}
+            />
+          ) : null}
+          {todo.visible ? (
+            <TodoPanel
+              key={selectedSessionId ?? "todo"}
+              todos={todo.todos}
+              collapsed={todo.collapsed}
+              preview={todo.preview}
             />
           ) : null}
           <PromptBar

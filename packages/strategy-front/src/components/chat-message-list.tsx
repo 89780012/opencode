@@ -1,8 +1,10 @@
 import { memo } from "react"
+import { CheckCircle2, Circle, ListTodo, LoaderCircle, MinusCircle } from "lucide-react"
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation"
 import { Message, MessageContent } from "@/components/ai-elements/message"
 import { Response } from "@/components/ai-elements/response"
-import type { ChatPart, ChatStatus, ChatToolPart, ChatView } from "@/types/chat"
+import { cn } from "@/lib/utils"
+import type { ChatPart, ChatStatus, ChatTodo, ChatToolPart, ChatToolState, ChatView } from "@/types/chat"
 
 interface Props {
   messages: ChatView[]
@@ -19,8 +21,88 @@ function text(parts: ChatPart[]) {
     .join("")
 }
 
+function todos(state: ChatToolState) {
+  if (!("metadata" in state)) return
+  const value = state.metadata?.todos
+  if (!Array.isArray(value)) return
+  return value.filter(
+    (item): item is ChatTodo =>
+      !!item &&
+      typeof item === "object" &&
+      "content" in item &&
+      "status" in item &&
+      typeof item.content === "string" &&
+      typeof item.status === "string",
+  )
+}
+
+function count(list?: ChatTodo[]) {
+  if (!list) return
+  return {
+    total: list.length,
+    active: list.filter((item) => item.status !== "completed" && item.status !== "cancelled").length,
+    done: list.filter((item) => item.status === "completed").length,
+  }
+}
+
+function todoIcon(status: string) {
+  if (status === "completed") return <CheckCircle2 className="size-4 text-emerald-600" />
+  if (status === "running") return <LoaderCircle className="size-4 animate-spin text-sky-600" />
+  if (status === "error") return <MinusCircle className="size-4 text-red-600" />
+  return <Circle className="size-4 text-muted-foreground" />
+}
+
+function todoText(tool: string, state: ChatToolState) {
+  const list = count(todos(state))
+  if (state.status === "pending") {
+    return tool === "todowrite" ? "Preparing todo update" : "Preparing todo read"
+  }
+  if (state.status === "running") {
+    return tool === "todowrite" ? "Updating todo list" : "Reading todo list"
+  }
+  if (state.status === "error") {
+    return tool === "todowrite" ? "Todo update failed" : "Todo read failed"
+  }
+  if (!list) {
+    return tool === "todowrite" ? "Todo list updated" : "Todo list loaded"
+  }
+  if (tool === "todowrite") {
+    return list.active > 0
+      ? `Todo list updated · ${list.active} active / ${list.total} total`
+      : `Todo list updated · ${list.done} done`
+  }
+  return list.active > 0
+    ? `Todo list loaded · ${list.active} active / ${list.total} total`
+    : `Todo list loaded · ${list.done} done`
+}
+
+function renderTodoTool(part: ChatToolPart) {
+  const state = part.state
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-2 rounded-xl border px-3 py-2 text-xs",
+        state.status === "error" ? "border-red-200 bg-red-50 text-red-700" : "bg-muted/20 text-muted-foreground",
+      )}
+    >
+      <div className="shrink-0">
+        {state.status === "completed" ? <ListTodo className="size-4 text-muted-foreground" /> : todoIcon(state.status)}
+      </div>
+      <div className="min-w-0 flex-1 truncate">
+        {todoText(part.tool, state)}
+      </div>
+      <div className="shrink-0 uppercase tracking-[0.08em] text-[10px]">
+        {state.status}
+      </div>
+    </div>
+  )
+}
+
 function renderTool(part: ChatToolPart) {
   const state = part.state
+  if (part.tool === "todowrite" || part.tool === "todoread") {
+    return renderTodoTool(part)
+  }
   return (
     <details className="rounded-lg border bg-muted/30 px-3 py-2 text-sm">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">

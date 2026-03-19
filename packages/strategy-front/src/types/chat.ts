@@ -65,6 +65,12 @@ export type ChatStatus =
       next: number;
     };
 
+export interface ChatTodo {
+  content: string;
+  status: "pending" | "in_progress" | "completed" | "cancelled" | string;
+  priority: "high" | "medium" | "low" | string;
+}
+
 export interface ChatError {
   name: string;
   data: Record<string, unknown>;
@@ -491,5 +497,12 @@ export type ChatEvent =
       properties: {
         sessionID: string;
         requestID: string;
+      };
+    }
+  | {
+      type: "todo.updated";
+      properties: {
+        sessionID: string;
+        todos: ChatTodo[];
       };
     };

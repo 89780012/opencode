@@ -7,6 +7,7 @@ import type {
   ChatQuestionRequest,
   ChatSessionSummary,
   ChatStatus,
+  ChatTodo,
 } from "@/types/chat";
 
 export type ChatStateShape = {
@@ -14,6 +15,7 @@ export type ChatStateShape = {
   selected: Record<string, string | null>;
   messages: Record<string, ChatMessageInfo[]>;
   parts: Record<string, ChatPart[]>;
+  todos: Record<string, ChatTodo[] | undefined>;
   permissions: Record<string, PermissionRequest[]>;
   questions: Record<string, ChatQuestionRequest[]>;
   status: Record<string, ChatStatus>;
@@ -133,6 +135,7 @@ export function removeSession(state: ChatStateShape, workspace: string, info: Ch
   delete state.messages[info.id];
   delete state.status[info.id];
   delete state.errs[info.id];
+  delete state.todos[info.id];
   delete state.permissions[info.id];
   delete state.questions[info.id];
 }
@@ -235,6 +238,10 @@ export function applyChatEvent(state: ChatStateShape, workspace: string, evt: Ch
       const idx = list.findIndex((item) => item.id === evt.properties.partID);
       if (idx < 0) return;
       add(list[idx], evt.properties.field, evt.properties.delta);
+      return;
+    }
+    case "todo.updated": {
+      state.todos[evt.properties.sessionID] = evt.properties.todos;
       return;
     }
     case "question.asked": {
