@@ -2,8 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { chatApi } from "@/api/modules";
 import { useAppDispatch } from "@/hooks/useAppDispatch";
 import { useAppSelector } from "@/hooks/useAppSelector";
+import { idle } from "@/lib/chat-event-reducer";
 import { hydrateSessionMessages } from "@/store/chat-session-slice";
-import type { ChatView } from "@/types/chat";
+import type { ChatMessageInfo, ChatView } from "@/types/chat";
+
+const emptyMessages: ChatMessageInfo[] = [];
 
 export function useChatSessionDetail(
   workspacePath?: string | null,
@@ -11,11 +14,11 @@ export function useChatSessionDetail(
 ) {
   const dispatch = useAppDispatch();
   const messages = useAppSelector((state) =>
-    sessionId ? (state.chatSession.messages[sessionId] ?? []) : [],
+    sessionId ? (state.chatSession.messages[sessionId] ?? emptyMessages) : emptyMessages,
   );
   const parts = useAppSelector((state) => state.chatSession.parts);
   const status = useAppSelector((state) =>
-    sessionId ? (state.chatSession.status[sessionId] ?? { type: "idle" as const }) : { type: "idle" as const },
+    sessionId ? (state.chatSession.status[sessionId] ?? idle) : idle,
   );
   const err = useAppSelector((state) =>
     sessionId ? state.chatSession.errs[sessionId] : undefined,
