@@ -18,14 +18,12 @@ import { useChatQuestion } from "@/hooks/use-chat-question"
 import { useChatSessionDetail } from "@/hooks/use-chat-session-detail"
 import { useChatSessions } from "@/hooks/use-chat-sessions"
 import { useChatTodo } from "@/hooks/use-chat-todo"
-import { useIsMobile } from "@/hooks/use-mobile"
 import { usePromptSubmit } from "@/hooks/use-prompt-submit"
 import { useAppSelector } from "@/hooks/useAppSelector"
 
 export default function Home() {
   const workspace = useAppSelector((state) => state.workspaceView.selectedWorkspace)
   const path = workspace?.path ?? null
-  const mobile = useIsMobile()
   const [input, setInput] = useState("")
   const [open, setOpen] = useState(false)
   const [wide, setWide] = useState(false)
@@ -35,7 +33,13 @@ export default function Home() {
 
   const { selectedSessionId, loading, creating, refreshSessions, createSession, selectSession } = useChatSessions(path)
   const composer = useChatComposer(path, selectedSessionId)
-  const { messages, status, err, loading: detail, refresh: refreshDetail } = useChatSessionDetail(path, selectedSessionId)
+  const {
+    messages,
+    status,
+    err,
+    loading: detail,
+    refresh: refreshDetail,
+  } = useChatSessionDetail(path, selectedSessionId)
   const permission = useChatPermission(path, selectedSessionId, composer.accepting, refreshDetail)
   const question = useChatQuestion(path, selectedSessionId)
   const { submitting, submit } = usePromptSubmit({
@@ -105,12 +109,18 @@ export default function Home() {
   }
 
   const show = !!workspace && open
-  const split = !!workspace && !mobile && wide
-  const overlay = show && (mobile || !wide)
+  const split = !!workspace && wide
+  const overlay = show && !wide
   const chat = (
     <div className="flex h-full min-h-0 min-w-0 w-full flex-col">
       <div className="relative flex min-h-0 flex-1">
-        <ChatMessageList err={err} messages={messages} loading={detail && !!selectedSessionId} status={status} hasCache={messages.length > 0} />
+        <ChatMessageList
+          err={err}
+          messages={messages}
+          loading={detail && !!selectedSessionId}
+          status={status}
+          hasCache={messages.length > 0}
+        />
 
         {empty ? (
           <div className="absolute inset-0 flex items-center justify-center px-6">

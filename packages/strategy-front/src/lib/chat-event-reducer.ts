@@ -22,7 +22,7 @@ export type ChatStateShape = {
   errs: Record<string, string | undefined>;
 };
 
-const idle: ChatStatus = { type: "idle" };
+export const idle: ChatStatus = { type: "idle" };
 
 const sortSession = (list: ChatSessionSummary[]) =>
   [...list].sort((a, b) => b.time.updated - a.time.updated);
@@ -194,9 +194,34 @@ export function applyChatEvent(state: ChatStateShape, workspace: string, evt: Ch
     case "message.updated": {
       const info = evt.properties.info;
       const list = state.messages[info.sessionID] ?? [];
-      const next = list.some((item) => item.id === info.id)
-        ? list.map((item) => (item.id === info.id ? info : item))
-        : [...list, info];
+      const exactMatch = list.some((item) => item.id === info.id);
+      let next: ChatMessageInfo[];
+      if (exactMatch) {
+        next = list.map((item) => (item.id === info.id ? info : item));
+      } else {
+        // Check for optimistic message with client-generated ID (same role, close timestamp)
+        const optimisticIdx = list.findIndex(
+          (item) =>
+            item.id !== info.id &&
+            item.role === info.role &&
+            item.id.startsWith("msg_") &&
+            Math.abs(item.time.created - info.time.created) < 5000,
+        );
+        if (optimisticIdx >= 0) {
+          // Replace optimistic message with server message, and migrate parts
+          const oldId = list[optimisticIdx].id;
+          next = list.map((item, i) => (i === optimisticIdx ? info : item));
+          // Migrate parts from client ID to server ID
+          if (state.parts[oldId]) {
+            if (!state.parts[info.id]) {
+              state.parts[info.id] = state.parts[oldId];
+            }
+            delete state.parts[oldId];
+          }
+        } else {
+          next = [...list, info];
+        }
+      }
       state.messages[info.sessionID] = sortMsg(next);
       if (info.role !== "assistant") return;
       const msg = msgErr(info.error);
