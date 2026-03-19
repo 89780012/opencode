@@ -31,6 +31,7 @@ Treat the SDK runtime contract as a hard constraint:
 - Official example/demo: `https://smarttest.ztqft.com/sdkDoc/python/1.0.0/example/pythonApiExample.html`
 - When writing or revising Smart API calls, open the API reference first and match the current method names, callback names, enums, and parameter shapes.
 - When a Smart call fails, a callback shape is unclear, or a field name seems uncertain, check the API reference and demo before guessing.
+- If debugging code reveals a Smart SDK error, first confirm from the API reference that the function name, parameter names, parameter order, and callback signature are correct before changing business logic.
 
 - Put all SDK-dependent startup logic behind `smart.on_init(init)`.
 - Do not execute subscriptions, account access, or order placement before `init()` runs.
@@ -45,6 +46,7 @@ Treat the SDK runtime contract as a hard constraint:
 Before planning or making changes, proactively inspect the workspace-local OpenCode assets:
 
 - Look for `.opencode/skills/*/SKILL.md` under the current workspace.
+- Look for `.opencode/history.md` under the current workspace and read it before acting when it exists.
 - Treat workspace-local skills as mandatory instructions, not optional hints.
 - Use the `skill` tool to load every relevant workspace-local skill before executing the task.
 - If multiple workspace-local skills apply, load all of them.
@@ -69,6 +71,7 @@ When editing `start.py` or related Python files, keep the SmartX lifecycle expli
 When writing strategy code for this workspace:
 
 - Prefer simple module-level state or `smart.cache` over adding a new framework.
+- For quant strategy parameters such as symbols, windows, thresholds, sizing, fees, and risk limits, prefer a standalone JSON config file instead of hardcoding them in Python.
 - For quote-driven strategies, subscribe first and react in `on_quote`.
 - For bar-driven strategies, use `smart.subscribe_bar` and `smart.on_bar` / `smart.on(smart.Event.ON_BAR, ...)`.
 - For order-driven state machines such as grid trading, update pending state from `on_order` and use `insert_order(..., callback=...)` results only as submit acknowledgements.
@@ -79,4 +82,7 @@ When working:
 - Search the workspace actively before acting.
 - Prefer existing local automation, scripts, templates, and conventions over creating parallel workflows.
 - Keep work scoped to the current workspace.
+- Treat previously recorded mistakes in `.opencode/history.md` as constraints and actively avoid repeating them.
+- If you make or discover a meaningful mistake, wrong assumption, wrong SDK call shape, or failed debugging path, record it briefly in `.opencode/history.md` with the correction so later sessions do not repeat it.
+- At the end of a meaningful round, if there are important decisions, SDK findings, debugging conclusions, assumptions, follow-up items, or mistakes worth remembering, append a short handoff summary to `.opencode/history.md` for future sessions.
 - Be concise, decisive, and execution-focused.

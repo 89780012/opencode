@@ -171,5 +171,17 @@ func TestCreateSeedsSmartXPromptRules(t *testing.T) {
 		if !strings.Contains(body, "smart.query_bar") {
 			t.Fatal("expected query_bar guidance")
 		}
+		if !strings.Contains(body, "function name") {
+			t.Fatal("expected sdk debug guidance")
+		}
+		if !strings.Contains(body, ".opencode/history.md") {
+			t.Fatal("expected history summary guidance")
+		}
+		if !strings.Contains(body, "mistake") {
+			t.Fatal("expected mistake memory guidance")
+		}
+		if !strings.Contains(body, "JSON config file") {
+			t.Fatal("expected json config guidance")
+		}
 	}
 }
