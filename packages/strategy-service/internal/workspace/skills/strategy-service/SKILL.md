@@ -10,6 +10,22 @@ This workspace was prepared by `strategy-service`.
 Use this skill when the user wants to write, modify, backtest, or review a trading strategy in this workspace.
 Treat strategy writing as a structured workflow, not a one-shot code generation task.
 Prefer existing project files, local conventions, and reusable components before creating new files.
+Assume the target runtime is the SmartX Python component SDK shown in the local `start.py` shape and SDK docs, not a generic Python quant framework.
+
+Use these SmartX docs whenever you need to write APIs accurately or debug SDK behavior:
+
+- API reference: `https://smarttest.ztqft.com/sdkDoc/python/1.0.0/api/pythonApi.html`
+- Example/demo: `https://smarttest.ztqft.com/sdkDoc/python/1.0.0/example/pythonApiExample.html`
+
+Before writing or changing Smart API calls:
+
+- open the API reference and match the exact method name, callback name, enum, and parameter form
+- use the demo to copy the expected lifecycle and event wiring style
+
+When Smart code errors or behaves unexpectedly:
+
+- check the API reference before guessing field names or callback signatures
+- check the demo before inventing a new event flow or account-access pattern
 
 If this workspace was bootstrapped from the built-in `plugin_python` template, inspect the template in this order:
 
@@ -29,6 +45,39 @@ When first entering a template-based workspace, summarize the project as:
 - build path
 - which files are source-of-truth versus generated output
 
+## SmartX SDK Rules
+
+These rules override generic strategy-writing habits.
+
+1. Respect the component lifecycle.
+All Smart initialization must hang off `smart.on_init(init)`.
+Do not place subscriptions, account reads, or order placement at import time.
+
+2. Write for the account object first.
+Prefer `smart.current_account` for single-account work and `smart.account_map` only when the task clearly needs multi-account logic.
+Prefer account callbacks such as `smart.current_account.on_order(...)`, `on_trade(...)`, `on_assets(...)`, and `on_position(...)`.
+
+3. Prefer the current SDK calling style.
+Use keyword arguments and `code` / `codes` inputs over older positional forms when both are available.
+When placing orders, prefer `smart.insert_order(code="000001.SZ", ...)` or the equivalent keyword form already used in the workspace.
+
+4. Use the SDK event model instead of polling.
+For quote-driven logic, subscribe and react in callbacks.
+For bar-driven logic, use `smart.subscribe_bar(...)`, `smart.on_bar(...)`, or `smart.on(smart.Event.ON_BAR, ...)`.
+For historical warmup, use `smart.query_bar(...)` before computing indicators.
+
+5. Treat submit callbacks and order callbacks differently.
+`insert_order(..., callback=...)` confirms submit success or failure.
+Order lifecycle changes must still be handled from `on_order`.
+
+6. Do not invent unsupported Smart APIs.
+Assume strategy-level `strategy.insert_order`, `strategy.subscribe`, and similar helpers are unavailable in SDK `1.0.0` unless the workspace already proves they exist.
+Do not import `backtrader`, `vnpy`, `ccxt`, or similar frameworks unless the user explicitly asks or the workspace already depends on them.
+
+7. Keep generated code close to the template.
+If the workspace comes from `plugin_python`, prefer editing `start.py` and existing `src/` files instead of introducing a new package layout.
+Add helper functions only when they clearly reduce duplication or make the event flow easier to reason about.
+
 ## Core Rules
 
 1. Inspect the workspace first.
@@ -46,6 +95,11 @@ A strategy is incomplete if it has entries and exits but no position sizing, sto
 5. Backtest before claiming completion.
 If the repo supports backtesting, use it. If it does not, explain what is missing and what should be verified next.
 
+6. Match SmartX names exactly.
+Before using an enum, field, or callback name, verify it against existing code or SDK docs.
+Do not guess names such as order status, side constants, exchange constants, or event names.
+If needed, reopen the API reference and demo above before editing.
+
 ## Standard Workflow For Writing A Strategy
 
 When the user asks to write a strategy, follow this order:
@@ -54,11 +108,11 @@ When the user asks to write a strategy, follow this order:
 
 Collect or infer:
 
-- market: spot, futures, options, perpetuals
+- market: A-share, ETF, futures, options, or another Smart-supported market
 - symbol set: one symbol or a basket
-- timeframe: tick, 1m, 5m, 1h, daily
-- venue: Binance, OKX, local simulator, custom feed
-- execution style: live trading, paper trading, backtest only
+- timeframe: quote, tick, 1m, 5m, 1h, daily
+- venue: Smart client / SmartX environment / local simulator
+- execution style: live trading, paper trading, replay, backtest only
 - direction: long only, short only, both
 
 If any of these are unknown, identify the missing fields before implementation.
@@ -100,7 +154,8 @@ Before editing, identify:
 - where indicators are computed
 - where orders are created
 - where portfolio state is stored
-- where backtests are run
+- where Smart callbacks are registered
+- where historical data is queried
 - where config is loaded
 
 Prefer extending the existing structure instead of inventing a new mini-framework.
@@ -126,6 +181,8 @@ Check:
 - does it compile or run
 - does it produce trades
 - do entry and exit rules match the spec
+- does it register the right Smart callbacks
+- does it avoid using unsupported SDK APIs
 - are fees and slippage considered
 - does position size stay within limits
 - does the strategy break on edge cases such as flat markets, gaps, partial fills, or duplicate signals
@@ -143,6 +200,7 @@ At the end, report:
 ## Python Grid Strategy Workflow
 
 If the user asks for a Python grid strategy, use this exact workflow.
+Default to the SmartX component style shown in the SDK demo: quote subscription plus account callbacks, with explicit per-symbol state.
 
 ### Step 1: Clarify the grid type
 
@@ -203,8 +261,8 @@ For a Python grid strategy, prefer this structure:
 - grid builder
 - strategy state
 - signal or order planner
+- Smart callback wiring
 - execution adapter
-- backtest runner
 - result report
 
 If the workspace already has equivalent modules, reuse them instead of introducing new names.
@@ -219,7 +277,7 @@ If the workspace already has equivalent modules, reuse them instead of introduci
 6. implement paired order regeneration
 7. implement range-break handling
 8. implement fee and slippage accounting
-9. implement backtest statistics
+9. implement logging and operator visibility
 
 ### Step 6: Validate the grid strategy
 
@@ -231,6 +289,8 @@ Verify at least these cases:
 - price gaps beyond the upper or lower bound
 - repeated fills do not create duplicate paired orders
 - inventory does not exceed configured limits
+- submit callback failure does not corrupt pending state
+- `on_order` updates keep local state consistent with exchange reality
 
 ### Step 7: Report strategy quality
 
@@ -250,6 +310,7 @@ When working on a strategy task in this workspace:
 - present assumptions clearly
 - keep implementation steps ordered
 - show the exact files changed
+- explain which Smart callbacks and subscriptions were added or changed
 - explain how to run or backtest the result
 - identify what remains unverified
 
@@ -259,3 +320,5 @@ When working on a strategy task in this workspace:
 - do not skip risk controls
 - do not claim profitability from code inspection alone
 - do not bypass existing project structure unless it is clearly broken
+- do not write Smart-dependent code outside the `smart.on_init(init)` lifecycle
+- do not replace callback-driven logic with `while True` polling unless the user explicitly asks for it

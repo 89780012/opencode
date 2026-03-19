@@ -24,6 +24,24 @@ Operate with full authority inside the current workspace directory.
 You may read, edit, create, move, and delete files in this workspace and run bash commands in this workspace without asking for approval.
 Assume your execution scope is the current workspace only. Do not leave the workspace unless the user explicitly asks for it.
 
+This workspace targets the SmartX Python component SDK, not a generic Python trading stack.
+Treat the SDK runtime contract as a hard constraint:
+
+- Official API reference: `https://smarttest.ztqft.com/sdkDoc/python/1.0.0/api/pythonApi.html`
+- Official example/demo: `https://smarttest.ztqft.com/sdkDoc/python/1.0.0/example/pythonApiExample.html`
+- When writing or revising Smart API calls, open the API reference first and match the current method names, callback names, enums, and parameter shapes.
+- When a Smart call fails, a callback shape is unclear, or a field name seems uncertain, check the API reference and demo before guessing.
+
+- Put all SDK-dependent startup logic behind `smart.on_init(init)`.
+- Do not execute subscriptions, account access, or order placement before `init()` runs.
+- Prefer `smart.current_account` and `smart.account_map` for account access.
+- Prefer keyword-argument forms and `code` / `codes` inputs over old positional APIs when both exist.
+- Prefer `smart.current_account.on_order`, `on_trade`, `on_assets`, and `on_position` for account state changes.
+- Prefer `smart.current_account.subscribe(codes=[...])` or `smart.subscribe_bar(...)` over inventing polling loops.
+- Use `smart.query_bar(...)` for historical bar data when the strategy needs warmup or historical context.
+- Assume strategy-level `strategy.insert_order` / `strategy.subscribe` flows are unavailable in 1.0.0 unless the workspace already proves otherwise.
+- Do not introduce third-party backtesting or broker frameworks unless the workspace already uses them or the user explicitly asks.
+
 Before planning or making changes, proactively inspect the workspace-local OpenCode assets:
 
 - Look for `.opencode/skills/*/SKILL.md` under the current workspace.
@@ -40,6 +58,21 @@ For a newly created strategy workspace, inspect the project in this order before
 - Read `build.js` and `webpack.config.js` to understand the build flow.
 - Treat root `index.js` and `index.html` as generated or runtime-facing files unless the user explicitly asks to change them.
 - Summarize the current project structure and execution flow before implementing strategy logic.
+
+When editing `start.py` or related Python files, keep the SmartX lifecycle explicit:
+
+- `init()` wires subscriptions, handlers, cache/bootstrap, and first queries.
+- `show()` reacquires resources only if needed.
+- `hide()` releases optional resources only if needed.
+- `close()` tears down subscriptions or long-lived resources.
+
+When writing strategy code for this workspace:
+
+- Prefer simple module-level state or `smart.cache` over adding a new framework.
+- For quote-driven strategies, subscribe first and react in `on_quote`.
+- For bar-driven strategies, use `smart.subscribe_bar` and `smart.on_bar` / `smart.on(smart.Event.ON_BAR, ...)`.
+- For order-driven state machines such as grid trading, update pending state from `on_order` and use `insert_order(..., callback=...)` results only as submit acknowledgements.
+- Always validate code against Smart enums and field names from existing workspace code or SDK docs before introducing new constants.
 
 When working:
 

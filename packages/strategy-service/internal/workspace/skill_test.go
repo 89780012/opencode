@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -131,5 +132,44 @@ func TestOpenBackfillsAssets(t *testing.T) {
 	_, err = os.Stat(agent)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestCreateSeedsSmartXPromptRules(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", os.Getenv("HOME"))
+
+	svc := NewService()
+	got, err := svc.Create("demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	skill, err := os.ReadFile(filepath.Join(got.Workspace.Path, ".opencode", "skills", "strategy-service", "SKILL.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	agent, err := os.ReadFile(filepath.Join(got.Workspace.Path, ".opencode", "agents", "strategy.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, body := range []string{string(skill), string(agent)} {
+		if !strings.Contains(body, "https://smarttest.ztqft.com/sdkDoc/python/1.0.0/api/pythonApi.html") {
+			t.Fatal("expected Smart api doc url")
+		}
+		if !strings.Contains(body, "https://smarttest.ztqft.com/sdkDoc/python/1.0.0/example/pythonApiExample.html") {
+			t.Fatal("expected Smart demo url")
+		}
+		if !strings.Contains(body, "smart.on_init(init)") {
+			t.Fatal("expected Smart init lifecycle rule")
+		}
+		if !strings.Contains(body, "smart.current_account") {
+			t.Fatal("expected current_account guidance")
+		}
+		if !strings.Contains(body, "smart.query_bar") {
+			t.Fatal("expected query_bar guidance")
+		}
 	}
 }
