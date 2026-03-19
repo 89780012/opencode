@@ -12,6 +12,7 @@ import type { ComposerModel } from "@/hooks/use-chat-composer"
 interface Props {
   value: string
   disabled?: boolean
+  busy?: boolean
   submitting?: boolean
   agents: string[]
   models: ComposerModel[]
@@ -22,6 +23,7 @@ interface Props {
   accepting?: boolean
   onValueChange: (value: string) => void
   onSubmit: (value: string) => void
+  onAbort: () => void
   onAgent: (value: string) => void
   onModel: (value: string) => void
   onVariant: (value: string) => void
@@ -36,6 +38,7 @@ export function PromptBar(props: Props) {
   const onModel = props.onModel
   const first = models[0] ? `${models[0].provider.id}/${models[0].id}` : ""
   const pick = models.some((item) => `${item.provider.id}/${item.id}` === model) ? model ?? "" : first
+  const stop = !!props.busy
 
   useEffect(() => {
     if (!pick) return
@@ -44,7 +47,17 @@ export function PromptBar(props: Props) {
   }, [model, onModel, pick])
 
   return (
-    <PromptInput onSubmit={(msg) => props.onSubmit(msg.text)} onValueChange={props.onValueChange} value={props.value}>
+    <PromptInput
+      onSubmit={(msg) => {
+        if (stop) {
+          props.onAbort()
+          return
+        }
+        props.onSubmit(msg.text)
+      }}
+      onValueChange={props.onValueChange}
+      value={props.value}
+    >
       <PromptInputBody>
         <PromptInputTextarea maxHeight={200} minHeight={72} placeholder="输入你的消息..." />
       </PromptInputBody>
@@ -111,8 +124,8 @@ export function PromptBar(props: Props) {
           </Button> */}
         </div>
         <PromptInputSubmit
-          disabled={props.disabled || props.value.trim().length === 0}
-          status={props.submitting ? "submitted" : "ready"}
+          disabled={props.disabled || (!stop && props.value.trim().length === 0)}
+          status={stop ? "streaming" : props.submitting ? "submitted" : "ready"}
         />
       </PromptInputFooter>
     </PromptInput>

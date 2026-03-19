@@ -38,4 +38,12 @@ export const chatApi = {
       },
     );
   },
+
+  abortSession(workspacePath: string, sessionId: string) {
+    return opencode.post<boolean>(`/session/${sessionId}/abort`, undefined, {
+      params: {
+        directory: workspacePath,
+      },
+    });
+  },
 };

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { FolderOpen } from "lucide-react"
 import { toast } from "sonner"
+import { chatApi } from "@/api/modules"
 import { ChatWorkspacePanel } from "@/components/chat/chat-workspace-panel"
 import { ChatWorkspaceToggle } from "@/components/chat/chat-workspace-toggle"
 import { ChatMessageList } from "@/components/chat-message-list"
@@ -46,6 +47,7 @@ export default function Home() {
     selectSession,
     onSubmitted: () => setInput(""),
   })
+  const busy = !!selectedSessionId && status.type !== "idle"
   const empty = !selectedSessionId || (!detail && status.type !== "busy" && messages.length === 0)
 
   useEffect(() => {
@@ -81,6 +83,19 @@ export default function Home() {
     } catch (err) {
       console.error("Failed to submit prompt", err)
       toast.error("提交失败")
+    }
+  }
+
+  const onAbort = async () => {
+    if (!path || !selectedSessionId || !busy) {
+      return
+    }
+
+    try {
+      await chatApi.abortSession(path, selectedSessionId)
+    } catch (err) {
+      console.error("Failed to abort prompt", err)
+      toast.error("停止失败")
     }
   }
 
@@ -136,12 +151,16 @@ export default function Home() {
             agent={composer.state?.agent}
             agents={composer.agents}
             accepting={composer.accepting}
+            busy={busy}
             disabled={!workspace || composer.load}
             model={
               composer.state?.model ? `${composer.state.model.providerID}/${composer.state.model.modelID}` : undefined
             }
             models={composer.models}
             onAgent={composer.setAgent}
+            onAbort={() => {
+              void onAbort()
+            }}
             onModel={composer.setModel}
             onPermission={composer.togglePermission}
             onSubmit={(value) => {
