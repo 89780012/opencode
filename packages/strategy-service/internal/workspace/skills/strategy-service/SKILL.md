@@ -26,6 +26,13 @@ When Smart code errors or behaves unexpectedly:
 
 - check the API reference before guessing field names or callback signatures
 - check the demo before inventing a new event flow or account-access pattern
+- first confirm whether the function name, parameter names, parameter order, and callback signature are correct before changing strategy logic
+
+Use `.opencode/history.md` as the workspace memory when it exists:
+
+- read it before acting so you inherit prior decisions, debugging results, and recorded mistakes
+- treat recorded mistakes as things not to repeat
+- if you discover a new meaningful mistake or wrong assumption, append a short correction note for the next session
 
 If this workspace was bootstrapped from the built-in `plugin_python` template, inspect the template in this order:
 
@@ -99,6 +106,7 @@ If the repo supports backtesting, use it. If it does not, explain what is missin
 Before using an enum, field, or callback name, verify it against existing code or SDK docs.
 Do not guess names such as order status, side constants, exchange constants, or event names.
 If needed, reopen the API reference and demo above before editing.
+If a debug session points at a Smart API call, verify the function and parameter shape first, then investigate business logic.
 
 ## Standard Workflow For Writing A Strategy
 
@@ -134,6 +142,8 @@ Do not write code until these rules are explicit enough to simulate.
 ### Step 3: Define the parameter set
 
 Separate fixed rules from tunable parameters.
+Prefer placing tunable strategy parameters in a standalone JSON config file instead of hardcoding them in `start.py`.
+If the workspace has no existing config convention, use a simple JSON file at the workspace root and load it explicitly from the strategy code.
 
 Typical parameters:
 
@@ -165,6 +175,7 @@ Prefer extending the existing structure instead of inventing a new mini-framewor
 Recommended implementation order:
 
 1. config and parameters
+Keep tunable parameters in a JSON config file and keep Python focused on loading and using them.
 2. market data inputs
 3. indicator or level calculation
 4. signal generation
@@ -313,6 +324,7 @@ When working on a strategy task in this workspace:
 - explain which Smart callbacks and subscriptions were added or changed
 - explain how to run or backtest the result
 - identify what remains unverified
+- if the round produced important decisions, SDK debugging findings, confirmed API usage, unfinished follow-up items, or mistakes worth remembering, append a short summary to `.opencode/history.md` so a later session can recover context quickly
 
 ## Do Not
 
@@ -322,3 +334,4 @@ When working on a strategy task in this workspace:
 - do not bypass existing project structure unless it is clearly broken
 - do not write Smart-dependent code outside the `smart.on_init(init)` lifecycle
 - do not replace callback-driven logic with `while True` polling unless the user explicitly asks for it
+- do not repeat a mistake already recorded in `.opencode/history.md` without first explaining why the old constraint no longer applies
