@@ -35,8 +35,8 @@ export default function Home() {
 
   const { selectedSessionId, loading, creating, refreshSessions, createSession, selectSession } = useChatSessions(path)
   const composer = useChatComposer(path, selectedSessionId)
-  const { messages, status, err, loading: detail } = useChatSessionDetail(path, selectedSessionId)
-  const permission = useChatPermission(path, selectedSessionId, composer.accepting)
+  const { messages, status, err, loading: detail, refresh: refreshDetail } = useChatSessionDetail(path, selectedSessionId)
+  const permission = useChatPermission(path, selectedSessionId, composer.accepting, refreshDetail)
   const question = useChatQuestion(path, selectedSessionId)
   const { submitting, submit } = usePromptSubmit({
     workspacePath: path,
@@ -46,6 +46,7 @@ export default function Home() {
     variant: composer.state?.variant,
     createSession,
     refreshSessions,
+    refreshDetail,
     selectSession,
     onSubmitted: () => setInput(""),
   })

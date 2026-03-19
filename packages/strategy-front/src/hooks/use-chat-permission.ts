@@ -10,6 +10,7 @@ export function useChatPermission(
   workspacePath?: string | null,
   sessionID?: string | null,
   accepting?: boolean,
+  refresh?: (sessionId?: string | null) => Promise<void>,
 ) {
   const dispatch = useAppDispatch();
   const [sending, setSending] = useState(false);
@@ -58,10 +59,14 @@ export function useChatPermission(
           },
         }),
       );
+      await Promise.all([
+        refresh?.(item.sessionID),
+        pull(),
+      ]);
     } finally {
       setSending(false);
     }
-  }, [dispatch, sending, workspacePath]);
+  }, [dispatch, pull, refresh, sending, workspacePath]);
 
   const allow = useCallback(async (response: "once" | "always" | "reject") => {
     if (!req) return;
