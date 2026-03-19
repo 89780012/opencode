@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, Loader2, RefreshCcw, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { systemApi } from "@/api/modules";
@@ -73,7 +73,7 @@ export function SystemPage() {
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
 
-  async function sync(ids: string[]) {
+  const sync = useCallback(async (ids: string[]) => {
     if (ids.length === 0) {
       return;
     }
@@ -86,9 +86,9 @@ export function SystemPage() {
       ...prev,
       ...Object.fromEntries(rows),
     }));
-  }
+  }, []);
 
-  async function reload(spin: boolean = true) {
+  const reload = useCallback(async (spin: boolean = true) => {
     if (spin) {
       setLoad(true);
     }
@@ -107,11 +107,11 @@ export function SystemPage() {
         setLoad(false);
       }
     }
-  }
+  }, [sync]);
 
   useEffect(() => {
     void reload();
-  }, []);
+  }, [reload]);
 
   useEffect(() => {
     if (!list.some((item) => item.status === "installing")) {
@@ -123,7 +123,7 @@ export function SystemPage() {
     }, 2000);
 
     return () => window.clearInterval(timer);
-  }, [list]);
+  }, [list, reload]);
 
   async function install(id: ToolID) {
     setBusy(id);
