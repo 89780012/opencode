@@ -36,6 +36,11 @@ const msgErr = (err?: { data?: Record<string, unknown> }) => {
   return typeof txt === "string" && txt ? txt : undefined;
 };
 
+const abortErr = (txt?: string) => {
+  if (!txt) return false;
+  return txt.toLowerCase().includes("abort");
+};
+
 function add(part: ChatPart, field: string, delta: string) {
   if (field === "text" && "text" in part) {
     part.text += delta;
@@ -73,6 +78,8 @@ export function hydrateChat(state: ChatStateShape, sessionID: string, list: Chat
     state.messages[sessionID] = nextMessages;
   }
 
+  let err = false;
+
   list.forEach((item) => {
     const nextParts = sortPart(item.parts);
     const prevParts = state.parts[item.info.id];
@@ -80,10 +87,14 @@ export function hydrateChat(state: ChatStateShape, sessionID: string, list: Chat
       state.parts[item.info.id] = nextParts;
     }
     if (item.info.role !== "assistant") return;
-    const err = msgErr(item.info.error);
-    if (!err) return;
-    state.errs[sessionID] = err;
+    const msg = msgErr(item.info.error);
+    if (!msg || abortErr(msg)) return;
+    err = true;
+    state.errs[sessionID] = msg;
   });
+  if (!err) {
+    delete state.errs[sessionID];
+  }
   if (!state.status[sessionID]) {
     state.status[sessionID] = idle;
   }
@@ -158,6 +169,9 @@ export function applyChatEvent(state: ChatStateShape, workspace: string, evt: Ch
     }
     case "session.status": {
       state.status[evt.properties.sessionID] = evt.properties.status;
+      if (evt.properties.status.type === "busy") {
+        delete state.errs[evt.properties.sessionID];
+      }
       return;
     }
     case "session.idle": {
@@ -166,7 +180,12 @@ export function applyChatEvent(state: ChatStateShape, workspace: string, evt: Ch
     }
     case "session.error": {
       if (!evt.properties.sessionID) return;
-      state.errs[evt.properties.sessionID] = msgErr(evt.properties.error) ?? "Request failed";
+      const msg = msgErr(evt.properties.error) ?? "Request failed";
+      if (abortErr(msg)) {
+        delete state.errs[evt.properties.sessionID];
+        return;
+      }
+      state.errs[evt.properties.sessionID] = msg;
       return;
     }
     case "message.updated": {
@@ -177,9 +196,12 @@ export function applyChatEvent(state: ChatStateShape, workspace: string, evt: Ch
         : [...list, info];
       state.messages[info.sessionID] = sortMsg(next);
       if (info.role !== "assistant") return;
-      const err = msgErr(info.error);
-      if (!err) return;
-      state.errs[info.sessionID] = err;
+      const msg = msgErr(info.error);
+      if (!msg || abortErr(msg)) {
+        delete state.errs[info.sessionID];
+        return;
+      }
+      state.errs[info.sessionID] = msg;
       return;
     }
     case "message.removed": {

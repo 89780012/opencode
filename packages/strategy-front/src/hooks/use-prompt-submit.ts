@@ -1,6 +1,8 @@
 import { useCallback, useState } from "react"
 import { chatApi } from "@/api/modules"
+import { useAppDispatch } from "@/hooks/useAppDispatch"
 import { buildRequestParts } from "@/lib/build-request-parts"
+import { clearSessionError } from "@/store/chat-session-slice"
 import type { ChatModelRef } from "@/types/chat"
 
 interface Input {
@@ -16,6 +18,7 @@ interface Input {
 }
 
 export function usePromptSubmit(input: Input) {
+  const dispatch = useAppDispatch()
   const [submitting, setSubmitting] = useState(false)
 
   const submit = useCallback(
@@ -32,6 +35,7 @@ export function usePromptSubmit(input: Input) {
       setSubmitting(true)
       try {
         const sessionId = input.sessionId ?? (await input.createSession())
+        dispatch(clearSessionError({ sessionId }))
         input.selectSession(sessionId)
         await chatApi.sendPrompt(input.workspacePath, sessionId, {
           agent: input.agent,
@@ -47,7 +51,7 @@ export function usePromptSubmit(input: Input) {
         setSubmitting(false)
       }
     },
-    [input],
+    [dispatch, input],
   )
 
   return {
