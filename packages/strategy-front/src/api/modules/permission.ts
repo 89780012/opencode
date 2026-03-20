@@ -2,18 +2,27 @@ import { opencode } from "@/api/opencode";
 import type { PermissionRequest } from "@/types/chat";
 
 export const permissionApi = {
-  list() {
-    return opencode.get<PermissionRequest[]>("/permission");
+  list(directory: string) {
+    return opencode.get<PermissionRequest[]>("/permission", {
+      params: {
+        directory,
+      },
+    });
   },
 
   respond(
-    sessionID: string,
-    permissionID: string,
-    body: { response: "once" | "always" | "reject" },
+    directory: string,
+    requestID: string,
+    body: { reply: "once" | "always" | "reject" },
   ) {
-    return opencode.post<boolean, { response: "once" | "always" | "reject" }>(
-      `/session/${encodeURIComponent(sessionID)}/permissions/${encodeURIComponent(permissionID)}`,
+    return opencode.post<boolean, { reply: "once" | "always" | "reject" }>(
+      `/permission/${encodeURIComponent(requestID)}/reply`,
       body,
+      {
+        params: {
+          directory,
+        },
+      },
     );
   },
 };

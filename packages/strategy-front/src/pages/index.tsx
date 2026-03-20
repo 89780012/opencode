@@ -34,7 +34,7 @@ export default function Home() {
   const { selectedSessionId, loading, creating, refreshSessions, createSession, selectSession } = useChatSessions(path)
   const composer = useChatComposer(path, selectedSessionId)
   const { messages, status, err, loading: detail } = useChatSessionDetail(path, selectedSessionId)
-  const permission = useChatPermission(path, selectedSessionId, composer.accepting)
+  const permission = useChatPermission(path, selectedSessionId)
   const question = useChatQuestion(path, selectedSessionId)
   const { submitting, submit } = usePromptSubmit({
     workspacePath: path,
@@ -166,7 +166,6 @@ export default function Home() {
           <PromptBar
             agent={composer.state?.agent}
             agents={composer.agents}
-            accepting={composer.accepting}
             busy={busy}
             disabled={!workspace || composer.load}
             model={
@@ -178,7 +177,6 @@ export default function Home() {
               void onAbort()
             }}
             onModel={composer.setModel}
-            onPermission={composer.togglePermission}
             onSubmit={(value) => {
               void onSubmit(value)
             }}

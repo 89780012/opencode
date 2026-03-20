@@ -13,7 +13,6 @@ type Item = {
   draft?: ComposerState;
   session?: Record<string, ComposerState | undefined>;
   recent?: ChatModelRef[];
-  accept?: boolean;
 };
 
 const key = "strategy-front.chat-composer.v2";
@@ -59,16 +58,6 @@ function write(all: Record<string, Item>) {
 function same(a?: ChatModelRef, b?: ChatModelRef) {
   if (!a || !b) return false;
   return a.providerID === b.providerID && a.modelID === b.modelID;
-}
-
-function hasPermissionPromptRules(permission: Config["permission"]) {
-  if (!permission) return false;
-  if (typeof permission === "string") return permission !== "allow";
-  return Object.values(permission).some((item) => {
-    if (typeof item === "string") return item !== "allow";
-    if (!item || typeof item !== "object") return false;
-    return Object.values(item).some((value) => value !== "allow");
-  });
 }
 
 function rank(name: string) {
@@ -160,19 +149,6 @@ export function useChatComposer(workspacePath?: string | null, sessionID?: strin
       dead = true;
     };
   }, [user, workspacePath]);
-
-  useEffect(() => {
-    if (!workspacePath) return;
-    if (cur.accept !== undefined) return;
-    if (cfg.permission !== "allow") return;
-    setAll((prev) => ({
-      ...prev,
-      [workspacePath]: {
-        ...prev[workspacePath],
-        accept: true,
-      },
-    }));
-  }, [cfg.permission, cur.accept, workspacePath]);
 
   useEffect(() => {
     const last = prev.current;
@@ -337,13 +313,6 @@ export function useChatComposer(workspacePath?: string | null, sessionID?: strin
     });
   }, [writePick]);
 
-  const togglePermission = useCallback(() => {
-    save((item) => ({
-      ...item,
-      accept: !(item.accept ?? (cfg.permission === "allow")),
-    }));
-  }, [cfg.permission, save]);
-
   return {
     load,
     agents: list,
@@ -351,11 +320,8 @@ export function useChatComposer(workspacePath?: string | null, sessionID?: strin
     state,
     row,
     vars,
-    accepting: cur.accept ?? (cfg.permission === "allow"),
-    permissionsEnabled: hasPermissionPromptRules(cfg.permission),
     setAgent,
     setModel,
     setVariant,
-    togglePermission,
   };
 }

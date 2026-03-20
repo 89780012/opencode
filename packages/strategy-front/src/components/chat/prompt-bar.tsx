@@ -20,14 +20,12 @@ interface Props {
   model?: string
   variant?: string | null
   vars: string[]
-  accepting?: boolean
   onValueChange: (value: string) => void
   onSubmit: (value: string) => void
   onAbort: () => void
   onAgent: (value: string) => void
   onModel: (value: string) => void
   onVariant: (value: string) => void
-  onPermission: () => void
 }
 
 const item = "h-8 min-w-0 rounded-xl border bg-muted/20 px-2 text-xs shadow-none"
@@ -110,18 +108,6 @@ export function PromptBar(props: Props) {
               </SelectContent>
             </Select>
           ) : null} */}
-          {/* <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className={`${item} size-8 px-0 ${props.accepting ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100" : ""}`}
-            onClick={props.onPermission}
-            disabled={props.disabled}
-            aria-pressed={props.accepting}
-            aria-label={props.accepting ? "已开启自动放行权限" : "开启自动放行权限"}
-          >
-            <Shield className="size-4" />
-          </Button> */}
         </div>
         <PromptInputSubmit
           disabled={props.disabled || (!stop && props.value.trim().length === 0)}

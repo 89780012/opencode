@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { permissionApi } from "@/api/modules";
 import { useAppDispatch } from "@/hooks/useAppDispatch";
 import { useAppSelector } from "@/hooks/useAppSelector";
@@ -9,30 +9,24 @@ import type { PermissionRequest } from "@/types/chat";
 export function useChatPermission(
   workspacePath?: string | null,
   sessionID?: string | null,
-  accepting?: boolean,
 ) {
   const dispatch = useAppDispatch();
   const [sending, setSending] = useState(false);
-  const sent = useRef(new Set<string>());
   const sessions = useAppSelector((state) =>
     workspacePath ? (state.chatSession.sessions[workspacePath] ?? []) : [],
   );
   const reqs = useAppSelector((state) => state.chatSession.permissions);
 
   const pull = useCallback(async () => {
-    const data = await permissionApi.list().catch(() => [] as PermissionRequest[]);
+    if (!workspacePath) return;
+    const data = await permissionApi.list(workspacePath).catch(() => [] as PermissionRequest[]);
     dispatch(setPendingPermissions({ items: data }));
-  }, [dispatch]);
+  }, [dispatch, workspacePath]);
 
   useEffect(() => {
     if (!workspacePath) return;
     void pull();
   }, [pull, workspacePath]);
-
-  useEffect(() => {
-    if (!workspacePath || !accepting) return;
-    void pull();
-  }, [accepting, pull, workspacePath]);
 
   const req = useMemo(
     () => sessionPermissionRequest(sessions, reqs, sessionID),
@@ -43,8 +37,7 @@ export function useChatPermission(
     if (!workspacePath || sending) return;
     setSending(true);
     try {
-      await permissionApi.respond(item.sessionID, item.id, { response });
-      sent.current.add(item.id);
+      await permissionApi.respond(workspacePath, item.id, { reply: response });
       dispatch(
         applyWorkspaceEvent({
           workspace: workspacePath,
@@ -67,17 +60,6 @@ export function useChatPermission(
     if (!req) return;
     await respond(req, response);
   }, [req, respond]);
-
-  useEffect(() => {
-    if (!workspacePath || !accepting || sending) return;
-    const ids = new Set(sessions.map((item) => item.id));
-    const list = Object.values(reqs)
-      .flatMap((item) => item ?? [])
-      .filter((item) => ids.has(item.sessionID))
-      .filter((item) => !sent.current.has(item.id));
-    if (list.length === 0) return;
-    void Promise.all(list.map((item) => respond(item, "once")));
-  }, [accepting, reqs, respond, sending, sessions, workspacePath]);
 
   return {
     req,
