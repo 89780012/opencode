@@ -1,35 +1,29 @@
-"use client";
+"use client"
 
-import { useState } from "react";
-import { ChevronsUpDown, LogOut, Settings } from "lucide-react";
+import { useState } from "react"
+import { ChevronsUpDown, LogOut, Settings } from "lucide-react"
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from "@/components/ui/sidebar";
-import { useSidebar } from "@/components/ui/sidebar-context";
-import { SettingsDialog } from "@/components/settings";
+} from "@/components/ui/dropdown-menu"
+import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar"
+import { useSidebar } from "@/components/ui/sidebar-context"
 
 export function NavUser({
   user,
 }: {
   user: {
-    name: string;
-    email: string;
-    avatar: string;
-  };
+    name: string
+    email: string
+    avatar: string
+  }
 }) {
-  const { isMobile } = useSidebar();
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const { isMobile } = useSidebar()
 
   return (
     <SidebarMenu>
@@ -57,7 +51,7 @@ export function NavUser({
             align="end"
             sideOffset={4}
           >
-            <DropdownMenuItem onSelect={() => setSettingsOpen(true)}>
+            <DropdownMenuItem>
               <Settings />
               设置
             </DropdownMenuItem>
@@ -69,8 +63,6 @@ export function NavUser({
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>
-
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </SidebarMenu>
-  );
+  )
 }
