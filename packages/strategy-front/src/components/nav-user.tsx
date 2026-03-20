@@ -1,6 +1,5 @@
 "use client"
 
-import { useState } from "react"
 import { ChevronsUpDown, LogOut, Settings } from "lucide-react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"

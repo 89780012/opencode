@@ -1,8 +1,9 @@
 "use client";
 
-import { Command, MessageSquareText, PlugZap, Wrench } from "lucide-react";
+import { Command, MessageSquareText, PlugZap, ServerCog, Wrench } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { HomeSidebarPanel } from "@/components/home/home-sidebar-panel";
+import { McpSidebarPanel } from "@/components/mcp/mcp-sidebar-panel";
 import { NavUser } from "@/components/nav-user";
 import { ProviderSidebarPanel } from "@/components/provider/provider-sidebar-panel";
 import { SystemSidebarPanel } from "@/components/system/system-sidebar-panel";
@@ -40,6 +41,11 @@ const data = {
       url: "/installer",
       icon: Wrench,
     },
+    {
+      title: "MCP 服务",
+      url: "/mcp",
+      icon: ServerCog,
+    },
   ],
 };
 
@@ -47,6 +53,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const { pathname } = useLocation();
   const home = pathname === "/";
   const provider = pathname.startsWith("/providers");
+  const mcp = pathname.startsWith("/mcp");
   const isActive = (url: string) =>
     url === "/" ? pathname === "/" : pathname.startsWith(url);
 
@@ -113,6 +120,8 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
           <HomeSidebarPanel />
         ) : provider ? (
           <ProviderSidebarPanel />
+        ) : mcp ? (
+          <McpSidebarPanel />
         ) : (
           <SystemSidebarPanel />
         )}

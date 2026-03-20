@@ -35,7 +35,7 @@ export function PromptBar(props: Props) {
   const models = props.models
   const onModel = props.onModel
   const first = models[0] ? `${models[0].provider.id}/${models[0].id}` : ""
-  const pick = models.some((item) => `${item.provider.id}/${item.id}` === model) ? model ?? "" : first
+  const pick = models.some((item) => `${item.provider.id}/${item.id}` === model) ? (model ?? "") : first
   const stop = !!props.busy
 
   useEffect(() => {
@@ -77,18 +77,14 @@ export function PromptBar(props: Props) {
               ))}
             </SelectContent>
           </Select>
-          <Select
-            disabled={props.disabled || models.length === 0}
-            onValueChange={onModel}
-            value={pick}
-          >
+          <Select disabled={props.disabled || models.length === 0} onValueChange={onModel} value={pick}>
             <SelectTrigger className={`${item} max-w-[220px]`}>
               <SelectValue placeholder="选择模型" />
             </SelectTrigger>
             <SelectContent>
               {models.map((item) => (
                 <SelectItem key={`${item.provider.id}/${item.id}`} value={`${item.provider.id}/${item.id}`}>
-                  {item.name}
+                  {`${item.id} (${item.provider.id})`}
                 </SelectItem>
               ))}
             </SelectContent>
