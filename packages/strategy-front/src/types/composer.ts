@@ -21,6 +21,6 @@ export interface ComposerResolved {
   agent?: Agent
   model?: ChatModelRef
   variant?: string
-  entry?: ComposerModel
+  modelEntry?: ComposerModel
   variants: string[]
 }

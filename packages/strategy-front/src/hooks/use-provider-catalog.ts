@@ -19,7 +19,7 @@ export function useProviderCatalog() {
   })
   const [load, setLoad] = useState(false)
   const [err, setErr] = useState<unknown>()
-  const user = useMemo(() => readModelVisibility(), [])
+  const user = useMemo(() => readModelVisibility(), []) //用户偏好
 
   const reload = useCallback(async () => {
     setLoad(true)

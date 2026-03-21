@@ -9,7 +9,7 @@ import {
 import type { ChatModelRef } from "@/types/chat"
 import type { ProjectComposerState } from "@/types/composer"
 
-const key = "strategy-front.project-composer.v1"
+const key = "strategy-front.project-composer.v2"
 
 function parse() {
   if (typeof window === "undefined") return {}
@@ -17,80 +17,58 @@ function parse() {
   try {
     const raw = window.localStorage.getItem(key)
     if (!raw) return {}
-    return JSON.parse(raw) as Record<string, ProjectComposerState>
+    return JSON.parse(raw) as ProjectComposerState
   } catch {
     return {}
   }
 }
 
-function write(all: Record<string, ProjectComposerState>) {
+function write(item: ProjectComposerState) {
   if (typeof window === "undefined") return
-  window.localStorage.setItem(key, JSON.stringify(all))
+  window.localStorage.setItem(key, JSON.stringify(item))
 }
 
-export function useProjectComposer(workspacePath?: string | null) {
+export function useProjectComposer() {
   const dispatch = useAppDispatch()
-  const cur = useAppSelector((state) =>
-    workspacePath ? (state.projectComposer.items[workspacePath] ?? {}) : {},
-  )
-  const ready = useAppSelector((state) =>
-    workspacePath ? !!state.projectComposer.ready[workspacePath] : false,
-  )
-  const all = useAppSelector((state) => state.projectComposer.items)
+  const cur = useAppSelector((state) => state.projectComposer.item)
+  const ready = useAppSelector((state) => state.projectComposer.ready)
 
   useEffect(() => {
-    if (!workspacePath || ready) return
-    dispatch(
-      hydrateProjectComposer({
-        workspace: workspacePath,
-        item: parse()[workspacePath] ?? {},
-      }),
-    )
-  }, [dispatch, ready, workspacePath])
+    if (ready) return
+    // 客户端首次进入时，先从 localStorage 回填一次。
+    dispatch(hydrateProjectComposer(parse()))
+  }, [dispatch, ready])
 
   useEffect(() => {
-    if (!workspacePath || !ready) return
-    const next = parse()
-    next[workspacePath] = cur
-    write(next)
-  }, [cur, ready, workspacePath])
+    if (!ready) return
+    // 只有回填完成后才写回，避免初始空 store 覆盖掉已保存的偏好。
+    write(cur)
+  }, [cur, ready])
 
   const patch = useCallback(
     (item: Partial<ProjectComposerState>) => {
-      if (!workspacePath) return
-      dispatch(
-        patchProjectComposer({
-          workspace: workspacePath,
-          item,
-        }),
-      )
+      dispatch(patchProjectComposer(item))
     },
-    [dispatch, workspacePath],
+    [dispatch],
   )
 
   const push = useCallback(
     (model: ChatModelRef) => {
-      if (!workspacePath) return
-      dispatch(
-        pushProjectModel({
-          workspace: workspacePath,
-          model,
-        }),
-      )
+      dispatch(pushProjectModel(model))
     },
-    [dispatch, workspacePath],
+    [dispatch],
   )
 
   return useMemo(
     () => ({
       ready,
       state: cur,
-      all,
       setAgent(agent?: string) {
         patch({ agent })
       },
       setModel(model?: ChatModelRef) {
         patch({ model })
+        // 用户显式选过的模型要单独记到 recent 里，给后续回退排序使用。
         if (!model) return
         push(model)
       },
@@ -98,6 +76,6 @@ export function useProjectComposer(workspacePath?: string | null) {
         patch({ variant })
       },
     }),
-    [all, cur, patch, push, ready],
+    [cur, patch, push, ready],
   )
 }

@@ -4,13 +4,15 @@ import type { ChatModelRef } from "@/types/chat"
 import type { ProjectComposerState } from "@/types/composer"
 
 interface State {
-  items: Record<string, ProjectComposerState>
-  ready: Record<string, boolean>
+  // 所有工作区共用的一份 composer 偏好。
+  item: ProjectComposerState
+  // 用来避免 localStorage 回填前，先把初始空状态写回去。
+  ready: boolean
 }
 
 const initialState: State = {
-  items: {},
-  ready: {},
+  item: {},
+  ready: false,
 }
 
 const max = 5
@@ -19,32 +21,25 @@ const slice = createSlice({
   name: "projectComposer",
   initialState,
   reducers: {
-    hydrateProjectComposer(
-      state,
-      action: PayloadAction<{ workspace: string; item: ProjectComposerState }>,
-    ) {
-      state.items[action.payload.workspace] = action.payload.item
-      state.ready[action.payload.workspace] = true
+    // 首次进入页面时，用持久化存下来的配置整体回填当前 composer 状态。
+    hydrateProjectComposer(state, action: PayloadAction<ProjectComposerState>) {
+      state.item = action.payload
+      state.ready = true
     },
-    patchProjectComposer(
-      state,
-      action: PayloadAction<{ workspace: string; item: Partial<ProjectComposerState> }>,
-    ) {
-      const cur = state.items[action.payload.workspace] ?? {}
-      state.items[action.payload.workspace] = {
-        ...cur,
-        ...action.payload.item,
+    // 用户修改 agent、model、variant 时，只局部更新对应字段，其他字段保持不变。
+    patchProjectComposer(state, action: PayloadAction<Partial<ProjectComposerState>>) {
+      state.item = {
+        ...state.item,
+        ...action.payload,
       }
     },
-    pushProjectModel(
-      state,
-      action: PayloadAction<{ workspace: string; model: ChatModelRef }>,
-    ) {
-      const cur = state.items[action.payload.workspace] ?? {}
-      const recent = [action.payload.model, ...(cur.recent ?? []).filter((item) => !sameModel(item, action.payload.model))]
+    // 记录最近选过的模型，给后续回退逻辑使用。
+    pushProjectModel(state, action: PayloadAction<ChatModelRef>) {
+      // 按最近使用顺序记录模型，后续 resolveComposer 可以回退到最近仍然可用的模型。
+      const recent = [action.payload, ...(state.item.recent ?? []).filter((item) => !sameModel(item, action.payload))]
         .slice(0, max)
-      state.items[action.payload.workspace] = {
-        ...cur,
+      state.item = {
+        ...state.item,
         recent,
       }
     },

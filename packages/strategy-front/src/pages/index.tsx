@@ -28,23 +28,24 @@ import { resolveComposer } from "@/lib/chat-composer"
 export default function Home() {
   const workspace = useAppSelector((state) => state.workspaceView.selectedWorkspace)
   const path = workspace?.path ?? null
-  const [open, setOpen] = useState(false)
-  const [wide, setWide] = useState(false)
+  const [open, setOpen] = useState(false) // 是否显示工作区代码
+  const [wide, setWide] = useState(false) // 是否进入宽屏布局模式
   const root = useRef<HTMLDivElement | null>(null)
 
+  //事件初始化
   useChatEvents(path)
 
   const { selectedSessionId, loading, creating, refreshSessions, createSession, selectSession } = useChatSessions(path)
-  const ags = useAgentCatalog(path)
-  const catalog = useProviderCatalog()
-  const project = useProjectComposer(path)
-  const draft = useSessionDraft(path, selectedSessionId)
+  const ags = useAgentCatalog(path) // agents代码
+  const catalog = useProviderCatalog() // 提供商
+  const project = useProjectComposer() // 项目维度
+  const sessionDraft = useSessionDraft(path, selectedSessionId)
   const composer = useMemo(
     () =>
       resolveComposer({
         agents: ags.ags,
         catalog,
-        current: project.state,
+        state: project.state,
       }),
     [ags.ags, catalog, project.state],
   )
@@ -60,7 +61,7 @@ export default function Home() {
     createSession,
     refreshSessions,
     selectSession,
-    onSubmitted: draft.clear,
+    onSubmitted: sessionDraft.clear,
   })
   const busy = !!selectedSessionId && status.type !== "idle"
   const live = busy || !!permission.req || !!question.req
@@ -220,10 +221,10 @@ export default function Home() {
             onSubmit={(value) => {
               void onSubmit(value)
             }}
-            onValueChange={draft.setValue}
+            onValueChange={sessionDraft.setText}
             onVariant={setVariant}
             submitting={submitting || creating || loading}
-            value={draft.value}
+            value={sessionDraft.text}
             variant={composer.variant}
             variants={composer.variants}
           />
@@ -236,6 +237,7 @@ export default function Home() {
     <div className="flex h-full w-full min-w-0">
       <div ref={root} className="relative flex h-full min-w-0 w-full flex-col">
         <div className="absolute right-4 top-2 z-20">
+          {/** 右上角是否展开工作区按钮 */}
           <ChatWorkspaceToggle
             open={show}
             disabled={!workspace}
@@ -287,5 +289,3 @@ export default function Home() {
     </div>
   )
 }
-
-
