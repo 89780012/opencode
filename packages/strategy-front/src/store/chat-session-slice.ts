@@ -13,7 +13,8 @@ const initialState: State = {
   permissions: {},
   questions: {},
   status: {},
-  errs: {},
+  messageErrs: {},
+  eventErrs: {},
 };
 
 const slice = createSlice({
@@ -54,6 +55,10 @@ const slice = createSlice({
       action: PayloadAction<{ workspace: string; sessionId: string | null }>,
     ) {
       state.selected[action.payload.workspace] = action.payload.sessionId;
+      if (!action.payload.sessionId) {
+        return;
+      }
+      delete state.eventErrs[action.payload.sessionId];
     },
     hydrateSessionMessages(
       state,
@@ -91,11 +96,11 @@ const slice = createSlice({
     ) {
       state.status[action.payload.sessionId] = action.payload.status;
     },
-    clearSessionError(
+    clearSessionEventError(
       state,
       action: PayloadAction<{ sessionId: string }>,
     ) {
-      delete state.errs[action.payload.sessionId];
+      delete state.eventErrs[action.payload.sessionId];
     },
   },
 });
@@ -111,7 +116,7 @@ export const {
   setPendingPermissions,
   applyWorkspaceEvent,
   setSessionStatus,
-  clearSessionError,
+  clearSessionEventError,
 } = slice.actions;
 
 export const chatSessionReducer = slice.reducer;

@@ -20,8 +20,11 @@ export function useChatSessionDetail(
   const status = useAppSelector((state) =>
     sessionId ? (state.chatSession.status[sessionId] ?? idle) : idle,
   );
-  const err = useAppSelector((state) =>
-    sessionId ? state.chatSession.errs[sessionId] : undefined,
+  const messageErr = useAppSelector((state) =>
+    sessionId ? state.chatSession.messageErrs[sessionId] : undefined,
+  );
+  const rawEventErr = useAppSelector((state) =>
+    sessionId ? state.chatSession.eventErrs[sessionId] : undefined,
   );
   const [loading, setLoading] = useState(false);
 
@@ -59,14 +62,19 @@ export function useChatSessionDetail(
     [messages, parts],
   );
 
+  // 一旦错误已经落进 AI 历史消息，就只显示历史里的那条，避免再叠加一条事件红框。
+  const eventErr = messageErr ? undefined : rawEventErr;
+
   return useMemo(
     () => ({
       messages: view,
       status,
-      err,
+      err: eventErr ?? messageErr,
+      eventErr,
+      messageErr,
       loading,
       refresh,
     }),
-    [err, loading, refresh, status, view],
+    [eventErr, loading, messageErr, refresh, status, view],
   );
 }

@@ -19,7 +19,11 @@ export type ChatStateShape = {
   permissions: Record<string, PermissionRequest[]>;
   questions: Record<string, ChatQuestionRequest[]>;
   status: Record<string, ChatStatus>;
-  errs: Record<string, string | undefined>;
+  // AI 消息自身携带的历史错误。它属于时间线的一部分，后续进入会话时不应被清掉。
+  messageErrs: Record<string, string | undefined>;
+  // 运行时事件错误。典型场景是 session.error 先到达，但对应的 assistant message.error
+  // 还没回流，或某些错误只以事件形式出现（例如上下文溢出触发 compaction）。
+  eventErrs: Record<string, string | undefined>;
 };
 
 export const idle: ChatStatus = { type: "idle" };
@@ -36,6 +40,16 @@ const sortPart = (list: ChatPart[]) =>
 const msgErr = (err?: { data?: Record<string, unknown> }) => {
   const txt = err?.data?.message;
   return typeof txt === "string" && txt ? txt : undefined;
+};
+
+const lastAssistantErr = (list: ChatMessageInfo[]) => {
+  for (let i = list.length - 1; i >= 0; i--) {
+    const item = list[i];
+    if (item.role !== "assistant") continue;
+    const msg = msgErr(item.error);
+    if (!msg || abortErr(msg)) return;
+    return msg;
+  }
 };
 
 const abortErr = (txt?: string) => {
@@ -80,22 +94,19 @@ export function hydrateChat(state: ChatStateShape, sessionID: string, list: Chat
     state.messages[sessionID] = nextMessages;
   }
 
-  let err = false;
-
   list.forEach((item) => {
     const nextParts = sortPart(item.parts);
     const prevParts = state.parts[item.info.id];
     if (!prevParts || !arraysShallowEqual(prevParts, nextParts)) {
       state.parts[item.info.id] = nextParts;
     }
-    if (item.info.role !== "assistant") return;
-    const msg = msgErr(item.info.error);
-    if (!msg || abortErr(msg)) return;
-    err = true;
-    state.errs[sessionID] = msg;
   });
-  if (!err) {
-    delete state.errs[sessionID];
+
+  const msg = lastAssistantErr(nextMessages);
+  if (!msg) {
+    delete state.messageErrs[sessionID];
+  } else {
+    state.messageErrs[sessionID] = msg;
   }
   if (!state.status[sessionID]) {
     state.status[sessionID] = idle;
@@ -134,7 +145,8 @@ export function removeSession(state: ChatStateShape, workspace: string, info: Ch
   }
   delete state.messages[info.id];
   delete state.status[info.id];
-  delete state.errs[info.id];
+  delete state.messageErrs[info.id];
+  delete state.eventErrs[info.id];
   delete state.todos[info.id];
   delete state.permissions[info.id];
   delete state.questions[info.id];
@@ -173,7 +185,7 @@ export function applyChatEvent(state: ChatStateShape, workspace: string, evt: Ch
     case "session.status": {
       state.status[evt.properties.sessionID] = evt.properties.status;
       if (evt.properties.status.type === "busy") {
-        delete state.errs[evt.properties.sessionID];
+        delete state.eventErrs[evt.properties.sessionID];
       }
       return;
     }
@@ -185,10 +197,10 @@ export function applyChatEvent(state: ChatStateShape, workspace: string, evt: Ch
       if (!evt.properties.sessionID) return;
       const msg = msgErr(evt.properties.error) ?? "Request failed";
       if (abortErr(msg)) {
-        delete state.errs[evt.properties.sessionID];
+        delete state.eventErrs[evt.properties.sessionID];
         return;
       }
-      state.errs[evt.properties.sessionID] = msg;
+      state.eventErrs[evt.properties.sessionID] = msg;
       return;
     }
     case "message.updated": {
@@ -223,13 +235,12 @@ export function applyChatEvent(state: ChatStateShape, workspace: string, evt: Ch
         }
       }
       state.messages[info.sessionID] = sortMsg(next);
-      if (info.role !== "assistant") return;
-      const msg = msgErr(info.error);
-      if (!msg || abortErr(msg)) {
-        delete state.errs[info.sessionID];
+      const msg = lastAssistantErr(state.messages[info.sessionID]);
+      if (!msg) {
+        delete state.messageErrs[info.sessionID];
         return;
       }
-      state.errs[info.sessionID] = msg;
+      state.messageErrs[info.sessionID] = msg;
       return;
     }
     case "message.removed": {

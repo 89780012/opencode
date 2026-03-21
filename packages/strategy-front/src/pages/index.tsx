@@ -49,7 +49,7 @@ export default function Home() {
       }),
     [ags.ags, catalog, project.state],
   )
-  const { messages, status, err, loading: detail } = useChatSessionDetail(path, selectedSessionId)
+  const { messages, status, eventErr, loading: detail } = useChatSessionDetail(path, selectedSessionId)
   const permission = useChatPermission(path, selectedSessionId)
   const question = useChatQuestion(path, selectedSessionId)
   const { submitting, submit } = usePromptSubmit({
@@ -151,7 +151,7 @@ export default function Home() {
     <div className="flex h-full min-h-0 min-w-0 w-full flex-col">
       <div className="relative flex min-h-0 flex-1">
         <ChatMessageList
-          err={err}
+          err={eventErr}
           messages={messages}
           loading={detail && !!selectedSessionId}
           status={status}

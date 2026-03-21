@@ -4,7 +4,7 @@ import { Conversation, ConversationContent, ConversationScrollButton } from "@/c
 import { Message, MessageContent } from "@/components/ai-elements/message"
 import { Response } from "@/components/ai-elements/response"
 import { cn } from "@/lib/utils"
-import type { ChatPart, ChatStatus, ChatTodo, ChatToolPart, ChatToolState, ChatView } from "@/types/chat"
+import type { ChatError, ChatPart, ChatStatus, ChatTodo, ChatToolPart, ChatToolState, ChatView } from "@/types/chat"
 
 interface Props {
   messages: ChatView[]
@@ -14,11 +14,12 @@ interface Props {
   hasCache?: boolean
 }
 
-function text(parts: ChatPart[]) {
-  return parts
-    .filter((part) => part.type === "text" || part.type === "reasoning")
-    .map((part) => ("text" in part ? part.text : ""))
-    .join("")
+function errorText(err?: ChatError) {
+  const msg = err?.data?.message
+  if (typeof msg === "string" && msg) {
+    return msg
+  }
+  return err?.name
 }
 
 function todos(state: ChatToolState) {
@@ -208,18 +209,8 @@ export const ChatMessageList = memo(function ChatMessageList(props: Props) {
     <Conversation className="custom-scrollbar flex-1" initial={props.hasCache ? "instant" : "smooth"}>
       <ConversationContent className="mx-auto w-full max-w-[776px]">
         {props.messages.map((message) => {
-          const body =
-            message.parts.length > 0
-              ? message.parts
-              : [
-                  {
-                    id: `${message.info.id}:text`,
-                    sessionID: message.info.sessionID,
-                    messageID: message.info.id,
-                    type: "text" as const,
-                    text: text(message.parts),
-                  },
-                ]
+          const body = message.parts.length > 0 ? message.parts : []
+          const err = message.info.role === "assistant" ? errorText(message.info.error) : undefined
 
           return (
             <Message key={message.info.id} from={message.info.role}>
@@ -227,6 +218,11 @@ export const ChatMessageList = memo(function ChatMessageList(props: Props) {
                 {body.map((part) => (
                   <div key={part.id}>{renderPart(part, message.info.role)}</div>
                 ))}
+                {err ? (
+                  <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {err}
+                  </div>
+                ) : null}
               </MessageContent>
             </Message>
           )

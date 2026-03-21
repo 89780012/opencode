@@ -41,6 +41,7 @@ export function useChatEvents(workspacePath?: string | null) {
       // console.log("onmessage-->", msg)
       const evt = parse(msg.data)
       if (!evt) return
+      // 全局事件转发
       dispatch(applyWorkspaceEvent({ workspace: workspacePath, event: evt }))
     }
 
