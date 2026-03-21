@@ -16,7 +16,6 @@ type Item = {
 }
 
 const key = "strategy-front.chat-composer.v2"
-const old = "strategy-front.chat-composer.v1"
 const max = 5
 
 function parse<T>(key: string) {
@@ -34,20 +33,7 @@ function parse<T>(key: string) {
 function read(): Record<string, Item> {
   const cur = parse<Record<string, Item>>(key)
   if (cur) return cur
-
-  const oldState = parse<Record<string, ComposerState>>(old)
-  if (!oldState) return {}
-
-  return Object.fromEntries(
-    Object.entries(oldState).map(([id, item]) => [
-      id,
-      {
-        draft: item,
-        session: {},
-        recent: item.model ? [item.model] : [],
-      } satisfies Item,
-    ]),
-  )
+  return {}
 }
 
 function write(all: Record<string, Item>) {
@@ -109,12 +95,15 @@ export function useChatComposer(workspacePath?: string | null, sessionID?: strin
         if (dead) return
 
         const list = agent.filter((item) => item.mode === "primary" && !item.hidden)
+        // 主agents 列表
         const ags = [...list].sort((a, b) => {
           const diff = rank(a.name) - rank(b.name)
           if (diff !== 0) return diff
           return a.name.localeCompare(b.name)
         })
+        // 提供商连接ids
         const ids = new Set(provider.connected)
+        // 提供商列表
         const allRows = provider.all
           .filter((item) => ids.has(item.id))
           .flatMap((provider) =>
@@ -132,7 +121,6 @@ export function useChatComposer(workspacePath?: string | null, sessionID?: strin
             model: { providerID: item.provider.id, modelID: item.id },
           }),
         )
-
         setAgs(ags)
         setPrv(provider)
         setAllRows(allRows)
@@ -239,7 +227,8 @@ export function useChatComposer(workspacePath?: string | null, sessionID?: strin
 
   const cfgModel = useMemo(() => {
     if (!cfg.model) return undefined
-    const [providerID, modelID] = cfg.model.split("/")
+    const [providerID, ...rest] = cfg.model.split("/")
+    const modelID = rest.join("/")
     const item = { providerID, modelID }
     if (!valid(item)) return undefined
     return item
@@ -262,9 +251,6 @@ export function useChatComposer(workspacePath?: string | null, sessionID?: strin
     const list = [pick?.model, agent?.model, cfgModel, recent, ...by, first].filter(
       (item): item is ChatModelRef => !!item,
     )
-
-    console.log("model", list)
-    console.log("valid", list.find(valid))
     return list.find(valid)
   }, [agent?.model, allRows, cfgModel, pick?.model, prv.all, prv.connected, prv.default, recent, valid])
 
@@ -312,7 +298,8 @@ export function useChatComposer(workspacePath?: string | null, sessionID?: strin
 
   const setModel = useCallback(
     (value: string) => {
-      const [providerID, modelID] = value.split("/")
+      const [providerID, ...rest] = value.split("/")
+      const modelID = rest.join("/")
       const model = { providerID, modelID }
       if (!valid(model)) return
       writePick({ model })

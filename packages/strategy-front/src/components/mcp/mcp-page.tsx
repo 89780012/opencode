@@ -286,8 +286,8 @@ export function McpPage() {
           return (
             <div key={item.name} className="bg-background rounded-2xl border px-5 py-4 shadow-xs">
               <div className="flex flex-col gap-4">
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div className="min-w-0 flex-1 space-y-3">
+                <div className="flex flex-wrap gap-3 2xl:flex-nowrap 2xl:items-start 2xl:justify-between">
+                  <div className="min-w-0 flex-1 basis-80 space-y-3">
                     <div className="flex flex-wrap items-center gap-2">
                       <div className="text-base font-semibold">{item.name}</div>
                       <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
@@ -305,7 +305,7 @@ export function McpPage() {
                     ) : null}
                   </div>
 
-                  <div className="flex shrink-0 flex-wrap gap-2">
+                  <div className="flex basis-full flex-wrap gap-2 2xl:basis-auto 2xl:justify-end">
                     {state === "connected" ? (
                       <Button variant="outline" onClick={() => void disconnect(item.name)} disabled={lock}>
                         <Unplug className="size-4" />
