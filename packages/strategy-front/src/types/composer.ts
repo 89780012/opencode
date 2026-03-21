@@ -11,16 +11,16 @@ export type ProjectComposerState = ComposerState & {
 }
 
 export interface ProviderCatalogState {
-  list: List
-  cfg: Config
-  all: ComposerModel[]
-  rows: ComposerModel[]
+  providers: List
+  config: Config
+  connectedModels: ComposerModel[]
+  visibleModels: ComposerModel[]
 }
 
 export interface ComposerResolved {
   agent?: Agent
   model?: ChatModelRef
   variant?: string
-  row?: ComposerModel
-  vars: string[]
+  entry?: ComposerModel
+  variants: string[]
 }

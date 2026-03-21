@@ -19,7 +19,7 @@ interface Props {
   agent?: string
   model?: string
   variant?: string | null
-  vars: string[]
+  variants: string[]
   onValueChange: (value: string) => void
   onSubmit: (value: string) => void
   onAbort: () => void
@@ -89,14 +89,14 @@ export function PromptBar(props: Props) {
               ))}
             </SelectContent>
           </Select>
-          {/* {props.vars.length > 0 ? (
+          {/* {props.variants.length > 0 ? (
             <Select disabled={props.disabled} onValueChange={props.onVariant} value={props.variant ?? "default"}>
               <SelectTrigger className={`${item} max-w-[120px]`}>
                 <SelectValue placeholder="默认" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="default">默认</SelectItem>
-                {props.vars.map((item) => (
+                {props.variants.map((item) => (
                   <SelectItem key={item} value={item}>
                     {item}
                   </SelectItem>

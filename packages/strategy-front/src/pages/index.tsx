@@ -36,17 +36,17 @@ export default function Home() {
 
   const { selectedSessionId, loading, creating, refreshSessions, createSession, selectSession } = useChatSessions(path)
   const ags = useAgentCatalog(path)
-  const prv = useProviderCatalog()
+  const catalog = useProviderCatalog()
   const project = useProjectComposer(path)
   const draft = useSessionDraft(path, selectedSessionId)
   const composer = useMemo(
     () =>
       resolveComposer({
-        ags: ags.ags,
-        prv,
-        cur: project.state,
+        agents: ags.ags,
+        catalog,
+        current: project.state,
       }),
-    [ags.ags, project.state, prv],
+    [ags.ags, catalog, project.state],
   )
   const { messages, status, err, loading: detail } = useChatSessionDetail(path, selectedSessionId)
   const permission = useChatPermission(path, selectedSessionId)
@@ -66,7 +66,7 @@ export default function Home() {
   const live = busy || !!permission.req || !!question.req
   const todo = useChatTodo(path, selectedSessionId, live)
   const empty = !selectedSessionId || (!detail && status.type !== "busy" && messages.length === 0)
-  const load = ags.load || prv.load
+  const load = ags.load || catalog.load
   const model = composer.model ? `${composer.model.providerID}/${composer.model.modelID}` : undefined
 
   const setAgent = useCallback(
@@ -81,10 +81,10 @@ export default function Home() {
     (value: string) => {
       const [providerID, ...rest] = value.split("/")
       const modelID = rest.join("/")
-      if (!prv.all.some((item) => item.provider.id === providerID && item.id === modelID)) return
+      if (!catalog.connectedModels.some((item) => item.provider.id === providerID && item.id === modelID)) return
       project.setModel({ providerID, modelID })
     },
-    [project, prv.all],
+    [catalog.connectedModels, project],
   )
 
   const setVariant = useCallback(
@@ -211,7 +211,7 @@ export default function Home() {
             busy={busy}
             disabled={!workspace || load}
             model={model}
-            models={prv.rows}
+            models={catalog.visibleModels}
             onAgent={setAgent}
             onAbort={() => {
               void onAbort()
@@ -225,7 +225,7 @@ export default function Home() {
             submitting={submitting || creating || loading}
             value={draft.value}
             variant={composer.variant}
-            vars={composer.vars}
+            variants={composer.variants}
           />
         </div>
       </div>

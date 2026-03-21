@@ -72,7 +72,7 @@ export function ProviderModelPage() {
   const [user, setUser] = useState<Record<string, Vis>>(() => read())
   const [now] = useState(() => Date.now())
   const dq = useDeferredValue(q.trim().toLowerCase())
-  const list = prv.list
+  const providers = prv.providers
   const load = prv.load
   const err = prv.err ? text(prv.err, "加载模型列表失败") : ""
 
@@ -82,19 +82,19 @@ export function ProviderModelPage() {
   }, [user])
 
   const rows = useMemo(() => {
-    const ids = new Set(list.connected)
+    const ids = new Set(providers.connected)
 
-    return list.all
+    return providers.all
       .filter((item) => ids.has(item.id))
       .flatMap((provider) =>
         Object.values(provider.models).map((model) => ({
           ...model,
           provider,
-          def: list.default[provider.id] === model.id,
+          def: providers.default[provider.id] === model.id,
           free: provider.id === "opencode" && (!model.cost || model.cost.input === 0),
         })),
       )
-  }, [list])
+  }, [providers])
 
   const latest = useMemo(() => {
     const grp = new Map<string, Map<string, Row[]>>()

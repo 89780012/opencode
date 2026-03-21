@@ -12,10 +12,10 @@ const empty: List = {
 
 export function useProviderCatalog() {
   const [state, setState] = useState<ProviderCatalogState>({
-    list: empty,
-    cfg: {},
-    all: [],
-    rows: [],
+    providers: empty,
+    config: {},
+    connectedModels: [],
+    visibleModels: [],
   })
   const [load, setLoad] = useState(false)
   const [err, setErr] = useState<unknown>()
@@ -25,18 +25,18 @@ export function useProviderCatalog() {
     setLoad(true)
     setErr(undefined)
     try {
-      const [list, cfg] = await Promise.all([providerApi.list(), providerApi.config()])
-      const ids = new Set(list.connected)
-      const all = list.all
-        .filter((item) => ids.has(item.id))
+      const [providers, config] = await Promise.all([providerApi.list(), providerApi.config()])
+      const connected = new Set(providers.connected)
+      const connectedModels = providers.all
+        .filter((item) => connected.has(item.id))
         .flatMap((provider) =>
           Object.values(provider.models).map((model) => ({
             ...model,
             provider,
           })),
         )
-      const latest = latestModels(all)
-      const rows = all.filter((item) =>
+      const latest = latestModels(connectedModels)
+      const visibleModels = connectedModels.filter((item) =>
         modelVisible({
           row: item,
           user,
@@ -45,10 +45,10 @@ export function useProviderCatalog() {
         }),
       )
       setState({
-        list,
-        cfg,
-        all,
-        rows,
+        providers,
+        config,
+        connectedModels,
+        visibleModels,
       })
     } catch (err) {
       setErr(err)

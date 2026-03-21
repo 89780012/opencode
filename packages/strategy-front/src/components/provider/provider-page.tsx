@@ -21,31 +21,31 @@ export function ProviderPage() {
   const [err, setErr] = useState("")
   const [item, setItem] = useState<Provider>()
   const [customOpen, setCustomOpen] = useState(false)
-  const list = prv.list
-  const cfg = prv.cfg
+  const providers = prv.providers
+  const config = prv.config
   const load = prv.load || authLoad
 
   const connected = useMemo(() => {
-    if (list.all.length === 0 || list.connected.length === 0) return []
-    const ids = new Set(list.connected)
-    return list.all.filter((item) => ids.has(item.id))
-  }, [list])
+    if (providers.all.length === 0 || providers.connected.length === 0) return []
+    const ids = new Set(providers.connected)
+    return providers.all.filter((item) => ids.has(item.id))
+  }, [providers])
 
   const hot = useMemo(() => new Set(popular), [])
 
   const popularList = useMemo(() => {
     const ids = new Set(connected.map((item) => item.id))
-    return list.all
+    return providers.all
       .filter((item) => hot.has(item.id) && !ids.has(item.id))
       .sort((a, b) => popular.indexOf(a.id) - popular.indexOf(b.id))
-  }, [connected, hot, list])
+  }, [connected, hot, providers])
 
   const other = useMemo(() => {
     const ids = new Set(connected.map((item) => item.id))
-    return list.all.filter((item) => !ids.has(item.id) && !hot.has(item.id))
-  }, [connected, hot, list])
+    return providers.all.filter((item) => !ids.has(item.id) && !hot.has(item.id))
+  }, [connected, hot, providers])
 
-  const ids = useMemo(() => new Set(list.all.map((item) => item.id)), [list])
+  const ids = useMemo(() => new Set(providers.all.map((item) => item.id)), [providers])
 
   const reload = useCallback(async () => {
     setAuthLoad(true)
@@ -67,10 +67,10 @@ export function ProviderPage() {
   async function remove(item: Provider) {
     setBusy(item.id)
     try {
-      if (custom(item.id, cfg)) {
+      if (custom(item.id, config)) {
         await providerApi.remove(item.id).catch(() => undefined)
         await providerApi.update({
-          disabled_providers: [...new Set([...(cfg.disabled_providers ?? []), item.id])],
+          disabled_providers: [...new Set([...(config.disabled_providers ?? []), item.id])],
         })
       } else {
         await providerApi.remove(item.id)
@@ -93,7 +93,7 @@ export function ProviderPage() {
     return (
       <div className="space-y-3">
         {items.map((item) => {
-          const linked = list.connected.includes(item.id)
+          const linked = providers.connected.includes(item.id)
           const models = Object.keys(item.models ?? {}).length
           const lock = busy === item.id
           const msg = note(item.id)
@@ -175,7 +175,7 @@ export function ProviderPage() {
             </div>
             <div className="rounded-2xl border bg-muted/20 px-4 py-4">
               <div className="text-muted-foreground text-sm">可连接</div>
-              <div className="mt-2 text-3xl font-semibold">{list.all.length - connected.length}</div>
+              <div className="mt-2 text-3xl font-semibold">{providers.all.length - connected.length}</div>
             </div>
             <div className="rounded-2xl border bg-muted/20 px-4 py-4">
               <div className="text-muted-foreground text-sm">热门</div>
@@ -242,7 +242,7 @@ export function ProviderPage() {
         onDone={reload}
       />
 
-      <ProviderCustomDialog open={customOpen} ids={ids} cfg={cfg} onOpenChange={setCustomOpen} onDone={reload} />
+      <ProviderCustomDialog open={customOpen} ids={ids} cfg={config} onOpenChange={setCustomOpen} onDone={reload} />
     </div>
   )
 }
