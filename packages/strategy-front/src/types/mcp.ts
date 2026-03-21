@@ -57,6 +57,8 @@ export type McpDoc = {
 
 export type McpKind = "local" | "remote" | "unknown"
 
+export type McpView = "connected" | "auth" | "issue" | "disconnected" | "disabled"
+
 export type McpRow = {
   name: string
   cfg?: McpStored

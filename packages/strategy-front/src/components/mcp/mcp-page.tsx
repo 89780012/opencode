@@ -17,13 +17,7 @@ import {
 import { toast } from "sonner"
 import { mcpApi } from "@/api/modules"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -35,7 +29,7 @@ import {
 import { Input } from "@/components/ui/input"
 import type { McpCfg, McpDoc, McpMap, McpRow, McpStatus } from "@/types/mcp"
 import { McpDialog } from "./mcp-dialog"
-import { enabled, isCfg, kind, oauth, sort, summary, text, tone } from "./utils"
+import { enabled, isCfg, kind, oauth, sort, summary, text, tone, view } from "./utils"
 
 type Dlg = {
   open: boolean
@@ -51,12 +45,11 @@ type Auth = {
 
 const empty: McpDoc = {}
 const init: McpMap = {}
-
 function info(status?: McpStatus) {
   if (!status) return ""
   if ("error" in status && status.error) return status.error
   if (status.status === "needs_auth") {
-    return "远程服务需要先完成 OAuth 授权，随后才能连接。"
+    return "远程服务需要先完成 OAuth 授权，完成后再连接。"
   }
   return ""
 }
@@ -84,7 +77,7 @@ export function McpPage() {
             cfg: cfg[name],
             status: map[name],
             kind: kind(cfg[name]),
-            enabled: enabled(cfg[name], map[name]),
+            enabled: enabled(cfg[name]),
             oauth: oauth(cfg[name]),
             summary: summary(cfg[name]),
           }) satisfies McpRow,
@@ -98,14 +91,11 @@ export function McpPage() {
   const stats = useMemo(
     () => ({
       all: rows.length,
-      ok: rows.filter((item) => item.status?.status === "connected").length,
-      auth: rows.filter((item) => item.status?.status === "needs_auth").length,
-      bad: rows.filter(
-        (item) =>
-          item.status?.status === "failed" ||
-          item.status?.status === "needs_client_registration",
-      ).length,
-      off: rows.filter((item) => item.status?.status === "disabled" || !item.enabled).length,
+      ok: rows.filter((item) => view(item) === "connected").length,
+      disc: rows.filter((item) => view(item) === "disconnected").length,
+      auth: rows.filter((item) => view(item) === "auth").length,
+      bad: rows.filter((item) => view(item) === "issue").length,
+      off: rows.filter((item) => view(item) === "disabled").length,
     }),
     [rows],
   )
@@ -164,7 +154,7 @@ export function McpPage() {
     try {
       await mcpApi.connect(name)
       await reload(false)
-      toast.success(`已发起 ${name} 的连接`)
+      toast.success(`已连接 ${name}`)
     } catch (err) {
       toast.error(text(err, `连接 ${name} 失败`))
     } finally {
@@ -222,7 +212,7 @@ export function McpPage() {
       }
       toast.error(info(status) || `${name} 尚未完成授权`)
     } catch (err) {
-      toast.error(text(err, `为 ${name} 执行授权失败`))
+      toast.error(text(err, `${name} 自动授权失败`))
     } finally {
       setBusy("")
     }
@@ -280,20 +270,17 @@ export function McpPage() {
     }
   }
 
-  function render(list: McpRow[]) {
+  function draw(list: McpRow[]) {
     if (list.length === 0) {
-      return (
-        <div className="text-muted-foreground rounded-xl border border-dashed px-4 py-6 text-sm">
-          暂无数据。
-        </div>
-      )
+      return <div className="text-muted-foreground rounded-xl border border-dashed px-4 py-6 text-sm">暂无数据。</div>
     }
 
     return (
       <div className="space-y-3">
         {list.map((item) => {
-          const meta = tone(item.status)
-          const lock = busy.includes(item.name)
+          const meta = tone(item)
+          const state = view(item)
+          const lock = busy.endsWith(`:${item.name}`)
           const msg = info(item.status)
 
           return (
@@ -319,15 +306,18 @@ export function McpPage() {
                   </div>
 
                   <div className="flex shrink-0 flex-wrap gap-2">
-                    {item.status?.status === "connected" ? (
+                    {state === "connected" ? (
                       <Button variant="outline" onClick={() => void disconnect(item.name)} disabled={lock}>
                         <Unplug className="size-4" />
                         断开连接
                       </Button>
                     ) : (
-                      <Button onClick={() => void connect(item.name)} disabled={lock || !isCfg(item.cfg) || !item.enabled}>
+                      <Button
+                        onClick={() => void connect(item.name)}
+                        disabled={lock || !isCfg(item.cfg) || !item.enabled}
+                      >
                         <PlugZap className="size-4" />
-                        连接
+                        {state === "disconnected" ? "重新连接" : "连接"}
                       </Button>
                     )}
 
@@ -385,14 +375,11 @@ export function McpPage() {
     )
   }
 
-  const ok = rows.filter((item) => item.status?.status === "connected")
-  const authList = rows.filter((item) => item.status?.status === "needs_auth")
-  const bad = rows.filter(
-    (item) =>
-      item.status?.status === "failed" ||
-      item.status?.status === "needs_client_registration",
-  )
-  const off = rows.filter((item) => item.status?.status === "disabled" || !item.enabled)
+  const ok = rows.filter((item) => view(item) === "connected")
+  const disc = rows.filter((item) => view(item) === "disconnected")
+  const auths = rows.filter((item) => view(item) === "auth")
+  const bad = rows.filter((item) => view(item) === "issue")
+  const off = rows.filter((item) => view(item) === "disabled")
 
   return (
     <div className="bg-background h-full overflow-auto">
@@ -402,9 +389,7 @@ export function McpPage() {
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div className="space-y-2">
                 <CardTitle>MCP 管理</CardTitle>
-                <CardDescription>
-                  所有改动都会写入全局配置，因此任意工作区都可以复用同一套 MCP 设置。
-                </CardDescription>
+                <CardDescription>所有改动都会写入全局配置，因此不同工作区可以复用同一套 MCP 设置。</CardDescription>
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="outline" onClick={() => void reload()} disabled={load}>
@@ -425,7 +410,7 @@ export function McpPage() {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="grid gap-4 py-6 md:grid-cols-4">
+          <CardContent className="grid gap-4 py-6 md:grid-cols-3 xl:grid-cols-6">
             <div className="rounded-2xl border bg-muted/20 px-4 py-4">
               <div className="text-muted-foreground text-sm">总数</div>
               <div className="mt-2 text-3xl font-semibold">{stats.all}</div>
@@ -435,24 +420,31 @@ export function McpPage() {
               <div className="mt-2 text-3xl font-semibold">{stats.ok}</div>
             </div>
             <div className="rounded-2xl border bg-muted/20 px-4 py-4">
+              <div className="text-muted-foreground text-sm">已断开</div>
+              <div className="mt-2 text-3xl font-semibold">{stats.disc}</div>
+            </div>
+            <div className="rounded-2xl border bg-muted/20 px-4 py-4">
               <div className="text-muted-foreground text-sm">待授权</div>
               <div className="mt-2 text-3xl font-semibold">{stats.auth}</div>
             </div>
             <div className="rounded-2xl border bg-muted/20 px-4 py-4">
-              <div className="text-muted-foreground text-sm">失败 / 已禁用</div>
-              <div className="mt-2 text-3xl font-semibold">{stats.bad + stats.off}</div>
+              <div className="text-muted-foreground text-sm">需处理</div>
+              <div className="mt-2 text-3xl font-semibold">{stats.bad}</div>
+            </div>
+            <div className="rounded-2xl border bg-muted/20 px-4 py-4">
+              <div className="text-muted-foreground text-sm">已禁用</div>
+              <div className="mt-2 text-3xl font-semibold">{stats.off}</div>
             </div>
           </CardContent>
         </Card>
 
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          配置更新采用合并方式。当前界面支持新增、编辑、启用和禁用，但不支持彻底删除某个 MCP 键。
+          配置更新采用合并模式。当前页面支持新增、编辑、启用和禁用，但不支持彻底删除某个 MCP 键, 你需要
+          在~/.config/opencode 下 opencode.jsonc主动删除
         </div>
 
         {err ? (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {err}
-          </div>
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{err}</div>
         ) : null}
 
         <section className="space-y-4">
@@ -466,7 +458,22 @@ export function McpPage() {
               加载中...
             </div>
           ) : (
-            render(ok)
+            draw(ok)
+          )}
+        </section>
+
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold">已断开</h2>
+            <p className="text-muted-foreground mt-1 text-sm">配置仍处于启用状态，但当前连接已关闭，可直接重新连接。</p>
+          </div>
+          {load ? (
+            <div className="text-muted-foreground flex items-center gap-2 text-sm">
+              <Loader2 className="size-4 animate-spin" />
+              加载中...
+            </div>
+          ) : (
+            draw(disc)
           )}
         </section>
 
@@ -481,7 +488,7 @@ export function McpPage() {
               加载中...
             </div>
           ) : (
-            render(authList)
+            draw(auths)
           )}
         </section>
 
@@ -496,14 +503,14 @@ export function McpPage() {
               加载中...
             </div>
           ) : (
-            render(bad)
+            draw(bad)
           )}
         </section>
 
         <section className="space-y-4">
           <div>
             <h2 className="text-lg font-semibold">已禁用</h2>
-            <p className="text-muted-foreground mt-1 text-sm">仍保留在配置中，但不会自动连接的条目。</p>
+            <p className="text-muted-foreground mt-1 text-sm">仍保留在配置中，但不会参与自动连接的条目。</p>
           </div>
           {load ? (
             <div className="text-muted-foreground flex items-center gap-2 text-sm">
@@ -511,7 +518,7 @@ export function McpPage() {
               加载中...
             </div>
           ) : (
-            render(off)
+            draw(off)
           )}
         </section>
       </div>
@@ -537,17 +544,13 @@ export function McpPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>手动 OAuth</DialogTitle>
-            <DialogDescription>
-              打开授权地址并完成流程，然后将返回的授权码粘贴到这里。
-            </DialogDescription>
+            <DialogDescription>打开授权地址并完成流程，然后将返回的授权码粘贴到这里。</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="space-y-2">
               <div className="text-sm font-medium">授权地址</div>
-              <div className="bg-muted rounded-xl border px-3 py-3 text-xs break-all">
-                {auth?.url || "-"}
-              </div>
+              <div className="bg-muted rounded-xl border px-3 py-3 text-xs break-all">{auth?.url || "-"}</div>
               {auth?.url ? (
                 <Button
                   variant="outline"
@@ -580,7 +583,12 @@ export function McpPage() {
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setAuth(undefined)} disabled={busy.startsWith("code:")}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setAuth(undefined)}
+              disabled={busy.startsWith("code:")}
+            >
               取消
             </Button>
             <Button

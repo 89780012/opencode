@@ -1,4 +1,4 @@
-import type { McpCfg, McpKind, McpRemote, McpRow, McpStatus, McpStored } from "@/types/mcp"
+import type { McpCfg, McpKind, McpRemote, McpRow, McpStored, McpView } from "@/types/mcp"
 
 export function text(err: unknown, fallback: string) {
   if (err && typeof err === "object" && "message" in err) {
@@ -40,11 +40,11 @@ export function kind(cfg?: McpStored): McpKind {
   return "unknown"
 }
 
-export function enabled(cfg?: McpStored, status?: McpStatus) {
+export function enabled(cfg?: McpStored) {
   if (cfg && "enabled" in cfg && cfg.enabled === false) {
     return false
   }
-  return status?.status !== "disabled"
+  return true
 }
 
 export function oauth(cfg?: McpStored) {
@@ -64,76 +64,98 @@ export function summary(cfg?: McpStored) {
     return cfg.command.join(" ")
   }
 
-  return "仅包含启用状态"
+  return "仅保留启用状态"
 }
 
-export function tone(status?: McpStatus) {
-  if (!status) {
-    return {
-      tone: "border-slate-200 bg-slate-50 text-slate-700",
-      text: "未知",
-    }
+export function view(item: McpRow): McpView {
+  if (!item.enabled) {
+    return "disabled"
   }
 
-  if (status.status === "connected") {
+  if (item.status?.status === "connected") {
+    return "connected"
+  }
+
+  if (item.status?.status === "needs_auth") {
+    return "auth"
+  }
+
+  if (
+    item.status?.status === "failed" ||
+    item.status?.status === "needs_client_registration"
+  ) {
+    return "issue"
+  }
+
+  return "disconnected"
+}
+
+export function tone(item: McpRow) {
+  const current = view(item)
+
+  if (current === "connected") {
     return {
       tone: "border-emerald-200 bg-emerald-50 text-emerald-700",
       text: "已连接",
     }
   }
 
-  if (status.status === "disabled") {
-    return {
-      tone: "border-slate-200 bg-slate-50 text-slate-700",
-      text: "已禁用",
-    }
-  }
-
-  if (status.status === "needs_auth") {
+  if (current === "auth") {
     return {
       tone: "border-amber-200 bg-amber-50 text-amber-700",
-      text: "需授权",
+      text: "待授权",
     }
   }
 
-  if (status.status === "needs_client_registration") {
+  if (current === "issue") {
     return {
       tone: "border-red-200 bg-red-50 text-red-700",
-      text: "需配置客户端 ID",
+      text: "需处理",
+    }
+  }
+
+  if (current === "disconnected") {
+    return {
+      tone: "border-sky-200 bg-sky-50 text-sky-700",
+      text: "已断开",
     }
   }
 
   return {
-    tone: "border-red-200 bg-red-50 text-red-700",
-    text: "失败",
+    tone: "border-slate-200 bg-slate-50 text-slate-700",
+    text: "已禁用",
   }
 }
 
-function rank(status?: McpStatus) {
-  if (!status) {
-    return 5
-  }
-  if (status.status === "connected") {
+function rank(item: McpRow) {
+  const current = view(item)
+
+  if (current === "connected") {
     return 0
   }
-  if (status.status === "needs_auth") {
+
+  if (current === "disconnected") {
     return 1
   }
-  if (status.status === "needs_client_registration") {
+
+  if (current === "auth") {
     return 2
   }
-  if (status.status === "failed") {
+
+  if (current === "issue") {
     return 3
   }
-  if (status.status === "disabled") {
+
+  if (current === "disabled") {
     return 4
   }
+
   return 5
 }
 
 export function sort(items: McpRow[]) {
   return [...items].sort((a, b) => {
-    const diff = rank(a.status) - rank(b.status)
+    const diff = rank(a) - rank(b)
     if (diff !== 0) {
       return diff
     }

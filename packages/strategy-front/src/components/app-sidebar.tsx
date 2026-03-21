@@ -1,12 +1,12 @@
-"use client";
+"use client"
 
-import { Command, MessageSquareText, PlugZap, ServerCog, Wrench } from "lucide-react";
-import { NavLink, useLocation } from "react-router-dom";
-import { HomeSidebarPanel } from "@/components/home/home-sidebar-panel";
-import { McpSidebarPanel } from "@/components/mcp/mcp-sidebar-panel";
-import { NavUser } from "@/components/nav-user";
-import { ProviderSidebarPanel } from "@/components/provider/provider-sidebar-panel";
-import { SystemSidebarPanel } from "@/components/system/system-sidebar-panel";
+import { Command, MessageSquareText, PlugZap, ServerCog, Wrench } from "lucide-react"
+import { NavLink, useLocation } from "react-router-dom"
+import { HomeSidebarPanel } from "@/components/home/home-sidebar-panel"
+import { McpSidebarPanel } from "@/components/mcp/mcp-sidebar-panel"
+import { NavUser } from "@/components/nav-user"
+import { ProviderSidebarPanel } from "@/components/provider/provider-sidebar-panel"
+import { SystemSidebarPanel } from "@/components/system/system-sidebar-panel"
 import {
   Sidebar,
   SidebarContent,
@@ -17,7 +17,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar";
+} from "@/components/ui/sidebar"
 
 const data = {
   user: {
@@ -37,36 +37,28 @@ const data = {
       icon: PlugZap,
     },
     {
-      title: "安装检测",
-      url: "/installer",
-      icon: Wrench,
-    },
-    {
       title: "MCP 服务",
       url: "/mcp",
       icon: ServerCog,
     },
+    {
+      title: "安装检测",
+      url: "/installer",
+      icon: Wrench,
+    },
   ],
-};
+}
 
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
-  const { pathname } = useLocation();
-  const home = pathname === "/";
-  const provider = pathname.startsWith("/providers");
-  const mcp = pathname.startsWith("/mcp");
-  const isActive = (url: string) =>
-    url === "/" ? pathname === "/" : pathname.startsWith(url);
+  const { pathname } = useLocation()
+  const home = pathname === "/"
+  const provider = pathname.startsWith("/providers")
+  const mcp = pathname.startsWith("/mcp")
+  const isActive = (url: string) => (url === "/" ? pathname === "/" : pathname.startsWith(url))
 
   return (
-    <Sidebar
-      collapsible="icon"
-      className="overflow-hidden *:data-[sidebar=sidebar]:flex-row"
-      {...props}
-    >
-      <Sidebar
-        collapsible="none"
-        className="w-[calc(var(--sidebar-width-icon)+1px)]! border-r"
-      >
+    <Sidebar collapsible="icon" className="overflow-hidden *:data-[sidebar=sidebar]:flex-row" {...props}>
+      <Sidebar collapsible="none" className="w-[calc(var(--sidebar-width-icon)+1px)]! border-r">
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
@@ -127,5 +119,5 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
         )}
       </Sidebar>
     </Sidebar>
-  );
+  )
 }
