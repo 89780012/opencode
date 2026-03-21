@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { FolderOpen } from "lucide-react"
 import { toast } from "sonner"
 import { chatApi } from "@/api/modules"
@@ -11,20 +11,23 @@ import { QuestionPanel } from "@/components/chat/question-panel"
 import { TodoPanel } from "@/components/chat/todo-panel"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { useChatComposer } from "@/hooks/use-chat-composer"
+import { useAgentCatalog } from "@/hooks/use-agent-catalog"
 import { useChatEvents } from "@/hooks/use-chat-events"
 import { useChatPermission } from "@/hooks/use-chat-permission"
 import { useChatQuestion } from "@/hooks/use-chat-question"
+import { useProjectComposer } from "@/hooks/use-project-composer"
+import { useProviderCatalog } from "@/hooks/use-provider-catalog"
 import { useChatSessionDetail } from "@/hooks/use-chat-session-detail"
 import { useChatSessions } from "@/hooks/use-chat-sessions"
 import { useChatTodo } from "@/hooks/use-chat-todo"
 import { usePromptSubmit } from "@/hooks/use-prompt-submit"
+import { useSessionDraft } from "@/hooks/use-session-draft"
 import { useAppSelector } from "@/hooks/useAppSelector"
+import { resolveComposer } from "@/lib/chat-composer"
 
 export default function Home() {
   const workspace = useAppSelector((state) => state.workspaceView.selectedWorkspace)
   const path = workspace?.path ?? null
-  const [input, setInput] = useState("")
   const [open, setOpen] = useState(false)
   const [wide, setWide] = useState(false)
   const root = useRef<HTMLDivElement | null>(null)
@@ -32,25 +35,64 @@ export default function Home() {
   useChatEvents(path)
 
   const { selectedSessionId, loading, creating, refreshSessions, createSession, selectSession } = useChatSessions(path)
-  const composer = useChatComposer(path, selectedSessionId)
+  const ags = useAgentCatalog(path)
+  const prv = useProviderCatalog()
+  const project = useProjectComposer(path)
+  const draft = useSessionDraft(path, selectedSessionId)
+  const composer = useMemo(
+    () =>
+      resolveComposer({
+        ags: ags.ags,
+        prv,
+        cur: project.state,
+      }),
+    [ags.ags, project.state, prv],
+  )
   const { messages, status, err, loading: detail } = useChatSessionDetail(path, selectedSessionId)
   const permission = useChatPermission(path, selectedSessionId)
   const question = useChatQuestion(path, selectedSessionId)
   const { submitting, submit } = usePromptSubmit({
     workspacePath: path,
     sessionId: selectedSessionId,
-    agent: composer.state?.agent,
-    model: composer.state?.model,
-    variant: composer.state?.variant,
+    agent: composer.agent?.name,
+    model: composer.model,
+    variant: composer.variant,
     createSession,
     refreshSessions,
     selectSession,
-    onSubmitted: () => setInput(""),
+    onSubmitted: draft.clear,
   })
   const busy = !!selectedSessionId && status.type !== "idle"
   const live = busy || !!permission.req || !!question.req
   const todo = useChatTodo(path, selectedSessionId, live)
   const empty = !selectedSessionId || (!detail && status.type !== "busy" && messages.length === 0)
+  const load = ags.load || prv.load
+  const model = composer.model ? `${composer.model.providerID}/${composer.model.modelID}` : undefined
+
+  const setAgent = useCallback(
+    (value: string) => {
+      if (!ags.ags.some((item) => item.name === value)) return
+      project.setAgent(value)
+    },
+    [ags.ags, project],
+  )
+
+  const setModel = useCallback(
+    (value: string) => {
+      const [providerID, ...rest] = value.split("/")
+      const modelID = rest.join("/")
+      if (!prv.all.some((item) => item.provider.id === providerID && item.id === modelID)) return
+      project.setModel({ providerID, modelID })
+    },
+    [project, prv.all],
+  )
+
+  const setVariant = useCallback(
+    (value: string) => {
+      project.setVariant(value === "default" ? null : value)
+    },
+    [project],
+  )
 
   useEffect(() => {
     const node = root.current
@@ -75,7 +117,7 @@ export default function Home() {
       toast.error("请先选择工作区")
       return
     }
-    if (!composer.state?.agent || !composer.state?.model) {
+    if (!composer.agent?.name || !composer.model) {
       toast.error("请先选择 Agent 和模型")
       return
     }
@@ -120,7 +162,7 @@ export default function Home() {
             <div className="max-w-md space-y-3 text-center">
               <div className="text-xl font-semibold">开始新会话</div>
               <p className="text-sm text-muted-foreground">
-                请先在左侧会话标签选择历史会话，或点击“新建会话”后发送第一条消息来创建当前工作区的会话。
+                请先在左侧选择历史会话，或发送第一条消息创建当前工作区的新会话。
               </p>
             </div>
           </div>
@@ -164,27 +206,25 @@ export default function Home() {
             />
           ) : null}
           <PromptBar
-            agent={composer.state?.agent}
-            agents={composer.agents}
+            agent={composer.agent?.name}
+            agents={ags.names}
             busy={busy}
-            disabled={!workspace || composer.load}
-            model={
-              composer.state?.model ? `${composer.state.model.providerID}/${composer.state.model.modelID}` : undefined
-            }
-            models={composer.models}
-            onAgent={composer.setAgent}
+            disabled={!workspace || load}
+            model={model}
+            models={prv.rows}
+            onAgent={setAgent}
             onAbort={() => {
               void onAbort()
             }}
-            onModel={composer.setModel}
+            onModel={setModel}
             onSubmit={(value) => {
               void onSubmit(value)
             }}
-            onValueChange={setInput}
-            onVariant={composer.setVariant}
+            onValueChange={draft.setValue}
+            onVariant={setVariant}
             submitting={submitting || creating || loading}
-            value={input}
-            variant={composer.state?.variant}
+            value={draft.value}
+            variant={composer.variant}
             vars={composer.vars}
           />
         </div>
@@ -211,7 +251,7 @@ export default function Home() {
                 <FolderOpen className="size-6 text-muted-foreground" />
               </div>
               <div className="text-xl font-semibold">选择一个工作区</div>
-              <p className="text-sm text-muted-foreground">活动的会话绑定到所选的工作空间目录</p>
+              <p className="text-sm text-muted-foreground">活动会话会绑定到当前选中的工作区。</p>
             </div>
           </div>
         ) : split ? (
@@ -247,3 +287,5 @@ export default function Home() {
     </div>
   )
 }
+
+

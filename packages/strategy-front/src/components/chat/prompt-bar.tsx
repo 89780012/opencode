@@ -7,7 +7,7 @@ import {
   PromptInputTextarea,
 } from "@/components/ai-elements/prompt-input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import type { ComposerModel } from "@/hooks/use-chat-composer"
+import type { ComposerModel } from "@/types/composer"
 
 interface Props {
   value: string

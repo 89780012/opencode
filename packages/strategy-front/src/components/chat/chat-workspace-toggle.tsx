@@ -1,4 +1,4 @@
-import { PanelRightClose, PanelRightOpen } from "lucide-react";
+﻿import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -10,7 +10,7 @@ interface Props {
 }
 
 export function ChatWorkspaceToggle(props: Props) {
-  const text = props.disabled ? "Select a workspace first" : props.open ? "Hide workspace" : "Show workspace";
+  const text = props.disabled ? "请先选择工作区" : props.open ? "隐藏工作区" : "显示工作区";
 
   return (
     <Tooltip>
@@ -18,7 +18,7 @@ export function ChatWorkspaceToggle(props: Props) {
         <div>
           <Button variant="outline" size="sm" disabled={props.disabled} onClick={props.onClick}>
             {props.open ? <PanelRightClose className="size-4" /> : <PanelRightOpen className="size-4" />}
-            <span className="max-w-36 truncate">{props.name ?? "Workspace"}</span>
+            <span className="max-w-36 truncate">{props.name ?? "工作区"}</span>
           </Button>
         </div>
       </TooltipTrigger>
@@ -28,3 +28,5 @@ export function ChatWorkspaceToggle(props: Props) {
     </Tooltip>
   );
 }
+
+

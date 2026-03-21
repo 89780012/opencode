@@ -16,13 +16,13 @@ const nav = [
     icon: PlugZap,
     title: "概览",
     url: "/providers/overview",
-    text: "连接提供商、查看认证方式，并管理自定义的 OpenAI 兼容提供商。",
+    text: "管理全局提供商连接、认证方式，以及自定义的 OpenAI 兼容提供商。",
   },
   {
     icon: Bot,
     title: "模型",
     url: "/providers/models",
-    text: "浏览已连接提供商下的模型目录，并控制当前前端展示哪些模型。",
+    text: "浏览全局提供商模型目录，并控制当前前端展示哪些模型。",
   },
 ]
 
@@ -33,9 +33,9 @@ export function ProviderSidebarPanel() {
     <>
       <SidebarHeader className="border-b p-4">
         <div className="space-y-1">
-          <div className="text-sm font-semibold">提供商</div>
+          <div className="text-sm font-semibold">全局提供商</div>
           <p className="text-muted-foreground text-xs leading-5">
-            管理提供商连接，以及每个已连接提供商对外暴露的模型目录。
+            提供商与项目解耦，这里只管理全局连接和全局模型目录。
           </p>
         </div>
       </SidebarHeader>

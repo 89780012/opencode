@@ -1,77 +1,68 @@
-"use client"
+﻿"use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Loader2, Plus, RefreshCcw } from "lucide-react"
 import { toast } from "sonner"
 import { providerApi } from "@/api/modules/provider"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useProviderCatalog } from "@/hooks/use-provider-catalog"
 import { ProviderConnectDialog } from "./provider-connect-dialog"
 import { ProviderCustomDialog } from "./provider-custom-dialog"
 import { custom, note, popular, source, text } from "./utils"
-import type { AuthMap, Config, List, Provider } from "@/types/provider"
-
-const empty: List = {
-  all: [],
-  connected: [],
-  default: {},
-}
-
-const init: Config = {}
+import type { AuthMap, Provider } from "@/types/provider"
 
 export function ProviderPage() {
-  const [list, setList] = useState<List>(empty)
+  const prv = useProviderCatalog()
+  const refresh = prv.reload
   const [map, setMap] = useState<AuthMap>({})
-  const [cfg, setCfg] = useState<Config>(init)
-  const [load, setLoad] = useState(true)
+  const [authLoad, setAuthLoad] = useState(false)
   const [busy, setBusy] = useState("")
   const [err, setErr] = useState("")
   const [item, setItem] = useState<Provider>()
   const [customOpen, setCustomOpen] = useState(false)
+  const list = prv.list
+  const cfg = prv.cfg
+  const load = prv.load || authLoad
 
   const connected = useMemo(() => {
-    if (list.all.length === 0 || list.connected.length === 0) {
-      return []
-    }
-
-    const set = new Set(list.connected)
-    return list.all.filter((item) => set.has(item.id))
+    if (list.all.length === 0 || list.connected.length === 0) return []
+    const ids = new Set(list.connected)
+    return list.all.filter((item) => ids.has(item.id))
   }, [list])
 
-  const popularSet = useMemo(() => new Set(popular), [])
+  const hot = useMemo(() => new Set(popular), [])
 
   const popularList = useMemo(() => {
-    const set = new Set(connected.map((item) => item.id))
+    const ids = new Set(connected.map((item) => item.id))
     return list.all
-      .filter((item) => popularSet.has(item.id) && !set.has(item.id))
+      .filter((item) => hot.has(item.id) && !ids.has(item.id))
       .sort((a, b) => popular.indexOf(a.id) - popular.indexOf(b.id))
-  }, [connected, list, popularSet])
+  }, [connected, hot, list])
 
   const other = useMemo(() => {
-    const set = new Set(connected.map((item) => item.id))
-    return list.all.filter((item) => !set.has(item.id) && !popularSet.has(item.id))
-  }, [connected, list, popularSet])
+    const ids = new Set(connected.map((item) => item.id))
+    return list.all.filter((item) => !ids.has(item.id) && !hot.has(item.id))
+  }, [connected, hot, list])
 
   const ids = useMemo(() => new Set(list.all.map((item) => item.id)), [list])
 
-  async function reload() {
-    setLoad(true)
+  const reload = useCallback(async () => {
+    setAuthLoad(true)
     setErr("")
     try {
-      const [list, map, cfg] = await Promise.all([providerApi.list(), providerApi.auth(), providerApi.config()])
-      setList(list)
+      const [map] = await Promise.all([providerApi.auth(), refresh()])
       setMap(map)
-      setCfg(cfg)
-    } catch (error) {
-      setErr(text(error, "加载提供商失败"))
+    } catch (err) {
+      setErr(text(err, "加载提供商失败"))
     } finally {
-      setLoad(false)
+      setAuthLoad(false)
     }
-  }
+  }, [refresh])
 
   useEffect(() => {
     void reload()
-  }, [])
+  }, [reload])
 
   async function remove(item: Provider) {
     setBusy(item.id)
@@ -87,14 +78,14 @@ export function ProviderPage() {
       }
       await reload()
       toast.success(`${item.name} 已断开`)
-    } catch (error) {
-      toast.error(text(error, "断开提供商失败"))
+    } catch (err) {
+      toast.error(text(err, "断开提供商失败"))
     } finally {
       setBusy("")
     }
   }
 
-  function renderList(items: Provider[], mode: "connected" | "available") {
+  function render(items: Provider[], mode: "connected" | "available") {
     if (items.length === 0) {
       return <div className="text-muted-foreground rounded-xl border border-dashed px-4 py-6 text-sm">暂无数据。</div>
     }
@@ -113,18 +104,18 @@ export function ProviderPage() {
                   <div className="mb-2 flex flex-wrap items-center gap-2">
                     <div className="text-base font-semibold">{item.name}</div>
                     <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">{item.id}</span>
-                    {linked && (
+                    {linked ? (
                       <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
                         {source(item)}
                       </span>
-                    )}
+                    ) : null}
                   </div>
                   <div className="text-muted-foreground flex flex-wrap items-center gap-3 text-sm">
                     <span>{models} 个模型</span>
-                    {item.env.length > 0 && <span>{item.env.length} 个环境变量入口</span>}
-                    {item.api && <span>{item.api}</span>}
+                    {item.env.length > 0 ? <span>{item.env.length} 个环境变量</span> : null}
+                    {item.api ? <span>{item.api}</span> : null}
                   </div>
-                  {msg && <p className="text-muted-foreground mt-3 text-sm leading-6">{msg}</p>}
+                  {msg ? <p className="text-muted-foreground mt-3 text-sm leading-6">{msg}</p> : null}
                 </div>
 
                 <div className="flex shrink-0 items-center gap-2">
@@ -160,9 +151,9 @@ export function ProviderPage() {
           <CardHeader className="border-b">
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div className="space-y-2">
-                <CardTitle>提供商管理</CardTitle>
+                <CardTitle>提供商</CardTitle>
                 <CardDescription>
-                  查看当前已连接的提供商，发起 OAuth 或 API 密钥认证，并添加自定义兼容 OpenAI 的提供商。
+                  管理全局提供商连接、认证方式，以及自定义 OpenAI 兼容提供商。
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">
@@ -172,7 +163,7 @@ export function ProviderPage() {
                 </Button>
                 <Button onClick={() => setCustomOpen(true)}>
                   <Plus className="size-4" />
-                  自定义提供商
+                  添加自定义提供商
                 </Button>
               </div>
             </div>
@@ -187,18 +178,18 @@ export function ProviderPage() {
               <div className="mt-2 text-3xl font-semibold">{list.all.length - connected.length}</div>
             </div>
             <div className="rounded-2xl border bg-muted/20 px-4 py-4">
-              <div className="text-muted-foreground text-sm">热门提供商</div>
+              <div className="text-muted-foreground text-sm">热门</div>
               <div className="mt-2 text-3xl font-semibold">{popularList.length}</div>
             </div>
           </CardContent>
         </Card>
 
-        {err && <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{err}</div>}
+        {err ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{err}</div> : null}
 
         <section className="space-y-4">
           <div>
-            <h2 className="text-lg font-semibold">已连接的提供商</h2>
-            <p className="text-muted-foreground mt-1 text-sm">连接后，对应模型才会进入可用集合。</p>
+            <h2 className="text-lg font-semibold">已连接提供商</h2>
+            <p className="text-muted-foreground mt-1 text-sm">已连接的提供商会在整个应用中暴露模型。</p>
           </div>
           {load ? (
             <div className="text-muted-foreground flex items-center gap-2 text-sm">
@@ -206,14 +197,14 @@ export function ProviderPage() {
               正在加载提供商状态...
             </div>
           ) : (
-            renderList(connected, "connected")
+            render(connected, "connected")
           )}
         </section>
 
         <section className="space-y-4">
           <div>
             <h2 className="text-lg font-semibold">热门提供商</h2>
-            <p className="text-muted-foreground mt-1 text-sm">优先展示常用提供商，支持直接进入认证流程。</p>
+            <p className="text-muted-foreground mt-1 text-sm">优先展示常用提供商，支持直接发起连接。</p>
           </div>
           {load ? (
             <div className="text-muted-foreground flex items-center gap-2 text-sm">
@@ -221,14 +212,14 @@ export function ProviderPage() {
               正在加载...
             </div>
           ) : (
-            renderList(popularList, "available")
+            render(popularList, "available")
           )}
         </section>
 
         <section className="space-y-4">
           <div>
             <h2 className="text-lg font-semibold">更多提供商</h2>
-            <p className="text-muted-foreground mt-1 text-sm">这里展示服务端当前可识别但尚未连接的其余提供商。</p>
+            <p className="text-muted-foreground mt-1 text-sm">后端已识别但尚未连接的其他提供商。</p>
           </div>
           {load ? (
             <div className="text-muted-foreground flex items-center gap-2 text-sm">
@@ -236,7 +227,7 @@ export function ProviderPage() {
               正在加载...
             </div>
           ) : (
-            renderList(other, "available")
+            render(other, "available")
           )}
         </section>
       </div>
@@ -255,3 +246,10 @@ export function ProviderPage() {
     </div>
   )
 }
+
+
+
+
+
+
+

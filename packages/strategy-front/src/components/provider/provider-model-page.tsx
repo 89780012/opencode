@@ -1,14 +1,14 @@
 ﻿"use client"
 
-import { useDeferredValue, useEffect, useMemo, useState } from "react"
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react"
 import { Loader2, RefreshCcw, RotateCcw, Search } from "lucide-react"
 import { NavLink } from "react-router-dom"
-import { providerApi } from "@/api/modules/provider"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
-import type { List, Model, Provider } from "@/types/provider"
+import { useProviderCatalog } from "@/hooks/use-provider-catalog"
+import type { Model, Provider } from "@/types/provider"
 import { popular, text } from "./utils"
 
 type Vis = "show" | "hide"
@@ -20,12 +20,6 @@ type Row = Model & {
   provider: Provider
   def: boolean
   free: boolean
-}
-
-const empty: List = {
-  all: [],
-  connected: [],
-  default: {},
 }
 
 const storeKey = "strategy-front.provider-models.v1"
@@ -73,33 +67,19 @@ function sortProvider(a: string, b: string, map: Map<string, string>) {
 }
 
 export function ProviderModelPage() {
-  const [list, setList] = useState<List>(empty)
-  const [load, setLoad] = useState(true)
-  const [err, setErr] = useState("")
+  const prv = useProviderCatalog()
   const [q, setQ] = useState("")
   const [user, setUser] = useState<Record<string, Vis>>(() => read())
+  const [now] = useState(() => Date.now())
   const dq = useDeferredValue(q.trim().toLowerCase())
+  const list = prv.list
+  const load = prv.load
+  const err = prv.err ? text(prv.err, "加载模型列表失败") : ""
 
   useEffect(() => {
     if (typeof window === "undefined") return
     window.localStorage.setItem(storeKey, JSON.stringify({ user }))
   }, [user])
-
-  async function reload() {
-    setLoad(true)
-    setErr("")
-    try {
-      setList(await providerApi.list())
-    } catch (error) {
-      setErr(text(error, "加载模型列表失败"))
-    } finally {
-      setLoad(false)
-    }
-  }
-
-  useEffect(() => {
-    void reload()
-  }, [])
 
   const rows = useMemo(() => {
     const ids = new Set(list.connected)
@@ -117,43 +97,45 @@ export function ProviderModelPage() {
   }, [list])
 
   const latest = useMemo(() => {
-    const now = Date.now()
     const grp = new Map<string, Map<string, Row[]>>()
 
     for (const row of rows) {
       const ts = stamp(row.release_date)
       if (!Number.isFinite(ts) || Math.abs(now - ts) >= win) continue
 
-      const byProvider = grp.get(row.provider.id) ?? new Map<string, Row[]>()
+      const by = grp.get(row.provider.id) ?? new Map<string, Row[]>()
       const fam = row.family ?? ""
-      const items = byProvider.get(fam) ?? []
+      const items = by.get(fam) ?? []
       items.push(row)
-      byProvider.set(fam, items)
-      grp.set(row.provider.id, byProvider)
+      by.set(fam, items)
+      grp.set(row.provider.id, by)
     }
 
     const set = new Set<string>()
-    for (const byProvider of grp.values()) {
-      for (const items of byProvider.values()) {
+    for (const by of grp.values()) {
+      for (const items of by.values()) {
         const row = items.slice().sort((a, b) => stamp(b.release_date) - stamp(a.release_date))[0]
         if (!row) continue
         set.add(key({ providerID: row.provider.id, modelID: row.id }))
       }
     }
     return set
-  }, [rows])
+  }, [now, rows])
 
-  const visible = (input: Key) => {
-    const id = key(input)
-    const cur = user[id]
-    if (cur === "hide") return false
-    if (cur === "show") return true
-    if (latest.has(id)) return true
+  const visible = useCallback(
+    (input: Key) => {
+      const id = key(input)
+      const cur = user[id]
+      if (cur === "hide") return false
+      if (cur === "show") return true
+      if (latest.has(id)) return true
 
-    const row = rows.find((item) => item.provider.id === input.providerID && item.id === input.modelID)
-    if (!row) return false
-    return !Number.isFinite(stamp(row.release_date))
-  }
+      const row = rows.find((item) => item.provider.id === input.providerID && item.id === input.modelID)
+      if (!row) return false
+      return !Number.isFinite(stamp(row.release_date))
+    },
+    [latest, rows, user],
+  )
 
   const setVisible = (input: Key, on: boolean) => {
     const id = key(input)
@@ -189,7 +171,7 @@ export function ProviderModelPage() {
       models,
       shown,
     }
-  }, [rows, user, latest])
+  }, [rows, visible])
 
   const clear = () => {
     setUser({})
@@ -206,10 +188,10 @@ export function ProviderModelPage() {
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div className="space-y-2">
                 <CardTitle>提供商模型</CardTitle>
-                <CardDescription>查看已连接提供商暴露出来的模型目录，并控制当前前端真正展示哪些模型。</CardDescription>
+                <CardDescription>浏览全局提供商模型目录，并控制当前前端展示哪些模型。</CardDescription>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <Button variant="outline" onClick={() => void reload()} disabled={load}>
+                <Button variant="outline" onClick={() => void prv.reload()} disabled={load}>
                   <RefreshCcw className={load ? "size-4 animate-spin" : "size-4"} />
                   刷新
                 </Button>
@@ -244,19 +226,12 @@ export function ProviderModelPage() {
             </div>
             <div className="relative">
               <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-              <Input
-                value={q}
-                onChange={(event) => setQ(event.target.value)}
-                placeholder="搜索提供商模型"
-                className="pl-9"
-              />
+              <Input value={q} onChange={(event) => setQ(event.target.value)} placeholder="搜索提供商模型" className="pl-9" />
             </div>
           </CardHeader>
         </Card>
 
-        {err ? (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{err}</div>
-        ) : null}
+        {err ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{err}</div> : null}
 
         {load ? (
           <div className="text-muted-foreground flex items-center gap-2 text-sm">
@@ -267,7 +242,7 @@ export function ProviderModelPage() {
           <Card>
             <CardHeader>
               <CardTitle>暂无已连接提供商</CardTitle>
-              <CardDescription>先在概览页连接至少一个提供商，再来管理模型目录。</CardDescription>
+              <CardDescription>请先在概览页连接至少一个提供商，再来管理模型目录。</CardDescription>
             </CardHeader>
             <CardContent>
               <Button asChild>
@@ -293,7 +268,7 @@ export function ProviderModelPage() {
                     <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                       <div className="space-y-1">
                         <CardTitle>{group.name}</CardTitle>
-                        <CardDescription>当前已连接目录下共有 {group.items.length} 个模型。</CardDescription>
+                        <CardDescription>{group.items.length} 个模型。</CardDescription>
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="text-muted-foreground text-sm">全部切换</span>
@@ -322,19 +297,13 @@ export function ProviderModelPage() {
                                   {item.id}
                                 </span>
                                 {item.def ? (
-                                  <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
-                                    默认
-                                  </span>
+                                  <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">默认</span>
                                 ) : null}
                                 {latest.has(key({ providerID: item.provider.id, modelID: item.id })) ? (
-                                  <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
-                                    最新
-                                  </span>
+                                  <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">最新</span>
                                 ) : null}
                                 {item.free ? (
-                                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
-                                    免费
-                                  </span>
+                                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">免费</span>
                                 ) : null}
                               </div>
                               <div className="text-muted-foreground flex flex-wrap gap-3 text-sm">
@@ -347,9 +316,7 @@ export function ProviderModelPage() {
                               <span className="text-muted-foreground text-sm">{on ? "显示中" : "已隐藏"}</span>
                               <Switch
                                 checked={on}
-                                onCheckedChange={(next) =>
-                                  setVisible({ providerID: item.provider.id, modelID: item.id }, next)
-                                }
+                                onCheckedChange={(next) => setVisible({ providerID: item.provider.id, modelID: item.id }, next)}
                               />
                             </div>
                           </div>
@@ -366,3 +333,10 @@ export function ProviderModelPage() {
     </div>
   )
 }
+
+
+
+
+
+
+
