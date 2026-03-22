@@ -77,15 +77,37 @@ export function ResizablePanelGroup(props: GroupProps) {
   const handle = React.isValidElement<HandleProps>(items[1]) ? items[1] : null
   const right = React.isValidElement<PanelProps>(items[2]) ? items[2] : null
   const root = React.useRef<HTMLDivElement | null>(null)
+  const dragRef = React.useRef(false)
+  const sizeRef = React.useRef(0)
+  const posRef = React.useRef(0)
+  const frameRef = React.useRef<number | null>(null)
+  const boxRef = React.useRef<{ left: number; width: number; span: number; min: number; max: number } | null>(null)
   const start = left?.props.defaultSize ?? 50
   const [size, setSize] = React.useState(() => read(props.autoSaveId, start))
   const [drag, setDrag] = React.useState(false)
   const fold = !!props.collapsed
   const gap = fold ? 0 : rail
+  const ratio = fold ? 1 : size / 100
+
+  const paint = React.useCallback((value: number) => {
+    const node = root.current
+    if (!node) {
+      return
+    }
+
+    node.style.setProperty("--resize-size", `${fold ? 1 : value / 100}`)
+  }, [fold])
 
   React.useEffect(() => {
     setSize(read(props.autoSaveId, start))
   }, [props.autoSaveId, start])
+
+  React.useEffect(() => {
+    sizeRef.current = size
+    if (!dragRef.current) {
+      paint(size)
+    }
+  }, [paint, size])
 
   React.useEffect(() => {
     const node = root.current
@@ -110,37 +132,62 @@ export function ResizablePanelGroup(props: GroupProps) {
       return
     }
 
-    const move = (event: PointerEvent) => {
-      const node = root.current
-      if (!node || !left || !right) {
+    dragRef.current = true
+
+    const flush = () => {
+      frameRef.current = null
+      const box = boxRef.current
+      if (!box) {
         return
       }
 
-      const rect = node.getBoundingClientRect()
-      const span = rect.width - gap
-      const min = left.props.minSize ?? 320
-      const max = span - (right.props.minSize ?? 520)
-      const next = Math.min(Math.max(event.clientX - rect.left, min), max)
-      const value = clamp((next / span) * 100, rect.width, gap, left, right)
-      setSize(value)
+      const next = Math.min(Math.max(posRef.current - box.left, box.min), box.max)
+      const value = clamp((next / box.span) * 100, box.width, gap, left, right)
+      sizeRef.current = value
+      paint(value)
+    }
+
+    const move = (event: PointerEvent) => {
+      posRef.current = event.clientX
+      if (frameRef.current !== null) {
+        return
+      }
+      frameRef.current = window.requestAnimationFrame(flush)
     }
 
     const up = () => {
+      dragRef.current = false
+      if (frameRef.current !== null) {
+        window.cancelAnimationFrame(frameRef.current)
+        flush()
+      }
+      boxRef.current = null
       setDrag(false)
+      setSize(sizeRef.current)
     }
 
     window.addEventListener("pointermove", move)
     window.addEventListener("pointerup", up)
+    window.addEventListener("pointercancel", up)
+    window.addEventListener("blur", up)
     document.body.style.cursor = "col-resize"
     document.body.style.userSelect = "none"
 
     return () => {
+      dragRef.current = false
+      boxRef.current = null
+      if (frameRef.current !== null) {
+        window.cancelAnimationFrame(frameRef.current)
+        frameRef.current = null
+      }
       window.removeEventListener("pointermove", move)
       window.removeEventListener("pointerup", up)
+      window.removeEventListener("pointercancel", up)
+      window.removeEventListener("blur", up)
       document.body.style.cursor = ""
       document.body.style.userSelect = ""
     }
-  }, [drag, fold, gap, left, right])
+  }, [drag, fold, gap, left, paint, right])
 
   React.useEffect(() => {
     if (!fold) {
@@ -151,22 +198,35 @@ export function ResizablePanelGroup(props: GroupProps) {
   }, [fold])
 
   React.useEffect(() => {
-    write(props.autoSaveId, size)
-  }, [props.autoSaveId, size])
+    if (drag) {
+      return
+    }
+
+    const id = window.setTimeout(() => {
+      write(props.autoSaveId, size)
+    }, 120)
+
+    return () => {
+      window.clearTimeout(id)
+    }
+  }, [drag, props.autoSaveId, size])
 
   if (props.direction !== "horizontal" || !left || !right) {
     return <div className={props.className}>{props.children}</div>
   }
 
   return (
-    <div ref={root} className={cn("flex min-h-0 min-w-0 overflow-hidden", props.className)}>
+    <div
+      ref={root}
+      className={cn("flex min-h-0 min-w-0 overflow-hidden", props.className)}
+      style={{ "--resize-size": `${ratio}` } as React.CSSProperties}
+    >
       <div
         className={cn("flex min-h-0 min-w-0 w-full flex-col overflow-hidden", left.props.className)}
         style={{
-          flexBasis: fold ? "100%" : `calc((100% - ${gap}px) * ${size / 100})`,
+          flexBasis: fold ? "100%" : `calc((100% - ${gap}px) * var(--resize-size))`,
           flexGrow: 0,
           flexShrink: 0,
-          width: fold ? "100%" : `calc((100% - ${gap}px) * ${size / 100})`,
         }}
       >
         {left.props.children}
@@ -180,6 +240,23 @@ export function ResizablePanelGroup(props: GroupProps) {
             return
           }
           event.preventDefault()
+          const node = root.current
+          if (!node) {
+            return
+          }
+          const rect = node.getBoundingClientRect()
+          const span = rect.width - gap
+          if (span <= 0) {
+            return
+          }
+          boxRef.current = {
+            left: rect.left,
+            width: rect.width,
+            span,
+            min: left.props.minSize ?? 320,
+            max: span - (right.props.minSize ?? 520),
+          }
+          posRef.current = event.clientX
           setDrag(true)
         }}
         className={cn(
@@ -199,10 +276,9 @@ export function ResizablePanelGroup(props: GroupProps) {
       <div
         className={cn("flex min-h-0 min-w-0 w-full flex-col overflow-hidden", right.props.className)}
         style={{
-          flexBasis: fold ? 0 : `calc((100% - ${gap}px) * ${(100 - size) / 100})`,
+          flexBasis: fold ? 0 : `calc((100% - ${gap}px) * (1 - var(--resize-size)))`,
           flexGrow: 0,
           flexShrink: 0,
-          width: fold ? 0 : `calc((100% - ${gap}px) * ${(100 - size) / 100})`,
         }}
         aria-hidden={fold}
       >
