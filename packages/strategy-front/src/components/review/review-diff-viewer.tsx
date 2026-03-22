@@ -1,4 +1,5 @@
-import { DiffEditor } from "@monaco-editor/react"
+import { DiffEditor, type MonacoDiffEditor } from "@monaco-editor/react"
+import { useEffect, useRef } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { editorLanguage } from "@/lib/editor-language"
 import type { ReviewMode } from "@/hooks/use-chat-review"
@@ -11,6 +12,27 @@ interface Props {
 }
 
 export function ReviewDiffViewer(props: Props) {
+  const ref = useRef<MonacoDiffEditor | null>(null)
+
+  useEffect(() => {
+    return () => {
+      const model = ref.current?.getModel()
+      ref.current = null
+      if (!model) {
+        return
+      }
+
+      queueMicrotask(() => {
+        if (!model.original.isDisposed()) {
+          model.original.dispose()
+        }
+        if (!model.modified.isDisposed()) {
+          model.modified.dispose()
+        }
+      })
+    }
+  }, [props.diff?.file])
+
   if (props.loading && !props.diff) {
     return (
       <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col gap-3 p-4">
@@ -37,6 +59,7 @@ export function ReviewDiffViewer(props: Props) {
       </div>
       <div className="min-h-0 min-w-0 flex-1">
         <DiffEditor
+          key={props.diff.file}
           height="100%"
           width="100%"
           original={props.diff.before}
@@ -44,6 +67,11 @@ export function ReviewDiffViewer(props: Props) {
           language={editorLanguage(props.diff.file)}
           originalModelPath={`original:${props.diff.file}`}
           modifiedModelPath={`modified:${props.diff.file}`}
+          keepCurrentOriginalModel
+          keepCurrentModifiedModel
+          onMount={(editor) => {
+            ref.current = editor
+          }}
           options={{
             automaticLayout: true,
             minimap: { enabled: false },
