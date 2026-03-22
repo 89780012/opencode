@@ -3,6 +3,7 @@ package workspace
 import (
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -47,7 +48,14 @@ func (s *Service) List() (ListResult, error) {
 	}, nil
 }
 
-func (s *Service) Create(name string) (CreateResult, error) {
+func initGit(dir string) error {
+	cmd := exec.Command("git", "init", "--quiet")
+	cmd.Dir = dir
+	return cmd.Run()
+}
+
+// 创建工作空间
+func (s *Service) Create(name string, git bool) (CreateResult, error) {
 	slog.Info("workspace create", "name", name)
 	root, err := base()
 	if err != nil {
@@ -78,6 +86,7 @@ func (s *Service) Create(name string) (CreateResult, error) {
 		return CreateResult{}, err
 	}
 
+	// 模板文件
 	err = seed(path)
 	if err != nil {
 		slog.Error("workspace create: seed failed", "path", path, "error", err)
@@ -85,11 +94,21 @@ func (s *Service) Create(name string) (CreateResult, error) {
 		return CreateResult{}, err
 	}
 
+	//skills, agents
 	err = ensure(path)
 	if err != nil {
 		slog.Error("workspace create: ensure failed", "path", path, "error", err)
 		_ = os.RemoveAll(path)
 		return CreateResult{}, err
+	}
+
+	if git {
+		err = initGit(path)
+		if err != nil {
+			slog.Error("workspace create: git init failed", "path", path, "error", err)
+			_ = os.RemoveAll(path)
+			return CreateResult{}, err
+		}
 	}
 
 	slog.Info("workspace created", "name", name, "path", path)
@@ -99,7 +118,8 @@ func (s *Service) Create(name string) (CreateResult, error) {
 	}, nil
 }
 
-func (s *Service) Open(path string) (OpenResult, error) {
+// 打开工作空间
+func (s *Service) Open(path string, git bool) (OpenResult, error) {
 	slog.Info("workspace open", "path", path)
 	root, err := base()
 	if err != nil {
@@ -131,6 +151,14 @@ func (s *Service) Open(path string) (OpenResult, error) {
 	if err != nil {
 		slog.Error("workspace open: ensure failed", "dir", dir, "error", err)
 		return OpenResult{}, err
+	}
+
+	if git {
+		err = initGit(dir)
+		if err != nil {
+			slog.Error("workspace open: git init failed", "dir", dir, "error", err)
+			return OpenResult{}, err
+		}
 	}
 
 	slog.Info("workspace opened", "dir", dir)

@@ -2,6 +2,7 @@ export interface LocalWorkspace {
   name: string;
   path: string;
   keywords: string[];
+  vcs?: "git";
 }
 
 export interface LocalWorkspaceResponse {
@@ -11,6 +12,7 @@ export interface LocalWorkspaceResponse {
 
 export interface CreateWorkspaceRequest {
   name: string;
+  git?: boolean;
 }
 
 export interface CreateWorkspaceResponse {
@@ -20,6 +22,7 @@ export interface CreateWorkspaceResponse {
 
 export interface OpenWorkspaceRequest {
   path: string;
+  git?: boolean;
 }
 
 export interface OpenWorkspaceResponse {

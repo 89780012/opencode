@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { RefreshCw } from "lucide-react"
 import { workspaceApi } from "@/api/modules/workspace"
 import { Button } from "@/components/ui/button"
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { WorkspaceCodeEditor } from "@/components/workspace/workspace-code-editor"
 import { WorkspaceFileTabs } from "@/components/workspace/workspace-file-tabs"
 import { WorkspaceFileTree } from "@/components/workspace/workspace-file-tree"
@@ -169,30 +170,43 @@ export function WorkspaceEditorPane(props: Props) {
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col bg-background">
-      <div className="flex items-center justify-between gap-2 border-b px-4 py-2 text-xs text-muted-foreground">
-        <div className="flex items-center gap-2">
-          {props.readonly ? (
-            <span className="rounded-md border px-2 py-1 text-[10px] uppercase tracking-[0.16em]">Read only</span>
-          ) : null}
-          <Button size="sm" variant="outline" onClick={() => void load()} disabled={loading}>
-            <RefreshCw className="size-4" />
-            {loading ? "刷新中..." : "刷新"}
-          </Button>
-        </div>
-      </div>
-
-      <div className="flex min-h-0 min-w-0 flex-1">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <WorkspaceFileTabs open={open} active={active} onPick={setActive} onClose={drop} />
+      <ResizablePanelGroup
+        direction="horizontal"
+        autoSaveId="strategy-front:workspace-editor-split:v1"
+        className="min-h-0 min-w-0 flex-1"
+      >
+        <ResizablePanel defaultSize={74} minSize={420} className="min-h-0 min-w-0">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <WorkspaceFileTabs
+            open={open}
+            active={active}
+            onPick={setActive}
+            onClose={drop}
+            side={
+              <>
+                {props.readonly ? (
+                  <span className="rounded-md px-2 py-1 text-[10px] uppercase tracking-[0.16em]">只读</span>
+                ) : null}
+                <Button size="sm" variant="outline" onClick={() => void load()} disabled={loading}>
+                  <RefreshCw className="size-4" />
+                  {loading ? "刷新中..." : "刷新"}
+                </Button>
+              </>
+            }
+          />
           <WorkspaceCodeEditor
             loading={loading || fileLoading}
             error={error || fileError}
             activeFilePath={active}
             file={file}
           />
-        </div>
-        <WorkspaceFileTree filePaths={paths} activeFilePath={active} onSelectFile={show} />
-      </div>
+          </div>
+        </ResizablePanel>
+        <ResizableHandle withHandle className="pointer" />
+        <ResizablePanel defaultSize={26} minSize={220} className="min-h-0 min-w-0">
+          <WorkspaceFileTree filePaths={paths} activeFilePath={active} onSelectFile={show} />
+        </ResizablePanel>
+      </ResizablePanelGroup>
     </div>
   )
 }

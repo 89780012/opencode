@@ -81,6 +81,15 @@ export interface ChatModelRef {
   modelID: string;
 }
 
+export interface ChatFileDiff {
+  file: string;
+  before: string;
+  after: string;
+  additions: number;
+  deletions: number;
+  status?: "added" | "deleted" | "modified";
+}
+
 export interface ChatPartRange {
   start: {
     line: number;
@@ -320,6 +329,11 @@ export interface ChatUserMessage {
   time: {
     created: number;
   };
+  summary?: {
+    title?: string;
+    body?: string;
+    diffs: ChatFileDiff[];
+  };
   agent: string;
   model: ChatModelRef;
   variant?: string;
@@ -393,6 +407,13 @@ export interface ChatPromptBody {
 }
 
 export type ChatEvent =
+  | {
+      type: "session.diff";
+      properties: {
+        sessionID: string;
+        diff: ChatFileDiff[];
+      };
+    }
   | {
       type: "session.created";
       properties: {

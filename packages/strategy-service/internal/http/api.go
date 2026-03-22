@@ -88,10 +88,12 @@ func (a *API) workspaceList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	data.Workspaces = a.workspaceLocals(r.Context(), data.Workspaces)
 	slog.Info("workspace list", "count", len(data.Workspaces))
 	write(w, http.StatusOK, "ok", data)
 }
 
+// 创建工作空间
 func (a *API) workspaceCreate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
@@ -100,6 +102,7 @@ func (a *API) workspaceCreate(w http.ResponseWriter, r *http.Request) {
 
 	body := struct {
 		Name string `json:"name"`
+		Git  bool   `json:"git"`
 	}{}
 	err := readJSON(r, &body)
 	if err != nil {
@@ -109,17 +112,19 @@ func (a *API) workspaceCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slog.Info("workspace create", "name", body.Name)
-	data, err := a.ws.Create(body.Name)
+	data, err := a.ws.Create(body.Name, body.Git)
 	if err != nil {
 		slog.Error("workspace create failed", "name", body.Name, "error", err)
 		write(w, http.StatusBadRequest, err.Error(), nil)
 		return
 	}
 
+	data.Workspace = a.workspaceLocal(r.Context(), data.Workspace)
 	slog.Info("workspace created", "name", body.Name, "path", data.Workspace.Path)
 	write(w, http.StatusOK, "ok", data)
 }
 
+// 打开工作空间
 func (a *API) workspaceOpen(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
@@ -128,6 +133,7 @@ func (a *API) workspaceOpen(w http.ResponseWriter, r *http.Request) {
 
 	body := struct {
 		Path string `json:"path"`
+		Git  bool   `json:"git"`
 	}{}
 	err := readJSON(r, &body)
 	if err != nil {
@@ -137,13 +143,14 @@ func (a *API) workspaceOpen(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slog.Info("workspace open", "path", body.Path)
-	data, err := a.ws.Open(body.Path)
+	data, err := a.ws.Open(body.Path, body.Git)
 	if err != nil {
 		slog.Error("workspace open failed", "path", body.Path, "error", err)
 		write(w, http.StatusBadRequest, err.Error(), nil)
 		return
 	}
 
+	data.Workspace = a.workspaceLocal(r.Context(), data.Workspace)
 	write(w, http.StatusOK, "ok", data)
 }
 

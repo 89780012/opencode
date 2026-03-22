@@ -12,6 +12,7 @@ interface Props {
   err?: string
   loading?: boolean
   hasCache?: boolean
+  onOpenDiff?: (file: string) => void
 }
 
 function errorText(err?: ChatError) {
@@ -123,7 +124,7 @@ function renderTool(part: ChatToolPart) {
   )
 }
 
-function renderPart(part: ChatPart, role: ChatView["info"]["role"]) {
+function renderPart(part: ChatPart, role: ChatView["info"]["role"], onOpenDiff?: (file: string) => void) {
   switch (part.type) {
     case "text":
       if (role === "assistant") {
@@ -180,9 +181,17 @@ function renderPart(part: ChatPart, role: ChatView["info"]["role"]) {
           <div className="font-medium">Patch {part.hash}</div>
           <div className="mt-2 flex flex-wrap gap-2">
             {part.files.map((item) => (
-              <span key={item} className="rounded bg-muted px-2 py-1 text-xs">
+              <button
+                key={item}
+                type="button"
+                onClick={() => onOpenDiff?.(item)}
+                className={cn(
+                  "rounded px-2 py-1 text-xs transition-colors",
+                  onOpenDiff ? "bg-muted hover:bg-primary/10 hover:text-foreground" : "bg-muted",
+                )}
+              >
                 {item}
-              </span>
+              </button>
             ))}
           </div>
         </div>
@@ -216,7 +225,7 @@ export const ChatMessageList = memo(function ChatMessageList(props: Props) {
             <Message key={message.info.id} from={message.info.role}>
               <MessageContent>
                 {body.map((part) => (
-                  <div key={part.id}>{renderPart(part, message.info.role)}</div>
+                  <div key={part.id}>{renderPart(part, message.info.role, props.onOpenDiff)}</div>
                 ))}
                 {err ? (
                   <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

@@ -1,5 +1,6 @@
 import type {
   ChatEvent,
+  ChatFileDiff,
   ChatMessageInfo,
   ChatMessageRecord,
   ChatPart,
@@ -15,6 +16,7 @@ export type ChatStateShape = {
   selected: Record<string, string | null>;
   messages: Record<string, ChatMessageInfo[]>;
   parts: Record<string, ChatPart[]>;
+  sessionDiffs: Record<string, ChatFileDiff[] | undefined>;
   todos: Record<string, ChatTodo[] | undefined>;
   permissions: Record<string, PermissionRequest[]>;
   questions: Record<string, ChatQuestionRequest[]>;
@@ -147,6 +149,7 @@ export function removeSession(state: ChatStateShape, workspace: string, info: Ch
   delete state.status[info.id];
   delete state.messageErrs[info.id];
   delete state.eventErrs[info.id];
+  delete state.sessionDiffs[info.id];
   delete state.todos[info.id];
   delete state.permissions[info.id];
   delete state.questions[info.id];
@@ -161,6 +164,10 @@ export function applyChatEvent(state: ChatStateShape, workspace: string, evt: Ch
     }
     case "session.deleted": {
       removeSession(state, workspace, evt.properties.info);
+      return;
+    }
+    case "session.diff": {
+      state.sessionDiffs[evt.properties.sessionID] = evt.properties.diff;
       return;
     }
     case "permission.asked": {

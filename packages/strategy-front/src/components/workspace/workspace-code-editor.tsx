@@ -1,66 +1,13 @@
-import * as monaco from "monaco-editor/esm/vs/editor/editor.api"
-import { Editor, loader } from "@monaco-editor/react"
-import "monaco-editor/esm/vs/basic-languages/html/html.contribution"
-import "monaco-editor/esm/vs/basic-languages/python/python.contribution"
-import "monaco-editor/esm/vs/basic-languages/shell/shell.contribution"
+import { Editor } from "@monaco-editor/react"
 import { Skeleton } from "@/components/ui/skeleton"
+import { editorLanguage } from "@/lib/editor-language"
 import type { WorkspaceFileContentResponse } from "@/types/workspace"
-
-loader.config({ monaco })
 
 interface Props {
   loading: boolean
   error: string | null
   activeFilePath: string | null
   file: WorkspaceFileContentResponse | null
-}
-
-const language = (path: string | null) => {
-  if (!path) {
-    return "plaintext"
-  }
-
-  const file = path.toLowerCase().split("/").pop() ?? ""
-  if (file === "dockerfile") {
-    return "dockerfile"
-  }
-
-  switch (file.split(".").pop()?.toLowerCase()) {
-    case "ts":
-    case "tsx":
-      return "typescript"
-    case "js":
-    case "jsx":
-      return "javascript"
-    case "json":
-      return "json"
-    case "py":
-    case "pyw":
-    case "pyi":
-      return "python"
-    case "vue":
-      return "html"
-    case "md":
-      return "markdown"
-    case "yml":
-    case "yaml":
-      return "yaml"
-    case "css":
-      return "css"
-    case "html":
-      return "html"
-    case "xml":
-      return "xml"
-    case "sql":
-      return "sql"
-    case "sh":
-    case "bash":
-    case "zsh":
-    case "ps1":
-      return "shell"
-    default:
-      return "plaintext"
-  }
 }
 
 const note = (file: WorkspaceFileContentResponse | null) => {
@@ -117,7 +64,7 @@ export function WorkspaceCodeEditor(props: Props) {
         width="100%"
         path={props.activeFilePath}
         value={props.file?.content ?? ""}
-        language={language(props.activeFilePath)}
+        language={editorLanguage(props.activeFilePath)}
         options={{
           automaticLayout: true,
           minimap: { enabled: false },

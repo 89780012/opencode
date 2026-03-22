@@ -23,6 +23,7 @@ type Service struct {
 func New(cfg Config) (*Service, error) {
 	slog.Info("initializing service", "addr", cfg.Addr(), "opencode_enabled", cfg.Opencode.Enabled, "ipc_enabled", cfg.IPC.Enabled)
 
+	// 创建http 请求多路复用器
 	mux := http.NewServeMux()
 	op := opencode.New(opencode.Config(cfg.Opencode))
 	ip := ipc.New(ipc.Config{

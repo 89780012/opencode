@@ -13,7 +13,7 @@ const same = (a: LocalWorkspace | null, b: LocalWorkspace) => {
   if (!a) {
     return false
   }
-  if (a.path !== b.path || a.name !== b.name) {
+  if (a.path !== b.path || a.name !== b.name || a.vcs !== b.vcs) {
     return false
   }
   if (a.keywords.length !== b.keywords.length) {

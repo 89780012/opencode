@@ -1,8 +1,8 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { FolderOpen } from "lucide-react"
 import { toast } from "sonner"
 import { chatApi } from "@/api/modules"
-import { ChatWorkspacePanel } from "@/components/chat/chat-workspace-panel"
+import { ChatWorkspacePanel, type WorkspaceTab } from "@/components/chat/chat-workspace-panel"
 import { ChatWorkspaceToggle } from "@/components/chat/chat-workspace-toggle"
 import { ChatMessageList } from "@/components/chat-message-list"
 import { PermissionPanel } from "@/components/chat/permission-panel"
@@ -12,33 +12,35 @@ import { TodoPanel } from "@/components/chat/todo-panel"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { useAgentCatalog } from "@/hooks/use-agent-catalog"
+import { useAppSelector } from "@/hooks/useAppSelector"
 import { useChatEvents } from "@/hooks/use-chat-events"
 import { useChatPermission } from "@/hooks/use-chat-permission"
 import { useChatQuestion } from "@/hooks/use-chat-question"
-import { useProjectComposer } from "@/hooks/use-project-composer"
-import { useProviderCatalog } from "@/hooks/use-provider-catalog"
+import { useChatReview } from "@/hooks/use-chat-review"
 import { useChatSessionDetail } from "@/hooks/use-chat-session-detail"
 import { useChatSessions } from "@/hooks/use-chat-sessions"
 import { useChatTodo } from "@/hooks/use-chat-todo"
+import { useProjectInfo } from "@/hooks/use-project-info"
+import { useProjectComposer } from "@/hooks/use-project-composer"
 import { usePromptSubmit } from "@/hooks/use-prompt-submit"
+import { useProviderCatalog } from "@/hooks/use-provider-catalog"
 import { useSessionDraft } from "@/hooks/use-session-draft"
-import { useAppSelector } from "@/hooks/useAppSelector"
 import { resolveComposer } from "@/lib/chat-composer"
 
 export default function Home() {
   const workspace = useAppSelector((state) => state.workspaceView.selectedWorkspace)
   const path = workspace?.path ?? null
-  const [open, setOpen] = useState(false) // 是否显示工作区代码
-  const [wide, setWide] = useState(false) // 是否进入宽屏布局模式
+  const [open, setOpen] = useState(false)
+  const [wide, setWide] = useState(false)
+  const [tab, setTab] = useState<WorkspaceTab>("files")
   const root = useRef<HTMLDivElement | null>(null)
 
-  //事件初始化
   useChatEvents(path)
 
   const { selectedSessionId, loading, creating, refreshSessions, createSession, selectSession } = useChatSessions(path)
-  const ags = useAgentCatalog(path) // agents代码
-  const catalog = useProviderCatalog() // 提供商
-  const project = useProjectComposer() // 项目维度
+  const ags = useAgentCatalog(path)
+  const catalog = useProviderCatalog()
+  const project = useProjectComposer()
   const sessionDraft = useSessionDraft(path, selectedSessionId)
   const composer = useMemo(
     () =>
@@ -50,6 +52,8 @@ export default function Home() {
     [ags.ags, catalog, project.state],
   )
   const { messages, status, eventErr, loading: detail } = useChatSessionDetail(path, selectedSessionId)
+  const review = useChatReview(path, selectedSessionId, !!workspace && open && tab === "review")
+  const projectInfo = useProjectInfo(path, !!workspace && open)
   const permission = useChatPermission(path, selectedSessionId)
   const question = useChatQuestion(path, selectedSessionId)
   const { submitting, submit } = usePromptSubmit({
@@ -93,6 +97,19 @@ export default function Home() {
       project.setVariant(value === "default" ? null : value)
     },
     [project],
+  )
+
+  const openDiff = useCallback(
+    (file: string) => {
+      if (!workspace || !selectedSessionId) {
+        return
+      }
+
+      setOpen(true)
+      setTab("review")
+      review.open(file)
+    },
+    [review, selectedSessionId, workspace],
   )
 
   useEffect(() => {
@@ -156,6 +173,7 @@ export default function Home() {
           loading={detail && !!selectedSessionId}
           status={status}
           hasCache={messages.length > 0}
+          onOpenDiff={openDiff}
         />
 
         {empty ? (
@@ -237,7 +255,6 @@ export default function Home() {
     <div className="flex h-full w-full min-w-0">
       <div ref={root} className="relative flex h-full min-w-0 w-full flex-col">
         <div className="absolute right-4 top-2 z-20">
-          {/** 右上角是否展开工作区按钮 */}
           <ChatWorkspaceToggle
             open={show}
             disabled={!workspace}
@@ -268,7 +285,15 @@ export default function Home() {
             </ResizablePanel>
             <ResizableHandle withHandle className="pointer" />
             <ResizablePanel defaultSize={75} minSize={520} className="min-h-0 min-w-0">
-              <ChatWorkspacePanel workspace={workspace} onClose={() => setOpen(false)} />
+              <ChatWorkspacePanel
+                workspace={workspace}
+                sessionId={selectedSessionId}
+                tab={tab}
+                review={review}
+                project={projectInfo}
+                onTab={setTab}
+                onClose={() => setOpen(false)}
+              />
             </ResizablePanel>
           </ResizablePanelGroup>
         ) : (
@@ -281,7 +306,15 @@ export default function Home() {
               <SheetHeader className="sr-only">
                 <SheetTitle>工作区</SheetTitle>
               </SheetHeader>
-              <ChatWorkspacePanel workspace={workspace} onClose={() => setOpen(false)} />
+              <ChatWorkspacePanel
+                workspace={workspace}
+                sessionId={selectedSessionId}
+                tab={tab}
+                review={review}
+                project={projectInfo}
+                onTab={setTab}
+                onClose={() => setOpen(false)}
+              />
             </SheetContent>
           </Sheet>
         ) : null}

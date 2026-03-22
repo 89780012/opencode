@@ -4,6 +4,7 @@ type Local struct {
 	Name     string   `json:"name"`
 	Path     string   `json:"path"`
 	Keywords []string `json:"keywords"`
+	VCS      string   `json:"vcs,omitempty"`
 }
 
 type ListResult struct {

@@ -25,15 +25,13 @@ export function useLocalWorkspaces(): UseLocalWorkspacesResult {
     try {
       const data = await workspaceApi.getLocalWorkspaces()
       setBasePath(data.base_path)
-      setWorkspaces(
-        (data.workspaces ?? []).map((item) => ({
-          ...item,
-          keywords: item.keywords ?? [],
-        })),
-      )
+      setWorkspaces((data.workspaces ?? []).map((item) => ({
+        ...item,
+        keywords: item.keywords ?? [],
+      })))
     } catch (err) {
       console.error("failed to load local workspaces", err)
-      setError("失败加载工作空间")
+      setError("Failed to load workspaces")
     } finally {
       setLoaded(true)
       setLoading(false)

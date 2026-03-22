@@ -164,7 +164,7 @@ export function WorkspaceFileTree(props: Props) {
   }, []);
 
   return (
-    <aside ref={ref} className="h-full w-[280px] shrink-0 border-r bg-muted/10">
+    <aside ref={ref} className="h-full min-w-0 bg-muted/10">
       <Tree<Node>
         data={data}
         width="100%"

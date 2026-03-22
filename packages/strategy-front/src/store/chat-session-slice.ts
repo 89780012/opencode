@@ -1,6 +1,15 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import { applyChatEvent, hydrateChat, hydratePermissions, hydrateQuestions, removeSession, upsertSession, type ChatStateShape } from "@/lib/chat-event-reducer";
-import type { ChatEvent, ChatMessageRecord, ChatQuestionRequest, ChatSessionSummary, ChatStatus, ChatTodo, PermissionRequest } from "@/types/chat";
+import type {
+  ChatEvent,
+  ChatFileDiff,
+  ChatMessageRecord,
+  ChatQuestionRequest,
+  ChatSessionSummary,
+  ChatStatus,
+  ChatTodo,
+  PermissionRequest,
+} from "@/types/chat";
 
 type State = ChatStateShape;
 
@@ -9,6 +18,7 @@ const initialState: State = {
   selected: {},
   messages: {},
   parts: {},
+  sessionDiffs: {},
   todos: {},
   permissions: {},
   questions: {},
@@ -66,6 +76,12 @@ const slice = createSlice({
     ) {
       hydrateChat(state, action.payload.sessionId, action.payload.records);
     },
+    hydrateSessionDiff(
+      state,
+      action: PayloadAction<{ sessionId: string; diffs: ChatFileDiff[] }>,
+    ) {
+      state.sessionDiffs[action.payload.sessionId] = action.payload.diffs;
+    },
     setSessionTodos(
       state,
       action: PayloadAction<{ sessionId: string; todos: ChatTodo[] }>,
@@ -111,6 +127,7 @@ export const {
   removeWorkspaceSession,
   setSelectedWorkspaceSession,
   hydrateSessionMessages,
+  hydrateSessionDiff,
   setSessionTodos,
   setPendingQuestions,
   setPendingPermissions,
