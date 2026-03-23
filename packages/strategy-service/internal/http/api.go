@@ -7,11 +7,13 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
 	"strategy-service/internal/ipc"
 	"strategy-service/internal/opencode"
+	"strategy-service/internal/system"
 	"strategy-service/internal/tool"
 	"strategy-service/internal/workspace"
 )
@@ -21,14 +23,16 @@ type API struct {
 	ws  *workspace.Service
 	op  *opencode.Manager
 	ip  *ipc.Manager
+	cfg *system.Store
 }
 
-func NewAPI(svc *tool.Service, op *opencode.Manager, ip *ipc.Manager) *API {
+func NewAPI(svc *tool.Service, op *opencode.Manager, ip *ipc.Manager, cfg *system.Store) *API {
 	return &API{
 		svc: svc,
 		ws:  workspace.NewService(),
 		op:  op,
 		ip:  ip,
+		cfg: cfg,
 	}
 }
 
@@ -46,6 +50,8 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/system/tools", a.tools)
 	mux.HandleFunc("/api/system/tools/", a.install)
 	mux.HandleFunc("/api/system/tasks/", a.task)
+	mux.HandleFunc("/api/system/config", a.config)
+	mux.HandleFunc("/api/system/logs", a.logs)
 	mux.HandleFunc("/api/system/opencode/status", a.opencodeStatus)
 	mux.HandleFunc("/api/system/opencode/logs", a.opencodeLogs)
 	mux.HandleFunc("/api/system/opencode/start", a.opencodeStart)
@@ -439,6 +445,70 @@ func (a *API) task(w http.ResponseWriter, r *http.Request) {
 	}
 
 	write(w, http.StatusOK, "ok", task)
+}
+
+func (a *API) config(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		cfg, err := a.cfg.Load()
+		if err != nil {
+			write(w, http.StatusBadRequest, err.Error(), nil)
+			return
+		}
+
+		write(w, http.StatusOK, "ok", cfg)
+		return
+	}
+
+	if r.Method == http.MethodPut {
+		body := system.Config{}
+		err := readJSON(r, &body)
+		if err != nil {
+			write(w, http.StatusBadRequest, err.Error(), nil)
+			return
+		}
+
+		cfg, err := a.cfg.Save(body)
+		if err != nil {
+			write(w, http.StatusBadRequest, err.Error(), nil)
+			return
+		}
+
+		write(w, http.StatusOK, "ok", cfg)
+		return
+	}
+
+	write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
+}
+
+func (a *API) logs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
+		return
+	}
+
+	cfg, err := a.cfg.Load()
+	if err != nil {
+		write(w, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+
+	size := cfg.Logs.Tail
+	raw := strings.TrimSpace(r.URL.Query().Get("tail"))
+	if raw != "" {
+		size, err = strconv.Atoi(raw)
+		if err != nil {
+			write(w, http.StatusBadRequest, "invalid tail", nil)
+			return
+		}
+	}
+
+	data, err := system.Tail(r.URL.Query().Get("kind"), size)
+	if err != nil {
+		write(w, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+
+	write(w, http.StatusOK, "ok", data)
 }
 
 func (a *API) opencodeStatus(w http.ResponseWriter, r *http.Request) {

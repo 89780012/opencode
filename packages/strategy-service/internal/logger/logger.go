@@ -4,8 +4,9 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"strings"
+
+	"strategy-service/internal/system"
 
 	"gopkg.in/natefinch/lumberjack.v2"
 )
@@ -19,18 +20,13 @@ var (
 // Logs are written to ~/.strategy-service/logs/strategy-service.log
 // with rotation (50MB), compression, and 30-day retention.
 func Init() error {
-	home, err := os.UserHomeDir()
+	path, err := system.ServicePath()
 	if err != nil {
 		return err
 	}
 
-	dir := filepath.Join(home, ".strategy-service", "logs")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return err
-	}
-
 	writer = &lumberjack.Logger{
-		Filename:  filepath.Join(dir, "strategy-service.log"),
+		Filename:  path,
 		MaxSize:   50, // MB
 		MaxAge:    30, // days
 		Compress:  true,

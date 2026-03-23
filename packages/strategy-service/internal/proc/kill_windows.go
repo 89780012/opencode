@@ -3,6 +3,7 @@
 package proc
 
 import (
+	"os"
 	"os/exec"
 	"strconv"
 )
@@ -12,10 +13,22 @@ func Kill(cmd *exec.Cmd) error {
 		return nil
 	}
 
-	kill := exec.Command("taskkill", "/PID", strconv.Itoa(cmd.Process.Pid), "/T", "/F")
+	return KillPID(cmd.Process.Pid)
+}
+
+func KillPID(pid int) error {
+	if pid <= 0 {
+		return nil
+	}
+
+	kill := exec.Command("taskkill", "/PID", strconv.Itoa(pid), "/T", "/F")
 	Hide(kill)
 	if err := kill.Run(); err != nil {
-		return cmd.Process.Kill()
+		proc, find := os.FindProcess(pid)
+		if find != nil {
+			return err
+		}
+		return proc.Kill()
 	}
 
 	return nil

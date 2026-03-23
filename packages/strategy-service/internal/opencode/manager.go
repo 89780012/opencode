@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"strategy-service/internal/proc"
+	"strategy-service/internal/system"
 )
 
 var errDisabled = errors.New("opencode is disabled")
@@ -93,6 +94,7 @@ func (m *Manager) State() State {
 func (m *Manager) Ensure(ctx context.Context) error {
 	if !m.cfg.Enabled {
 		slog.Warn("opencode ensure called but disabled")
+		m.note("opencode ensure called but disabled")
 		m.fail("disabled", errDisabled)
 		return errDisabled
 	}
@@ -103,10 +105,20 @@ func (m *Manager) Ensure(ctx context.Context) error {
 		m.mu.RUnlock()
 		if owned {
 			slog.Debug("opencode already running (owned)")
+			m.note("opencode already running (owned)")
 			m.live()
 			return nil
 		}
+
+		if item, ok := m.owner(); ok {
+			slog.Info("opencode ownership restored", "pid", item.PID)
+			m.note(fmt.Sprintf("opencode ownership restored pid=%d", item.PID))
+			m.attach(item)
+			return nil
+		}
+
 		slog.Info("opencode detected as external process")
+		m.note("opencode detected as external process")
 		m.external()
 		return nil
 	}
@@ -118,13 +130,16 @@ func (m *Manager) Ensure(ctx context.Context) error {
 	}
 
 	slog.Info("starting opencode process", "bin", m.cfg.Bin, "host", m.cfg.Host, "port", m.cfg.Port)
+	m.note(fmt.Sprintf("starting opencode process bin=%s host=%s port=%d", m.cfg.Bin, m.cfg.Host, m.cfg.Port))
 	if err := m.spawn(); err != nil {
 		if ping := m.health(ctx); ping == nil {
 			slog.Info("opencode spawn failed but process is reachable externally")
+			m.note("opencode spawn failed but process is reachable externally")
 			m.external()
 			return nil
 		}
 		slog.Error("opencode spawn failed", "error", err)
+		m.note("opencode spawn failed: " + err.Error())
 		m.fail("failed to start opencode", err)
 		m.done()
 		return err
@@ -133,6 +148,7 @@ func (m *Manager) Ensure(ctx context.Context) error {
 	err := m.ready(ctx)
 	if err != nil {
 		slog.Error("opencode did not become ready", "error", err, "timeout", m.cfg.StartTimeout)
+		m.note("opencode did not become ready: " + err.Error())
 		_ = m.Stop(context.Background())
 		m.fail("opencode did not become ready", err)
 		m.done()
@@ -140,6 +156,7 @@ func (m *Manager) Ensure(ctx context.Context) error {
 	}
 
 	slog.Info("opencode is ready")
+	m.note("opencode is ready")
 	m.live()
 	m.done()
 	return nil
@@ -147,13 +164,16 @@ func (m *Manager) Ensure(ctx context.Context) error {
 
 func (m *Manager) Restart(ctx context.Context) error {
 	slog.Info("restarting opencode")
+	m.note("restarting opencode")
 	if err := m.Stop(ctx); err != nil {
 		slog.Error("opencode stop failed during restart", "error", err)
+		m.note("opencode stop failed during restart: " + err.Error())
 		return err
 	}
 
 	if err := m.down(ctx); err != nil {
 		slog.Error("opencode did not stop during restart", "error", err)
+		m.note("opencode did not stop during restart: " + err.Error())
 		return err
 	}
 
@@ -162,17 +182,48 @@ func (m *Manager) Restart(ctx context.Context) error {
 
 func (m *Manager) Stop(context.Context) error {
 	slog.Info("stopping opencode")
+	m.note("stopping opencode")
 	m.mu.Lock()
 	cmd := m.cmd
 	owned := m.state.Owned
+	pid := m.state.PID
 
 	if cmd == nil {
 		m.mu.Unlock()
+		if owned && pid > 0 {
+			slog.Info("killing restored opencode process", "pid", pid)
+			m.note(fmt.Sprintf("killing restored opencode process pid=%d", pid))
+			if err := proc.KillPID(pid); err != nil {
+				m.note("failed to kill restored opencode process: " + err.Error())
+				return err
+			}
+			dropOwner()
+			m.mu.Lock()
+			m.lastErr = nil
+			m.state.Running = false
+			m.state.Ready = false
+			m.state.Owned = false
+			m.state.PID = 0
+			if m.state.Enabled {
+				m.state.Status = "stopped"
+			} else {
+				m.state.Status = "disabled"
+			}
+			m.state.Message = ""
+			m.state.StartedAt = nil
+			m.mu.Unlock()
+			slog.Info("opencode stopped (restored process)")
+			m.note("opencode stopped (restored process)")
+			return nil
+		}
+
 		if !owned && m.healthy() {
 			slog.Info("opencode is external, cannot stop")
+			m.note("opencode is external, cannot stop")
 			return errExternal
 		}
 		m.mu.Lock()
+		m.lastErr = nil
 		m.state.Running = false
 		m.state.Ready = false
 		m.state.Owned = false
@@ -185,6 +236,7 @@ func (m *Manager) Stop(context.Context) error {
 		m.state.Message = ""
 		m.mu.Unlock()
 		slog.Info("opencode stopped (no process)")
+		m.note("opencode stopped (no process)")
 		return nil
 	}
 
@@ -198,6 +250,7 @@ func (m *Manager) Stop(context.Context) error {
 	}
 
 	slog.Info("killing opencode process", "pid", cmd.Process.Pid)
+	m.note(fmt.Sprintf("killing opencode process pid=%d", cmd.Process.Pid))
 	return proc.Kill(cmd)
 }
 
@@ -251,6 +304,7 @@ func (m *Manager) await(ctx context.Context, ch chan struct{}) error {
 
 func (m *Manager) spawn() error {
 	slog.Info("spawning opencode", "bin", m.cfg.Bin, "host", m.cfg.Host, "port", m.cfg.Port, "cwd", m.cfg.Cwd)
+	m.note(fmt.Sprintf("spawning opencode bin=%s host=%s port=%d cwd=%s", m.cfg.Bin, m.cfg.Host, m.cfg.Port, m.cfg.Cwd))
 	cmd := exec.Command(m.cfg.Bin, "serve", "--hostname", m.cfg.Host, "--port", fmt.Sprintf("%d", m.cfg.Port))
 	proc.Hide(cmd)
 	if m.cfg.Cwd != "" {
@@ -272,6 +326,7 @@ func (m *Manager) spawn() error {
 
 	if err := cmd.Start(); err != nil {
 		slog.Error("opencode start failed", "error", err)
+		m.note("opencode start failed: " + err.Error())
 		return err
 	}
 
@@ -283,7 +338,21 @@ func (m *Manager) spawn() error {
 	m.state.StartedAt = &now
 	m.mu.Unlock()
 
+	err = writeOwner(owner{
+		PID:       cmd.Process.Pid,
+		Bin:       m.cfg.Bin,
+		Host:      m.cfg.Host,
+		Port:      m.cfg.Port,
+		Cwd:       m.cfg.Cwd,
+		StartedAt: &now,
+	})
+	if err != nil {
+		slog.Warn("opencode owner write failed", "error", err)
+		m.note("opencode owner write failed: " + err.Error())
+	}
+
 	slog.Info("opencode process started", "pid", cmd.Process.Pid)
+	m.note(fmt.Sprintf("opencode process started pid=%d", cmd.Process.Pid))
 
 	go m.scan(stdout)
 	go m.scan(stderr)
@@ -364,6 +433,21 @@ func (m *Manager) external() {
 	m.cmd = nil
 }
 
+func (m *Manager) attach(item owner) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.lastErr = nil
+	m.state.Status = "running"
+	m.state.Ready = true
+	m.state.Running = true
+	m.state.Owned = true
+	m.state.PID = item.PID
+	m.state.Message = ""
+	m.state.StartedAt = item.StartedAt
+	m.cmd = nil
+}
+
 func (m *Manager) fail(msg string, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -386,23 +470,27 @@ func (m *Manager) watch(cmd *exec.Cmd) {
 	err := cmd.Wait()
 	if err == nil {
 		slog.Info("opencode process exited normally", "pid", cmd.Process.Pid)
+		m.note(fmt.Sprintf("opencode process exited normally pid=%d", cmd.Process.Pid))
 		m.close(cmd, "stopped", "", nil)
 		return
 	}
 
 	if errors.Is(err, os.ErrProcessDone) {
 		slog.Info("opencode process already done", "pid", cmd.Process.Pid)
+		m.note(fmt.Sprintf("opencode process already done pid=%d", cmd.Process.Pid))
 		m.close(cmd, "stopped", "", nil)
 		return
 	}
 
 	if exit, ok := err.(*exec.ExitError); ok {
 		slog.Error("opencode process exited with error", "pid", cmd.Process.Pid, "exit_code", exit.ExitCode(), "error", exit.Error())
+		m.note(fmt.Sprintf("opencode process exited with error pid=%d exit_code=%d error=%s", cmd.Process.Pid, exit.ExitCode(), exit.Error()))
 		m.close(cmd, "failed", strings.TrimSpace(exit.Error()), err)
 		return
 	}
 
 	slog.Error("opencode process exited unexpectedly", "pid", cmd.Process.Pid, "error", err)
+	m.note(fmt.Sprintf("opencode process exited unexpectedly pid=%d error=%s", cmd.Process.Pid, err.Error()))
 	m.close(cmd, "failed", "opencode exited unexpectedly", err)
 }
 
@@ -420,6 +508,8 @@ func (m *Manager) close(cmd *exec.Cmd, status string, msg string, err error) {
 		err = nil
 		m.stop = false
 	}
+
+	dropOwner()
 
 	m.cmd = nil
 	m.state.PID = 0
@@ -449,6 +539,7 @@ func (m *Manager) scan(in io.ReadCloser) {
 		m.mu.Lock()
 		m.push(line)
 		m.mu.Unlock()
+		_ = system.Append(system.OpencodeLog, line)
 	}
 }
 
@@ -457,6 +548,19 @@ func (m *Manager) push(line string) {
 	if len(m.state.Log) > 80 {
 		m.state.Log = append([]string{}, m.state.Log[len(m.state.Log)-80:]...)
 	}
+}
+
+func (m *Manager) note(line string) {
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return
+	}
+
+	text := time.Now().Format(time.RFC3339) + " " + line
+	m.mu.Lock()
+	m.push(text)
+	m.mu.Unlock()
+	_ = system.Append(system.OpencodeLog, text)
 }
 
 func (m *Manager) health(ctx context.Context) error {

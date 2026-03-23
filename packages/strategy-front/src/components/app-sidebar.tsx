@@ -1,14 +1,14 @@
-"use client";
+"use client"
 
-import { Bot, Command, MessageSquareText, PlugZap, ServerCog, Sparkles, Wrench } from "lucide-react";
-import { NavLink, useLocation } from "react-router-dom";
-import { AgentSidebarPanel } from "@/components/agent/agent-sidebar-panel";
-import { HomeSidebarPanel } from "@/components/home/home-sidebar-panel";
-import { McpSidebarPanel } from "@/components/mcp/mcp-sidebar-panel";
-import { NavUser } from "@/components/nav-user";
-import { ProviderSidebarPanel } from "@/components/provider/provider-sidebar-panel";
-import { SkillSidebarPanel } from "@/components/skill/skill-sidebar-panel";
-import { SystemSidebarPanel } from "@/components/system/system-sidebar-panel";
+import { Bot, Command, MessageSquareText, PlugZap, ServerCog, Sparkles } from "lucide-react"
+import { NavLink, useLocation } from "react-router-dom"
+import { AgentSidebarPanel } from "@/components/agent/agent-sidebar-panel"
+import { HomeSidebarPanel } from "@/components/home/home-sidebar-panel"
+import { McpSidebarPanel } from "@/components/mcp/mcp-sidebar-panel"
+import { NavUser } from "@/components/nav-user"
+import { ProviderSidebarPanel } from "@/components/provider/provider-sidebar-panel"
+import { SkillSidebarPanel } from "@/components/skill/skill-sidebar-panel"
+import { SystemSidebarPanel } from "@/components/system/system-sidebar-panel"
 import {
   Sidebar,
   SidebarContent,
@@ -19,14 +19,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar";
+} from "@/components/ui/sidebar"
 
 const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
   nav: [
     {
       title: "对话",
@@ -53,22 +48,19 @@ const data = {
       url: "/skills",
       icon: Sparkles,
     },
-    {
-      title: "安装检测",
-      url: "/installer",
-      icon: Wrench,
-    },
   ],
-};
+}
 
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
-  const { pathname } = useLocation();
-  const home = pathname === "/";
-  const provider = pathname.startsWith("/providers");
-  const mcp = pathname.startsWith("/mcp");
-  const agent = pathname.startsWith("/agents");
-  const skill = pathname.startsWith("/skills");
-  const isActive = (url: string) => (url === "/" ? pathname === "/" : pathname.startsWith(url));
+  const route = useLocation()
+  const path = route.pathname
+  const home = path === "/"
+  const provider = path.startsWith("/providers")
+  const mcp = path.startsWith("/mcp")
+  const agent = path.startsWith("/agents")
+  const skill = path.startsWith("/skills")
+  const system = path.startsWith("/settings") || path.startsWith("/installer")
+  const pick = (url: string) => (url === "/" ? path === "/" : path.startsWith(url))
 
   return (
     <Sidebar collapsible="icon" className="overflow-hidden *:data-[sidebar=sidebar]:flex-row" {...props}>
@@ -82,8 +74,8 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
                     <Command className="size-4" />
                   </div>
                   <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-medium">Acme Inc</span>
-                    <span className="truncate text-xs">Enterprise</span>
+                    <span className="truncate font-medium">Strategy</span>
+                    <span className="truncate text-xs">Desktop</span>
                   </div>
                 </NavLink>
               </SidebarMenuButton>
@@ -102,7 +94,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
                         children: item.title,
                         hidden: false,
                       }}
-                      isActive={isActive(item.url)}
+                      isActive={pick(item.url)}
                       className="px-2.5 md:px-2"
                     >
                       <NavLink to={item.url}>
@@ -117,7 +109,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
           </SidebarGroup>
         </SidebarContent>
         <SidebarFooter>
-          <NavUser user={data.user} />
+          <NavUser />
         </SidebarFooter>
       </Sidebar>
 
@@ -132,10 +124,12 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
           <AgentSidebarPanel />
         ) : skill ? (
           <SkillSidebarPanel />
-        ) : (
+        ) : system ? (
           <SystemSidebarPanel />
+        ) : (
+          <HomeSidebarPanel />
         )}
       </Sidebar>
     </Sidebar>
-  );
+  )
 }
