@@ -13,6 +13,7 @@ func Kill(cmd *exec.Cmd) error {
 	}
 
 	kill := exec.Command("taskkill", "/PID", strconv.Itoa(cmd.Process.Pid), "/T", "/F")
+	Hide(kill)
 	if err := kill.Run(); err != nil {
 		return cmd.Process.Kill()
 	}
