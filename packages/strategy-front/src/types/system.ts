@@ -27,3 +27,19 @@ export interface InstallTask {
   output?: string;
   log?: string[];
 }
+
+export interface OpencodeState {
+  enabled: boolean;
+  startup: string;
+  bin: string;
+  url: string;
+  cwd?: string;
+  status: string;
+  ready: boolean;
+  running: boolean;
+  owned: boolean;
+  pid?: number;
+  message?: string;
+  started_at?: string;
+  log?: string[];
+}

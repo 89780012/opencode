@@ -8,6 +8,7 @@ const McpPage = lazy(() => import("@/pages/mcp"));
 const ProviderPage = lazy(() => import("@/pages/providers"));
 const ProviderOverviewPage = lazy(() => import("@/pages/providers-overview"));
 const ProviderModelsPage = lazy(() => import("@/pages/providers-models"));
+const SkillPage = lazy(() => import("@/pages/skills"));
 
 const router = createBrowserRouter([
   {
@@ -43,6 +44,10 @@ const router = createBrowserRouter([
       {
         path: "mcp",
         element: <McpPage />,
+      },
+      {
+        path: "skills",
+        element: <SkillPage />,
       },
     ],
   },

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"strategy-service/internal/ipc"
 	"strategy-service/internal/opencode"
@@ -33,6 +34,8 @@ func NewAPI(svc *tool.Service, op *opencode.Manager, ip *ipc.Manager) *API {
 
 func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/health", a.health)
+	mux.HandleFunc("/api/opencode/skills", a.opencodeSkills)
+	mux.HandleFunc("/api/opencode/skills/", a.opencodeSkill)
 	mux.HandleFunc("/api/workspace/list", a.workspaceList)
 	mux.HandleFunc("/api/workspace/create", a.workspaceCreate)
 	mux.HandleFunc("/api/workspace/open", a.workspaceOpen)
@@ -62,6 +65,95 @@ func (a *API) health(w http.ResponseWriter, r *http.Request) {
 		"opencode":       state,
 		"opencode_ready": state.Ready,
 	})
+}
+
+func (a *API) opencodeSkills(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		data, err := opencode.ListSkills()
+		if err != nil {
+			slog.Error("opencode skill list failed", "error", err)
+			write(w, http.StatusBadRequest, err.Error(), nil)
+			return
+		}
+		write(w, http.StatusOK, "ok", data)
+		return
+	}
+
+	if r.Method == http.MethodPost {
+		body := struct {
+			Name    string `json:"name"`
+			Content string `json:"content"`
+		}{}
+		err := readJSON(r, &body)
+		if err != nil {
+			write(w, http.StatusBadRequest, err.Error(), nil)
+			return
+		}
+
+		item, err := opencode.CreateSkill(body.Name, body.Content)
+		if err != nil {
+			slog.Error("opencode skill create failed", "name", body.Name, "error", err)
+			write(w, http.StatusBadRequest, err.Error(), nil)
+			return
+		}
+
+		write(w, http.StatusOK, "ok", map[string]any{
+			"skill":           item,
+			"reload_required": true,
+		})
+		return
+	}
+
+	write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
+}
+
+func (a *API) opencodeSkill(w http.ResponseWriter, r *http.Request) {
+	name, ok := tail(r.URL.Path, "/api/opencode/skills/")
+	if !ok {
+		write(w, http.StatusNotFound, "skill not found", nil)
+		return
+	}
+
+	if r.Method == http.MethodPut {
+		body := struct {
+			Content string `json:"content"`
+		}{}
+		err := readJSON(r, &body)
+		if err != nil {
+			write(w, http.StatusBadRequest, err.Error(), nil)
+			return
+		}
+
+		item, err := opencode.UpdateSkill(name, body.Content)
+		if err != nil {
+			slog.Error("opencode skill update failed", "name", name, "error", err)
+			write(w, http.StatusBadRequest, err.Error(), nil)
+			return
+		}
+
+		write(w, http.StatusOK, "ok", map[string]any{
+			"skill":           item,
+			"reload_required": true,
+		})
+		return
+	}
+
+	if r.Method == http.MethodDelete {
+		err := opencode.DeleteSkill(name)
+		if err != nil {
+			slog.Error("opencode skill delete failed", "name", name, "error", err)
+			write(w, http.StatusBadRequest, err.Error(), nil)
+			return
+		}
+
+		write(w, http.StatusOK, "ok", map[string]any{
+			"name":            name,
+			"reload_required": true,
+		})
+		return
+	}
+
+	write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
 }
 
 func (a *API) tools(w http.ResponseWriter, r *http.Request) {
@@ -285,7 +377,10 @@ func (a *API) opencodeStart(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slog.Info("opencode start request via API")
-	if err := a.op.Ensure(r.Context()); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+
+	if err := a.op.Ensure(ctx); err != nil {
 		slog.Error("opencode start failed via API", "error", err)
 		write(w, http.StatusServiceUnavailable, err.Error(), a.op.State())
 		return
@@ -302,7 +397,10 @@ func (a *API) opencodeRestart(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slog.Info("opencode restart request via API")
-	if err := a.op.Restart(r.Context()); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+
+	if err := a.op.Restart(ctx); err != nil {
 		slog.Error("opencode restart failed via API", "error", err)
 		write(w, http.StatusServiceUnavailable, err.Error(), a.op.State())
 		return
@@ -319,7 +417,10 @@ func (a *API) opencodeStop(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slog.Info("opencode stop request via API")
-	err := a.op.Stop(r.Context())
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+
+	err := a.op.Stop(ctx)
 	if err != nil && !errors.Is(err, opencode.ErrExternal()) {
 		slog.Error("opencode stop failed via API", "error", err)
 		write(w, http.StatusServiceUnavailable, err.Error(), a.op.State())
@@ -350,6 +451,23 @@ func cut(path string, pre string, suf string) (string, bool) {
 	}
 
 	return name, true
+}
+
+func tail(path string, pre string) (string, bool) {
+	if !strings.HasPrefix(path, pre) {
+		return "", false
+	}
+
+	name := strings.TrimPrefix(path, pre)
+	if name == "" || strings.Contains(name, "/") {
+		return "", false
+	}
+
+	out, err := url.PathUnescape(name)
+	if err != nil || out == "" {
+		return "", false
+	}
+	return out, true
 }
 
 func readJSON(r *http.Request, target any) error {

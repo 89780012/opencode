@@ -147,10 +147,16 @@ func (m *Manager) Ensure(ctx context.Context) error {
 
 func (m *Manager) Restart(ctx context.Context) error {
 	slog.Info("restarting opencode")
-	if err := m.Stop(ctx); err != nil && !errors.Is(err, errExternal) {
+	if err := m.Stop(ctx); err != nil {
 		slog.Error("opencode stop failed during restart", "error", err)
 		return err
 	}
+
+	if err := m.down(ctx); err != nil {
+		slog.Error("opencode did not stop during restart", "error", err)
+		return err
+	}
+
 	return m.Ensure(ctx)
 }
 
@@ -192,7 +198,7 @@ func (m *Manager) Stop(context.Context) error {
 	}
 
 	slog.Info("killing opencode process", "pid", cmd.Process.Pid)
-	return cmd.Process.Kill()
+	return proc.Kill(cmd)
 }
 
 func (m *Manager) begin() (chan struct{}, bool) {
@@ -302,6 +308,30 @@ func (m *Manager) ready(ctx context.Context) error {
 			return ctx.Err()
 		case <-limit.C:
 			return context.DeadlineExceeded
+		case <-tick.C:
+		}
+	}
+}
+
+func (m *Manager) down(ctx context.Context) error {
+	tick := time.NewTicker(50 * time.Millisecond)
+	defer tick.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		m.mu.RLock()
+		cmd := m.cmd
+		m.mu.RUnlock()
+		if cmd == nil && !m.healthy() {
+			return nil
+		}
+
+		select {
 		case <-tick.C:
 		}
 	}

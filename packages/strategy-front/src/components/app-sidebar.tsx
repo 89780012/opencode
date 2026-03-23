@@ -1,12 +1,13 @@
-"use client"
+"use client";
 
-import { Command, MessageSquareText, PlugZap, ServerCog, Wrench } from "lucide-react"
-import { NavLink, useLocation } from "react-router-dom"
-import { HomeSidebarPanel } from "@/components/home/home-sidebar-panel"
-import { McpSidebarPanel } from "@/components/mcp/mcp-sidebar-panel"
-import { NavUser } from "@/components/nav-user"
-import { ProviderSidebarPanel } from "@/components/provider/provider-sidebar-panel"
-import { SystemSidebarPanel } from "@/components/system/system-sidebar-panel"
+import { Command, MessageSquareText, PlugZap, ServerCog, Sparkles, Wrench } from "lucide-react";
+import { NavLink, useLocation } from "react-router-dom";
+import { HomeSidebarPanel } from "@/components/home/home-sidebar-panel";
+import { McpSidebarPanel } from "@/components/mcp/mcp-sidebar-panel";
+import { NavUser } from "@/components/nav-user";
+import { ProviderSidebarPanel } from "@/components/provider/provider-sidebar-panel";
+import { SkillSidebarPanel } from "@/components/skill/skill-sidebar-panel";
+import { SystemSidebarPanel } from "@/components/system/system-sidebar-panel";
 import {
   Sidebar,
   SidebarContent,
@@ -17,7 +18,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
 
 const data = {
   user: {
@@ -42,19 +43,25 @@ const data = {
       icon: ServerCog,
     },
     {
+      title: "Skills",
+      url: "/skills",
+      icon: Sparkles,
+    },
+    {
       title: "安装检测",
       url: "/installer",
       icon: Wrench,
     },
   ],
-}
+};
 
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
-  const { pathname } = useLocation()
-  const home = pathname === "/"
-  const provider = pathname.startsWith("/providers")
-  const mcp = pathname.startsWith("/mcp")
-  const isActive = (url: string) => (url === "/" ? pathname === "/" : pathname.startsWith(url))
+  const { pathname } = useLocation();
+  const home = pathname === "/";
+  const provider = pathname.startsWith("/providers");
+  const mcp = pathname.startsWith("/mcp");
+  const skill = pathname.startsWith("/skills");
+  const isActive = (url: string) => (url === "/" ? pathname === "/" : pathname.startsWith(url));
 
   return (
     <Sidebar collapsible="icon" className="overflow-hidden *:data-[sidebar=sidebar]:flex-row" {...props}>
@@ -114,10 +121,12 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
           <ProviderSidebarPanel />
         ) : mcp ? (
           <McpSidebarPanel />
+        ) : skill ? (
+          <SkillSidebarPanel />
         ) : (
           <SystemSidebarPanel />
         )}
       </Sidebar>
     </Sidebar>
-  )
+  );
 }

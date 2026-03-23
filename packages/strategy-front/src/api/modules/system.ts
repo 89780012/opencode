@@ -1,5 +1,5 @@
 import { request } from "@/api/client";
-import type { InstallTask, ToolID, ToolState } from "@/types/system";
+import type { InstallTask, OpencodeState, ToolID, ToolState } from "@/types/system";
 
 export const systemApi = {
   list() {
@@ -12,5 +12,11 @@ export const systemApi = {
 
   task(id: string) {
     return request.get<InstallTask>(`/system/tasks/${encodeURIComponent(id)}`);
+  },
+
+  opencodeRestart() {
+    return request.post<OpencodeState>("/system/opencode/restart", undefined, {
+      timeout: 45000,
+    });
   },
 };
