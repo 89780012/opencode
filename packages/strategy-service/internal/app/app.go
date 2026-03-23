@@ -11,6 +11,7 @@ import (
 	"strategy-service/internal/ipc"
 	"strategy-service/internal/opencode"
 	"strategy-service/internal/tool"
+	"strategy-service/internal/workspace"
 )
 
 type Service struct {
@@ -23,6 +24,12 @@ type Service struct {
 func New(cfg Config) (*Service, error) {
 	slog.Info("initializing service", "addr", cfg.Addr(), "opencode_enabled", cfg.Opencode.Enabled, "ipc_enabled", cfg.IPC.Enabled)
 
+	err := workspace.EnsureBuiltins()
+	if err != nil {
+		slog.Error("builtin opencode asset provision failed", "error", err)
+		return nil, err
+	}
+
 	// 创建http 请求多路复用器
 	mux := http.NewServeMux()
 	op := opencode.New(opencode.Config(cfg.Opencode))
@@ -31,7 +38,7 @@ func New(cfg Config) (*Service, error) {
 		Product: cfg.IPC.Product,
 		Version: cfg.IPC.Version,
 	})
-	err := ip.Start(context.Background())
+	err = ip.Start(context.Background())
 	if err != nil {
 		slog.Error("ipc start failed", "error", err)
 		return nil, err

@@ -35,12 +35,6 @@ func (s *Service) List() (ListResult, error) {
 		return ListResult{}, err
 	}
 
-	err = ensureAll(items)
-	if err != nil {
-		slog.Error("workspace list: ensureAll failed", "error", err)
-		return ListResult{}, err
-	}
-
 	slog.Info("workspace list", "root", root, "count", len(items))
 	return ListResult{
 		BasePath:   root,
@@ -87,17 +81,9 @@ func (s *Service) Create(name string, git bool) (CreateResult, error) {
 	}
 
 	// 模板文件
-	err = seed(path)
+	err = seedTemplate(path)
 	if err != nil {
 		slog.Error("workspace create: seed failed", "path", path, "error", err)
-		_ = os.RemoveAll(path)
-		return CreateResult{}, err
-	}
-
-	//skills, agents
-	err = ensure(path)
-	if err != nil {
-		slog.Error("workspace create: ensure failed", "path", path, "error", err)
 		_ = os.RemoveAll(path)
 		return CreateResult{}, err
 	}
@@ -147,12 +133,6 @@ func (s *Service) Open(path string, git bool) (OpenResult, error) {
 		return OpenResult{}, os.ErrInvalid
 	}
 
-	err = ensure(dir)
-	if err != nil {
-		slog.Error("workspace open: ensure failed", "dir", dir, "error", err)
-		return OpenResult{}, err
-	}
-
 	if git {
 		err = initGit(dir)
 		if err != nil {
@@ -181,11 +161,6 @@ func (s *Service) Files(path string) (FilesResult, error) {
 		return FilesResult{}, err
 	}
 
-	err = ensure(dir)
-	if err != nil {
-		return FilesResult{}, err
-	}
-
 	files, err := listFiles(dir)
 	if err != nil {
 		slog.Error("workspace files: listFiles failed", "dir", dir, "error", err)
@@ -210,11 +185,6 @@ func (s *Service) Content(path string, file string) (FileContentResult, error) {
 	dir, err := safe(root, path)
 	if err != nil {
 		slog.Error("workspace content: safe path error", "path", path, "error", err)
-		return FileContentResult{}, err
-	}
-
-	err = ensure(dir)
-	if err != nil {
 		return FileContentResult{}, err
 	}
 

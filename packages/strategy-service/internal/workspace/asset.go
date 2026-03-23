@@ -12,19 +12,14 @@ import (
 //go:embed skills/** agents/** template/**
 var asset embed.FS
 
-func ensureAll(items []Local) error {
-	for _, item := range items {
-		err := ensure(item.Path)
-		if err != nil {
-			return err
-		}
+func EnsureBuiltins() error {
+	root, err := global()
+	if err != nil {
+		return err
 	}
-	return nil
-}
 
-func ensure(dir string) error {
-	for _, root := range []string{"skills", "agents"} {
-		err := sync(filepath.Join(dir, ".opencode", filepath.FromSlash(root)), root)
+	for _, item := range []string{"agents", "skills"} {
+		err = syncAsset(filepath.Join(root, item), item)
 		if err != nil {
 			return err
 		}
@@ -33,8 +28,8 @@ func ensure(dir string) error {
 	return nil
 }
 
-func seed(dir string) error {
-	err := sync(dir, "template/plugin_python")
+func seedTemplate(dir string) error {
+	err := syncAsset(dir, "template/plugin_python")
 	if err != nil {
 		return err
 	}
@@ -42,7 +37,22 @@ func seed(dir string) error {
 	return patch(dir)
 }
 
-func sync(base string, root string) error {
+func global() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+
+	dir := filepath.Join(home, ".config", "opencode")
+	err = os.MkdirAll(dir, 0o755)
+	if err != nil {
+		return "", err
+	}
+
+	return dir, nil
+}
+
+func syncAsset(base string, root string) error {
 	return fs.WalkDir(asset, root, func(src string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -51,8 +61,8 @@ func sync(base string, root string) error {
 		if src == root {
 			return os.MkdirAll(base, 0o755)
 		}
-		rel := strings.TrimPrefix(src, root+"/")
 
+		rel := strings.TrimPrefix(src, root+"/")
 		dst := filepath.Join(base, filepath.FromSlash(rel))
 		if d.IsDir() {
 			return os.MkdirAll(dst, 0o755)
@@ -83,6 +93,7 @@ func sync(base string, root string) error {
 		if mode&0o200 == 0 {
 			mode |= 0o200
 		}
+
 		return os.WriteFile(dst, body, mode)
 	})
 }
@@ -128,5 +139,6 @@ func patch(dir string) error {
 	if mode&0o200 == 0 {
 		mode |= 0o200
 	}
+
 	return os.WriteFile(path, body, mode)
 }
