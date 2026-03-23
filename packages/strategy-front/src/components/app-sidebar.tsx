@@ -1,7 +1,8 @@
 "use client";
 
-import { Command, MessageSquareText, PlugZap, ServerCog, Sparkles, Wrench } from "lucide-react";
+import { Bot, Command, MessageSquareText, PlugZap, ServerCog, Sparkles, Wrench } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
+import { AgentSidebarPanel } from "@/components/agent/agent-sidebar-panel";
 import { HomeSidebarPanel } from "@/components/home/home-sidebar-panel";
 import { McpSidebarPanel } from "@/components/mcp/mcp-sidebar-panel";
 import { NavUser } from "@/components/nav-user";
@@ -43,6 +44,11 @@ const data = {
       icon: ServerCog,
     },
     {
+      title: "Agents",
+      url: "/agents",
+      icon: Bot,
+    },
+    {
       title: "Skills",
       url: "/skills",
       icon: Sparkles,
@@ -60,6 +66,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const home = pathname === "/";
   const provider = pathname.startsWith("/providers");
   const mcp = pathname.startsWith("/mcp");
+  const agent = pathname.startsWith("/agents");
   const skill = pathname.startsWith("/skills");
   const isActive = (url: string) => (url === "/" ? pathname === "/" : pathname.startsWith(url));
 
@@ -121,6 +128,8 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
           <ProviderSidebarPanel />
         ) : mcp ? (
           <McpSidebarPanel />
+        ) : agent ? (
+          <AgentSidebarPanel />
         ) : skill ? (
           <SkillSidebarPanel />
         ) : (

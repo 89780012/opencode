@@ -4,6 +4,7 @@ import { Suspense, lazy } from "react";
 const LayoutPage = lazy(() => import("@/pages/layout"));
 const IndexPage = lazy(() => import("@/pages/index"));
 const InstallerPage = lazy(() => import("@/pages/installer"));
+const AgentPage = lazy(() => import("@/pages/agents"));
 const McpPage = lazy(() => import("@/pages/mcp"));
 const ProviderPage = lazy(() => import("@/pages/providers"));
 const ProviderOverviewPage = lazy(() => import("@/pages/providers-overview"));
@@ -44,6 +45,10 @@ const router = createBrowserRouter([
       {
         path: "mcp",
         element: <McpPage />,
+      },
+      {
+        path: "agents",
+        element: <AgentPage />,
       },
       {
         path: "skills",

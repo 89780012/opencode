@@ -20,7 +20,8 @@ export function useAgentCatalog(workspacePath?: string | null) {
         const list = await agentApi.list(workspacePath)
         if (dead) return
         const ags = list
-          .filter((item) => item.mode === "primary" && !item.hidden)
+          // `all` 既能作为主 agent，也能作为子 agent，这里不能误过滤掉。
+          .filter((item) => item.mode !== "subagent" && !item.hidden)
           .slice()
           .sort((a, b) => {
             const diff = rankAgent(a.name) - rankAgent(b.name)

@@ -34,6 +34,8 @@ func NewAPI(svc *tool.Service, op *opencode.Manager, ip *ipc.Manager) *API {
 
 func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/health", a.health)
+	mux.HandleFunc("/api/opencode/agents", a.opencodeAgents)
+	mux.HandleFunc("/api/opencode/agents/", a.opencodeAgent)
 	mux.HandleFunc("/api/opencode/skills", a.opencodeSkills)
 	mux.HandleFunc("/api/opencode/skills/", a.opencodeSkill)
 	mux.HandleFunc("/api/workspace/list", a.workspaceList)
@@ -107,6 +109,46 @@ func (a *API) opencodeSkills(w http.ResponseWriter, r *http.Request) {
 	write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
 }
 
+func (a *API) opencodeAgents(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		data, err := opencode.ListAgents()
+		if err != nil {
+			slog.Error("opencode agent list failed", "error", err)
+			write(w, http.StatusBadRequest, err.Error(), nil)
+			return
+		}
+		write(w, http.StatusOK, "ok", data)
+		return
+	}
+
+	if r.Method == http.MethodPost {
+		body := struct {
+			Name    string `json:"name"`
+			Content string `json:"content"`
+		}{}
+		err := readJSON(r, &body)
+		if err != nil {
+			write(w, http.StatusBadRequest, err.Error(), nil)
+			return
+		}
+
+		item, err := opencode.CreateAgent(body.Name, body.Content)
+		if err != nil {
+			slog.Error("opencode agent create failed", "name", body.Name, "error", err)
+			write(w, http.StatusBadRequest, err.Error(), nil)
+			return
+		}
+
+		write(w, http.StatusOK, "ok", map[string]any{
+			"agent":           item,
+			"reload_required": true,
+		})
+		return
+	}
+
+	write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
+}
+
 func (a *API) opencodeSkill(w http.ResponseWriter, r *http.Request) {
 	name, ok := tail(r.URL.Path, "/api/opencode/skills/")
 	if !ok {
@@ -142,6 +184,55 @@ func (a *API) opencodeSkill(w http.ResponseWriter, r *http.Request) {
 		err := opencode.DeleteSkill(name)
 		if err != nil {
 			slog.Error("opencode skill delete failed", "name", name, "error", err)
+			write(w, http.StatusBadRequest, err.Error(), nil)
+			return
+		}
+
+		write(w, http.StatusOK, "ok", map[string]any{
+			"name":            name,
+			"reload_required": true,
+		})
+		return
+	}
+
+	write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
+}
+
+func (a *API) opencodeAgent(w http.ResponseWriter, r *http.Request) {
+	name, ok := tail(r.URL.Path, "/api/opencode/agents/")
+	if !ok {
+		write(w, http.StatusNotFound, "agent not found", nil)
+		return
+	}
+
+	if r.Method == http.MethodPut {
+		body := struct {
+			Content string `json:"content"`
+		}{}
+		err := readJSON(r, &body)
+		if err != nil {
+			write(w, http.StatusBadRequest, err.Error(), nil)
+			return
+		}
+
+		item, err := opencode.UpdateAgent(name, body.Content)
+		if err != nil {
+			slog.Error("opencode agent update failed", "name", name, "error", err)
+			write(w, http.StatusBadRequest, err.Error(), nil)
+			return
+		}
+
+		write(w, http.StatusOK, "ok", map[string]any{
+			"agent":           item,
+			"reload_required": true,
+		})
+		return
+	}
+
+	if r.Method == http.MethodDelete {
+		err := opencode.DeleteAgent(name)
+		if err != nil {
+			slog.Error("opencode agent delete failed", "name", name, "error", err)
 			write(w, http.StatusBadRequest, err.Error(), nil)
 			return
 		}
