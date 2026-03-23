@@ -1,4 +1,4 @@
-package opencode
+package oprun
 
 import (
 	"encoding/json"
@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"strategy-service/internal/system"
+	cfg "strategy-service/internal/config"
 )
 
 type owner struct {
@@ -19,7 +19,7 @@ type owner struct {
 }
 
 func ownerPath() (string, error) {
-	root, err := system.Root()
+	root, err := cfg.Root()
 	if err != nil {
 		return "", err
 	}

@@ -25,11 +25,12 @@ npm run build
 
 ```bash
 cd packages/strategy-service
-go run .
+go run ./cmd/service
 ```
 
 When `../strategy-front/dist` exists, the service serves files from disk.
-If that directory is missing, it falls back to embedded assets copied into `internal/http/dist/www`.
+If that directory is missing, it falls back to embedded assets copied into `internal/asset/frontend/dist/www`.
+The legacy `go run .` entry still works, but `cmd/service` is now the canonical CLI entrypoint.
 
 ## Desktop Shell
 
@@ -57,9 +58,7 @@ Wails desktop builds require the Wails CLI, `github.com/wailsapp/wails/v2`, and 
 toolchain for the target OS. Unlike the pure Go service binary, desktop packaging is not a
 `CGO_ENABLED=0` cross-build flow.
 The build script first tries a local `wails` binary and falls back to
-`go run github.com/wailsapp/wails/v2/cmd/wails build`.
-When it falls back, it also runs `go get github.com/wailsapp/wails/v2/cmd/wails@v2.11.0`
-from `packages/strategy-service` so the required `go.sum` entries exist before build.
+`go run github.com/wailsapp/wails/v2/cmd/wails@v2.11.0 build`.
 
 Options:
 
@@ -94,6 +93,13 @@ The classic CLI flow still works:
 ```bash
 cd packages/strategy-service
 go run .
+```
+
+Canonical CLI entry:
+
+```bash
+cd packages/strategy-service
+go run ./cmd/service
 ```
 
 ## Build Binaries

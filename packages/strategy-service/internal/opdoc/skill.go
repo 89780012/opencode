@@ -1,4 +1,4 @@
-package opencode
+package opdoc
 
 import (
 	"errors"
@@ -25,14 +25,6 @@ type SkillDoc struct {
 type SkillList struct {
 	Root string     `json:"root"`
 	List []SkillDoc `json:"skills"`
-}
-
-func configDir() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, ".config", "opencode"), nil
 }
 
 func skillRoot() (string, error) {
@@ -71,39 +63,6 @@ func skillPath(name string) (string, error) {
 	return filepath.Join(root, name, "SKILL.md"), nil
 }
 
-func frontmatter(input string) map[string]string {
-	out := map[string]string{}
-	text := strings.ReplaceAll(input, "\r\n", "\n")
-	if !strings.HasPrefix(text, "---\n") {
-		return out
-	}
-
-	rest := strings.TrimPrefix(text, "---\n")
-	end := strings.Index(rest, "\n---\n")
-	if end < 0 {
-		return out
-	}
-
-	for _, line := range strings.Split(rest[:end], "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		i := strings.Index(line, ":")
-		if i < 0 {
-			continue
-		}
-
-		key := strings.TrimSpace(strings.ToLower(line[:i]))
-		val := strings.TrimSpace(line[i+1:])
-		val = strings.Trim(val, `"'`)
-		out[key] = val
-	}
-
-	return out
-}
-
 func parseSkill(path string, body []byte, mod time.Time) (SkillDoc, error) {
 	text := strings.ToValidUTF8(string(body), "")
 	meta := frontmatter(text)
@@ -124,6 +83,7 @@ func parseSkill(path string, body []byte, mod time.Time) (SkillDoc, error) {
 	}, nil
 }
 
+// ListSkills returns the configured opencode skills on disk.
 func ListSkills() (SkillList, error) {
 	root, err := skillRoot()
 	if err != nil {
@@ -172,6 +132,7 @@ func ListSkills() (SkillList, error) {
 	}, nil
 }
 
+// CreateSkill writes a new skill document.
 func CreateSkill(name string, content string) (SkillDoc, error) {
 	path, err := skillPath(name)
 	if err != nil {
@@ -187,6 +148,7 @@ func CreateSkill(name string, content string) (SkillDoc, error) {
 	return writeSkill(path, content)
 }
 
+// UpdateSkill overwrites an existing skill document.
 func UpdateSkill(name string, content string) (SkillDoc, error) {
 	path, err := skillPath(name)
 	if err != nil {
@@ -199,6 +161,7 @@ func UpdateSkill(name string, content string) (SkillDoc, error) {
 	return writeSkill(path, content)
 }
 
+// DeleteSkill removes a skill directory from disk.
 func DeleteSkill(name string) error {
 	path, err := skillPath(name)
 	if err != nil {

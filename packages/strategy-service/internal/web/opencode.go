@@ -6,10 +6,10 @@ import (
 	"net/http/httputil"
 	"strings"
 
-	"strategy-service/internal/opencode"
+	"strategy-service/internal/oprun"
 )
 
-func NewOpencodeProxy(mgr *opencode.Manager) http.Handler {
+func NewOpencodeProxy(mgr *oprun.Manager) http.Handler {
 	target := mgr.Target()
 	proxy := httputil.NewSingleHostReverseProxy(target)
 	proxy.FlushInterval = -1
@@ -31,7 +31,7 @@ func NewOpencodeProxy(mgr *opencode.Manager) http.Handler {
 		err := mgr.Ensure(r.Context())
 		if err != nil {
 			code := http.StatusServiceUnavailable
-			if errors.Is(err, opencode.ErrDisabled()) {
+			if errors.Is(err, oprun.ErrDisabled()) {
 				code = http.StatusNotImplemented
 			}
 			http.Error(w, err.Error(), code)

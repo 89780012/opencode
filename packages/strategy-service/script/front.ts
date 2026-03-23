@@ -5,7 +5,7 @@ import path from "path"
 export async function front(root: string, skip: boolean) {
   const repo = path.resolve(root, "..", "..")
   const dir = path.join(repo, "packages", "strategy-front")
-  const web = path.join(root, "internal", "http", "dist", "www")
+  const web = path.join(root, "internal", "asset", "frontend", "dist", "www")
 
   if (!skip) {
     console.log("building strategy-front")

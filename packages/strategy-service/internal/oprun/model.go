@@ -1,4 +1,4 @@
-package opencode
+package oprun
 
 import "time"
 

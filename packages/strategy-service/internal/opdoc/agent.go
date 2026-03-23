@@ -1,4 +1,4 @@
-package opencode
+package opdoc
 
 import (
 	"errors"
@@ -139,6 +139,7 @@ func parseAgent(path string, body []byte, mod time.Time) (AgentDoc, error) {
 	}, nil
 }
 
+// ListAgents returns the configured opencode agents on disk.
 func ListAgents() (AgentList, error) {
 	root, err := agentRoot()
 	if err != nil {
@@ -187,6 +188,7 @@ func ListAgents() (AgentList, error) {
 	}, nil
 }
 
+// CreateAgent writes a new agent document.
 func CreateAgent(name string, content string) (AgentDoc, error) {
 	path, err := agentPath(name)
 	if err != nil {
@@ -202,6 +204,7 @@ func CreateAgent(name string, content string) (AgentDoc, error) {
 	return writeAgent(path, content)
 }
 
+// UpdateAgent overwrites an existing agent document.
 func UpdateAgent(name string, content string) (AgentDoc, error) {
 	path, err := agentPath(name)
 	if err != nil {
@@ -214,6 +217,7 @@ func UpdateAgent(name string, content string) (AgentDoc, error) {
 	return writeAgent(path, content)
 }
 
+// DeleteAgent removes an agent document from disk.
 func DeleteAgent(name string) error {
 	path, err := agentPath(name)
 	if err != nil {
@@ -235,7 +239,6 @@ func writeAgent(path string, content string) (AgentDoc, error) {
 		content += "\n"
 	}
 
-	// 文件名是 agent 的稳定标识，frontmatter name 只能缺省或与文件名一致。
 	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 	meta := frontmatter(content)
 	if meta["name"] != "" && strings.ToLower(strings.TrimSpace(meta["name"])) != name {

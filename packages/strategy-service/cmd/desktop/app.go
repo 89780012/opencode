@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"strategy-service/internal/app"
+	"strategy-service/internal/bootstrap"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -17,7 +17,7 @@ import (
 type shell struct {
 	ctx  context.Context
 	mu   sync.Mutex
-	srv  *app.Service
+	srv  *bootstrap.Service
 	ln   net.Listener
 	url  string
 	err  string
@@ -46,11 +46,11 @@ func (s *shell) shutdown(context.Context) {
 }
 
 func (s *shell) boot() {
-	cfg := app.LoadConfig()
+	cfg := bootstrap.LoadConfig()
 	cfg.Host = "127.0.0.1"
 	cfg.Port = "0"
 
-	srv, err := app.New(cfg)
+	srv, err := bootstrap.New(cfg)
 	if err != nil {
 		s.fail(err)
 		return

@@ -7,6 +7,8 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+
+	"strategy-service/internal/asset"
 )
 
 type Static struct {
@@ -22,15 +24,10 @@ func NewStatic(root string) *Static {
 		abs = root
 	}
 
-	site, err := fs.Sub(asset, "dist")
-	if err != nil {
-		site = nil
-	}
-
 	return &Static{
 		root:  abs,
 		index: filepath.Join(abs, "index.html"),
-		site:  site,
+		site:  asset.Site(),
 		entry: "www/index.html",
 	}
 }

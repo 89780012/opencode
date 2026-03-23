@@ -57,7 +57,7 @@ for (const item of jobs) {
   await fs.rm(dir, { force: true, recursive: true })
   await fs.mkdir(dir, { recursive: true })
   console.log(`go build ${item.id}`)
-  await $`go build -o ${bin} .`.cwd(root).env({
+  await $`go build -o ${bin} ./cmd/service`.cwd(root).env({
     ...process.env,
     CGO_ENABLED: "0",
     GOCACHE: process.env.GOCACHE || cache,

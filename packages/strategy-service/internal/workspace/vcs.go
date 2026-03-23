@@ -1,4 +1,4 @@
-package web
+package workspace
 
 import (
 	"context"
@@ -9,8 +9,6 @@ import (
 	"net/url"
 	"sync"
 	"time"
-
-	"strategy-service/internal/workspace"
 )
 
 var opclient = &http.Client{
@@ -22,21 +20,23 @@ type project struct {
 	VCS string `json:"vcs,omitempty"`
 }
 
-func (a *API) workspaceLocal(ctx context.Context, item workspace.Local) workspace.Local {
-	return a.workspaceLocals(ctx, []workspace.Local{item})[0]
+type VCS interface {
+	Ensure(context.Context) error
+	Target() *url.URL
 }
 
-func (a *API) workspaceLocals(ctx context.Context, items []workspace.Local) []workspace.Local {
-	if len(items) == 0 {
+// Enrich attaches VCS metadata to local workspaces when opencode is reachable.
+func Enrich(ctx context.Context, items []Local, src VCS) []Local {
+	if len(items) == 0 || src == nil {
 		return items
 	}
 
-	if err := a.op.Ensure(ctx); err != nil {
+	if err := src.Ensure(ctx); err != nil {
 		slog.Debug("workspace vcs unavailable", "error", err)
 		return items
 	}
 
-	out := append([]workspace.Local{}, items...)
+	out := append([]Local{}, items...)
 	var wait sync.WaitGroup
 	wait.Add(len(out))
 
@@ -44,7 +44,7 @@ func (a *API) workspaceLocals(ctx context.Context, items []workspace.Local) []wo
 		go func(i int) {
 			defer wait.Done()
 
-			vcs, err := a.workspaceVCS(ctx, out[i].Path)
+			vcs, err := lookup(ctx, src, out[i].Path)
 			slog.Info("workspace vcs", "path", out[i].Path, "vcs", vcs)
 			if err != nil {
 				slog.Debug("workspace vcs failed", "path", out[i].Path, "error", err)
@@ -59,8 +59,8 @@ func (a *API) workspaceLocals(ctx context.Context, items []workspace.Local) []wo
 	return out
 }
 
-func (a *API) workspaceVCS(ctx context.Context, dir string) (string, error) {
-	target := a.op.Target()
+func lookup(ctx context.Context, src VCS, dir string) (string, error) {
+	target := src.Target()
 	target.Path = "/project/current"
 	target.RawQuery = url.Values{
 		"directory": []string{dir},

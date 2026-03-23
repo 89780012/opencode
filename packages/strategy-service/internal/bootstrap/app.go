@@ -1,4 +1,4 @@
-package app
+package bootstrap
 
 import (
 	"context"
@@ -7,25 +7,26 @@ import (
 	"net/http"
 	"time"
 
-	web "strategy-service/internal/http"
+	"strategy-service/internal/asset"
+	conf "strategy-service/internal/config"
 	"strategy-service/internal/ipc"
-	"strategy-service/internal/opencode"
-	"strategy-service/internal/system"
+	"strategy-service/internal/oprun"
 	"strategy-service/internal/tool"
-	"strategy-service/internal/workspace"
+	web "strategy-service/internal/web"
 )
 
 type Service struct {
 	cfg Config
 	srv *http.Server
-	op  *opencode.Manager
+	op  *oprun.Manager
 	ip  *ipc.Manager
 }
 
 func New(cfg Config) (*Service, error) {
 	slog.Info("initializing service", "addr", cfg.Addr(), "opencode_enabled", cfg.Opencode.Enabled, "ipc_enabled", cfg.IPC.Enabled)
 
-	err := workspace.EnsureBuiltins()
+	// 将asset下 workspace 下 agents和skills copy到~.config/opencode/ 下
+	err := asset.EnsureBuiltins()
 	if err != nil {
 		slog.Error("builtin opencode asset provision failed", "error", err)
 		return nil, err
@@ -33,7 +34,7 @@ func New(cfg Config) (*Service, error) {
 
 	// 创建http 请求多路复用器
 	mux := http.NewServeMux()
-	op := opencode.New(opencode.Config(cfg.Opencode))
+	op := oprun.New(oprun.Config(cfg.Opencode))
 	ip := ipc.New(ipc.Config{
 		Enabled: cfg.IPC.Enabled,
 		Product: cfg.IPC.Product,
@@ -46,7 +47,7 @@ func New(cfg Config) (*Service, error) {
 	}
 	slog.Info("ipc manager started")
 
-	api := web.NewAPI(tool.NewService(), op, ip, &system.Store{})
+	api := web.NewAPI(tool.NewService(), op, ip, &conf.Store{})
 	api.Register(mux)
 	mux.Handle("/opencode/", web.NewOpencodeProxy(op))
 	mux.Handle("/opencode", web.NewOpencodeProxy(op))

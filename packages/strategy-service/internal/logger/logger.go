@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"strategy-service/internal/system"
+	"strategy-service/internal/logs"
 
 	"gopkg.in/natefinch/lumberjack.v2"
 )
@@ -20,7 +20,7 @@ var (
 // Logs are written to ~/.strategy-service/logs/strategy-service.log
 // with rotation (50MB), compression, and 30-day retention.
 func Init() error {
-	path, err := system.ServicePath()
+	path, err := logs.ServicePath()
 	if err != nil {
 		return err
 	}

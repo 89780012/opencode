@@ -1,4 +1,4 @@
-package workspace
+package asset
 
 import (
 	"embed"
@@ -9,17 +9,30 @@ import (
 	"strings"
 )
 
-//go:embed skills/** agents/** template/**
-var asset embed.FS
+// raw stores the staged frontend bundle and builtin workspace assets.
+//
+//go:embed frontend/** workspace/**
+var raw embed.FS
 
+// Site returns the embedded frontend bundle when a staged build is available.
+func Site() fs.FS {
+	site, err := fs.Sub(raw, "frontend/dist")
+	if err != nil {
+		return nil
+	}
+	return site
+}
+
+// EnsureBuiltins将内置的开源代码代理和技能植入用户配置中。
 func EnsureBuiltins() error {
-	root, err := global()
+	root, err := configRoot()
 	if err != nil {
 		return err
 	}
 
+	// 将workspace下的agents 和 skills copy到用户配置中
 	for _, item := range []string{"agents", "skills"} {
-		err = syncAsset(filepath.Join(root, item), item)
+		err = sync(filepath.Join(root, item), "workspace/"+item)
 		if err != nil {
 			return err
 		}
@@ -28,8 +41,9 @@ func EnsureBuiltins() error {
 	return nil
 }
 
-func seedTemplate(dir string) error {
-	err := syncAsset(dir, "template/plugin_python")
+// SeedWorkspace copies the builtin workspace template into a new workspace.
+func SeedWorkspace(dir string) error {
+	err := sync(dir, "workspace/template/plugin_python")
 	if err != nil {
 		return err
 	}
@@ -37,7 +51,7 @@ func seedTemplate(dir string) error {
 	return patch(dir)
 }
 
-func global() (string, error) {
+func configRoot() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
@@ -52,8 +66,8 @@ func global() (string, error) {
 	return dir, nil
 }
 
-func syncAsset(base string, root string) error {
-	return fs.WalkDir(asset, root, func(src string, d fs.DirEntry, err error) error {
+func sync(base string, root string) error {
+	return fs.WalkDir(raw, root, func(src string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -76,7 +90,7 @@ func syncAsset(base string, root string) error {
 			return err
 		}
 
-		body, err := asset.ReadFile(src)
+		body, err := raw.ReadFile(src)
 		if err != nil {
 			return err
 		}

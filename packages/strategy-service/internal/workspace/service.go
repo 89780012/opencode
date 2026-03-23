@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"strategy-service/internal/asset"
 )
 
 type Service struct{}
@@ -81,7 +83,7 @@ func (s *Service) Create(name string, git bool) (CreateResult, error) {
 	}
 
 	// 模板文件
-	err = seedTemplate(path)
+	err = asset.SeedWorkspace(path)
 	if err != nil {
 		slog.Error("workspace create: seed failed", "path", path, "error", err)
 		_ = os.RemoveAll(path)

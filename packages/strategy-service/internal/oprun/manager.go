@@ -1,4 +1,4 @@
-package opencode
+package oprun
 
 import (
 	"bufio"
@@ -15,17 +15,19 @@ import (
 	"sync"
 	"time"
 
+	"strategy-service/internal/logs"
 	"strategy-service/internal/proc"
-	"strategy-service/internal/system"
 )
 
 var errDisabled = errors.New("opencode is disabled")
 var errExternal = errors.New("opencode is not managed by strategy-service")
 
+// ErrDisabled reports that managed opencode startup is disabled.
 func ErrDisabled() error {
 	return errDisabled
 }
 
+// ErrExternal reports that opencode is reachable but not owned by this service.
 func ErrExternal() error {
 	return errExternal
 }
@@ -43,6 +45,7 @@ type Manager struct {
 	lastErr error
 }
 
+// New builds a managed opencode runtime controller.
 func New(cfg Config) *Manager {
 	target := &url.URL{
 		Scheme: "http",
@@ -539,7 +542,7 @@ func (m *Manager) scan(in io.ReadCloser) {
 		m.mu.Lock()
 		m.push(line)
 		m.mu.Unlock()
-		_ = system.Append(system.OpencodeLog, line)
+		_ = logs.Append(logs.OpencodeKind, line)
 	}
 }
 
@@ -560,7 +563,7 @@ func (m *Manager) note(line string) {
 	m.mu.Lock()
 	m.push(text)
 	m.mu.Unlock()
-	_ = system.Append(system.OpencodeLog, text)
+	_ = logs.Append(logs.OpencodeKind, text)
 }
 
 func (m *Manager) health(ctx context.Context) error {
