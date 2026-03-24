@@ -1,5 +1,14 @@
 import { request } from "@/api/client"
-import type { InstallTask, OpencodeLog, OpencodeState, SystemConfig, SystemLog, ToolID, ToolState } from "@/types/system"
+import type {
+  InstallTask,
+  OpencodeLog,
+  OpencodeState,
+  SystemConfig,
+  SystemLog,
+  SystemVersion,
+  ToolID,
+  ToolState,
+} from "@/types/system"
 
 export const systemApi = {
   list() {
@@ -8,6 +17,10 @@ export const systemApi = {
 
   config() {
     return request.get<SystemConfig>("/system/config")
+  },
+
+  version() {
+    return request.get<SystemVersion>("/system/version")
   },
 
   saveConfig(cfg: SystemConfig) {

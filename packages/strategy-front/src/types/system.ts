@@ -68,6 +68,19 @@ export interface OpencodeLog {
   log: string[]
 }
 
+export interface SystemVersionCurrent {
+  version: string
+  channel: "dev" | "stable"
+  env: "development" | "production"
+  commit?: string
+  dirty: boolean
+  built_at?: string
+}
+
+export interface SystemVersion {
+  current: SystemVersionCurrent
+}
+
 export const systemDefault: SystemConfig = {
   theme: {
     mode: "system",
@@ -75,5 +88,14 @@ export const systemDefault: SystemConfig = {
   },
   logs: {
     tail: 200,
+  },
+}
+
+export const systemVersionDefault: SystemVersion = {
+  current: {
+    version: "dev",
+    channel: "dev",
+    env: "development",
+    dirty: false,
   },
 }

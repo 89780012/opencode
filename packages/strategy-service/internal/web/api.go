@@ -45,6 +45,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/system/tools/", a.install)
 	mux.HandleFunc("/api/system/tasks/", a.task)
 	mux.HandleFunc("/api/system/config", a.config)
+	mux.HandleFunc("/api/system/version", a.version)
 	mux.HandleFunc("/api/system/logs", a.logs)
 	mux.HandleFunc("/api/system/opencode/status", a.opencodeStatus)
 	mux.HandleFunc("/api/system/opencode/logs", a.opencodeLogs)

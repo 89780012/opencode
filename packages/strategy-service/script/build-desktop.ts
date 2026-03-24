@@ -22,6 +22,7 @@ import fs from "fs/promises"
 import path from "path"
 import { fileURLToPath } from "url"
 import { front } from "./front"
+import { flags, meta } from "./meta"
 
 const self = fileURLToPath(import.meta.url)
 const dir = path.dirname(self)
@@ -40,6 +41,8 @@ const ver = "v2.11.0"
 
 // 步骤 1: 构建前端资源
 await front(root, skip)
+const row = await meta()
+const ldflags = flags(row)
 
 // 步骤 2: 构建桌面应用
 console.log("building strategy-service desktop")
@@ -51,7 +54,7 @@ if (clean) {
 // 优先使用系统安装的 wails CLI，否则通过 go run 回退
 const bin = Bun.which(process.platform === "win32" ? "wails.exe" : "wails") || Bun.which("wails")
 if (bin) {
-  await $`${bin} build ${pass}`.cwd(cmd)
+  await $`${bin} build -ldflags ${ldflags} ${pass}`.cwd(cmd)
 } else {
   const go = Bun.which(process.platform === "win32" ? "go.exe" : "go") || Bun.which("go")
   if (!go) {
@@ -59,7 +62,7 @@ if (bin) {
   }
   // 直接 go run module@version，Go 会自动使用模块缓存，无需 go get
   console.log("running wails via go run (using module cache)")
-  await $`${go} run ${mod}/cmd/wails@${ver} build ${pass}`.cwd(cmd)
+  await $`${go} run ${mod}/cmd/wails@${ver} build -ldflags ${ldflags} ${pass}`.cwd(cmd)
 }
 
 // 步骤 3: 将构建产物复制到 dist/desktop/

@@ -11,6 +11,7 @@ import (
 
 	cfg "strategy-service/internal/config"
 	"strategy-service/internal/logs"
+	"strategy-service/internal/meta"
 	"strategy-service/internal/tool"
 )
 
@@ -120,6 +121,15 @@ func (a *API) config(w http.ResponseWriter, r *http.Request) {
 	}
 
 	write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
+}
+
+func (a *API) version(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
+		return
+	}
+
+	write(w, http.StatusOK, "ok", meta.Current())
 }
 
 func (a *API) logs(w http.ResponseWriter, r *http.Request) {

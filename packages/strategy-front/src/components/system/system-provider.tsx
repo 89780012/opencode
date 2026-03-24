@@ -2,13 +2,17 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { useTheme } from "next-themes"
 import { systemApi } from "@/api/modules"
 import { applyAccent } from "@/lib/system-theme"
-import { systemDefault, type SystemConfig } from "@/types/system"
+import { systemDefault, systemVersionDefault, type SystemConfig, type SystemVersion } from "@/types/system"
 
 type State = {
   cfg: SystemConfig
   load: boolean
   err: string
+  ver: SystemVersion
+  vload: boolean
+  verr: string
   reload: () => Promise<void>
+  reloadVersion: () => Promise<void>
   save: (cfg: SystemConfig) => Promise<SystemConfig>
 }
 
@@ -19,7 +23,11 @@ export function SystemProvider(props: { children: ReactNode }) {
   const [cfg, setCfg] = useState<SystemConfig>(systemDefault)
   const [load, setLoad] = useState(true)
   const [err, setErr] = useState("")
+  const [ver, setVer] = useState<SystemVersion>(systemVersionDefault)
+  const [vload, setVload] = useState(true)
+  const [verr, setVerr] = useState("")
   const seq = useRef(0)
+  const vseq = useRef(0)
 
   useEffect(() => {
     setTheme(cfg.theme.mode)
@@ -73,11 +81,43 @@ export function SystemProvider(props: { children: ReactNode }) {
     }
   }, [cfg])
 
+  const reloadVersion = useCallback(async () => {
+    const id = ++vseq.current
+    setVerr("")
+    try {
+      const next = await systemApi.version()
+      if (id !== vseq.current) {
+        return
+      }
+      setVer(next)
+    } catch (err) {
+      if (id !== vseq.current) {
+        return
+      }
+      if (err instanceof Error) {
+        setVerr(err.message)
+      }
+      setVer(systemVersionDefault)
+    } finally {
+      if (id === vseq.current) {
+        setVload(false)
+      }
+    }
+  }, [])
+
   useEffect(() => {
     void reload()
   }, [reload])
 
-  return <Ctx.Provider value={{ cfg, load, err, reload, save }}>{props.children}</Ctx.Provider>
+  useEffect(() => {
+    void reloadVersion()
+  }, [reloadVersion])
+
+  return (
+    <Ctx.Provider value={{ cfg, load, err, ver, vload, verr, reload, reloadVersion, save }}>
+      {props.children}
+    </Ctx.Provider>
+  )
 }
 
 export function useSystem() {
