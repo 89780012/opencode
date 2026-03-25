@@ -52,6 +52,7 @@ func New(cfg Config) (*Service, error) {
 		Platform: cfg.Platform,
 		Account:  cfg.Account,
 		WindowId: cfg.WindowId,
+		LogDir:   cfg.LogDir,
 	}))
 	api.Register(mux)
 	mux.Handle("/opencode/", web.NewOpencodeProxy(op))

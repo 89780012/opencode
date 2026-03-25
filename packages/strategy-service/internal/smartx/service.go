@@ -19,6 +19,7 @@ type Config struct {
 	Account  string
 	WindowId string
 	Password string
+	LogDir   string
 	Timeout  time.Duration
 }
 

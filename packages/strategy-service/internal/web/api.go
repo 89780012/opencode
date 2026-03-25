@@ -50,6 +50,8 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/system/config", a.config)
 	mux.HandleFunc("/api/system/version", a.version)
 	mux.HandleFunc("/api/system/logs", a.logs)
+	mux.HandleFunc("/api/system/smartx/logs/meta", a.smartxLogsMeta)
+	mux.HandleFunc("/api/system/smartx/logs/watch", a.smartxLogsWatch)
 	mux.HandleFunc("/api/system/smartx/startExtension", a.smartxStart)
 	mux.HandleFunc("/api/system/opencode/status", a.opencodeStatus)
 	mux.HandleFunc("/api/system/opencode/logs", a.opencodeLogs)

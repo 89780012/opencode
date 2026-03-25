@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	cfg "strategy-service/internal/config"
 	"strategy-service/internal/logs"
@@ -197,4 +198,64 @@ func (a *API) smartxStart(w http.ResponseWriter, r *http.Request) {
 	}
 
 	write(w, http.StatusOK, "ok", out)
+}
+
+func (a *API) smartxLogsMeta(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
+		return
+	}
+
+	limit, err := queryInt(r, "limit", 3)
+	if err != nil {
+		write(w, http.StatusBadRequest, "invalid limit", nil)
+		return
+	}
+
+	out, err := a.sx.Meta(r.URL.Query().Get("name"), limit)
+	if err != nil {
+		write(w, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+
+	write(w, http.StatusOK, "ok", out)
+}
+
+func (a *API) smartxLogsWatch(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
+		return
+	}
+
+	tail, err := queryInt(r, "tail", 200)
+	if err != nil {
+		write(w, http.StatusBadRequest, "invalid tail", nil)
+		return
+	}
+	limit, err := queryInt(r, "limit", 3)
+	if err != nil {
+		write(w, http.StatusBadRequest, "invalid limit", nil)
+		return
+	}
+	sec, err := queryInt(r, "seconds", 10)
+	if err != nil {
+		write(w, http.StatusBadRequest, "invalid seconds", nil)
+		return
+	}
+
+	out, err := a.sx.Watch(r.Context(), r.URL.Query().Get("name"), tail, limit, time.Duration(sec)*time.Second)
+	if err != nil {
+		write(w, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+
+	write(w, http.StatusOK, "ok", out)
+}
+
+func queryInt(r *http.Request, key string, fallback int) (int, error) {
+	raw := strings.TrimSpace(r.URL.Query().Get(key))
+	if raw == "" {
+		return fallback, nil
+	}
+	return strconv.Atoi(raw)
 }

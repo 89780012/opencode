@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"os"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -17,6 +18,7 @@ type Config struct {
 	Platform string
 	Account  string //账号
 	WindowId string //smartX 客户端实例
+	LogDir   string
 }
 
 type OpencodeConfig struct {
@@ -42,12 +44,14 @@ func LoadConfig() Config {
 	platform := text("PLATFORM", runtime.GOOS)
 	account := text("ACCOUNT", "")
 	windowId := text("WINDOWID", "")
+	logDir := smartxLog()
 
 	return Config{
 		Host:     host,
 		Port:     port,
 		Dist:     dist,
 		Platform: platform,
+		LogDir:   logDir,
 		Opencode: OpencodeConfig{
 			Enabled:      truth("STRATEGY_OPENCODE_ENABLED", true),
 			Startup:      text("STRATEGY_OPENCODE_STARTUP", "auto"),
@@ -111,4 +115,17 @@ func span(key string, fallback time.Duration) time.Duration {
 		return fallback
 	}
 	return out
+}
+
+func smartxLog() string {
+	value := strings.TrimSpace(os.Getenv("STRATEGY_SMARTX_LOG_DIR"))
+	if value != "" {
+		return filepath.Clean(value)
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return filepath.Join(".xtp-smart", "log", "default")
+	}
+	return filepath.Join(home, ".xtp-smart", "log", "default")
 }

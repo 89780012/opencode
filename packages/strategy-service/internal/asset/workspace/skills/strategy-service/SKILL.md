@@ -57,45 +57,45 @@ description: 由 strategy-service 预置的工作区内置技能，用于在 Sma
 这些规则优先于通用策略开发习惯。
 
 1. 严格遵守组件生命周期。  
-所有 Smart 初始化必须挂在 `smart.on_init(init)` 下。不要在模块导入阶段做订阅、账户读取和下单。
+   所有 Smart 初始化必须挂在 `smart.on_init(init)` 下。不要在模块导入阶段做订阅、账户读取和下单。
 
 2. 优先围绕账户对象写逻辑。  
-单账户优先使用 `smart.current_account`；只有明确需要多账户时才用 `smart.account_map`。账户状态回调优先使用 `on_order`、`on_trade`、`on_assets`、`on_position`。
+   单账户优先使用 `smart.current_account`；只有明确需要多账户时才用 `smart.account_map`。账户状态回调优先使用 `on_order`、`on_trade`、`on_assets`、`on_position`。
 
 3. 优先使用当前 SDK 调用风格。  
-若新旧形式都可用，优先关键字参数以及 `code` / `codes` 形式。下单优先采用工作区里已有的关键字写法。
+   若新旧形式都可用，优先关键字参数以及 `code` / `codes` 形式。下单优先采用工作区里已有的关键字写法。
 
 4. 用事件模型代替轮询。  
-报价策略靠订阅和回调；K 线策略靠 `smart.subscribe_bar(...)`、`smart.on_bar(...)` 或 `smart.on(smart.Event.ON_BAR, ...)`；历史预热用 `smart.query_bar(...)`。
+   报价策略靠订阅和回调；K 线策略靠 `smart.subscribe_bar(...)`、`smart.on_bar(...)` 或 `smart.on(smart.Event.ON_BAR, ...)`；历史预热用 `smart.query_bar(...)`。
 
 5. 区分提交回调和订单状态回调。  
-`insert_order(..., callback=...)` 只说明提交成功或失败；真正的订单生命周期变化仍以 `on_order` 为准。
+   `insert_order(..., callback=...)` 只说明提交成功或失败；真正的订单生命周期变化仍以 `on_order` 为准。
 
 6. 不要凭空发明 SDK 不支持的 API。  
-默认 SDK `1.0.0` 不支持 `strategy.insert_order`、`strategy.subscribe` 这类策略级快捷接口，除非工作区已有明确证据。除非用户明确要求或项目已依赖，不要引入 `backtrader`、`vnpy`、`ccxt` 等框架。
+   默认 SDK `1.0.0` 不支持 `strategy.insert_order`、`strategy.subscribe` 这类策略级快捷接口，除非工作区已有明确证据。除非用户明确要求或项目已依赖，不要引入 `backtrader`、`vnpy`、`ccxt` 等框架。
 
 7. 尽量贴近模板和现有结构。  
-如果工作区来自 `plugin_python`，优先在 `start.py` 和现有 `src/` 中扩展，不要随意拆出新的包结构。只有在明显减少重复或提高事件流可读性时，才增加辅助函数。
+   如果工作区来自 `plugin_python`，优先在 `start.py` 和现有 `src/` 中扩展，不要随意拆出新的包结构。只有在明显减少重复或提高事件流可读性时，才增加辅助函数。
 
 ## 核心规则
 
 1. 先检查工作区。  
-先找已有策略代码、回测代码、配置文件、数据适配器和执行入口，再决定结构。
+   先找已有策略代码、回测代码、配置文件、数据适配器和执行入口，再决定结构。
 
 2. 编码前先澄清策略。  
-关键输入缺失时，优先简短提问；如果可以安全推断，就给出默认值并显式说明假设。
+   关键输入缺失时，优先简短提问；如果可以安全推断，就给出默认值并显式说明假设。
 
 3. 把策略想法、实现、验证分开。  
-不要从一个模糊想法直接跳到最终代码，中间必须有规则、参数和验证预期。
+   不要从一个模糊想法直接跳到最终代码，中间必须有规则、参数和验证预期。
 
 4. 策略必须包含风控。  
-只有进出场没有仓位、止损、失效条件的策略是不完整的。
+   只有进出场没有仓位、止损、失效条件的策略是不完整的。
 
 5. 能回测就回测。  
-如果仓库支持回测，要使用它；如果不支持，要明确缺什么以及下一步该验证什么。
+   如果仓库支持回测，要使用它；如果不支持，要明确缺什么以及下一步该验证什么。
 
 6. SmartX 名称必须精确。  
-枚举、字段、回调名必须先和现有代码或 SDK 文档核对，不允许猜。
+   枚举、字段、回调名必须先和现有代码或 SDK 文档核对，不允许猜。
 
 ## 标准策略工作流
 
@@ -202,6 +202,8 @@ description: 由 strategy-service 预置的工作区内置技能，用于在 Sma
 - 优先使用工具：`smartx_start`
 - 这个工具内部会调用：`POST /api/system/smartx/startExtension`
 - 作用：先登录 SmartX CLI，再执行 `startExtension <name>`
+- 如果启动成功， 需要调用 `smartx_logs` 工具获取最新日志，看策略启动过程中是否有报错，有报错则修复错误，再重试启动排查
+- `smartx_logs` 会观察 SmartX 日志几秒钟，并返回最新日志文件路径和新增日志内容
 - 调用工具时至少应提供：`name`、`account`、`window_id`
 - `window_id` 表示 SmartX 客户端窗口实例 ID，不特指 Windows 平台
 - 如未额外指定，平台由 `strategy-service` 的配置项 `PLATFORM` 决定
@@ -211,6 +213,7 @@ description: 由 strategy-service 预置的工作区内置技能，用于在 Sma
 1. 写好策略
 2. 校验关键文件和参数
 3. 在需要时主动调用 `smartx_start` 工具启动扩展和策略
+4. 如果启动结果异常或不完整，立即调用 `smartx_logs` 观察日志窗口并总结错误
 
 ## Python 网格策略工作流
 
@@ -339,3 +342,11 @@ description: 由 strategy-service 预置的工作区内置技能，用于在 Sma
 - 不要把 Smart 相关代码写到 `smart.on_init(init)` 生命周期之外
 - 不要把回调驱动逻辑改成 `while True` 轮询，除非用户明确要求
 - 不要重复 `.opencode/history.md` 里已经记录过的错误，除非先说明为什么旧约束已不再适用
+## Runtime Completion Rule
+
+- 默认把“策略能成功启动、运行日志中没有明显错误”视为交付标准，而不只是“代码写完”
+- 编写策略完成后，主动调用 `smartx_start` 启动策略
+- 启动后必须主动调用 `smartx_logs` 观察一段时间日志，检查是否有错误
+- 如果启动输出或日志里仍有错误，继续修改并重复“启动 -> 看日志 -> 修复”
+- 只有在遇到明确外部阻塞时才允许停止，例如 SmartX 客户端未启动、账号不可用、窗口实例不对、权限缺失、网络异常、依赖缺失
+- 因外部阻塞停止时，必须明确说明阻塞点、已验证过什么、下一步需要用户做什么

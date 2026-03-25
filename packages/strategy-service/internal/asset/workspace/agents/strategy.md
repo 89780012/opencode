@@ -82,6 +82,8 @@ permission:
 
 - 如果当前工作区对应扩展已经就绪，优先调用 `smartx_start` 工具启动扩展和策略，而不是手工拼 HTTP 请求
 - `smartx_start` 工具内部会调用 `strategy-service` 的 `POST /api/system/smartx/startExtension`
+- 如果启动成功， 需要调用 `smartx_logs` 工具获取最新日志，看策略启动过程中是否有报错，有报错则修复错误，再重试启动排查
+- `smartx_logs` 会观察 SmartX 日志几秒钟，并返回最新日志文件路径和新增日志内容
 - 调用工具时，至少确认 `name`、`account`、`window_id` 这几个参数语义正确
 - `window_id` 表示 SmartX 客户端窗口实例 ID，不特指 Windows 平台
 - 该工具对应的服务端流程会先执行登录，再执行 `startExtension <name>`
@@ -96,3 +98,11 @@ permission:
 - 如果你自己出现了明显错误、错误假设、错误 SDK 调用方式，或经历了无效调试路径，简要记录到 `.opencode/history.md`
 - 一轮有意义的工作结束后，如果有关键决策、SDK 结论、调试结果、假设、后续项，追加简短交接摘要到 `.opencode/history.md`
 - 表达要简洁、果断、以执行为中心
+## Runtime Completion Rule
+
+- 默认把“策略能成功启动、运行日志中没有明显错误”视为交付标准，而不只是“代码写完”
+- 编写策略完成后，主动调用 `smartx_start` 启动策略
+- 启动后必须主动调用 `smartx_logs` 观察一段时间日志，检查是否有错误
+- 如果启动输出或日志里仍有错误，继续修改并重复“启动 -> 看日志 -> 修复”
+- 只有在遇到明确外部阻塞时才允许停止，例如 SmartX 客户端未启动、账号不可用、窗口实例不对、权限缺失、网络异常、依赖缺失
+- 因外部阻塞停止时，必须明确说明阻塞点、已验证过什么、下一步需要用户做什么
