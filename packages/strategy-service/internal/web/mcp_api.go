@@ -125,9 +125,6 @@ func (a *API) smartxMCP(w http.ResponseWriter, r *http.Request) {
 		case "start":
 			out, err := a.sx.Start(r.Context(), smartx.Input{
 				Name:     text(args["name"]),
-				Account:  text(args["account"]),
-				WindowId: text(args["window_id"]),
-				Password: text(args["password"]),
 			})
 			if err != nil {
 				mcpToolResult(w, req.ID, err.Error(), nil, true)

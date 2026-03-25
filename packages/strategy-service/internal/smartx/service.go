@@ -29,9 +29,6 @@ type Service struct {
 
 type Input struct {
 	Name     string `json:"name"`
-	Account  string `json:"account"`
-	WindowId string `json:"window_id"`
-	Password string `json:"password"`
 }
 
 type Result struct {
@@ -72,29 +69,9 @@ func (s *Service) Start(ctx context.Context, in Input) (Result, error) {
 	}
 	name = name + "-local"
 
-	account := strings.TrimSpace(in.Account)
-	if account == "" {
-		account = strings.TrimSpace(s.cfg.Account)
-	}
-	if account == "" {
-		return Result{}, errors.New("account is required")
-	}
-
-	id := strings.TrimSpace(in.WindowId)
-	if id == "" {
-		id = strings.TrimSpace(s.cfg.WindowId)
-	}
-	if id == "" {
-		return Result{}, errors.New("window_id is required")
-	}
-
-	pass := strings.TrimSpace(in.Password)
-	if pass == "" {
-		pass = strings.TrimSpace(s.cfg.Password)
-	}
-	if pass == "" {
-		return Result{}, errors.New("password is required")
-	}
+	account := strings.TrimSpace(s.cfg.Account)
+	id := strings.TrimSpace(s.cfg.WindowId)
+	pass := strings.TrimSpace(s.cfg.Password)
 
 	out, err := s.run(ctx, name, account, id, pass)
 	if err != nil {
