@@ -31,7 +31,7 @@ func EnsureBuiltins() error {
 	}
 
 	// 将workspace下的agents 和 skills copy到用户配置中
-	for _, item := range []string{"agents", "skills"} {
+	for _, item := range []string{"agents", "skills", "tools"} {
 		err = sync(filepath.Join(root, item), "workspace/"+item)
 		if err != nil {
 			return err

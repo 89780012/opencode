@@ -1,337 +1,341 @@
 ---
 name: strategy-service
-description: Built-in workspace skill provisioned by strategy-service.
+description: 由 strategy-service 预置的工作区内置技能，用于在 SmartX Python 组件工作区内编写、修改、检查并启动策略。
 ---
 
 # Strategy Service
 
-This workspace was prepared by `strategy-service`.
+这个工作区由 `strategy-service` 初始化。
 
-Use this skill when the user wants to write, modify, backtest, or review a trading strategy in this workspace.
-Treat strategy writing as a structured workflow, not a one-shot code generation task.
-Prefer existing project files, local conventions, and reusable components before creating new files.
-Assume the target runtime is the SmartX Python component SDK shown in the local `start.py` shape and SDK docs, not a generic Python quant framework.
+当用户希望在这个工作区里编写、修改、回测、排查或评审交易策略时，使用这个 skill。
+把策略开发视为一个有步骤的工作流，而不是一次性的代码生成。
+优先复用现有项目文件、本地约定和可重用组件，再决定是否创建新文件。
+默认假设目标运行时是 SmartX Python 组件 SDK，也就是 `start.py` 和本地文档体现出来的运行方式，而不是通用 Python 量化框架。
 
-Use these SmartX docs whenever you need to write APIs accurately or debug SDK behavior:
+需要准确编写 API 或排查 SDK 行为时，优先使用以下 SmartX 文档：
 
-- API reference: `https://smarttest.ztqft.com/sdkDoc/python/1.0.0/api/pythonApi.html`
-- Example/demo: `https://smarttest.ztqft.com/sdkDoc/python/1.0.0/example/pythonApiExample.html`
+- API 文档：`https://smarttest.ztqft.com/sdkDoc/python/1.0.0/api/pythonApi.html`
+- 示例文档：`https://smarttest.ztqft.com/sdkDoc/python/1.0.0/example/pythonApiExample.html`
 
-Before writing or changing Smart API calls:
+在编写或修改 Smart API 调用前：
 
-- open the API reference and match the exact method name, callback name, enum, and parameter form
-- use the demo to copy the expected lifecycle and event wiring style
+- 先打开 API 文档，确认方法名、回调名、枚举值和参数形式
+- 用示例文档对齐生命周期写法、事件绑定方式和调用风格
 
-When Smart code errors or behaves unexpectedly:
+当 Smart 代码报错、表现异常、或你对字段和回调不确定时：
 
-- check the API reference before guessing field names or callback signatures
-- check the demo before inventing a new event flow or account-access pattern
-- first confirm whether the function name, parameter names, parameter order, and callback signature are correct before changing strategy logic
+- 先查 API 文档，不要猜字段名和回调签名
+- 先查示例，不要凭空发明新的事件流或账户访问方式
+- 先确认函数名、参数名、参数顺序和回调签名无误，再修改策略逻辑
 
-Use `.opencode/history.md` as the workspace memory when it exists:
+如果工作区下存在 `.opencode/history.md`，把它当作工作区记忆：
 
-- read it before acting so you inherit prior decisions, debugging results, and recorded mistakes
-- treat recorded mistakes as things not to repeat
-- if you discover a new meaningful mistake or wrong assumption, append a short correction note for the next session
+- 动手前先读，继承之前的决策、调试结论和错误记录
+- 已记录的错误默认不允许重复
+- 如果你发现新的错误假设或新的纠正结论，追加一条简短说明，给下次会话复用
 
-If this workspace was bootstrapped from the built-in `plugin_python` template, inspect the template in this order:
+如果工作区来自内置 `plugin_python` 模板，先按这个顺序理解项目：
 
-- `package.json`: plugin metadata, build script, and workspace identity
-- `start.py`: Python strategy entrypoint and Smart callbacks
-- `src/index.js`: frontend boot path and Python launch hook
-- `src/js/App.vue`: default UI composition
-- `build.js` and `webpack.config.js`: packaging flow
+- `package.json`：插件元数据、脚本、工作区身份
+- `start.py`：Python 策略入口和 Smart 生命周期
+- `src/index.js`：前端启动路径和 Python 启动入口
+- `src/js/App.vue`：默认界面结构
+- `build.js` 和 `webpack.config.js`：打包流程
 
-Treat root `index.js` and `index.html` as generated or runtime-facing outputs by default. Prefer editing source files under `src/` and the Python entrypoint unless the user explicitly asks to modify generated assets.
+默认把根目录 `index.js` 和 `index.html` 当作生成产物或运行时产物。除非用户明确要求，否则优先修改 `src/` 下的源文件和 Python 入口。
 
-When first entering a template-based workspace, summarize the project as:
+第一次进入模板型工作区时，先总结：
 
-- plugin metadata and expected runtime
-- Python execution flow
-- frontend execution flow
-- build path
-- which files are source-of-truth versus generated output
+- 插件元数据和目标运行环境
+- Python 侧执行流程
+- 前端执行流程
+- 打包路径
+- 哪些文件是源码，哪些更接近生成产物
 
-## SmartX SDK Rules
+## SmartX SDK 规则
 
-These rules override generic strategy-writing habits.
+这些规则优先于通用策略开发习惯。
 
-1. Respect the component lifecycle.
-All Smart initialization must hang off `smart.on_init(init)`.
-Do not place subscriptions, account reads, or order placement at import time.
+1. 严格遵守组件生命周期。  
+所有 Smart 初始化必须挂在 `smart.on_init(init)` 下。不要在模块导入阶段做订阅、账户读取和下单。
 
-2. Write for the account object first.
-Prefer `smart.current_account` for single-account work and `smart.account_map` only when the task clearly needs multi-account logic.
-Prefer account callbacks such as `smart.current_account.on_order(...)`, `on_trade(...)`, `on_assets(...)`, and `on_position(...)`.
+2. 优先围绕账户对象写逻辑。  
+单账户优先使用 `smart.current_account`；只有明确需要多账户时才用 `smart.account_map`。账户状态回调优先使用 `on_order`、`on_trade`、`on_assets`、`on_position`。
 
-3. Prefer the current SDK calling style.
-Use keyword arguments and `code` / `codes` inputs over older positional forms when both are available.
-When placing orders, prefer `smart.insert_order(code="000001.SZ", ...)` or the equivalent keyword form already used in the workspace.
+3. 优先使用当前 SDK 调用风格。  
+若新旧形式都可用，优先关键字参数以及 `code` / `codes` 形式。下单优先采用工作区里已有的关键字写法。
 
-4. Use the SDK event model instead of polling.
-For quote-driven logic, subscribe and react in callbacks.
-For bar-driven logic, use `smart.subscribe_bar(...)`, `smart.on_bar(...)`, or `smart.on(smart.Event.ON_BAR, ...)`.
-For historical warmup, use `smart.query_bar(...)` before computing indicators.
+4. 用事件模型代替轮询。  
+报价策略靠订阅和回调；K 线策略靠 `smart.subscribe_bar(...)`、`smart.on_bar(...)` 或 `smart.on(smart.Event.ON_BAR, ...)`；历史预热用 `smart.query_bar(...)`。
 
-5. Treat submit callbacks and order callbacks differently.
-`insert_order(..., callback=...)` confirms submit success or failure.
-Order lifecycle changes must still be handled from `on_order`.
+5. 区分提交回调和订单状态回调。  
+`insert_order(..., callback=...)` 只说明提交成功或失败；真正的订单生命周期变化仍以 `on_order` 为准。
 
-6. Do not invent unsupported Smart APIs.
-Assume strategy-level `strategy.insert_order`, `strategy.subscribe`, and similar helpers are unavailable in SDK `1.0.0` unless the workspace already proves they exist.
-Do not import `backtrader`, `vnpy`, `ccxt`, or similar frameworks unless the user explicitly asks or the workspace already depends on them.
+6. 不要凭空发明 SDK 不支持的 API。  
+默认 SDK `1.0.0` 不支持 `strategy.insert_order`、`strategy.subscribe` 这类策略级快捷接口，除非工作区已有明确证据。除非用户明确要求或项目已依赖，不要引入 `backtrader`、`vnpy`、`ccxt` 等框架。
 
-7. Keep generated code close to the template.
-If the workspace comes from `plugin_python`, prefer editing `start.py` and existing `src/` files instead of introducing a new package layout.
-Add helper functions only when they clearly reduce duplication or make the event flow easier to reason about.
+7. 尽量贴近模板和现有结构。  
+如果工作区来自 `plugin_python`，优先在 `start.py` 和现有 `src/` 中扩展，不要随意拆出新的包结构。只有在明显减少重复或提高事件流可读性时，才增加辅助函数。
 
-## Core Rules
+## 核心规则
 
-1. Inspect the workspace first.
-Look for existing strategy code, backtest code, config files, data adapters, and execution entrypoints before proposing new structure.
+1. 先检查工作区。  
+先找已有策略代码、回测代码、配置文件、数据适配器和执行入口，再决定结构。
 
-2. Clarify the strategy before coding.
-If key inputs are missing, ask for them briefly or infer the safest default and state the assumption.
+2. 编码前先澄清策略。  
+关键输入缺失时，优先简短提问；如果可以安全推断，就给出默认值并显式说明假设。
 
-3. Separate idea, implementation, and validation.
-Do not jump from a vague idea straight into final code without defining rules, parameters, and test expectations.
+3. 把策略想法、实现、验证分开。  
+不要从一个模糊想法直接跳到最终代码，中间必须有规则、参数和验证预期。
 
-4. Always include risk controls.
-A strategy is incomplete if it has entries and exits but no position sizing, stop conditions, or invalidation rules.
+4. 策略必须包含风控。  
+只有进出场没有仓位、止损、失效条件的策略是不完整的。
 
-5. Backtest before claiming completion.
-If the repo supports backtesting, use it. If it does not, explain what is missing and what should be verified next.
+5. 能回测就回测。  
+如果仓库支持回测，要使用它；如果不支持，要明确缺什么以及下一步该验证什么。
 
-6. Match SmartX names exactly.
-Before using an enum, field, or callback name, verify it against existing code or SDK docs.
-Do not guess names such as order status, side constants, exchange constants, or event names.
-If needed, reopen the API reference and demo above before editing.
-If a debug session points at a Smart API call, verify the function and parameter shape first, then investigate business logic.
+6. SmartX 名称必须精确。  
+枚举、字段、回调名必须先和现有代码或 SDK 文档核对，不允许猜。
 
-## Standard Workflow For Writing A Strategy
+## 标准策略工作流
 
-When the user asks to write a strategy, follow this order:
+当用户要求“写一个策略”时，按以下顺序执行：
 
-### Step 1: Define the trading problem
+### 第 1 步：定义交易问题
 
-Collect or infer:
+收集或推断：
 
-- market: A-share, ETF, futures, options, or another Smart-supported market
-- symbol set: one symbol or a basket
-- timeframe: quote, tick, 1m, 5m, 1h, daily
-- venue: Smart client / SmartX environment / local simulator
-- execution style: live trading, paper trading, replay, backtest only
-- direction: long only, short only, both
+- 市场：A 股、ETF、期货、期权或其他 Smart 支持市场
+- 标的集合：单标的还是组合
+- 周期：quote、tick、1m、5m、1h、daily
+- 运行环境：Smart 客户端 / SmartX 环境 / 本地模拟
+- 执行方式：实盘、仿真、回放、仅回测
+- 方向：只做多、只做空、双向
 
-If any of these are unknown, identify the missing fields before implementation.
+如果其中任一项未知，先标出缺失项，再实现。
 
-### Step 2: Define the strategy rules precisely
+### 第 2 步：把策略规则写清楚
 
-Write the logic in plain language first:
+先用自然语言明确：
 
-- entry conditions
-- add-to-position conditions
-- exit conditions
-- stop-loss conditions
-- take-profit conditions
-- cooldown or re-entry rules
-- capital allocation rules
+- 入场条件
+- 加仓条件
+- 出场条件
+- 止损条件
+- 止盈条件
+- 冷却或重新入场规则
+- 资金分配规则
 
-Do not write code until these rules are explicit enough to simulate.
+在这些规则清晰到足以模拟之前，不要急着写代码。
 
-### Step 3: Define the parameter set
+### 第 3 步：定义参数集合
 
-Separate fixed rules from tunable parameters.
-Prefer placing tunable strategy parameters in a standalone JSON config file instead of hardcoding them in `start.py`.
-If the workspace has no existing config convention, use a simple JSON file at the workspace root and load it explicitly from the strategy code.
+把固定规则和可调参数拆开。  
+优先把可调参数放到独立 JSON 配置文件，而不是硬编码在 `start.py`。
 
-Typical parameters:
+常见参数包括：
 
-- lookback windows
-- thresholds
-- leverage
-- order size
-- max positions
-- slippage assumptions
-- fee assumptions
-- risk limits
+- 回看窗口
+- 阈值
+- 杠杆
+- 下单量
+- 最大持仓
+- 滑点假设
+- 手续费假设
+- 风险限制
 
-### Step 4: Map the code structure
+### 第 4 步：映射代码结构
 
-Before editing, identify:
+编码前先定位：
 
-- where strategy classes or functions live
-- where indicators are computed
-- where orders are created
-- where portfolio state is stored
-- where Smart callbacks are registered
-- where historical data is queried
-- where config is loaded
+- 策略函数或策略类在哪
+- 指标在哪里计算
+- 订单在哪里生成
+- 组合状态放在哪里
+- Smart 回调在哪里注册
+- 历史数据在哪里查询
+- 配置从哪里加载
 
-Prefer extending the existing structure instead of inventing a new mini-framework.
+尽量扩展现有结构，不要另起一个迷你框架。
 
-### Step 5: Implement in small layers
+### 第 5 步：分层实现
 
-Recommended implementation order:
+建议顺序：
 
-1. config and parameters
-Keep tunable parameters in a JSON config file and keep Python focused on loading and using them.
-2. market data inputs
-3. indicator or level calculation
-4. signal generation
-5. position sizing
-6. order generation
-7. risk controls
-8. state persistence if needed
-9. backtest wiring
+1. 配置和参数
+2. 行情输入
+3. 指标或关键价位计算
+4. 信号生成
+5. 仓位控制
+6. 下单逻辑
+7. 风控逻辑
+8. 状态持久化（如有必要）
+9. 回测接线
 
-### Step 6: Validate behavior
+### 第 6 步：验证行为
 
-Check:
+至少检查：
 
-- does it compile or run
-- does it produce trades
-- do entry and exit rules match the spec
-- does it register the right Smart callbacks
-- does it avoid using unsupported SDK APIs
-- are fees and slippage considered
-- does position size stay within limits
-- does the strategy break on edge cases such as flat markets, gaps, partial fills, or duplicate signals
+- 能否运行
+- 是否真的产生交易
+- 进出场规则是否符合描述
+- Smart 回调是否注册正确
+- 是否使用了不支持的 SDK API
+- 是否考虑费用和滑点
+- 仓位是否超限
+- 面对横盘、跳空、部分成交、重复信号时是否会失真
 
-### Step 7: Summarize the result
+### 第 7 步：总结结果
 
-At the end, report:
+结束时至少说明：
 
-- what was implemented
-- key assumptions
-- main parameters
-- major risks
-- what should be tested next
+- 实现了什么
+- 关键假设
+- 核心参数
+- 主要风险
+- 下一步还要验证什么
 
-## Python Grid Strategy Workflow
+### 第 8 步：写完后启动策略
 
-If the user asks for a Python grid strategy, use this exact workflow.
-Default to the SmartX component style shown in the SDK demo: quote subscription plus account callbacks, with explicit per-symbol state.
+如果用户希望“写完并运行”，或者上下文明确要求直接启动，则策略代码完成后需要主动调用启动工具：
 
-### Step 1: Clarify the grid type
+- 优先使用工具：`smartx_start`
+- 这个工具内部会调用：`POST /api/system/smartx/startExtension`
+- 作用：先登录 SmartX CLI，再执行 `startExtension <name>`
+- 调用工具时至少应提供：`name`、`account`、`window_id`
+- `window_id` 表示 SmartX 客户端窗口实例 ID，不特指 Windows 平台
+- 如未额外指定，平台由 `strategy-service` 的配置项 `PLATFORM` 决定
 
-Determine:
+也就是说，本 skill 的完整闭环不是“只把策略代码写好”，而是：
 
-- spot grid or futures grid
-- neutral grid, long grid, or short grid
-- arithmetic grid or geometric grid
-- static range or dynamic range
-- one-shot deployment or continuously re-centered grid
+1. 写好策略
+2. 校验关键文件和参数
+3. 在需要时主动调用 `smartx_start` 工具启动扩展和策略
 
-If the user only says "write a Python grid strategy", default to:
+## Python 网格策略工作流
 
-- spot
-- long-only neutral grid
-- arithmetic grid
-- fixed price range
+如果用户要求写 Python 网格策略，按这个固定流程执行。
+默认采用 SmartX 示例中的组件式风格：行情订阅 + 账户回调 + 明确的每标的状态管理。
 
-State these defaults explicitly.
+### 第 1 步：明确网格类型
 
-### Step 2: Collect the required parameters
+先确定：
 
-Minimum required inputs:
+- 现货网格还是期货网格
+- 中性网格、做多网格还是做空网格
+- 等差网格还是等比网格
+- 静态区间还是动态区间
+- 一次性部署还是持续重心重置
 
-- symbol
-- timeframe or candle frequency
-- upper price bound
-- lower price bound
-- grid count
-- total capital
-- per-grid order sizing rule
-- fee rate
+如果用户只说“写个 Python 网格策略”，默认值为：
 
-Strongly recommended inputs:
+- 现货
+- 偏中性的做多网格
+- 等差网格
+- 固定价格区间
 
-- rebalance rule
-- stop-loss rule
-- take-profit or shutdown rule
-- max holding time
-- max drawdown guard
+并把这些默认值明确写出来。
 
-### Step 3: Express the strategy in plain language
+### 第 2 步：收集必要参数
 
-Describe the grid logic before coding:
+最少需要：
 
-- divide the price range into N grid levels
-- place buy orders below the current price
-- place sell orders above the current price
-- when a buy fills, place the paired sell at the next higher grid
-- when a sell fills, place the paired buy at the next lower grid
-- stop trading if price leaves the allowed range or a risk guard triggers
+- 标的
+- 时间周期
+- 上边界
+- 下边界
+- 网格数量
+- 总资金
+- 单格下单规则
+- 费率
 
-### Step 4: Design the Python components
+强烈建议同时收集：
 
-For a Python grid strategy, prefer this structure:
+- 重平衡规则
+- 止损规则
+- 止盈或停机规则
+- 最大持仓时间
+- 最大回撤限制
 
-- config model
-- grid builder
-- strategy state
-- signal or order planner
-- Smart callback wiring
-- execution adapter
-- result report
+### 第 3 步：先用自然语言定义策略
 
-If the workspace already has equivalent modules, reuse them instead of introducing new names.
+编码前先把逻辑说清楚：
 
-### Step 5: Implement in this order
+- 把价格区间切成 N 个网格
+- 当前价格下方挂买单
+- 当前价格上方挂卖单
+- 买单成交后，在上一格挂对应卖单
+- 卖单成交后，在下一格挂对应买单
+- 价格突破区间或触发风控时停止交易
 
-1. define the config schema
-2. build the grid price levels
-3. track current inventory and cash
-4. implement order placement logic
-5. implement fill handling
-6. implement paired order regeneration
-7. implement range-break handling
-8. implement fee and slippage accounting
-9. implement logging and operator visibility
+### 第 4 步：设计 Python 组件
 
-### Step 6: Validate the grid strategy
+推荐结构：
 
-Verify at least these cases:
+- 配置模型
+- 网格生成器
+- 策略状态
+- 信号或订单规划器
+- Smart 回调绑定
+- 执行适配层
+- 结果报告
 
-- price oscillates inside the grid
-- price trends upward through the range
-- price trends downward through the range
-- price gaps beyond the upper or lower bound
-- repeated fills do not create duplicate paired orders
-- inventory does not exceed configured limits
-- submit callback failure does not corrupt pending state
-- `on_order` updates keep local state consistent with exchange reality
+如果项目里已有等价结构，优先复用。
 
-### Step 7: Report strategy quality
+### 第 5 步：按顺序实现
 
-For a grid strategy, always discuss:
+1. 配置结构
+2. 网格价格生成
+3. 仓位与现金跟踪
+4. 下单逻辑
+5. 成交处理
+6. 配对订单再生成
+7. 区间突破处理
+8. 费用和滑点处理
+9. 日志和可视化反馈
 
-- capital utilization
-- inventory risk
-- trend risk
-- fee sensitivity
-- sensitivity to grid density
-- what happens when price leaves the range
+### 第 6 步：验证网格行为
 
-## Output Expectations
+至少验证：
 
-When working on a strategy task in this workspace:
+- 价格在区间内震荡
+- 价格向上单边趋势
+- 价格向下单边趋势
+- 价格直接跳出上下边界
+- 重复成交不会生成重复配对订单
+- 持仓不会超过配置限制
+- 提交回调失败不会破坏本地状态
+- `on_order` 更新能让本地状态与真实订单状态保持一致
 
-- present assumptions clearly
-- keep implementation steps ordered
-- show the exact files changed
-- explain which Smart callbacks and subscriptions were added or changed
-- explain how to run or backtest the result
-- identify what remains unverified
-- if the round produced important decisions, SDK debugging findings, confirmed API usage, unfinished follow-up items, or mistakes worth remembering, append a short summary to `.opencode/history.md` so a later session can recover context quickly
+### 第 7 步：汇报网格策略质量
 
-## Do Not
+必须讨论：
 
-- do not invent strategy rules the user did not ask for without labeling them as assumptions
-- do not skip risk controls
-- do not claim profitability from code inspection alone
-- do not bypass existing project structure unless it is clearly broken
-- do not write Smart-dependent code outside the `smart.on_init(init)` lifecycle
-- do not replace callback-driven logic with `while True` polling unless the user explicitly asks for it
-- do not repeat a mistake already recorded in `.opencode/history.md` without first explaining why the old constraint no longer applies
+- 资金利用率
+- 库存风险
+- 趋势风险
+- 手续费敏感性
+- 网格密度敏感性
+- 价格离开区间后会发生什么
+
+## 输出要求
+
+在这个工作区处理策略任务时：
+
+- 假设必须说清楚
+- 实现步骤要有顺序
+- 明确列出改动文件
+- 说明增加或修改了哪些 Smart 回调和订阅
+- 说明如何运行、回测，或如何调用 `smartx_start` 工具启动策略
+- 明确哪些部分还没验证
+- 如果本轮产生了关键决策、SDK 结论、调试结果、确认过的 API 用法、未完成事项或值得记录的错误，追加一段简短摘要到 `.opencode/history.md`
+
+## 不要这样做
+
+- 不要擅自补充用户没要求的策略规则，除非明确标记为假设
+- 不要跳过风控
+- 不要仅凭代码阅读就宣称策略能盈利
+- 不要无故绕开现有项目结构
+- 不要把 Smart 相关代码写到 `smart.on_init(init)` 生命周期之外
+- 不要把回调驱动逻辑改成 `while True` 轮询，除非用户明确要求
+- 不要重复 `.opencode/history.md` 里已经记录过的错误，除非先说明为什么旧约束已不再适用

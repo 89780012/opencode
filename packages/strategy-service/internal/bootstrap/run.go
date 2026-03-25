@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"time"
 
 	"strategy-service/internal/logger"
 )
@@ -30,14 +31,27 @@ func Run() int {
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt)
+	defer signal.Stop(stop)
+
+	quit := make(chan struct{})
+	done := make(chan struct{})
 	go func() {
 		<-stop
+		close(quit)
 		slog.Info("received interrupt, shutting down")
-		_ = srv.Shutdown(context.Background())
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_ = srv.Shutdown(ctx)
+		close(done)
 	}()
 
 	err = srv.ListenAndServe()
 	if err == nil || err == http.ErrServerClosed {
+		select {
+		case <-quit:
+			<-done
+		default:
+		}
 		slog.Info("strategy-service stopped")
 		return 0
 	}

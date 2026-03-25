@@ -6,6 +6,7 @@ import (
 	cfg "strategy-service/internal/config"
 	"strategy-service/internal/ipc"
 	"strategy-service/internal/oprun"
+	"strategy-service/internal/smartx"
 	"strategy-service/internal/tool"
 	"strategy-service/internal/workspace"
 )
@@ -16,16 +17,18 @@ type API struct {
 	op  *oprun.Manager
 	ip  *ipc.Manager
 	cfg *cfg.Store
+	sx  *smartx.Service
 }
 
 // NewAPI wires the HTTP handlers to the runtime services.
-func NewAPI(svc *tool.Service, op *oprun.Manager, ip *ipc.Manager, cfg *cfg.Store) *API {
+func NewAPI(svc *tool.Service, op *oprun.Manager, ip *ipc.Manager, cfg *cfg.Store, sx *smartx.Service) *API {
 	return &API{
 		svc: svc,
 		ws:  workspace.NewService(),
 		op:  op,
 		ip:  ip,
 		cfg: cfg,
+		sx:  sx,
 	}
 }
 
@@ -47,6 +50,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/system/config", a.config)
 	mux.HandleFunc("/api/system/version", a.version)
 	mux.HandleFunc("/api/system/logs", a.logs)
+	mux.HandleFunc("/api/system/smartx/startExtension", a.smartxStart)
 	mux.HandleFunc("/api/system/opencode/status", a.opencodeStatus)
 	mux.HandleFunc("/api/system/opencode/logs", a.opencodeLogs)
 	mux.HandleFunc("/api/system/opencode/start", a.opencodeStart)

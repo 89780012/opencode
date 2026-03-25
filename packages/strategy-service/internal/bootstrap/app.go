@@ -11,6 +11,7 @@ import (
 	conf "strategy-service/internal/config"
 	"strategy-service/internal/ipc"
 	"strategy-service/internal/oprun"
+	"strategy-service/internal/smartx"
 	"strategy-service/internal/tool"
 	web "strategy-service/internal/web"
 )
@@ -47,7 +48,11 @@ func New(cfg Config) (*Service, error) {
 	}
 	slog.Info("ipc manager started")
 
-	api := web.NewAPI(tool.NewService(), op, ip, &conf.Store{})
+	api := web.NewAPI(tool.NewService(), op, ip, &conf.Store{}, smartx.New(smartx.Config{
+		Platform: cfg.Platform,
+		Account:  cfg.Account,
+		WindowId: cfg.WindowId,
+	}))
 	api.Register(mux)
 	mux.Handle("/opencode/", web.NewOpencodeProxy(op))
 	mux.Handle("/opencode", web.NewOpencodeProxy(op))

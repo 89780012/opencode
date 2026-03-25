@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -13,6 +14,9 @@ type Config struct {
 	Dist     string
 	Opencode OpencodeConfig
 	IPC      IPCConfig
+	Platform string
+	Account  string //账号
+	WindowId string //smartX 客户端实例
 }
 
 type OpencodeConfig struct {
@@ -35,11 +39,15 @@ func LoadConfig() Config {
 	host := text("HOST", "127.0.0.1")
 	port := text("PORT", "5000")
 	dist := text("STRATEGY_FRONT_DIST", "../strategy-front/dist")
+	platform := text("PLATFORM", runtime.GOOS)
+	account := text("ACCOUNT", "")
+	windowId := text("WINDOWID", "")
 
 	return Config{
-		Host: host,
-		Port: port,
-		Dist: dist,
+		Host:     host,
+		Port:     port,
+		Dist:     dist,
+		Platform: platform,
 		Opencode: OpencodeConfig{
 			Enabled:      truth("STRATEGY_OPENCODE_ENABLED", true),
 			Startup:      text("STRATEGY_OPENCODE_STARTUP", "auto"),
@@ -54,6 +62,8 @@ func LoadConfig() Config {
 			Product: text("STRATEGY_IPC_PRODUCT", "IDE"),
 			Version: text("STRATEGY_IPC_VERSION", ""),
 		},
+		Account:  account,
+		WindowId: windowId,
 	}
 }
 

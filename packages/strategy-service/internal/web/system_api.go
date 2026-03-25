@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -12,6 +13,7 @@ import (
 	cfg "strategy-service/internal/config"
 	"strategy-service/internal/logs"
 	"strategy-service/internal/meta"
+	"strategy-service/internal/smartx"
 	"strategy-service/internal/tool"
 )
 
@@ -170,4 +172,29 @@ func (a *API) ipcStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	write(w, http.StatusOK, "ok", a.ip.State())
+}
+
+func (a *API) smartxStart(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
+		return
+	}
+
+	body := smartx.Input{}
+	if r.ContentLength != 0 {
+		err := readJSON(r, &body)
+		if err != nil && !errors.Is(err, io.EOF) {
+			write(w, http.StatusBadRequest, err.Error(), nil)
+			return
+		}
+	}
+
+	out, err := a.sx.Start(r.Context(), body)
+	if err != nil {
+		slog.Warn("smartx startExtension failed", "error", err)
+		write(w, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+
+	write(w, http.StatusOK, "ok", out)
 }
