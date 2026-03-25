@@ -19,7 +19,7 @@ func Run() int {
 	defer logger.Shutdown()
 
 	cfg := LoadConfig()
-	slog.Info("config loaded", "addr", cfg.Addr(), "opencode_enabled", cfg.Opencode.Enabled, "ipc_enabled", cfg.IPC.Enabled)
+	slog.Info("config loaded", "addr", cfg.Addr(), "opencode_enabled", cfg.Opencode.Enabled)
 
 	srv, err := New(cfg)
 	if err != nil {

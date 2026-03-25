@@ -3,24 +3,18 @@ import { agentApi } from "@/api/modules"
 import { rankAgent } from "@/lib/chat-composer"
 import type { Agent } from "@/types/agent"
 
-export function useAgentCatalog(workspacePath?: string | null) {
+export function useAgentCatalog() {
   const [ags, setAgs] = useState<Agent[]>([])
   const [load, setLoad] = useState(false)
 
   useEffect(() => {
-    if (!workspacePath) {
-      setAgs([])
-      return
-    }
-
     let dead = false
     const run = async () => {
       setLoad(true)
       try {
-        const list = await agentApi.list(workspacePath)
+        const list = await agentApi.list()
         if (dead) return
         const ags = list
-          // `all` 既能作为主 agent，也能作为子 agent，这里不能误过滤掉。
           .filter((item) => item.mode !== "subagent" && !item.hidden)
           .slice()
           .sort((a, b) => {
@@ -39,7 +33,7 @@ export function useAgentCatalog(workspacePath?: string | null) {
     return () => {
       dead = true
     }
-  }, [workspacePath])
+  }, [])
 
   return useMemo(
     () => ({

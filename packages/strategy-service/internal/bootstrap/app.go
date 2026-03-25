@@ -2,9 +2,11 @@ package bootstrap
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,11 +25,23 @@ type Service struct {
 }
 
 func New(cfg Config) (*Service, error) {
-	slog.Info("initializing service", "addr", cfg.Addr(), "opencode_enabled", cfg.Opencode.Enabled, "ipc_enabled", cfg.IPC.Enabled)
+	slog.Info("initializing service", "addr", cfg.Addr(), "opencode_enabled", cfg.Opencode.Enabled)
 
 	if err := asset.EnsureBuiltins(); err != nil {
 		slog.Error("builtin opencode asset provision failed", "error", err)
 		return nil, err
+	}
+
+	if cfg.Opencode.Enabled {
+		port, err := port(cfg.Opencode.Host, cfg.Opencode.Port)
+		if err != nil {
+			slog.Error("opencode port probe failed", "host", cfg.Opencode.Host, "port", cfg.Opencode.Port, "error", err)
+			return nil, err
+		}
+		if port != cfg.Opencode.Port {
+			slog.Info("opencode port adjusted", "host", cfg.Opencode.Host, "from", cfg.Opencode.Port, "to", port)
+			cfg.Opencode.Port = port
+		}
 	}
 
 	mux := http.NewServeMux()
@@ -102,4 +116,20 @@ func (s *Service) activate(addr string) {
 	if err := s.op.Ensure(context.Background()); err != nil {
 		slog.Error("opencode auto-start failed", "error", err)
 	}
+}
+
+func port(host string, start int) (int, error) {
+	if start <= 0 {
+		return 0, fmt.Errorf("invalid port: %d", start)
+	}
+
+	for next := start; next <= 65535; next++ {
+		ln, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(next)))
+		if err == nil {
+			_ = ln.Close()
+			return next, nil
+		}
+	}
+
+	return 0, fmt.Errorf("no free port for host %s starting at %d", host, start)
 }

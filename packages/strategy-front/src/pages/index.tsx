@@ -38,7 +38,7 @@ export default function Home() {
   useChatEvents(path)
 
   const { selectedSessionId, loading, creating, refreshSessions, createSession, selectSession } = useChatSessions(path)
-  const ags = useAgentCatalog(path)
+  const ags = useAgentCatalog()
   const catalog = useProviderCatalog()
   const project = useProjectComposer()
   const sessionDraft = useSessionDraft(path, selectedSessionId)
