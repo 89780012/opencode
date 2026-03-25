@@ -166,15 +166,6 @@ func (a *API) logs(w http.ResponseWriter, r *http.Request) {
 	write(w, http.StatusOK, "ok", data)
 }
 
-func (a *API) ipcStatus(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
-		return
-	}
-
-	write(w, http.StatusOK, "ok", a.ip.State())
-}
-
 func (a *API) smartxStart(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)

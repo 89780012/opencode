@@ -31,7 +31,7 @@ func EnsureBuiltins() error {
 	}
 
 	// 将workspace下的agents 和 skills copy到用户配置中
-	for _, item := range []string{"agents", "skills", "tools"} {
+	for _, item := range []string{"agents", "skills" } {
 		err = sync(filepath.Join(root, item), "workspace/"+item)
 		if err != nil {
 			return err
@@ -39,6 +39,46 @@ func EnsureBuiltins() error {
 	}
 
 	return nil
+}
+
+// EnsureMCP writes the strategy-service remote MCP entry into the user's global opencode config.
+func EnsureMCP(url string) error {
+	root, err := configRoot()
+	if err != nil {
+		return err
+	}
+
+	path := filepath.Join(root, "opencode.json")
+	cfg := map[string]any{}
+	body, err := os.ReadFile(path)
+	if err == nil {
+		_ = json.Unmarshal(body, &cfg)
+	}
+	if cfg["mcp"] == nil {
+		cfg["mcp"] = map[string]any{}
+	}
+
+	mcp, ok := cfg["mcp"].(map[string]any)
+	if !ok {
+		next := map[string]any{}
+		cfg["mcp"] = next
+		mcp = next
+	}
+
+	mcp["smartx"] = map[string]any{
+		"type":    "remote",
+		"url":     strings.TrimRight(url, "/") + "/mcp",
+		"enabled": true,
+		"oauth":   false,
+		"timeout": 30000,
+	}
+
+	body, err = json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	body = append(body, '\n')
+	return os.WriteFile(path, body, 0o644)
 }
 
 // SeedWorkspace copies the builtin workspace template into a new workspace.
