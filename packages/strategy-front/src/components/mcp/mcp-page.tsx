@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   CheckCircle2,
   ExternalLink,
@@ -16,6 +16,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { mcpApi } from "@/api/modules"
+import { useGlobalData } from "@/components/data/global-data-provider"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -27,7 +28,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import type { McpCfg, McpDoc, McpMap, McpRow, McpStatus } from "@/types/mcp"
+import type { McpCfg, McpDoc, McpRow, McpStatus } from "@/types/mcp"
 import { McpDialog } from "./mcp-dialog"
 import { enabled, isCfg, kind, oauth, sort, summary, text, tone, view } from "./utils"
 
@@ -43,8 +44,6 @@ type Auth = {
   code: string
 }
 
-const empty: McpDoc = {}
-const init: McpMap = {}
 function info(status?: McpStatus) {
   if (!status) return ""
   if ("error" in status && status.error) return status.error
@@ -55,16 +54,17 @@ function info(status?: McpStatus) {
 }
 
 export function McpPage() {
-  const [doc, setDoc] = useState<McpDoc>(empty)
-  const [map, setMap] = useState<McpMap>(init)
-  const [load, setLoad] = useState(true)
+  const { mcp, ensure, refresh } = useGlobalData()
   const [busy, setBusy] = useState("")
-  const [err, setErr] = useState("")
   const [dlg, setDlg] = useState<Dlg>({
     open: false,
     mode: "create",
   })
   const [auth, setAuth] = useState<Auth>()
+  const doc = mcp.data.doc
+  const map = mcp.data.map
+  const load = mcp.load
+  const err = mcp.err
 
   const rows = useMemo(() => {
     const cfg = doc.mcp ?? {}
@@ -100,24 +100,9 @@ export function McpPage() {
     [rows],
   )
 
-  const reload = useCallback(async (spin = true) => {
-    if (spin) setLoad(true)
-    setErr("")
-
-    try {
-      const [doc, map] = await Promise.all([mcpApi.config(), mcpApi.status()])
-      setDoc(doc)
-      setMap(map)
-    } catch (err) {
-      setErr(text(err, "加载 MCP 服务失败"))
-    } finally {
-      if (spin) setLoad(false)
-    }
-  }, [])
-
   useEffect(() => {
-    void reload()
-  }, [reload])
+    void ensure("mcp")
+  }, [ensure])
 
   async function patch(body: McpDoc) {
     await mcpApi.update(body)
@@ -136,7 +121,7 @@ export function McpPage() {
       } else {
         await mcpApi.disconnect(name).catch(() => undefined)
       }
-      await reload(false)
+      await refresh("mcp")
       toast.success(`已保存 ${name}`)
       setDlg({
         open: false,
@@ -153,7 +138,7 @@ export function McpPage() {
     setBusy(`connect:${name}`)
     try {
       await mcpApi.connect(name)
-      await reload(false)
+      await refresh("mcp")
       toast.success(`已连接 ${name}`)
     } catch (err) {
       toast.error(text(err, `连接 ${name} 失败`))
@@ -166,7 +151,7 @@ export function McpPage() {
     setBusy(`disconnect:${name}`)
     try {
       await mcpApi.disconnect(name)
-      await reload(false)
+      await refresh("mcp")
       toast.success(`已断开 ${name}`)
     } catch (err) {
       toast.error(text(err, `断开 ${name} 失败`))
@@ -192,7 +177,7 @@ export function McpPage() {
       } else {
         await mcpApi.connect(item.name).catch(() => undefined)
       }
-      await reload(false)
+      await refresh("mcp")
       toast.success(item.enabled ? `已禁用 ${item.name}` : `已启用 ${item.name}`)
     } catch (err) {
       toast.error(text(err, `更新 ${item.name} 失败`))
@@ -205,7 +190,7 @@ export function McpPage() {
     setBusy(`auth:${name}`)
     try {
       const status = await mcpApi.authenticate(name)
-      await reload(false)
+      await refresh("mcp")
       if (status.status === "connected") {
         toast.success(`${name} 已完成授权`)
         return
@@ -243,7 +228,7 @@ export function McpPage() {
     setBusy(`code:${auth.name}`)
     try {
       const status = await mcpApi.authCallback(auth.name, auth.code.trim())
-      await reload(false)
+      await refresh("mcp")
       if (status.status === "connected") {
         toast.success(`${auth.name} 已完成授权`)
         setAuth(undefined)
@@ -261,7 +246,7 @@ export function McpPage() {
     setBusy(`drop:${name}`)
     try {
       await mcpApi.authRemove(name)
-      await reload(false)
+      await refresh("mcp")
       toast.success(`已清除 ${name} 的授权信息`)
     } catch (err) {
       toast.error(text(err, `清除 ${name} 的授权信息失败`))
@@ -392,7 +377,7 @@ export function McpPage() {
                 <CardDescription>所有改动都会写入全局配置，因此不同工作区可以复用同一套 MCP 设置。</CardDescription>
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="outline" onClick={() => void reload()} disabled={load}>
+                <Button variant="outline" onClick={() => void refresh("mcp")} disabled={load}>
                   <RefreshCcw className={load ? "size-4 animate-spin" : "size-4"} />
                   刷新
                 </Button>

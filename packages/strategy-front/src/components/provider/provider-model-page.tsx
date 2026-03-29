@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react"
 import { Loader2, RefreshCcw, RotateCcw, Search } from "lucide-react"
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
-import { useProviderCatalog } from "@/hooks/use-provider-catalog"
+import { useProviderList } from "@/components/data/global-data-provider"
 import type { Model, Provider } from "@/types/provider"
 import { popular, text } from "./utils"
 
@@ -67,7 +67,7 @@ function sortProvider(a: string, b: string, map: Map<string, string>) {
 }
 
 export function ProviderModelPage() {
-  const prv = useProviderCatalog()
+  const prv = useProviderList()
   const [q, setQ] = useState("")
   const [user, setUser] = useState<Record<string, Vis>>(() => read())
   const [now] = useState(() => Date.now())

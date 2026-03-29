@@ -4,6 +4,7 @@ import { toast } from "sonner"
 import { chatApi } from "@/api/modules"
 import { ChatWorkspacePanel, type WorkspaceTab } from "@/components/chat/chat-workspace-panel"
 import { ChatWorkspaceToggle } from "@/components/chat/chat-workspace-toggle"
+import { useAgentList, useProviderList } from "@/components/data/global-data-provider"
 import { ChatMessageList } from "@/components/chat-message-list"
 import { PermissionPanel } from "@/components/chat/permission-panel"
 import { PromptBar } from "@/components/chat/prompt-bar"
@@ -11,7 +12,6 @@ import { QuestionPanel } from "@/components/chat/question-panel"
 import { TodoPanel } from "@/components/chat/todo-panel"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { useAgentCatalog } from "@/hooks/use-agent-catalog"
 import { useAppSelector } from "@/hooks/useAppSelector"
 import { useChatEvents } from "@/hooks/use-chat-events"
 import { useChatPermission } from "@/hooks/use-chat-permission"
@@ -23,7 +23,6 @@ import { useChatTodo } from "@/hooks/use-chat-todo"
 import { useProjectInfo } from "@/hooks/use-project-info"
 import { useProjectComposer } from "@/hooks/use-project-composer"
 import { usePromptSubmit } from "@/hooks/use-prompt-submit"
-import { useProviderCatalog } from "@/hooks/use-provider-catalog"
 import { useSessionDraft } from "@/hooks/use-session-draft"
 import { resolveComposer } from "@/lib/chat-composer"
 
@@ -38,8 +37,8 @@ export default function Home() {
   useChatEvents(path)
 
   const { selectedSessionId, loading, creating, refreshSessions, createSession, selectSession } = useChatSessions(path)
-  const ags = useAgentCatalog()
-  const catalog = useProviderCatalog()
+  const ags = useAgentList()
+  const catalog = useProviderList()
   const project = useProjectComposer()
   const sessionDraft = useSessionDraft(path, selectedSessionId)
   const composer = useMemo(

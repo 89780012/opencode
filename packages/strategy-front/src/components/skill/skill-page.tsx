@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { FileCode2, Loader2, Pencil, Plus, RefreshCcw, RotateCcw, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { skillApi, systemApi } from "@/api/modules"
+import { useGlobalData } from "@/components/data/global-data-provider"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -13,17 +14,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import type { GlobalSkill, GlobalSkillCatalog, RuntimeSkill } from "@/types/skill"
+import type { GlobalSkill } from "@/types/skill"
 
 type Dlg = {
   open: boolean
   mode: "create" | "edit"
   item?: GlobalSkill
-}
-
-const empty: GlobalSkillCatalog = {
-  root: "",
-  skills: [],
 }
 
 const rule = /^[a-z0-9][a-z0-9_-]*$/
@@ -50,7 +46,7 @@ function temp(name: string) {
   const id = name.trim() || "my-skill"
   return `---
 name: "${id}"
-description: Describe when this skill should be used
+description: describe when this skill should be used
 ---
 
 # ${id}
@@ -92,75 +88,35 @@ function desc(input: string) {
 }
 
 export function SkillPage() {
-  const [run, setRun] = useState<RuntimeSkill[]>([])
-  const [cfg, setCfg] = useState<GlobalSkillCatalog>(empty)
-  const [load, setLoad] = useState(true)
+  const { ensure, refresh, refreshMany, skill } = useGlobalData()
   const [busy, setBusy] = useState("")
-  const [err, setErr] = useState("")
   const [dlg, setDlg] = useState<Dlg>({
     open: false,
     mode: "create",
   })
   const [name, setName] = useState("")
   const [body, setBody] = useState(temp(""))
-
+  const run = skill.data.run
+  const cfg = skill.data.cfg
+  const load = skill.load
+  const err = skill.err
   const cur = dlg.item
 
-  const reload = useCallback(async (spin: boolean = true) => {
-    if (spin) {
-      setLoad(true)
-    }
-    setErr("")
-
-    const [run, cfg] = await Promise.allSettled([skillApi.listRuntime(), skillApi.listGlobal()])
-    const msg: string[] = []
-
-    if (run.status === "fulfilled") {
-      setRun(run.value)
-    } else {
-      setRun([])
-      msg.push(`当前生效 skill 列表加载失败：${note(run.reason, "请求失败")}`)
-    }
-
-    if (cfg.status === "fulfilled") {
-      setCfg(cfg.value)
-    } else {
-      setCfg(empty)
-      msg.push(`全局 skill 文件加载失败：${note(cfg.reason, "请求失败")}`)
-    }
-
-    if (msg.length > 0) {
-      setErr(msg.join("；"))
-    }
-
-    if (spin) {
-      setLoad(false)
-    }
-  }, [])
-
   useEffect(() => {
-    void reload()
-  }, [reload])
+    void ensure("skill")
+  }, [ensure])
 
   const sync = useCallback(async () => {
     for (const _ of Array.from({ length: 8 })) {
-      const [run, cfg] = await Promise.allSettled([skillApi.listRuntime(), skillApi.listGlobal()])
-      if (run.status === "fulfilled") {
-        setRun(run.value)
-      }
-      if (cfg.status === "fulfilled") {
-        setCfg(cfg.value)
-      }
-      if (run.status === "fulfilled" && cfg.status === "fulfilled") {
-        setErr("")
+      const next = await refresh("skill")
+      if (!next.err) {
         return true
       }
       await wait(500)
     }
 
-    await reload(false)
     return false
-  }, [reload])
+  }, [refresh])
 
   const open = useCallback((item?: GlobalSkill) => {
     if (item) {
@@ -215,16 +171,16 @@ export function SkillPage() {
     }
 
     if (!rule.test(id)) {
-      toast.error("skill 名称只能包含小写字母、数字、- 和 _")
+      toast.error("Skill names may only contain lowercase letters, numbers, _ and -")
       return
     }
 
     if (digit.test(id)) {
-      toast.error("skill 名称不能是纯数字")
+      toast.error("Skill names cannot be all digits")
       return
     }
     if (!body.trim()) {
-      toast.error("请先填写 SKILL.md 内容")
+      toast.error("Please fill the SKILL.md content")
       return
     }
 
@@ -243,28 +199,28 @@ export function SkillPage() {
         toast.success("已更新全局 skill，请重启 opencode 服务重新加载")
       }
       close()
-      await reload(false)
+      await refresh("skill")
     } catch (err) {
       toast.error(note(err, "保存 skill 失败"))
     } finally {
       setBusy("")
     }
-  }, [body, close, dlg.mode, name, reload])
+  }, [body, close, dlg.mode, name, refresh])
 
   const drop = useCallback(
     async (item: GlobalSkill) => {
       setBusy(`drop:${item.name}`)
       try {
         await skillApi.removeGlobal(item.name)
-        toast.success(`已删除 ${item.name}，请重启 opencode 服务重新加载`)
-        await reload(false)
+        toast.success(`已删除 ${item.name}. 请重启 opencode 服务重新加载.`)
+        await refresh("skill")
       } catch (err) {
         toast.error(note(err, `删除 ${item.name} 失败`))
       } finally {
         setBusy("")
       }
     },
-    [reload],
+    [refresh],
   )
 
   const restart = useCallback(async () => {
@@ -272,14 +228,14 @@ export function SkillPage() {
     try {
       await systemApi.opencodeRestart()
       await sync()
+      await refreshMany(["agent", "provider", "mcp"])
       toast.success("opencode 服务已重启")
-      await reload(false)
     } catch (err) {
       toast.error(note(err, "重启 opencode 服务失败"))
     } finally {
       setBusy("")
     }
-  }, [reload])
+  }, [refreshMany, sync])
 
   const stat = useMemo(
     () => ({
@@ -307,7 +263,7 @@ export function SkillPage() {
                 </CardDescription>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <Button variant="outline" onClick={() => void reload()} disabled={load || busy === "restart"}>
+                <Button variant="outline" onClick={() => void refresh("skill")} disabled={load || busy === "restart"}>
                   <RefreshCcw className={load ? "size-4 animate-spin" : "size-4"} />
                   刷新
                 </Button>
@@ -317,7 +273,7 @@ export function SkillPage() {
                 </Button>
                 <Button onClick={() => open()}>
                   <Plus className="size-4" />
-                  新建 Skill
+                  新建 skill
                 </Button>
               </div>
             </div>

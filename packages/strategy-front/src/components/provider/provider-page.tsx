@@ -1,29 +1,28 @@
-﻿"use client"
+"use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { Loader2, Plus, RefreshCcw } from "lucide-react"
 import { toast } from "sonner"
 import { providerApi } from "@/api/modules/provider"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { useProviderCatalog } from "@/hooks/use-provider-catalog"
+import { useProviderList } from "@/components/data/global-data-provider"
+import type { Provider } from "@/types/provider"
 import { ProviderConnectDialog } from "./provider-connect-dialog"
 import { ProviderCustomDialog } from "./provider-custom-dialog"
 import { custom, note, popular, source, text } from "./utils"
-import type { AuthMap, Provider } from "@/types/provider"
 
 export function ProviderPage() {
-  const prv = useProviderCatalog()
-  const refresh = prv.reload
-  const [map, setMap] = useState<AuthMap>({})
-  const [authLoad, setAuthLoad] = useState(false)
+  const prv = useProviderList()
+  const refresh = prv.refresh
   const [busy, setBusy] = useState("")
-  const [err, setErr] = useState("")
   const [item, setItem] = useState<Provider>()
   const [customOpen, setCustomOpen] = useState(false)
+  const map = prv.auth
   const providers = prv.providers
   const config = prv.config
-  const load = prv.load || authLoad
+  const load = prv.load
+  const err = prv.err
 
   const connected = useMemo(() => {
     if (providers.all.length === 0 || providers.connected.length === 0) return []
@@ -47,23 +46,6 @@ export function ProviderPage() {
 
   const ids = useMemo(() => new Set(providers.all.map((item) => item.id)), [providers])
 
-  const reload = useCallback(async () => {
-    setAuthLoad(true)
-    setErr("")
-    try {
-      const [map] = await Promise.all([providerApi.auth(), refresh()])
-      setMap(map)
-    } catch (err) {
-      setErr(text(err, "加载提供商失败"))
-    } finally {
-      setAuthLoad(false)
-    }
-  }, [refresh])
-
-  useEffect(() => {
-    void reload()
-  }, [reload])
-
   async function remove(item: Provider) {
     setBusy(item.id)
     try {
@@ -76,7 +58,7 @@ export function ProviderPage() {
         await providerApi.remove(item.id)
         await providerApi.dispose()
       }
-      await reload()
+      await refresh()
       toast.success(`${item.name} 已断开`)
     } catch (err) {
       toast.error(text(err, "断开提供商失败"))
@@ -157,7 +139,7 @@ export function ProviderPage() {
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="outline" onClick={() => void reload()} disabled={load}>
+                <Button variant="outline" onClick={() => void refresh()} disabled={load}>
                   <RefreshCcw className={load ? "size-4 animate-spin" : "size-4"} />
                   刷新
                 </Button>
@@ -239,17 +221,20 @@ export function ProviderPage() {
         onOpenChange={(open) => {
           if (!open) setItem(undefined)
         }}
-        onDone={reload}
+        onDone={async () => {
+          await refresh()
+        }}
       />
 
-      <ProviderCustomDialog open={customOpen} ids={ids} cfg={config} onOpenChange={setCustomOpen} onDone={reload} />
+      <ProviderCustomDialog
+        open={customOpen}
+        ids={ids}
+        cfg={config}
+        onOpenChange={setCustomOpen}
+        onDone={async () => {
+          await refresh()
+        }}
+      />
     </div>
   )
 }
-
-
-
-
-
-
-

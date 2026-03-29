@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { FileCode2, Loader2, Pencil, Plus, RefreshCcw, RotateCcw, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { agentApi, systemApi } from "@/api/modules"
+import { useGlobalData } from "@/components/data/global-data-provider"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -13,17 +14,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import type { GlobalAgent, GlobalAgentCatalog, RuntimeAgent } from "@/types/agent"
+import type { GlobalAgent, RuntimeAgent } from "@/types/agent"
 
 type Dlg = {
   open: boolean
   mode: "create" | "edit"
   item?: GlobalAgent
-}
-
-const empty: GlobalAgentCatalog = {
-  root: "",
-  agents: [],
 }
 
 const rule = /^[a-z0-9][a-z0-9_-]*$/
@@ -92,91 +88,36 @@ function modelText(model?: RuntimeAgent["model"] | string) {
   return `${model.providerID}/${model.modelID}`
 }
 
-function normCfg(input?: Partial<GlobalAgentCatalog> | null): GlobalAgentCatalog {
-  return {
-    root: typeof input?.root === "string" ? input.root : "",
-    agents: Array.isArray(input?.agents) ? input.agents : [],
-  }
-}
-
-function normRun(input: unknown): RuntimeAgent[] {
-  if (!Array.isArray(input)) {
-    return []
-  }
-
-  return input as RuntimeAgent[]
-}
-
 export function AgentPage() {
-  const [run, setRun] = useState<RuntimeAgent[]>([])
-  const [cfg, setCfg] = useState<GlobalAgentCatalog>(empty)
-  const [load, setLoad] = useState(true)
+  const { agent, ensure, refresh, refreshMany } = useGlobalData()
   const [busy, setBusy] = useState("")
-  const [err, setErr] = useState("")
   const [dlg, setDlg] = useState<Dlg>({
     open: false,
     mode: "create",
   })
   const [name, setName] = useState("")
   const [body, setBody] = useState(temp(""))
-
+  const run = agent.data.run
+  const cfg = agent.data.cfg
+  const load = agent.load
+  const err = agent.err
   const cur = dlg.item
 
-  const reload = useCallback(async (spin: boolean = true) => {
-    if (spin) {
-      setLoad(true)
-    }
-    setErr("")
-
-    const [run, cfg] = await Promise.allSettled([agentApi.listRuntime(), agentApi.listGlobal()])
-    const msg: string[] = []
-
-    if (run.status === "fulfilled") {
-      setRun(normRun(run.value))
-    } else {
-      setRun([])
-      msg.push(`全局可用 agent 列表加载失败：${note(run.reason, "请求失败")}`)
-    }
-
-    if (cfg.status === "fulfilled") {
-      setCfg(normCfg(cfg.value))
-    } else {
-      setCfg(empty)
-      msg.push(`全局 agent 文件加载失败：${note(cfg.reason, "请求失败")}`)
-    }
-
-    if (msg.length > 0) {
-      setErr(msg.join("；"))
-    }
-
-    if (spin) {
-      setLoad(false)
-    }
-  }, [])
-
   useEffect(() => {
-    void reload()
-  }, [reload])
+    void ensure("agent")
+  }, [ensure])
 
   const sync = useCallback(async () => {
     for (const _ of Array.from({ length: 8 })) {
-      const [run, cfg] = await Promise.allSettled([agentApi.listRuntime(), agentApi.listGlobal()])
-      if (run.status === "fulfilled") {
-        setRun(normRun(run.value))
-      }
-      if (cfg.status === "fulfilled") {
-        setCfg(normCfg(cfg.value))
-      }
-      if (run.status === "fulfilled" && cfg.status === "fulfilled") {
-        setErr("")
+      const next = await refresh("agent")
+      if (!next.err) {
         return true
       }
       await wait(500)
     }
 
-    await reload(false)
     return false
-  }, [reload])
+  }, [refresh])
 
   const open = useCallback((item?: GlobalAgent) => {
     if (item) {
@@ -260,13 +201,13 @@ export function AgentPage() {
         toast.success("已更新全局 agent，请重启 opencode 服务重新加载")
       }
       close()
-      await reload(false)
+      await refresh("agent")
     } catch (err) {
       toast.error(note(err, "保存 agent 失败"))
     } finally {
       setBusy("")
     }
-  }, [body, close, dlg.mode, name, reload])
+  }, [body, close, dlg.mode, name, refresh])
 
   const drop = useCallback(
     async (item: GlobalAgent) => {
@@ -274,14 +215,14 @@ export function AgentPage() {
       try {
         await agentApi.removeGlobal(item.name)
         toast.success(`已删除 ${item.name}，请重启 opencode 服务重新加载`)
-        await reload(false)
+        await refresh("agent")
       } catch (err) {
         toast.error(note(err, `删除 ${item.name} 失败`))
       } finally {
         setBusy("")
       }
     },
-    [reload],
+    [refresh],
   )
 
   const restart = useCallback(async () => {
@@ -289,14 +230,14 @@ export function AgentPage() {
     try {
       await systemApi.opencodeRestart()
       await sync()
-      toast.success("opencode 服务已重启")
-      await reload(false)
+      await refreshMany(["provider", "mcp", "skill"])
+      toast.success("opencode 已重启")
     } catch (err) {
-      toast.error(note(err, "重启 opencode 服务失败"))
+      toast.error(note(err, "重启opencode失败"))
     } finally {
       setBusy("")
     }
-  }, [reload, sync])
+  }, [refreshMany, sync])
 
   const stat = useMemo(
     () => ({
@@ -323,7 +264,7 @@ export function AgentPage() {
                 </CardDescription>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <Button variant="outline" onClick={() => void reload()} disabled={load || busy === "restart"}>
+                <Button variant="outline" onClick={() => void refresh("agent")} disabled={load || busy === "restart"}>
                   <RefreshCcw className={load ? "size-4 animate-spin" : "size-4"} />
                   刷新
                 </Button>
@@ -376,9 +317,7 @@ export function AgentPage() {
         <section className="space-y-4">
           <div>
             <h2 className="text-lg font-semibold">全局自定义 Agent</h2>
-            <p className="text-muted-foreground mt-1 text-sm">
-              这里仅管理写入全局配置目录的 Markdown agent 文件。
-            </p>
+            <p className="text-muted-foreground mt-1 text-sm">这里仅管理写入全局配置目录的 Markdown agent 文件。</p>
           </div>
           {load ? (
             <div className="text-muted-foreground flex items-center gap-2 text-sm">
@@ -411,11 +350,9 @@ export function AgentPage() {
                         <div className="text-muted-foreground text-sm leading-6">
                           {item.description || "未提供描述"}
                         </div>
-                        {item.model ? (
-                          <div className="text-muted-foreground text-xs">模型：{item.model}</div>
-                        ) : null}
+                        {item.model ? <div className="text-muted-foreground text-xs">模型： {item.model}</div> : null}
                         <div className="text-muted-foreground break-all text-xs">{item.path}</div>
-                        <div className="text-muted-foreground text-xs">更新于：{stamp(item.updated_at)}</div>
+                        <div className="text-muted-foreground text-xs">更新于： {stamp(item.updated_at)}</div>
                       </div>
                       <div className="flex shrink-0 flex-wrap items-center gap-2">
                         <Button variant="outline" onClick={() => open(item)} disabled={lock}>
@@ -465,23 +402,15 @@ export function AgentPage() {
                         {tag(item)}
                       </span>
                       {item.hidden ? (
-                        <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
-                          hidden
-                        </span>
+                        <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">隐藏</span>
                       ) : null}
                     </div>
-                    <div className="text-muted-foreground text-sm leading-6">
-                      {item.description || "未提供描述"}
-                    </div>
+                    <div className="text-muted-foreground text-sm leading-6">{item.description || "未提供描述"}</div>
                     {modelText(item.model) ? (
-                      <div className="text-muted-foreground text-xs">模型：{modelText(item.model)}</div>
+                      <div className="text-muted-foreground text-xs">模型： {modelText(item.model)}</div>
                     ) : null}
-                    {item.color ? (
-                      <div className="text-muted-foreground text-xs">颜色：{item.color}</div>
-                    ) : null}
-                    {item.steps ? (
-                      <div className="text-muted-foreground text-xs">最大步数：{item.steps}</div>
-                    ) : null}
+                    {item.color ? <div className="text-muted-foreground text-xs">颜色： {item.color}</div> : null}
+                    {item.steps ? <div className="text-muted-foreground text-xs">最大步数：{item.steps}</div> : null}
                   </div>
                 </div>
               ))}
