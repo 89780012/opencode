@@ -1,8 +1,9 @@
 import { FolderOpen, Plus, RefreshCw } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { toast } from "sonner"
 import { projectApi } from "@/api/modules/project"
 import { workspaceApi } from "@/api/modules/workspace"
+import { useWorkspaceList } from "@/components/data/global-data-provider"
 import { LocalWorkspaceList } from "@/components/workspace/local-workspace-list"
 import { Button } from "@/components/ui/button"
 import {
@@ -16,34 +17,15 @@ import {
 import { Input } from "@/components/ui/input"
 import { SidebarContent, SidebarGroup, SidebarGroupContent, SidebarHeader } from "@/components/ui/sidebar"
 import { Switch } from "@/components/ui/switch"
-import { useAppDispatch } from "@/hooks/useAppDispatch"
-import { useAppSelector } from "@/hooks/useAppSelector"
-import { useLocalWorkspaces } from "@/hooks/use-local-workspaces"
-import { clearSelectedWorkspace, setSelectedWorkspace } from "@/store/workspace-view-slice"
 import type { LocalWorkspace } from "@/types/workspace"
 
 interface Props {
   onPick?: () => void
 }
 
-const pick = (workspace: LocalWorkspace, dispatch: ReturnType<typeof useAppDispatch>) => {
-  dispatch(setSelectedWorkspace(workspace))
-}
-
-const same = (a: LocalWorkspace, b: LocalWorkspace) => {
-  if (a.path !== b.path || a.name !== b.name || a.vcs !== b.vcs) {
-    return false
-  }
-  if (a.keywords.length !== b.keywords.length) {
-    return false
-  }
-  return a.keywords.every((item, i) => item === b.keywords[i])
-}
-
 export function LocalWorkspaceTab(props: Props) {
-  const dispatch = useAppDispatch()
-  const { loading, loaded, error, basePath, workspaces, refresh } = useLocalWorkspaces()
-  const workspace = useAppSelector((state) => state.workspaceView.selectedWorkspace)
+  const { basePath, error, loading, refresh, select, selected, workspaces } = useWorkspaceList()
+  const workspace = selected
   const selectedPath = workspace?.path ?? null
   const [createOpen, setCreateOpen] = useState(false)
   const [openOpen, setOpenOpen] = useState(false)
@@ -53,32 +35,12 @@ export function LocalWorkspaceTab(props: Props) {
   const [gitOpen, setGitOpen] = useState(false)
   const [initing, setIniting] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!selectedPath) {
-      return
-    }
-    if (!loaded) {
-      return
-    }
-
-    const current = workspaces.find((item) => item.path === selectedPath)
-    if (!current) {
-      dispatch(clearSelectedWorkspace())
-      return
-    }
-    if (workspace && same(workspace, current)) {
-      return
-    }
-
-    dispatch(setSelectedWorkspace(current))
-  }, [dispatch, loaded, selectedPath, workspace, workspaces])
-
   const onPick = async (item: LocalWorkspace) => {
     try {
       const data = await workspaceApi.openWorkspace(item.path, gitOpen)
       await ensureGit(data.workspace.path, gitOpen)
       await refresh()
-      pick(data.workspace, dispatch)
+      select(data.workspace)
       setOpenOpen(false)
       props.onPick?.()
     } catch (err) {
@@ -126,7 +88,7 @@ export function LocalWorkspaceTab(props: Props) {
       const next = await workspaceApi.openWorkspace(data.workspace.path, false)
       //await ensureGit(data.workspace.path, gitNew)
       await refresh()
-      pick(next.workspace, dispatch)
+      select(next.workspace)
       props.onPick?.()
       setCreateOpen(false)
       setName("")

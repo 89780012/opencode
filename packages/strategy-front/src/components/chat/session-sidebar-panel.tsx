@@ -1,5 +1,6 @@
 import { FolderOpen, MessageSquareText, Plus, RefreshCw } from "lucide-react"
 import { useEffect } from "react"
+import { useWorkspaceList } from "@/components/data/global-data-provider"
 import { Button } from "@/components/ui/button"
 import {
   SidebarContent,
@@ -13,7 +14,6 @@ import {
 } from "@/components/ui/sidebar"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useChatSessions } from "@/hooks/use-chat-sessions"
-import { useAppSelector } from "@/hooks/useAppSelector"
 
 interface Props {
   onWorkspace?: () => void
@@ -27,7 +27,7 @@ const fmt = new Intl.DateTimeFormat("zh-CN", {
 })
 
 export function SessionSidebarPanel(props: Props) {
-  const workspace = useAppSelector((state) => state.workspaceView.selectedWorkspace)
+  const { selected: workspace } = useWorkspaceList()
   const path = workspace?.path ?? null
   const { sessions, selectedSessionId, loading, refreshSessions, selectSession } = useChatSessions(path)
 

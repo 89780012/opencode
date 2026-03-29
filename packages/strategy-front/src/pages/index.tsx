@@ -4,7 +4,7 @@ import { toast } from "sonner"
 import { chatApi } from "@/api/modules"
 import { ChatWorkspacePanel, type WorkspaceTab } from "@/components/chat/chat-workspace-panel"
 import { ChatWorkspaceToggle } from "@/components/chat/chat-workspace-toggle"
-import { useAgentList, useProviderList } from "@/components/data/global-data-provider"
+import { useAgentList, useProviderList, useWorkspaceList } from "@/components/data/global-data-provider"
 import { ChatMessageList } from "@/components/chat-message-list"
 import { PermissionPanel } from "@/components/chat/permission-panel"
 import { PromptBar } from "@/components/chat/prompt-bar"
@@ -12,7 +12,6 @@ import { QuestionPanel } from "@/components/chat/question-panel"
 import { TodoPanel } from "@/components/chat/todo-panel"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { useAppSelector } from "@/hooks/useAppSelector"
 import { useChatEvents } from "@/hooks/use-chat-events"
 import { useChatPermission } from "@/hooks/use-chat-permission"
 import { useChatQuestion } from "@/hooks/use-chat-question"
@@ -27,7 +26,7 @@ import { useSessionDraft } from "@/hooks/use-session-draft"
 import { resolveComposer } from "@/lib/chat-composer"
 
 export default function Home() {
-  const workspace = useAppSelector((state) => state.workspaceView.selectedWorkspace)
+  const { selected: workspace } = useWorkspaceList()
   const path = workspace?.path ?? null
   const [open, setOpen] = useState(false)
   const [wide, setWide] = useState(false)

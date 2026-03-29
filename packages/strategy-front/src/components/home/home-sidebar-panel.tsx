@@ -1,15 +1,15 @@
 import { FolderOpen, MessageSquareText } from "lucide-react"
 import { useState } from "react"
+import { useWorkspaceList } from "@/components/data/global-data-provider"
 import { SessionSidebarPanel } from "@/components/chat/session-sidebar-panel"
 import { SidebarHeader } from "@/components/ui/sidebar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { LocalWorkspaceTab } from "@/components/workspace/local-workspace-tab"
-import { useAppSelector } from "@/hooks/useAppSelector"
 
 type Tab = "workspace" | "session"
 
 export function HomeSidebarPanel() {
-  const workspace = useAppSelector((state) => state.workspaceView.selectedWorkspace)
+  const { selected: workspace } = useWorkspaceList()
   const [tab, setTab] = useState<Tab>(workspace ? "session" : "workspace")
 
   return (
