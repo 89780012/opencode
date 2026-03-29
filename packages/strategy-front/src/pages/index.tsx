@@ -168,6 +168,7 @@ export default function Home() {
     <div className="flex h-full min-h-0 min-w-0 w-full flex-col">
       <div className="relative flex min-h-0 flex-1">
         <ChatMessageList
+          key={selectedSessionId}
           err={eventErr}
           messages={messages}
           loading={detail && !!selectedSessionId}
