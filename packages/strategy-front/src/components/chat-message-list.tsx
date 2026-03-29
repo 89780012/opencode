@@ -3,11 +3,20 @@ import { CheckCircle2, Circle, ListTodo, LoaderCircle, MinusCircle } from "lucid
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation"
 import { Message, MessageContent } from "@/components/ai-elements/message"
 import { Response } from "@/components/ai-elements/response"
+import { useAppSelector } from "@/hooks/useAppSelector"
 import { cn } from "@/lib/utils"
-import type { ChatError, ChatPart, ChatStatus, ChatTodo, ChatToolPart, ChatToolState, ChatView } from "@/types/chat"
+import type {
+  ChatError,
+  ChatMessageInfo,
+  ChatPart,
+  ChatStatus,
+  ChatTodo,
+  ChatToolPart,
+  ChatToolState,
+} from "@/types/chat"
 
 interface Props {
-  messages: ChatView[]
+  messages: ChatMessageInfo[]
   status?: ChatStatus
   err?: string
   loading?: boolean
@@ -119,7 +128,7 @@ function renderTool(part: ChatToolPart) {
   )
 }
 
-function renderPart(part: ChatPart, role: ChatView["info"]["role"], onOpenDiff?: (file: string) => void) {
+function renderPart(part: ChatPart, role: ChatMessageInfo["role"], onOpenDiff?: (file: string) => void) {
   switch (part.type) {
     case "text":
       if (role === "assistant") {
@@ -208,27 +217,35 @@ function renderPart(part: ChatPart, role: ChatView["info"]["role"], onOpenDiff?:
   }
 }
 
+const ChatMessageItem = memo(function ChatMessageItem(props: {
+  info: ChatMessageInfo
+  onOpenDiff?: (file: string) => void
+}) {
+  const parts = useAppSelector((state) => state.chatSession.parts[props.info.id] ?? [])
+  const body = parts.length > 0 ? parts : []
+  const err = props.info.role === "assistant" ? errorText(props.info.error) : undefined
+
+  return (
+    <Message from={props.info.role}>
+      <MessageContent>
+        {body.map((part) => (
+          <div key={part.id}>{renderPart(part, props.info.role, props.onOpenDiff)}</div>
+        ))}
+        {err ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{err}</div>
+        ) : null}
+      </MessageContent>
+    </Message>
+  )
+})
+
 export const ChatMessageList = memo(function ChatMessageList(props: Props) {
   return (
-    <Conversation className="custom-scrollbar flex-1">
+    <Conversation className="custom-scrollbar-2 flex-1">
       <ConversationContent className="mx-auto w-full max-w-[776px]">
-        {props.messages.map((message) => {
-          const body = message.parts.length > 0 ? message.parts : []
-          const err = message.info.role === "assistant" ? errorText(message.info.error) : undefined
-
-          return (
-            <Message key={message.info.id} from={message.info.role}>
-              <MessageContent>
-                {body.map((part) => (
-                  <div key={part.id}>{renderPart(part, message.info.role, props.onOpenDiff)}</div>
-                ))}
-                {err ? (
-                  <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{err}</div>
-                ) : null}
-              </MessageContent>
-            </Message>
-          )
-        })}
+        {props.messages.map((info) => (
+          <ChatMessageItem key={info.id} info={info} onOpenDiff={props.onOpenDiff} />
+        ))}
         {props.err ? (
           <Message from="assistant">
             <MessageContent>
