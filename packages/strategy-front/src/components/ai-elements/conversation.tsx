@@ -15,11 +15,13 @@ import {
   type RefObject,
   type ReactNode,
 } from "react"
+import { createPortal } from "react-dom"
 
 const GAP = 24
 
 const Context = createContext<{
   body: RefObject<HTMLDivElement | null>
+  wrap: RefObject<HTMLDivElement | null>
   bot: boolean
   jump: (mode?: ScrollBehavior) => void
 } | null>(null)
@@ -36,6 +38,7 @@ export type ConversationProps = ComponentProps<"div">
 
 export const Conversation = ({ children, className, onScroll, ...props }: ConversationProps) => {
   const body = useRef<HTMLDivElement>(null)
+  const wrap = useRef<HTMLDivElement>(null)
   const root = useRef<HTMLDivElement>(null)
   const frame = useRef(0)
   const last = useRef(true)
@@ -91,18 +94,20 @@ export const Conversation = ({ children, className, onScroll, ...props }: Conver
   }, [jump, sync])
 
   return (
-    <Context.Provider value={{ body, bot, jump }}>
-      <div
-        className={cn("relative min-h-0 flex-1 overflow-y-auto", !ready && "invisible", className)}
-        ref={root}
-        role="log"
-        {...props}
-        onScroll={(event) => {
-          sync()
-          onScroll?.(event)
-        }}
-      >
-        {children}
+    <Context.Provider value={{ body, wrap, bot, jump }}>
+      <div className="relative min-h-0 flex-1" ref={wrap}>
+        <div
+          className={cn("min-h-0 h-full overflow-y-auto", !ready && "invisible", className)}
+          ref={root}
+          role="log"
+          {...props}
+          onScroll={(event) => {
+            sync()
+            onScroll?.(event)
+          }}
+        >
+          {children}
+        </div>
       </div>
     </Context.Provider>
   )
@@ -148,7 +153,7 @@ export const ConversationEmptyState = ({
 export type ConversationScrollButtonProps = ComponentProps<typeof Button>
 
 export const ConversationScrollButton = ({ className, ...props }: ConversationScrollButtonProps) => {
-  const { bot, jump } = useConversation()
+  const { wrap, bot, jump } = useConversation()
 
   const handleScrollToBottom = useCallback(() => {
     jump("smooth")
@@ -158,7 +163,11 @@ export const ConversationScrollButton = ({ className, ...props }: ConversationSc
     return null
   }
 
-  return (
+  if (!wrap.current) {
+    return null
+  }
+
+  return createPortal(
     <Button
       className={cn("absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full", className)}
       onClick={handleScrollToBottom}
@@ -168,6 +177,7 @@ export const ConversationScrollButton = ({ className, ...props }: ConversationSc
       {...props}
     >
       <ArrowDownIcon className="size-4" />
-    </Button>
+    </Button>,
+    wrap.current,
   )
 }
