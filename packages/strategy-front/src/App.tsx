@@ -1,4 +1,5 @@
 import { GlobalDataProvider } from "@/components/data/global-data-provider"
+import { ProjectComposerProvider } from "@/components/project/project-composer-provider"
 import { SystemProvider } from "@/components/system/system-provider"
 import { Toaster } from "@/components/ui/sonner"
 import { ThemeProvider } from "@/components/ui/theme-provider"
@@ -10,10 +11,12 @@ function App() {
     <ReduxProvider>
       <ThemeProvider>
         <SystemProvider>
-          <GlobalDataProvider>
-            <AppRouter />
-            <Toaster />
-          </GlobalDataProvider>
+          <ProjectComposerProvider>
+            <GlobalDataProvider>
+              <AppRouter />
+              <Toaster />
+            </GlobalDataProvider>
+          </ProjectComposerProvider>
         </SystemProvider>
       </ThemeProvider>
     </ReduxProvider>
