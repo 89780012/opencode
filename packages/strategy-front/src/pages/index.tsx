@@ -172,7 +172,6 @@ export default function Home() {
           messages={messages}
           loading={detail && !!selectedSessionId}
           status={status}
-          hasCache={messages.length > 0}
           onOpenDiff={openDiff}
         />
 

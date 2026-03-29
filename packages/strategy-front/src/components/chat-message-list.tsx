@@ -11,7 +11,6 @@ interface Props {
   status?: ChatStatus
   err?: string
   loading?: boolean
-  hasCache?: boolean
   onOpenDiff?: (file: string) => void
 }
 
@@ -90,12 +89,8 @@ function renderTodoTool(part: ChatToolPart) {
       <div className="shrink-0">
         {state.status === "completed" ? <ListTodo className="size-4 text-muted-foreground" /> : todoIcon(state.status)}
       </div>
-      <div className="min-w-0 flex-1 truncate">
-        {todoText(part.tool, state)}
-      </div>
-      <div className="shrink-0 uppercase tracking-[0.08em] text-[10px]">
-        {state.status}
-      </div>
+      <div className="min-w-0 flex-1 truncate">{todoText(part.tool, state)}</div>
+      <div className="shrink-0 uppercase tracking-[0.08em] text-[10px]">{state.status}</div>
     </div>
   )
 }
@@ -215,7 +210,7 @@ function renderPart(part: ChatPart, role: ChatView["info"]["role"], onOpenDiff?:
 
 export const ChatMessageList = memo(function ChatMessageList(props: Props) {
   return (
-    <Conversation className="custom-scrollbar flex-1" initial={props.hasCache ? "instant" : "smooth"}>
+    <Conversation className="custom-scrollbar flex-1">
       <ConversationContent className="mx-auto w-full max-w-[776px]">
         {props.messages.map((message) => {
           const body = message.parts.length > 0 ? message.parts : []
@@ -228,9 +223,7 @@ export const ChatMessageList = memo(function ChatMessageList(props: Props) {
                   <div key={part.id}>{renderPart(part, message.info.role, props.onOpenDiff)}</div>
                 ))}
                 {err ? (
-                  <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                    {err}
-                  </div>
+                  <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{err}</div>
                 ) : null}
               </MessageContent>
             </Message>

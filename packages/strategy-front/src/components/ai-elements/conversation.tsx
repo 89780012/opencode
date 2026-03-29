@@ -1,43 +1,35 @@
-"use client";
+"use client"
 
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { ArrowDownIcon } from "lucide-react";
-import type { ComponentProps, ReactNode } from "react";
-import { useCallback } from "react";
-import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
+import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
+import { ArrowDownIcon } from "lucide-react"
+import type { ComponentProps, ReactNode } from "react"
+import { useCallback } from "react"
+import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom"
 
-export type ConversationProps = ComponentProps<typeof StickToBottom>;
+export type ConversationProps = ComponentProps<typeof StickToBottom>
 
 export const Conversation = ({ className, ...props }: ConversationProps) => (
   <StickToBottom
     className={cn("relative flex-1 overflow-y-hidden", className)}
-    initial="smooth"
+    initial="instant"
     resize="smooth"
     role="log"
     {...props}
   />
-);
+)
 
-export type ConversationContentProps = ComponentProps<
-  typeof StickToBottom.Content
->;
+export type ConversationContentProps = ComponentProps<typeof StickToBottom.Content>
 
-export const ConversationContent = ({
-  className,
-  ...props
-}: ConversationContentProps) => (
-  <StickToBottom.Content
-    className={cn("flex flex-col gap-4 p-4", className)}
-    {...props}
-  />
-);
+export const ConversationContent = ({ className, ...props }: ConversationContentProps) => (
+  <StickToBottom.Content className={cn("flex flex-col gap-4 p-4", className)} {...props} />
+)
 
 export type ConversationEmptyStateProps = ComponentProps<"div"> & {
-  title?: string;
-  description?: string;
-  icon?: ReactNode;
-};
+  title?: string
+  description?: string
+  icon?: ReactNode
+}
 
 export const ConversationEmptyState = ({
   className,
@@ -48,10 +40,7 @@ export const ConversationEmptyState = ({
   ...props
 }: ConversationEmptyStateProps) => (
   <div
-    className={cn(
-      "flex size-full flex-col items-center justify-center gap-3 p-8 text-center",
-      className,
-    )}
+    className={cn("flex size-full flex-col items-center justify-center gap-3 p-8 text-center", className)}
     {...props}
   >
     {children ?? (
@@ -59,37 +48,29 @@ export const ConversationEmptyState = ({
         {icon ? <div className="text-muted-foreground">{icon}</div> : null}
         <div className="space-y-1">
           <h3 className="text-sm font-medium">{title}</h3>
-          {description ? (
-            <p className="text-sm text-muted-foreground">{description}</p>
-          ) : null}
+          {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
         </div>
       </>
     )}
   </div>
-);
+)
 
-export type ConversationScrollButtonProps = ComponentProps<typeof Button>;
+export type ConversationScrollButtonProps = ComponentProps<typeof Button>
 
-export const ConversationScrollButton = ({
-  className,
-  ...props
-}: ConversationScrollButtonProps) => {
-  const { isAtBottom, scrollToBottom } = useStickToBottomContext();
+export const ConversationScrollButton = ({ className, ...props }: ConversationScrollButtonProps) => {
+  const { isAtBottom, scrollToBottom } = useStickToBottomContext()
 
   const handleScrollToBottom = useCallback(() => {
-    scrollToBottom();
-  }, [scrollToBottom]);
+    scrollToBottom()
+  }, [scrollToBottom])
 
   if (isAtBottom) {
-    return null;
+    return null
   }
 
   return (
     <Button
-      className={cn(
-        "absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full",
-        className,
-      )}
+      className={cn("absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full", className)}
       onClick={handleScrollToBottom}
       size="icon"
       type="button"
@@ -98,5 +79,5 @@ export const ConversationScrollButton = ({
     >
       <ArrowDownIcon className="size-4" />
     </Button>
-  );
-};
+  )
+}
