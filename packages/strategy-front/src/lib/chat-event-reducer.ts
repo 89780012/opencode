@@ -13,6 +13,7 @@ import type {
 
 export type ChatStateShape = {
   sessions: Record<string, ChatSessionSummary[]>;
+  loaded: Record<string, boolean>;
   selected: Record<string, string | null>;
   messages: Record<string, ChatMessageInfo[]>;
   parts: Record<string, ChatPart[]>;

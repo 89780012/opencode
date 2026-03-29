@@ -7,6 +7,7 @@ import { setSelectedWorkspaceSession, setWorkspaceSessions, upsertWorkspaceSessi
 export function useChatSessions(workspacePath?: string | null) {
   const dispatch = useAppDispatch()
   const key = workspacePath ?? ""
+  const loaded = useAppSelector((state) => (key ? (state.chatSession.loaded[key] ?? false) : false))
   const sessions = useAppSelector((state) => (key ? (state.chatSession.sessions[key] ?? []) : []))
   const selectedSessionId = useAppSelector((state) => (key ? (state.chatSession.selected[key] ?? null) : null))
   const [loading, setLoading] = useState(false)
@@ -65,6 +66,7 @@ export function useChatSessions(workspacePath?: string | null) {
 
   return useMemo(
     () => ({
+      loaded,
       sessions,
       selectedSessionId,
       loading,
@@ -73,6 +75,6 @@ export function useChatSessions(workspacePath?: string | null) {
       createSession,
       selectSession,
     }),
-    [createSession, creating, loading, refreshSessions, selectSession, selectedSessionId, sessions],
+    [createSession, creating, loaded, loading, refreshSessions, selectSession, selectedSessionId, sessions],
   )
 }

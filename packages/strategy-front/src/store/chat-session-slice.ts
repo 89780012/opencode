@@ -15,6 +15,7 @@ type State = ChatStateShape;
 
 const initialState: State = {
   sessions: {},
+  loaded: {},
   selected: {},
   messages: {},
   parts: {},
@@ -38,6 +39,7 @@ const slice = createSlice({
       state.sessions[action.payload.workspace] = [...action.payload.sessions].sort(
         (a, b) => b.time.updated - a.time.updated,
       );
+      state.loaded[action.payload.workspace] = true;
       const id = state.selected[action.payload.workspace];
       if (!id) {
         return;

@@ -29,14 +29,14 @@ const fmt = new Intl.DateTimeFormat("zh-CN", {
 export function SessionSidebarPanel(props: Props) {
   const { selected: workspace } = useWorkspaceList()
   const path = workspace?.path ?? null
-  const { sessions, selectedSessionId, loading, refreshSessions, selectSession } = useChatSessions(path)
+  const { loaded, sessions, selectedSessionId, loading, refreshSessions, selectSession } = useChatSessions(path)
 
   useEffect(() => {
-    if (!path) {
+    if (!path || loaded) {
       return
     }
     void refreshSessions()
-  }, [path, refreshSessions])
+  }, [loaded, path, refreshSessions])
 
   return (
     <>
