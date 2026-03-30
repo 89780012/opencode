@@ -1,6 +1,6 @@
 import { FolderOpen, MessageSquareText } from "lucide-react"
 import { useState } from "react"
-import { useWorkspaceList } from "@/components/data/global-data-provider"
+import { useWorkspaceList } from "@/data/global-data-provider"
 import { SessionSidebarPanel } from "@/components/chat/session-sidebar-panel"
 import { SidebarHeader } from "@/components/ui/sidebar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"

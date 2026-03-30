@@ -16,7 +16,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { mcpApi } from "@/api/modules"
-import { useGlobalData } from "@/components/data/global-data-provider"
+import { useGlobalData } from "@/data/global-data-provider"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {

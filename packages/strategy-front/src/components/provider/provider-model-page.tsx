@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
-import { useProviderList } from "@/components/data/global-data-provider"
+import { useProviderList } from "@/data/global-data-provider"
 import type { Model, Provider } from "@/types/provider"
 import { popular, text } from "./utils"
 
@@ -226,12 +226,19 @@ export function ProviderModelPage() {
             </div>
             <div className="relative">
               <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-              <Input value={q} onChange={(event) => setQ(event.target.value)} placeholder="搜索提供商模型" className="pl-9" />
+              <Input
+                value={q}
+                onChange={(event) => setQ(event.target.value)}
+                placeholder="搜索提供商模型"
+                className="pl-9"
+              />
             </div>
           </CardHeader>
         </Card>
 
-        {err ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{err}</div> : null}
+        {err ? (
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{err}</div>
+        ) : null}
 
         {load ? (
           <div className="text-muted-foreground flex items-center gap-2 text-sm">
@@ -297,13 +304,19 @@ export function ProviderModelPage() {
                                   {item.id}
                                 </span>
                                 {item.def ? (
-                                  <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">默认</span>
+                                  <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
+                                    默认
+                                  </span>
                                 ) : null}
                                 {latest.has(key({ providerID: item.provider.id, modelID: item.id })) ? (
-                                  <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">最新</span>
+                                  <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
+                                    最新
+                                  </span>
                                 ) : null}
                                 {item.free ? (
-                                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">免费</span>
+                                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
+                                    免费
+                                  </span>
                                 ) : null}
                               </div>
                               <div className="text-muted-foreground flex flex-wrap gap-3 text-sm">
@@ -316,7 +329,9 @@ export function ProviderModelPage() {
                               <span className="text-muted-foreground text-sm">{on ? "显示中" : "已隐藏"}</span>
                               <Switch
                                 checked={on}
-                                onCheckedChange={(next) => setVisible({ providerID: item.provider.id, modelID: item.id }, next)}
+                                onCheckedChange={(next) =>
+                                  setVisible({ providerID: item.provider.id, modelID: item.id }, next)
+                                }
                               />
                             </div>
                           </div>
@@ -333,10 +348,3 @@ export function ProviderModelPage() {
     </div>
   )
 }
-
-
-
-
-
-
-

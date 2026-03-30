@@ -1,4 +1,4 @@
-import { GlobalDataProvider } from "@/components/data/global-data-provider"
+import { GlobalDataProvider } from "@/data/global-data-provider"
 import { ProjectComposerProvider } from "@/components/project/project-composer-provider"
 import { SystemProvider } from "@/components/system/system-provider"
 import { Toaster } from "@/components/ui/sonner"

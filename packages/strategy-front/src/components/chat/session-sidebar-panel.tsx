@@ -1,6 +1,6 @@
 import { FolderOpen, MessageSquareText, Plus, RefreshCw } from "lucide-react"
 import { useEffect } from "react"
-import { useWorkspaceList } from "@/components/data/global-data-provider"
+import { useWorkspaceList } from "@/data/global-data-provider"
 import { Button } from "@/components/ui/button"
 import {
   SidebarContent,
@@ -120,9 +120,7 @@ export function SessionSidebarPanel(props: Props) {
                           <div className="min-w-0 flex-1">
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <div className="text-sm font-medium whitespace-normal break-words">
-                                  {text}
-                                </div>
+                                <div className="text-sm font-medium whitespace-normal break-words">{text}</div>
                               </TooltipTrigger>
                               <TooltipContent side="right" align="start" sideOffset={8}>
                                 {text}

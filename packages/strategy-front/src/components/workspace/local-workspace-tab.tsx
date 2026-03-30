@@ -3,7 +3,7 @@ import { useState } from "react"
 import { toast } from "sonner"
 import { projectApi } from "@/api/modules/project"
 import { workspaceApi } from "@/api/modules/workspace"
-import { useWorkspaceList } from "@/components/data/global-data-provider"
+import { useWorkspaceList } from "@/data/global-data-provider"
 import { LocalWorkspaceList } from "@/components/workspace/local-workspace-list"
 import { Button } from "@/components/ui/button"
 import {

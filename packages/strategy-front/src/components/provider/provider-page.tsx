@@ -6,7 +6,7 @@ import { toast } from "sonner"
 import { providerApi } from "@/api/modules/provider"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { useProviderList } from "@/components/data/global-data-provider"
+import { useProviderList } from "@/data/global-data-provider"
 import type { Provider } from "@/types/provider"
 import { ProviderConnectDialog } from "./provider-connect-dialog"
 import { ProviderCustomDialog } from "./provider-custom-dialog"
@@ -134,9 +134,7 @@ export function ProviderPage() {
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div className="space-y-2">
                 <CardTitle>提供商</CardTitle>
-                <CardDescription>
-                  管理全局提供商连接、认证方式，以及自定义 OpenAI 兼容提供商。
-                </CardDescription>
+                <CardDescription>管理全局提供商连接、认证方式，以及自定义 OpenAI 兼容提供商。</CardDescription>
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="outline" onClick={() => void refresh()} disabled={load}>
@@ -166,7 +164,9 @@ export function ProviderPage() {
           </CardContent>
         </Card>
 
-        {err ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{err}</div> : null}
+        {err ? (
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{err}</div>
+        ) : null}
 
         <section className="space-y-4">
           <div>
