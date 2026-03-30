@@ -12,15 +12,16 @@ import (
 	"strategy-service/internal/proc"
 )
 
-var errBusy = errors.New("installation is already running for this tool")
+var errBusy = errors.New("该工具已有安装任务在运行")
 
 func ErrBusy() error {
 	return errBusy
 }
 
 type step struct {
-	cmd  string
-	args []string
+	title string
+	cmd   string
+	args  []string
 }
 
 func (s *Service) Install(ctx context.Context, id string) (Task, error) {
@@ -33,8 +34,9 @@ func (s *Service) Install(ctx context.Context, id string) (Task, error) {
 		ID:        fmt.Sprintf("%d", time.Now().UnixNano()),
 		Tool:      id,
 		Status:    TaskPending,
+		Title:     "等待开始",
 		StartedAt: time.Now(),
-		Log:       []string{"task created"},
+		Log:       []string{"任务已创建"},
 	}
 
 	s.mu.Lock()
@@ -57,7 +59,9 @@ func (s *Service) Install(ctx context.Context, id string) (Task, error) {
 func (s *Service) exec(ctx context.Context, id string) {
 	s.set(id, func(task *Task) {
 		task.Status = TaskRunning
-		task.Log = append(task.Log, "task started")
+		task.Title = "准备安装任务"
+		task.Output = "准备安装任务"
+		task.Log = append(task.Log, "任务已开始")
 	})
 
 	task, ok := s.Get(id)
@@ -75,12 +79,23 @@ func (s *Service) exec(ctx context.Context, id string) {
 		return
 	}
 
+	total := len(steps) + 1
+	s.set(id, func(task *Task) {
+		task.Total = total
+		task.Title = fmt.Sprintf("准备安装 %s", label(task.Tool))
+		task.Output = fmt.Sprintf("共 %d 个步骤", len(steps))
+		task.Log = push(task.Log, fmt.Sprintf("准备就绪: 共 %d 个步骤", len(steps)))
+	})
+
 	for i, item := range steps {
 		text := item.cmd + " " + strings.Join(item.args, " ")
 		slog.Info("tool install: running step", "tool", task.Tool, "step", i+1, "command", strings.TrimSpace(text))
 		s.set(id, func(task *Task) {
-			task.Log = push(task.Log, "run: "+strings.TrimSpace(text))
-			task.Output = "running " + item.cmd
+			task.Step = i + 1
+			task.Title = item.title
+			task.Log = push(task.Log, "执行命令: "+strings.TrimSpace(text))
+			task.Log = push(task.Log, fmt.Sprintf("步骤 %d/%d: %s", task.Step, task.Total, item.title))
+			task.Output = item.title
 		})
 
 		sub, cancel := context.WithTimeout(ctx, 30*time.Minute)
@@ -94,7 +109,7 @@ func (s *Service) exec(ctx context.Context, id string) {
 			s.set(id, func(task *Task) {
 				task.Output = body
 				task.Log = append(task.Log, lines(body)...)
-				task.Log = trim(task.Log, 40)
+				task.Log = trim(task.Log, 200)
 			})
 		}
 
@@ -110,13 +125,24 @@ func (s *Service) exec(ctx context.Context, id string) {
 		}
 
 		slog.Info("tool install: step completed", "tool", task.Tool, "step", i+1)
+		s.set(id, func(task *Task) {
+			task.Output = fmt.Sprintf("第 %d 步已完成", i+1)
+			task.Log = push(task.Log, fmt.Sprintf("步骤 %d/%d 已完成", i+1, task.Total))
+		})
 	}
+
+	s.set(id, func(task *Task) {
+		task.Step = total
+		task.Title = "校验安装结果"
+		task.Output = "校验安装结果"
+		task.Log = push(task.Log, fmt.Sprintf("步骤 %d/%d: 校验安装结果", task.Step, task.Total))
+	})
 
 	state := s.inspect(context.Background(), task.Tool)
 	if !state.Installed || state.Status != StatusInstalled {
 		msg := state.Message
 		if msg == "" {
-			msg = "install command finished but tool health check failed"
+			msg = "安装命令已执行完成，但健康检查未通过"
 		}
 		slog.Error("tool install: post-install check failed", "tool", task.Tool, "message", msg)
 		s.fail(id, nil, msg, "")
@@ -131,7 +157,8 @@ func (s *Service) steps(id string) ([]step, error) {
 	if id == "git" {
 		if has("winget") {
 			return []step{{
-				cmd: "winget",
+				title: "使用 winget 安装 Git",
+				cmd:   "winget",
 				args: []string{
 					"install",
 					"--id",
@@ -144,18 +171,19 @@ func (s *Service) steps(id string) ([]step, error) {
 			}}, nil
 		}
 		if has("scoop") {
-			return []step{{cmd: "scoop", args: []string{"install", "git"}}}, nil
+			return []step{{title: "使用 scoop 安装 Git", cmd: "scoop", args: []string{"install", "git"}}}, nil
 		}
 		if has("choco") {
-			return []step{{cmd: "choco", args: []string{"install", "git", "-y"}}}, nil
+			return []step{{title: "使用 chocolatey 安装 Git", cmd: "choco", args: []string{"install", "git", "-y"}}}, nil
 		}
-		return nil, errors.New("no installer found for git")
+		return nil, errors.New("未找到 Git 的安装器")
 	}
 
 	if id == "node" || id == "npm" {
 		if has("winget") {
 			return []step{{
-				cmd: "winget",
+				title: "使用 winget 安装 Node.js LTS",
+				cmd:   "winget",
 				args: []string{
 					"install",
 					"--id",
@@ -168,25 +196,25 @@ func (s *Service) steps(id string) ([]step, error) {
 			}}, nil
 		}
 		if has("scoop") {
-			return []step{{cmd: "scoop", args: []string{"install", "nodejs-lts"}}}, nil
+			return []step{{title: "使用 scoop 安装 Node.js LTS", cmd: "scoop", args: []string{"install", "nodejs-lts"}}}, nil
 		}
 		if has("choco") {
-			return []step{{cmd: "choco", args: []string{"install", "nodejs-lts", "-y"}}}, nil
+			return []step{{title: "使用 chocolatey 安装 Node.js LTS", cmd: "choco", args: []string{"install", "nodejs-lts", "-y"}}}, nil
 		}
-		return nil, errors.New("no installer found for node or npm")
+		return nil, errors.New("未找到 Node.js 或 npm 的安装器")
 	}
 
 	if id == "opencode" {
 		if has("npm") {
-			return []step{{cmd: "npm", args: []string{"install", "-g", "opencode-ai"}}}, nil
+			return []step{{title: "使用 npm 安装 OpenCode", cmd: "npm", args: []string{"install", "-g", "opencode-ai"}}}, nil
 		}
 		if has("scoop") {
-			return []step{{cmd: "scoop", args: []string{"install", "opencode"}}}, nil
+			return []step{{title: "使用 scoop 安装 OpenCode", cmd: "scoop", args: []string{"install", "opencode"}}}, nil
 		}
 		if has("choco") {
-			return []step{{cmd: "choco", args: []string{"install", "opencode", "-y"}}}, nil
+			return []step{{title: "使用 chocolatey 安装 OpenCode", cmd: "choco", args: []string{"install", "opencode", "-y"}}}, nil
 		}
-		return nil, errors.New("no installer found for opencode")
+		return nil, errors.New("未找到 OpenCode 的安装器")
 	}
 
 	return nil, errTool
@@ -218,11 +246,18 @@ func (s *Service) fail(id string, code *int, msg string, out string) {
 	task.Status = TaskFailed
 	task.FinishedAt = &now
 	task.ExitCode = code
+	task.Title = "安装失败"
 	task.Error = msg
 	if out != "" {
 		task.Output = out
 	}
-	task.Log = push(task.Log, "task failed")
+	if task.Output == "" {
+		task.Output = msg
+	}
+	if msg != "" {
+		task.Log = push(task.Log, "错误: "+msg)
+	}
+	task.Log = push(task.Log, "任务失败")
 	delete(s.run, task.Tool)
 }
 
@@ -238,9 +273,11 @@ func (s *Service) done(id string, state State) {
 	}
 
 	task.Status = TaskSuccess
+	task.Step = task.Total
 	task.FinishedAt = &now
+	task.Title = "安装完成"
 	task.Output = strings.TrimSpace(state.Version + " " + state.Path)
-	task.Log = push(task.Log, "task completed")
+	task.Log = push(task.Log, "任务完成")
 	delete(s.run, task.Tool)
 }
 
@@ -284,5 +321,5 @@ func trim(all []string, max int) []string {
 }
 
 func push(all []string, item string) []string {
-	return trim(append(all, item), 40)
+	return trim(append(all, item), 200)
 }

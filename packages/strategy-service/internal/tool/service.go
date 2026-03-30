@@ -66,11 +66,14 @@ func (s *Service) state(ctx context.Context, id string) State {
 	if run != "" {
 		st.Status = StatusInstalling
 		st.TaskID = run
-		if hasTask && task.Output != "" {
+		if hasTask && task.Title != "" {
+			st.Message = task.Title
+		}
+		if hasTask && st.Message == "" && task.Output != "" {
 			st.Message = task.Output
 		}
 		if st.Message == "" {
-			st.Message = "installation is running"
+			st.Message = "安装进行中"
 		}
 		return st
 	}
@@ -79,6 +82,9 @@ func (s *Service) state(ctx context.Context, id string) State {
 		st.Status = StatusFailed
 		st.TaskID = task.ID
 		st.Message = task.Error
+		if st.Message == "" {
+			st.Message = task.Title
+		}
 		if st.Message == "" {
 			st.Message = task.Output
 		}

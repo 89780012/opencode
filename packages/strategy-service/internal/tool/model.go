@@ -32,6 +32,9 @@ type Task struct {
 	ID         string     `json:"id"`
 	Tool       string     `json:"tool"`
 	Status     string     `json:"status"`
+	Step       int        `json:"step"`
+	Total      int        `json:"total"`
+	Title      string     `json:"title,omitempty"`
 	StartedAt  time.Time  `json:"started_at"`
 	FinishedAt *time.Time `json:"finished_at,omitempty"`
 	ExitCode   *int       `json:"exit_code,omitempty"`

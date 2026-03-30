@@ -24,6 +24,9 @@ export interface InstallTask {
   id: string
   tool: ToolID
   status: TaskStatus
+  step: number
+  total: number
+  title?: string
   started_at: string
   finished_at?: string
   exit_code?: number
