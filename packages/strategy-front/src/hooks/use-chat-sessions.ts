@@ -27,6 +27,13 @@ export function useChatSessions(workspacePath?: string | null) {
     }
   }, [dispatch, workspacePath])
 
+  const ensureSessions = useCallback(async () => {
+    if (!workspacePath || loaded) {
+      return
+    }
+    await refreshSessions()
+  }, [loaded, refreshSessions, workspacePath])
+
   // 创建session
   const createSession = useCallback(async () => {
     if (!workspacePath) {
@@ -71,10 +78,11 @@ export function useChatSessions(workspacePath?: string | null) {
       selectedSessionId,
       loading,
       creating,
+      ensureSessions,
       refreshSessions,
       createSession,
       selectSession,
     }),
-    [createSession, creating, loaded, loading, refreshSessions, selectSession, selectedSessionId, sessions],
+    [createSession, creating, ensureSessions, loaded, loading, refreshSessions, selectSession, selectedSessionId, sessions],
   )
 }

@@ -12,6 +12,7 @@ export function useChatPermission(
 ) {
   const dispatch = useAppDispatch();
   const [sending, setSending] = useState(false);
+  const loaded = useAppSelector((state) => state.chatSession.permissionLoaded);
   const sessions = useAppSelector((state) =>
     workspacePath ? (state.chatSession.sessions[workspacePath] ?? []) : [],
   );
@@ -19,14 +20,14 @@ export function useChatPermission(
 
   const pull = useCallback(async () => {
     if (!workspacePath) return;
-    const data = await permissionApi.list(workspacePath).catch(() => [] as PermissionRequest[]);
+    const data = await permissionApi.list().catch(() => [] as PermissionRequest[]);
     dispatch(setPendingPermissions({ items: data }));
   }, [dispatch, workspacePath]);
 
   useEffect(() => {
-    if (!workspacePath) return;
+    if (!workspacePath || loaded) return;
     void pull();
-  }, [pull, workspacePath]);
+  }, [loaded, pull, workspacePath]);
 
   const req = useMemo(
     () => sessionPermissionRequest(sessions, reqs, sessionID),
@@ -37,7 +38,7 @@ export function useChatPermission(
     if (!workspacePath || sending) return;
     setSending(true);
     try {
-      await permissionApi.respond(workspacePath, item.id, { reply: response });
+      await permissionApi.respond(item.id, { reply: response });
       dispatch(
         applyWorkspaceEvent({
           workspace: workspacePath,

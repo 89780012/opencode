@@ -2,7 +2,7 @@ import { useCallback, useState } from "react"
 import { chatApi } from "@/api/modules"
 import { useAppDispatch } from "@/hooks/useAppDispatch"
 import { buildRequestParts } from "@/lib/build-request-parts"
-import { clearSessionEventError } from "@/store/chat-session-slice"
+import { clearSessionEventError, hydrateSessionMessages } from "@/store/chat-session-slice"
 import type { ChatModelRef } from "@/types/chat"
 
 interface Input {
@@ -12,7 +12,6 @@ interface Input {
   model?: ChatModelRef
   variant?: string
   createSession: () => Promise<string>
-  refreshSessions: () => Promise<void>
   selectSession: (sessionId: string) => void
   onSubmitted?: () => void
 }
@@ -34,7 +33,11 @@ export function usePromptSubmit(input: Input) {
 
       setSubmitting(true)
       try {
+        const created = !input.sessionId
         const sessionId = input.sessionId ?? (await input.createSession())
+        if (created) {
+          dispatch(hydrateSessionMessages({ sessionId, records: [] }))
+        }
         dispatch(clearSessionEventError({ sessionId }))
         input.selectSession(sessionId)
         await chatApi.sendPrompt(input.workspacePath, sessionId, {
@@ -43,7 +46,6 @@ export function usePromptSubmit(input: Input) {
           variant: input.variant,
           parts,
         })
-        await input.refreshSessions()
         input.onSubmitted?.()
       } finally {
         setSubmitting(false)

@@ -6,8 +6,6 @@ import { setSessionTodos } from "@/store/chat-session-slice";
 import type { ChatTodo } from "@/types/chat";
 
 const empty: ChatTodo[] = [];
-const close = 400;
-
 function done(list: { status: string }[]) {
   return list.length > 0 && list.every((item) => item.status === "completed" || item.status === "cancelled");
 }
@@ -56,20 +54,6 @@ export function useChatTodo(
       dead = true;
     };
   }, [data, dispatch, sessionId, workspacePath]);
-
-  useEffect(() => {
-    if (!sessionId || live || list.length === 0) {
-      return;
-    }
-
-    const id = window.setTimeout(() => {
-      dispatch(setSessionTodos({ sessionId, todos: [] }));
-    }, close);
-
-    return () => {
-      window.clearTimeout(id);
-    };
-  }, [dispatch, list.length, live, sessionId]);
 
   const complete = useMemo(() => done(list), [list]);
   const item = useMemo(() => pick(list), [list]);

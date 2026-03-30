@@ -15,12 +15,15 @@ export type ChatStateShape = {
   sessions: Record<string, ChatSessionSummary[]>;
   loaded: Record<string, boolean>;
   selected: Record<string, string | null>;
+  hydrated: Record<string, boolean>;
   messages: Record<string, ChatMessageInfo[]>;
   parts: Record<string, ChatPart[]>;
   sessionDiffs: Record<string, ChatFileDiff[] | undefined>;
   todos: Record<string, ChatTodo[] | undefined>;
   permissions: Record<string, PermissionRequest[]>;
+  permissionLoaded: boolean;
   questions: Record<string, ChatQuestionRequest[]>;
+  questionLoaded: boolean;
   status: Record<string, ChatStatus>;
   // AI 消息自身携带的历史错误。它属于时间线的一部分，后续进入会话时不应被清掉。
   messageErrs: Record<string, string | undefined>;
@@ -96,6 +99,7 @@ export function hydrateChat(state: ChatStateShape, sessionID: string, list: Chat
   if (!prevMessages || !arraysShallowEqual(prevMessages, nextMessages)) {
     state.messages[sessionID] = nextMessages;
   }
+  state.hydrated[sessionID] = true;
 
   list.forEach((item) => {
     const nextParts = sortPart(item.parts);
@@ -117,19 +121,27 @@ export function hydrateChat(state: ChatStateShape, sessionID: string, list: Chat
 }
 
 export function hydrateQuestions(state: ChatStateShape, list: ChatQuestionRequest[]) {
-  state.questions = {};
-  list.forEach((item) => {
-    const cur = state.questions[item.sessionID] ?? [];
-    state.questions[item.sessionID] = [...cur, item].sort((a, b) => a.id.localeCompare(b.id));
-  });
+  state.questions = list.reduce(
+    (acc, item) => {
+      const cur = acc[item.sessionID] ?? [];
+      acc[item.sessionID] = [...cur, item].sort((a, b) => a.id.localeCompare(b.id));
+      return acc;
+    },
+    {} as Record<string, ChatQuestionRequest[]>,
+  );
+  state.questionLoaded = true;
 }
 
 export function hydratePermissions(state: ChatStateShape, list: PermissionRequest[]) {
-  state.permissions = {};
-  list.forEach((item) => {
-    const cur = state.permissions[item.sessionID] ?? [];
-    state.permissions[item.sessionID] = [...cur, item].sort((a, b) => a.id.localeCompare(b.id));
-  });
+  state.permissions = list.reduce(
+    (acc, item) => {
+      const cur = acc[item.sessionID] ?? [];
+      acc[item.sessionID] = [...cur, item].sort((a, b) => a.id.localeCompare(b.id));
+      return acc;
+    },
+    {} as Record<string, PermissionRequest[]>,
+  );
+  state.permissionLoaded = true;
 }
 
 export function upsertSession(state: ChatStateShape, workspace: string, info: ChatSessionSummary) {
@@ -146,6 +158,7 @@ export function removeSession(state: ChatStateShape, workspace: string, info: Ch
   if (state.selected[workspace] === info.id) {
     state.selected[workspace] = null;
   }
+  delete state.hydrated[info.id];
   delete state.messages[info.id];
   delete state.status[info.id];
   delete state.messageErrs[info.id];

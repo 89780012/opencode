@@ -9,6 +9,7 @@ import type { ChatQuestionAnswer } from "@/types/chat";
 export function useChatQuestion(workspacePath?: string | null, sessionID?: string | null) {
   const dispatch = useAppDispatch();
   const [sending, setSending] = useState(false);
+  const loaded = useAppSelector((state) => state.chatSession.questionLoaded);
   const sessions = useAppSelector((state) =>
     workspacePath ? (state.chatSession.sessions[workspacePath] ?? []) : [],
   );
@@ -16,23 +17,14 @@ export function useChatQuestion(workspacePath?: string | null, sessionID?: strin
 
   const pull = useCallback(async () => {
     if (!workspacePath) return;
-    const data = await questionApi.list(workspacePath).catch(() => []);
+    const data = await questionApi.list().catch(() => []);
     dispatch(setPendingQuestions({ items: data }));
   }, [dispatch, workspacePath]);
 
   useEffect(() => {
-    if (!workspacePath) return;
-    let dead = false;
-    const run = async () => {
-      const data = await questionApi.list(workspacePath).catch(() => []);
-      if (dead) return;
-      dispatch(setPendingQuestions({ items: data }));
-    };
-    void run();
-    return () => {
-      dead = true;
-    };
-  }, [dispatch, workspacePath]);
+    if (!workspacePath || loaded) return;
+    void pull();
+  }, [loaded, pull, workspacePath]);
 
   const req = useMemo(
     () => sessionQuestionRequest(sessions, reqs, sessionID),
@@ -43,7 +35,7 @@ export function useChatQuestion(workspacePath?: string | null, sessionID?: strin
     if (!req || !workspacePath || sending) return;
     setSending(true);
     try {
-      await questionApi.reply(workspacePath, req.id, answers);
+      await questionApi.reply(req.id, answers);
       await pull();
     } finally {
       setSending(false);
@@ -54,7 +46,7 @@ export function useChatQuestion(workspacePath?: string | null, sessionID?: strin
     if (!req || !workspacePath || sending) return;
     setSending(true);
     try {
-      await questionApi.reject(workspacePath, req.id);
+      await questionApi.reject(req.id);
       await pull();
     } finally {
       setSending(false);

@@ -10,6 +10,7 @@ const empty: ChatMessageInfo[] = []
 
 export function useChatSessionDetail(workspacePath?: string | null, sessionId?: string | null) {
   const dispatch = useAppDispatch()
+  const loaded = useAppSelector((state) => (sessionId ? (state.chatSession.hydrated[sessionId] ?? false) : false))
   const messages = useAppSelector((state) =>
     sessionId ? (state.chatSession.messages[sessionId] ?? empty) : empty,
   )
@@ -18,14 +19,13 @@ export function useChatSessionDetail(workspacePath?: string | null, sessionId?: 
   const rawEventErr = useAppSelector((state) => (sessionId ? state.chatSession.eventErrs[sessionId] : undefined))
   const [loading, setLoading] = useState(false)
 
-  const hasCache = messages.length > 0
-
   const refresh = useCallback(
     async (target?: string | null) => {
       const id = target ?? sessionId
       if (!workspacePath || !id) {
         return
       }
+      setLoading(true)
       try {
         const data = await chatApi.getSessionMessages(workspacePath, id)
         dispatch(hydrateSessionMessages({ sessionId: id, records: data }))
@@ -37,19 +37,17 @@ export function useChatSessionDetail(workspacePath?: string | null, sessionId?: 
   )
 
   useEffect(() => {
-    if (!workspacePath || !sessionId) {
+    if (!workspacePath || !sessionId || loaded) {
       return
     }
-    if (!hasCache) {
-      setLoading(true)
-    }
     void refresh(sessionId)
-  }, [hasCache, refresh, sessionId, workspacePath])
+  }, [loaded, refresh, sessionId, workspacePath])
 
   const eventErr = messageErr ? undefined : rawEventErr
 
   return useMemo(
     () => ({
+      loaded,
       messages,
       status,
       err: eventErr ?? messageErr,
@@ -58,6 +56,6 @@ export function useChatSessionDetail(workspacePath?: string | null, sessionId?: 
       loading,
       refresh,
     }),
-    [eventErr, loading, messageErr, messages, refresh, status],
+    [eventErr, loaded, loading, messageErr, messages, refresh, status],
   )
 }

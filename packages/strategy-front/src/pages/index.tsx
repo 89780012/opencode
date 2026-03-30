@@ -35,7 +35,7 @@ export default function Home() {
 
   useChatEvents(path)
 
-  const { selectedSessionId, loading, creating, refreshSessions, createSession, selectSession } = useChatSessions(path)
+  const { selectedSessionId, loading, creating, createSession, selectSession } = useChatSessions(path)
   const ags = useAgentList()
   const catalog = useProviderList()
   const project = useProjectComposer()
@@ -61,7 +61,6 @@ export default function Home() {
     model: composer.model,
     variant: composer.variant,
     createSession,
-    refreshSessions,
     selectSession,
     onSubmitted: sessionDraft.clear,
   })
