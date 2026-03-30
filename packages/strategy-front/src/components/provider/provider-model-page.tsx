@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react"
 import { Loader2, RefreshCcw, RotateCcw, Search } from "lucide-react"
@@ -253,7 +253,7 @@ export function ProviderModelPage() {
             </CardHeader>
             <CardContent>
               <Button asChild>
-                <NavLink to="/providers/overview">前往提供商概览</NavLink>
+                <NavLink to="/app/providers/overview">前往提供商概览</NavLink>
               </Button>
             </CardContent>
           </Card>

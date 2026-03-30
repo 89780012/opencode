@@ -12,7 +12,7 @@ import (
 	"strategy-service/internal/proc"
 )
 
-var errBusy = errors.New("该工具已有安装任务在运行")
+var errBusy = errors.New("该服务已有任务正在执行")
 
 func ErrBusy() error {
 	return errBusy
@@ -34,9 +34,9 @@ func (s *Service) Install(ctx context.Context, id string) (Task, error) {
 		ID:        fmt.Sprintf("%d", time.Now().UnixNano()),
 		Tool:      id,
 		Status:    TaskPending,
-		Title:     "等待开始",
+		Title:     "等待开始安装",
 		StartedAt: time.Now(),
-		Log:       []string{"任务已创建"},
+		Log:       []string{"安装任务已创建"},
 	}
 
 	s.mu.Lock()
@@ -61,7 +61,7 @@ func (s *Service) exec(ctx context.Context, id string) {
 		task.Status = TaskRunning
 		task.Title = "准备安装任务"
 		task.Output = "准备安装任务"
-		task.Log = append(task.Log, "任务已开始")
+		task.Log = append(task.Log, "安装任务已开始")
 	})
 
 	task, ok := s.Get(id)
@@ -84,7 +84,7 @@ func (s *Service) exec(ctx context.Context, id string) {
 		task.Total = total
 		task.Title = fmt.Sprintf("准备安装 %s", label(task.Tool))
 		task.Output = fmt.Sprintf("共 %d 个步骤", len(steps))
-		task.Log = push(task.Log, fmt.Sprintf("准备就绪: 共 %d 个步骤", len(steps)))
+		task.Log = push(task.Log, fmt.Sprintf("准备就绪：共 %d 个步骤", len(steps)))
 	})
 
 	for i, item := range steps {
@@ -93,8 +93,8 @@ func (s *Service) exec(ctx context.Context, id string) {
 		s.set(id, func(task *Task) {
 			task.Step = i + 1
 			task.Title = item.title
-			task.Log = push(task.Log, "执行命令: "+strings.TrimSpace(text))
-			task.Log = push(task.Log, fmt.Sprintf("步骤 %d/%d: %s", task.Step, task.Total, item.title))
+			task.Log = push(task.Log, "执行命令："+strings.TrimSpace(text))
+			task.Log = push(task.Log, fmt.Sprintf("步骤 %d/%d：%s", task.Step, task.Total, item.title))
 			task.Output = item.title
 		})
 
@@ -135,7 +135,7 @@ func (s *Service) exec(ctx context.Context, id string) {
 		task.Step = total
 		task.Title = "校验安装结果"
 		task.Output = "校验安装结果"
-		task.Log = push(task.Log, fmt.Sprintf("步骤 %d/%d: 校验安装结果", task.Step, task.Total))
+		task.Log = push(task.Log, fmt.Sprintf("步骤 %d/%d：校验安装结果", task.Step, task.Total))
 	})
 
 	state := s.inspect(context.Background(), task.Tool)
@@ -246,7 +246,7 @@ func (s *Service) fail(id string, code *int, msg string, out string) {
 	task.Status = TaskFailed
 	task.FinishedAt = &now
 	task.ExitCode = code
-	task.Title = "安装失败"
+	task.Title = "处理失败"
 	task.Error = msg
 	if out != "" {
 		task.Output = out
@@ -255,7 +255,7 @@ func (s *Service) fail(id string, code *int, msg string, out string) {
 		task.Output = msg
 	}
 	if msg != "" {
-		task.Log = push(task.Log, "错误: "+msg)
+		task.Log = push(task.Log, "错误："+msg)
 	}
 	task.Log = push(task.Log, "任务失败")
 	delete(s.run, task.Tool)

@@ -1,4 +1,5 @@
 export type ToolID = "git" | "node" | "npm" | "opencode"
+export type ToolAction = "install" | "uninstall" | "reinstall"
 
 export type ToolStatus = "installed" | "missing" | "installing" | "failed"
 

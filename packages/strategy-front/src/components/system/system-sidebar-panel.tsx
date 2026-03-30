@@ -15,25 +15,25 @@ const items = [
   {
     icon: Palette,
     title: "外观",
-    url: "/settings/appearance",
+    url: "/app/settings/appearance",
     text: "管理主题模式和主题色，让桌面端界面风格保持一致。",
   },
   {
     icon: PlayCircle,
     title: "运行",
-    url: "/settings/runtime",
+    url: "/app/settings/runtime",
     text: "查看 opencode 运行状态、启动方式、进程信息和最近输出。",
   },
   {
     icon: ScrollText,
     title: "日志",
-    url: "/settings/logs",
+    url: "/app/settings/logs",
     text: "查看 strategy-service 与 opencode 启动日志，并配置默认查看行数。",
   },
   {
     icon: Boxes,
     title: "工具",
-    url: "/settings/tools",
+    url: "/app/settings/tools",
     text: "保留本地依赖检测与一键安装，作为系统设置的一部分。",
   },
 ]

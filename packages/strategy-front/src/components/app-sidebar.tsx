@@ -25,27 +25,27 @@ const data = {
   nav: [
     {
       title: "对话",
-      url: "/",
+      url: "/app",
       icon: MessageSquareText,
     },
     {
       title: "提供商",
-      url: "/providers",
+      url: "/app/providers",
       icon: PlugZap,
     },
     {
       title: "MCP 服务",
-      url: "/mcp",
+      url: "/app/mcp",
       icon: ServerCog,
     },
     {
       title: "Agents",
-      url: "/agents",
+      url: "/app/agents",
       icon: Bot,
     },
     {
       title: "Skills",
-      url: "/skills",
+      url: "/app/skills",
       icon: Sparkles,
     },
   ],
@@ -54,13 +54,13 @@ const data = {
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const route = useLocation()
   const path = route.pathname
-  const home = path === "/"
-  const provider = path.startsWith("/providers")
-  const mcp = path.startsWith("/mcp")
-  const agent = path.startsWith("/agents")
-  const skill = path.startsWith("/skills")
-  const system = path.startsWith("/settings") || path.startsWith("/installer")
-  const pick = (url: string) => (url === "/" ? path === "/" : path.startsWith(url))
+  const home = path === "/app"
+  const provider = path.startsWith("/app/providers")
+  const mcp = path.startsWith("/app/mcp")
+  const agent = path.startsWith("/app/agents")
+  const skill = path.startsWith("/app/skills")
+  const system = path.startsWith("/app/settings") || path.startsWith("/app/installer")
+  const pick = (url: string) => (url === "/app" ? path === "/app" : path.startsWith(url))
 
   return (
     <Sidebar collapsible="icon" className="overflow-hidden *:data-[sidebar=sidebar]:flex-row" {...props}>
@@ -69,7 +69,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton size="lg" asChild className="md:h-8 md:p-0">
-                <NavLink to="/">
+                <NavLink to="/app">
                   <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
                     <Command className="size-4" />
                   </div>

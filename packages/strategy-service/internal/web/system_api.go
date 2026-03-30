@@ -34,40 +34,67 @@ func (a *API) install(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, ok := cut(r.URL.Path, "/api/system/tools/", "/install")
+	id, action, ok := toolAction(r.URL.Path)
 	if !ok {
 		write(w, http.StatusNotFound, "task not found", nil)
 		return
 	}
 
-	name, err := url.PathUnescape(id)
-	if err != nil {
+	name, parseErr := url.PathUnescape(id)
+	if parseErr != nil {
 		write(w, http.StatusBadRequest, "invalid tool id", nil)
 		return
 	}
 
-	slog.Info("tool install request", "tool", name)
-	task, err := a.svc.Install(context.Background(), name)
+	slog.Info("tool action request", "tool", name, "action", action)
+
+	var (
+		task tool.Task
+		err  error
+	)
+	switch action {
+	case "install":
+		task, err = a.svc.Install(context.Background(), name)
+	case "uninstall":
+		task, err = a.svc.Uninstall(context.Background(), name)
+	case "reinstall":
+		task, err = a.svc.Reinstall(context.Background(), name)
+	default:
+		write(w, http.StatusNotFound, "task not found", nil)
+		return
+	}
+
 	if err == nil {
-		slog.Info("tool install started", "tool", name, "task_id", task.ID)
+		slog.Info("tool action started", "tool", name, "action", action, "task_id", task.ID)
 		write(w, http.StatusOK, "ok", task)
 		return
 	}
 
 	if errors.Is(err, tool.ErrBusy()) {
-		slog.Warn("tool install busy", "tool", name)
+		slog.Warn("tool action busy", "tool", name, "action", action)
 		write(w, http.StatusConflict, err.Error(), nil)
 		return
 	}
 
 	if errors.Is(err, tool.ErrTool()) {
-		slog.Warn("tool install unsupported", "tool", name)
+		slog.Warn("tool action unsupported", "tool", name, "action", action)
 		write(w, http.StatusBadRequest, err.Error(), nil)
 		return
 	}
 
-	slog.Error("tool install failed", "tool", name, "error", err)
+	slog.Error("tool action failed", "tool", name, "action", action, "error", err)
 	write(w, http.StatusBadRequest, err.Error(), nil)
+}
+
+func toolAction(path string) (string, string, bool) {
+	for _, action := range []string{"install", "uninstall", "reinstall"} {
+		id, ok := cut(path, "/api/system/tools/", "/"+action)
+		if ok {
+			return id, action, true
+		}
+	}
+
+	return "", "", false
 }
 
 func (a *API) task(w http.ResponseWriter, r *http.Request) {

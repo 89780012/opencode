@@ -9,7 +9,7 @@ export function NavUser() {
     <SidebarMenu>
       <SidebarMenuItem>
         <SidebarMenuButton asChild size="lg" className="md:h-8 md:p-0">
-          <NavLink to="/settings/appearance">
+          <NavLink to="/app/settings/appearance">
             <div className="bg-sidebar-primary text-sidebar-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-lg">
               <Settings2 className="size-4" />
             </div>

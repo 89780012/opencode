@@ -73,7 +73,7 @@ func (s *Service) state(ctx context.Context, id string) State {
 			st.Message = task.Output
 		}
 		if st.Message == "" {
-			st.Message = "安装进行中"
+			st.Message = "任务执行中"
 		}
 		return st
 	}

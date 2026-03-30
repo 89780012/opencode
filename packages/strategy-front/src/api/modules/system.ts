@@ -6,6 +6,7 @@ import type {
   SystemConfig,
   SystemLog,
   SystemVersion,
+  ToolAction,
   ToolID,
   ToolState,
 } from "@/types/system"
@@ -37,6 +38,18 @@ export const systemApi = {
 
   install(id: ToolID) {
     return request.post<InstallTask>(`/system/tools/${encodeURIComponent(id)}/install`)
+  },
+
+  action(id: ToolID, action: ToolAction) {
+    return request.post<InstallTask>(`/system/tools/${encodeURIComponent(id)}/${encodeURIComponent(action)}`)
+  },
+
+  uninstall(id: ToolID) {
+    return systemApi.action(id, "uninstall")
+  },
+
+  reinstall(id: ToolID) {
+    return systemApi.action(id, "reinstall")
   },
 
   task(id: string) {

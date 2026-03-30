@@ -15,13 +15,13 @@ const nav = [
   {
     icon: PlugZap,
     title: "概览",
-    url: "/providers/overview",
+    url: "/app/providers/overview",
     text: "管理全局提供商连接、认证方式，以及自定义的 OpenAI 兼容提供商。",
   },
   {
     icon: Bot,
     title: "模型",
-    url: "/providers/models",
+    url: "/app/providers/models",
     text: "浏览全局提供商模型目录，并控制当前前端展示哪些模型。",
   },
 ]

@@ -1,7 +1,8 @@
 import { Suspense, lazy } from "react"
-import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom"
+import { createBrowserRouter, Navigate, RouterProvider, useLocation } from "react-router-dom"
 
-const LayoutPage = lazy(() => import("@/pages/layout"))
+const StartupPage = lazy(() => import("@/pages/startup"))
+const AppShellPage = lazy(() => import("@/pages/app-shell"))
 const IndexPage = lazy(() => import("@/pages/index"))
 const InstallerPage = lazy(() => import("@/pages/installer"))
 const SettingsPage = lazy(() => import("@/pages/settings"))
@@ -15,10 +16,20 @@ const ProviderOverviewPage = lazy(() => import("@/pages/providers-overview"))
 const ProviderModelsPage = lazy(() => import("@/pages/providers-models"))
 const SkillPage = lazy(() => import("@/pages/skills"))
 
+function LegacyPage() {
+  const route = useLocation()
+
+  return <Navigate to={`/app${route.pathname}${route.search}${route.hash}`} replace />
+}
+
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <LayoutPage />,
+    element: <StartupPage />,
+  },
+  {
+    path: "/app",
+    element: <AppShellPage />,
     children: [
       {
         index: true,
@@ -44,7 +55,7 @@ const router = createBrowserRouter([
       },
       {
         path: "installer",
-        element: <Navigate to="/settings/tools" replace />,
+        element: <Navigate to="/app/settings/tools" replace />,
       },
       {
         path: "settings",
@@ -85,6 +96,34 @@ const router = createBrowserRouter([
         element: <SkillPage />,
       },
     ],
+  },
+  {
+    path: "/providers/*",
+    element: <LegacyPage />,
+  },
+  {
+    path: "/settings/*",
+    element: <LegacyPage />,
+  },
+  {
+    path: "/mcp/*",
+    element: <LegacyPage />,
+  },
+  {
+    path: "/agents/*",
+    element: <LegacyPage />,
+  },
+  {
+    path: "/skills/*",
+    element: <LegacyPage />,
+  },
+  {
+    path: "/installer/*",
+    element: <LegacyPage />,
+  },
+  {
+    path: "*",
+    element: <Navigate to="/" replace />,
   },
 ])
 
