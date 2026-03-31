@@ -1,4 +1,4 @@
-import { FolderCode, LoaderCircle, RefreshCw } from "lucide-react"
+import { FolderCode, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { truncateString } from "@/lib/utils"
 import type { LocalWorkspace } from "@/types/workspace"
@@ -9,10 +9,8 @@ interface Props {
   error: string | null
   workspaces: LocalWorkspace[]
   selectedPath: string | null
-  initingPath?: string | null
   onRetry: () => void
   onSelect: (workspace: LocalWorkspace) => void
-  onInitGit: (workspace: LocalWorkspace) => void
 }
 
 export function LocalWorkspaceList(props: Props) {
@@ -67,39 +65,7 @@ export function LocalWorkspaceList(props: Props) {
         >
           <FolderCode className="size-4 shrink-0 text-muted-foreground" />
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <p className="min-w-0 flex-1 truncate text-sm font-medium">{workspace.name}</p>
-              <span
-                className={
-                  workspace.vcs === "git"
-                    ? "shrink-0 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] leading-none text-emerald-700"
-                    : "shrink-0"
-                }
-              >
-                {workspace.vcs === "git" ? (
-                  "Git"
-                ) : (
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      props.onInitGit(workspace)
-                    }}
-                    className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] leading-none text-amber-700 transition-colors hover:bg-amber-100"
-                    disabled={props.initingPath === workspace.path}
-                  >
-                    {props.initingPath === workspace.path ? (
-                      <span className="inline-flex items-center gap-1">
-                        <LoaderCircle className="size-3 animate-spin" />
-                        初始化git
-                      </span>
-                    ) : (
-                      "初始化git"
-                    )}
-                  </button>
-                )}
-              </span>
-            </div>
+            <p className="truncate text-sm font-medium">{workspace.name}</p>
             {workspace.keywords.length > 0 ? (
               <div className="mt-1 flex flex-wrap gap-1">
                 {workspace.keywords.map((keyword) => (

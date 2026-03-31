@@ -14,17 +14,17 @@ export const workspaceApi = {
     return request.get<LocalWorkspaceResponse>("/workspace/list");
   },
 
-  createWorkspace(name: string, git?: boolean) {
+  createWorkspace(name: string) {
     return request.post<CreateWorkspaceResponse, CreateWorkspaceRequest>(
       "/workspace/create",
-      { name, git },
+      { name, git: true },
     );
   },
 
-  openWorkspace(path: string, git?: boolean) {
+  openWorkspace(path: string) {
     return request.post<OpenWorkspaceResponse, OpenWorkspaceRequest>(
       "/workspace/open",
-      { path, git },
+      { path, git: true },
     );
   },
 

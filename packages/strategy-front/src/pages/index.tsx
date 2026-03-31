@@ -19,7 +19,6 @@ import { useChatReview } from "@/hooks/use-chat-review"
 import { useChatSessionDetail } from "@/hooks/use-chat-session-detail"
 import { useChatSessions } from "@/hooks/use-chat-sessions"
 import { useChatTodo } from "@/hooks/use-chat-todo"
-import { useProjectInfo } from "@/hooks/use-project-info"
 import { useProjectComposer } from "@/hooks/use-project-composer"
 import { usePromptSubmit } from "@/hooks/use-prompt-submit"
 import { useSessionDraft } from "@/hooks/use-session-draft"
@@ -51,7 +50,6 @@ export default function Home() {
   )
   const { messages, status, eventErr, loading: detail } = useChatSessionDetail(path, selectedSessionId)
   const review = useChatReview(path, selectedSessionId, !!workspace && open && tab === "review")
-  const projectInfo = useProjectInfo(path, !!workspace && open)
   const permission = useChatPermission(path, selectedSessionId)
   const question = useChatQuestion(path, selectedSessionId)
   const { submitting, submit } = usePromptSubmit({
@@ -287,7 +285,6 @@ export default function Home() {
                 sessionId={selectedSessionId}
                 tab={tab}
                 review={review}
-                project={projectInfo}
                 onTab={setTab}
                 onClose={() => setOpen(false)}
               />
@@ -308,7 +305,6 @@ export default function Home() {
                 sessionId={selectedSessionId}
                 tab={tab}
                 review={review}
-                project={projectInfo}
                 onTab={setTab}
                 onClose={() => setOpen(false)}
               />

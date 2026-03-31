@@ -2,7 +2,6 @@ import { SessionReviewPanel } from "@/components/review/session-review-panel"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { WorkspaceEditorPane } from "@/components/workspace/workspace-editor-pane"
 import type { ReviewMode } from "@/hooks/use-chat-review"
-import type { ProjectInfo } from "@/types/project"
 import type { ChatFileDiff } from "@/types/chat"
 import type { LocalWorkspace } from "@/types/workspace"
 
@@ -22,13 +21,6 @@ interface Props {
     open: (path: string) => void
     refresh: () => void
     setMode: (mode: ReviewMode) => void
-  }
-  project: {
-    data: ProjectInfo | null
-    loading: boolean
-    err: string | null
-    initing: boolean
-    init: () => Promise<unknown>
   }
   onTab: (tab: WorkspaceTab) => void
   onClose?: () => void
