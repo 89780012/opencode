@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -313,7 +314,7 @@ func (m *Manager) spawn() error {
 	if m.cfg.Cwd != "" {
 		cmd.Dir = m.cfg.Cwd
 	}
-	cmd.Env = env()
+	cmd.Env = env(m.cfg)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -591,11 +592,68 @@ func (m *Manager) healthy() bool {
 	return m.health(ctx) == nil
 }
 
-func env() []string {
+func env(cfg Config) []string {
 	out := append([]string{}, os.Environ()...)
 	out = set(out, "OPENCODE_CLIENT", "strategy-service")
 	out = set(out, "OPENCODE_SERVER_PASSWORD", "")
 	out = set(out, "OPENCODE_SERVER_USERNAME", "")
+	out = gitenv(out, cfg)
+	return out
+}
+
+func gitenv(all []string, cfg Config) []string {
+	bin := strings.TrimSpace(cfg.GitBin)
+	if bin == "" {
+		return all
+	}
+
+	dir := filepath.Dir(bin)
+	root := dir
+	base := strings.ToLower(filepath.Base(dir))
+	if base == "cmd" || base == "bin" {
+		root = filepath.Dir(dir)
+	}
+
+	parts := []string{}
+	for _, item := range []string{
+		filepath.Join(root, "cmd"),
+		filepath.Join(root, "bin"),
+		filepath.Join(root, "usr", "bin"),
+		filepath.Join(root, "mingw64", "bin"),
+		filepath.Join(root, "mingw64", "libexec", "git-core"),
+	} {
+		if info, err := os.Stat(item); err == nil && info.IsDir() {
+			parts = append(parts, item)
+		}
+	}
+
+	path := ""
+	out := make([]string, 0, len(all)+2)
+	for _, item := range all {
+		upper := strings.ToUpper(item)
+		if strings.HasPrefix(upper, "PATH=") {
+			path = item[5:]
+			continue
+		}
+		if strings.HasPrefix(upper, "GIT_TEMPLATE_DIR=") {
+			continue
+		}
+		out = append(out, item)
+	}
+
+	if path != "" {
+		parts = append(parts, path)
+	}
+	if len(parts) > 0 {
+		out = append(out, "PATH="+strings.Join(parts, string(os.PathListSeparator)))
+	}
+
+	tpl := filepath.Join(root, "mingw64", "share", "git-core", "templates")
+	if info, err := os.Stat(tpl); err == nil && info.IsDir() {
+		out = append(out, "GIT_TEMPLATE_DIR="+tpl)
+	}
+
+	out = set(out, "GIT_EXEC_PATH", filepath.Join(root, "mingw64", "libexec", "git-core"))
 	return out
 }
 

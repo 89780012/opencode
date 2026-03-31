@@ -1,39 +1,24 @@
-export type ToolID = "git" | "node" | "npm" | "opencode"
-export type ToolAction = "install" | "uninstall" | "reinstall"
-
-export type ToolStatus = "installed" | "missing" | "installing" | "failed"
-
-export type TaskStatus = "pending" | "running" | "success" | "failed"
-
 export type ThemeMode = "system" | "light" | "dark"
 
 export type ThemeAccent = "ocean" | "forest" | "ember" | "rose" | "graphite"
 
-export interface ToolState {
-  id: ToolID
+export interface StartupTool {
+  id: "git" | "opencode"
   label: string
   installed: boolean
+  status: "installed" | "missing" | "failed"
   version?: string
   path?: string
-  status: ToolStatus
+  source?: "config" | "builtin" | "system"
   message?: string
-  task_id?: string
   updated_at: string
 }
 
-export interface InstallTask {
-  id: string
-  tool: ToolID
-  status: TaskStatus
-  step: number
-  total: number
-  title?: string
-  started_at: string
-  finished_at?: string
-  exit_code?: number
-  error?: string
-  output?: string
-  log?: string[]
+export interface StartupState {
+  ready: boolean
+  summary: string
+  opencode: StartupTool
+  git: StartupTool
 }
 
 export interface SystemConfig {

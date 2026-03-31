@@ -5,13 +5,13 @@ import (
 
 	cfg "strategy-service/internal/config"
 	"strategy-service/internal/oprun"
+	rt "strategy-service/internal/runtime"
 	"strategy-service/internal/smartx"
-	"strategy-service/internal/tool"
 	"strategy-service/internal/workspace"
 )
 
 type API struct {
-	svc *tool.Service
+	rt  *rt.Service
 	ws  *workspace.Service
 	op  *oprun.Manager
 	cfg *cfg.Store
@@ -19,10 +19,10 @@ type API struct {
 }
 
 // NewAPI wires the HTTP handlers to the runtime services.
-func NewAPI(svc *tool.Service, op *oprun.Manager, cfg *cfg.Store, sx *smartx.Service) *API {
+func NewAPI(run *rt.Service, op *oprun.Manager, cfg *cfg.Store, sx *smartx.Service) *API {
 	return &API{
-		svc: svc,
-		ws:  workspace.NewService(),
+		rt:  run,
+		ws:  workspace.NewService(run),
 		op:  op,
 		cfg: cfg,
 		sx:  sx,
@@ -41,9 +41,8 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/workspace/open", a.workspaceOpen)
 	mux.HandleFunc("/api/workspace/files", a.workspaceFiles)
 	mux.HandleFunc("/api/workspace/file-content", a.workspaceFileContent)
-	mux.HandleFunc("/api/system/tools", a.tools)
-	mux.HandleFunc("/api/system/tools/", a.install)
-	mux.HandleFunc("/api/system/tasks/", a.task)
+	mux.HandleFunc("/api/system/startup", a.startup)
+	mux.HandleFunc("/api/system/startup/prepare", a.startupPrepare)
 	mux.HandleFunc("/api/system/config", a.config)
 	mux.HandleFunc("/api/system/version", a.version)
 	mux.HandleFunc("/api/system/logs", a.logs)

@@ -1,6 +1,8 @@
 package workspace
 
 import (
+	"context"
+	"errors"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -8,12 +10,16 @@ import (
 	"strings"
 
 	"strategy-service/internal/asset"
+	"strategy-service/internal/proc"
+	rt "strategy-service/internal/runtime"
 )
 
-type Service struct{}
+type Service struct {
+	rt *rt.Service
+}
 
-func NewService() *Service {
-	return &Service{}
+func NewService(rt *rt.Service) *Service {
+	return &Service{rt: rt}
 }
 
 func local(path string) Local {
@@ -44,10 +50,93 @@ func (s *Service) List() (ListResult, error) {
 	}, nil
 }
 
-func initGit(dir string) error {
-	cmd := exec.Command("git", "init", "--quiet")
+func (s *Service) initGit(ctx context.Context, dir string) error {
+	bin := "git"
+	src := "system"
+	env := os.Environ()
+	if s.rt != nil {
+		row, err := s.rt.Resolve(ctx, "git")
+		if err != nil {
+			return err
+		}
+		if !row.Found {
+			return os.ErrNotExist
+		}
+		bin = row.Path
+		src = string(row.Source)
+		env = gitEnv(env, row)
+	}
+
+	slog.Info("workspace git init", "bin", bin, "dir", dir, "source", src)
+	cmd := exec.CommandContext(ctx, bin, "init", "--quiet")
 	cmd.Dir = dir
-	return cmd.Run()
+	cmd.Env = env
+	proc.Hide(cmd)
+	out, err := cmd.CombinedOutput()
+	text := strings.TrimSpace(string(out))
+	if err == nil {
+		if text != "" {
+			slog.Info("workspace git init output", "dir", dir, "output", text)
+		}
+		return nil
+	}
+	if text != "" {
+		slog.Error("workspace git init output", "bin", bin, "dir", dir, "source", src, "output", text)
+		return errors.New(text)
+	}
+	return err
+}
+
+func gitEnv(env []string, row rt.Result) []string {
+	if row.Source != rt.SourceBuiltin {
+		return env
+	}
+
+	root := filepath.Dir(row.Path)
+	if filepath.Base(root) == "cmd" || filepath.Base(root) == "bin" {
+		root = filepath.Dir(root)
+	}
+
+	list := []string{
+		filepath.Join(root, "cmd"),
+		filepath.Join(root, "bin"),
+		filepath.Join(root, "usr", "bin"),
+		filepath.Join(root, "mingw64", "bin"),
+		filepath.Join(root, "mingw64", "libexec", "git-core"),
+	}
+
+	path := ""
+	out := make([]string, 0, len(env)+2)
+	for _, item := range env {
+		if strings.HasPrefix(strings.ToUpper(item), "PATH=") {
+			path = strings.TrimPrefix(item, item[:5])
+			continue
+		}
+		if strings.HasPrefix(strings.ToUpper(item), "GIT_TEMPLATE_DIR=") {
+			continue
+		}
+		out = append(out, item)
+	}
+
+	parts := make([]string, 0, len(list)+1)
+	for _, item := range list {
+		if info, err := os.Stat(item); err == nil && info.IsDir() {
+			parts = append(parts, item)
+		}
+	}
+	if path != "" {
+		parts = append(parts, path)
+	}
+	if len(parts) > 0 {
+		out = append(out, "PATH="+strings.Join(parts, string(os.PathListSeparator)))
+	}
+
+	tpl := filepath.Join(root, "mingw64", "share", "git-core", "templates")
+	if info, err := os.Stat(tpl); err == nil && info.IsDir() {
+		out = append(out, "GIT_TEMPLATE_DIR="+tpl)
+	}
+
+	return out
 }
 
 // 创建工作空间
@@ -91,7 +180,7 @@ func (s *Service) Create(name string, git bool) (CreateResult, error) {
 	}
 
 	if git {
-		err = initGit(path)
+		err = s.initGit(context.Background(), path)
 		if err != nil {
 			slog.Error("workspace create: git init failed", "path", path, "error", err)
 			_ = os.RemoveAll(path)
@@ -136,7 +225,7 @@ func (s *Service) Open(path string, git bool) (OpenResult, error) {
 	}
 
 	if git {
-		err = initGit(dir)
+		err = s.initGit(context.Background(), dir)
 		if err != nil {
 			slog.Error("workspace open: git init failed", "dir", dir, "error", err)
 			return OpenResult{}, err

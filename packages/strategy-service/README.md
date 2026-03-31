@@ -6,11 +6,11 @@ Cross-platform Go service for `strategy-front`, with Windows-first install flows
 
 - Serves the built `packages/strategy-front/dist` files with SPA fallback
 - Supports embedded frontend assets for single-binary builds
-- Exposes `/api/system/tools` for local tool detection
-- Exposes install tasks for `node`, `npm`, and `opencode`
+- Exposes `/api/system/startup` for startup runtime detection
+- Exposes `/api/system/startup/prepare` for builtin runtime preparation
 - Exposes `/api/system/ipc/status` for local IPC health and account-cache status
 - Hosts SmartX and ideContinue IPC endpoints with platform-native transports
-- Keeps explicit task states for install success and failure
+- Keeps startup runtime selection focused on `opencode` and `git`
 
 ## Run
 
@@ -18,7 +18,7 @@ Cross-platform Go service for `strategy-front`, with Windows-first install flows
 
 ```bash
 cd packages/strategy-front
-npm run build
+bun run build
 ```
 
 2. Start the Go service:
@@ -180,8 +180,8 @@ When multiple accounts are cached, the service replies with the last logged-in a
 
 ## Install strategy
 
-- Auto-install is still Windows-first. Cross-platform binaries can serve the UI and manage existing tools, but one-click install flows have not been generalized beyond the current package-manager strategy yet.
-- `node` and `npm`: prefer `winget`, then `scoop`, then `choco`
-- `opencode`: prefer `npm install -g opencode-ai`, then `scoop`, then `choco`
-
-If the install command exits successfully but the binary is still missing, the task is marked as failed and the tool remains in a failed or missing state.
+- Startup runtime management now targets only `git` and `opencode`.
+- The service first checks configured overrides, then activated builtin runtimes, then system `PATH`.
+- Builtin runtimes can be shipped as directories or `.zip` archives under `packages/strategy-service/runtime/<target>/`.
+- When a builtin package exists, startup preparation activates it into the user cache directory and uses that path directly.
+- `git` is treated as a dependency of `opencode`: system Git is preferred, otherwise builtin Git is injected at runtime.

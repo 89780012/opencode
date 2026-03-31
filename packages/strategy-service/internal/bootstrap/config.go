@@ -13,6 +13,7 @@ type Config struct {
 	Host     string
 	Port     string
 	Dist     string
+	Runtime  string
 	Opencode OpencodeConfig
 	Platform string
 	Account  string //账号
@@ -24,6 +25,8 @@ type OpencodeConfig struct {
 	Enabled      bool
 	Startup      string
 	Bin          string
+	GitBin       string
+	GitSource    string
 	Host         string
 	Port         int
 	Cwd          string
@@ -34,6 +37,7 @@ func LoadConfig() Config {
 	host := text("HOST", "127.0.0.1")
 	port := text("PORT", "5000")
 	dist := text("STRATEGY_FRONT_DIST", "../strategy-front/dist")
+	root := text("STRATEGY_RUNTIME_DIR", "")
 	platform := text("PLATFORM", runtime.GOOS)
 	account := text("ACCOUNT", "")
 	windowId := text("WINDOWID", "")
@@ -43,6 +47,7 @@ func LoadConfig() Config {
 		Host:     host,
 		Port:     port,
 		Dist:     dist,
+		Runtime:  root,
 		Platform: platform,
 		LogDir:   logDir,
 		Opencode: OpencodeConfig{

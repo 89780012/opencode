@@ -1,19 +1,20 @@
 import { request } from "@/api/client"
 import type {
-  InstallTask,
   OpencodeLog,
   OpencodeState,
+  StartupState,
   SystemConfig,
   SystemLog,
   SystemVersion,
-  ToolAction,
-  ToolID,
-  ToolState,
 } from "@/types/system"
 
 export const systemApi = {
-  list() {
-    return request.get<ToolState[]>("/system/tools")
+  startup() {
+    return request.get<StartupState>("/system/startup")
+  },
+
+  startupPrepare() {
+    return request.post<StartupState>("/system/startup/prepare")
   },
 
   config() {
@@ -34,26 +35,6 @@ export const systemApi = {
       query.set("tail", `${tail}`)
     }
     return request.get<SystemLog>(`/system/logs?${query.toString()}`)
-  },
-
-  install(id: ToolID) {
-    return request.post<InstallTask>(`/system/tools/${encodeURIComponent(id)}/install`)
-  },
-
-  action(id: ToolID, action: ToolAction) {
-    return request.post<InstallTask>(`/system/tools/${encodeURIComponent(id)}/${encodeURIComponent(action)}`)
-  },
-
-  uninstall(id: ToolID) {
-    return systemApi.action(id, "uninstall")
-  },
-
-  reinstall(id: ToolID) {
-    return systemApi.action(id, "reinstall")
-  },
-
-  task(id: string) {
-    return request.get<InstallTask>(`/system/tasks/${encodeURIComponent(id)}`)
   },
 
   opencodeStatus() {

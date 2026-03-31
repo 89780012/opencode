@@ -4,7 +4,6 @@ import { createBrowserRouter, Navigate, RouterProvider, useLocation } from "reac
 const StartupPage = lazy(() => import("@/pages/startup"))
 const AppShellPage = lazy(() => import("@/pages/app-shell"))
 const IndexPage = lazy(() => import("@/pages/index"))
-const InstallerPage = lazy(() => import("@/pages/installer"))
 const SettingsPage = lazy(() => import("@/pages/settings"))
 const SettingsAppearancePage = lazy(() => import("@/pages/settings-appearance"))
 const SettingsRuntimePage = lazy(() => import("@/pages/settings-runtime"))
@@ -55,7 +54,7 @@ const router = createBrowserRouter([
       },
       {
         path: "installer",
-        element: <Navigate to="/app/settings/tools" replace />,
+        element: <Navigate to="/app/settings/runtime" replace />,
       },
       {
         path: "settings",
@@ -76,10 +75,6 @@ const router = createBrowserRouter([
           {
             path: "logs",
             element: <SettingsLogsPage />,
-          },
-          {
-            path: "tools",
-            element: <InstallerPage />,
           },
         ],
       },

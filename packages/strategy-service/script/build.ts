@@ -67,6 +67,7 @@ for (const item of jobs) {
     GOOS: item.goos,
   })
   const sum = await hash(bin)
+  await stageRuntime(root, dir, item.id)
   await fs.writeFile(`${bin}.sha256`, `${sum}  ${path.basename(bin)}\n`)
   sums.push(`${sum}  ${slash(path.relative(out, bin))}`)
   built.push({
@@ -105,4 +106,16 @@ async function hash(file: string) {
 
 function slash(file: string) {
   return file.replaceAll("\\", "/")
+}
+
+async function stageRuntime(root: string, dir: string, id: string) {
+  const src = path.join(root, "runtime", id)
+  const dst = path.join(dir, "runtime")
+  const stat = await fs.stat(src).catch(() => null)
+  if (!stat?.isDirectory()) {
+    return
+  }
+
+  await fs.rm(dst, { force: true, recursive: true })
+  await fs.cp(src, dst, { recursive: true })
 }

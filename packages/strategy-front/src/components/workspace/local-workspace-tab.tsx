@@ -1,9 +1,6 @@
 import { FolderOpen, Plus, RefreshCw } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
-import { projectApi } from "@/api/modules/project"
-import { workspaceApi } from "@/api/modules/workspace"
-import { useWorkspaceList } from "@/data/global-data-provider"
 import { LocalWorkspaceList } from "@/components/workspace/local-workspace-list"
 import { Button } from "@/components/ui/button"
 import {
@@ -17,10 +14,21 @@ import {
 import { Input } from "@/components/ui/input"
 import { SidebarContent, SidebarGroup, SidebarGroupContent, SidebarHeader } from "@/components/ui/sidebar"
 import { Switch } from "@/components/ui/switch"
+import { projectApi } from "@/api/modules/project"
+import { workspaceApi } from "@/api/modules/workspace"
+import { useWorkspaceList } from "@/data/global-data-provider"
 import type { LocalWorkspace } from "@/types/workspace"
 
 interface Props {
   onPick?: () => void
+}
+
+function note(err: unknown, text: string) {
+  if (err instanceof Error && err.message) {
+    return err.message
+  }
+
+  return text
 }
 
 export function LocalWorkspaceTab(props: Props) {
@@ -45,7 +53,7 @@ export function LocalWorkspaceTab(props: Props) {
       props.onPick?.()
     } catch (err) {
       console.error("Failed to open workspace", err)
-      toast.error("Failed to open workspace")
+      toast.error(note(err, "打开工作区失败"))
     }
   }
 
@@ -66,10 +74,10 @@ export function LocalWorkspaceTab(props: Props) {
     try {
       await projectApi.initGit(item.path)
       await refresh()
-      toast.success(`git初始化: ${item.name}`)
+      toast.success(`Git 初始化完成: ${item.name}`)
     } catch (err) {
       console.error("Failed to init git", err)
-      toast.error("初始化git失败")
+      toast.error(note(err, "初始化 Git 失败"))
     } finally {
       setIniting(null)
     }
@@ -86,7 +94,6 @@ export function LocalWorkspaceTab(props: Props) {
     try {
       const data = await workspaceApi.createWorkspace(value, gitNew)
       const next = await workspaceApi.openWorkspace(data.workspace.path, false)
-      //await ensureGit(data.workspace.path, gitNew)
       await refresh()
       select(next.workspace)
       props.onPick?.()
@@ -96,7 +103,7 @@ export function LocalWorkspaceTab(props: Props) {
       toast.success(`工作区已创建: ${data.workspace.name}`)
     } catch (err) {
       console.error("Failed to create workspace", err)
-      toast.error("创建工作区失败")
+      toast.error(note(err, "创建工作区失败"))
     } finally {
       setBusy(false)
     }
@@ -157,7 +164,7 @@ export function LocalWorkspaceTab(props: Props) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>创建工作区</DialogTitle>
-            <DialogDescription>在 {basePath || "~/.xtp-smart/plugins"} 创建后打开它.</DialogDescription>
+            <DialogDescription>在 {basePath || "~/.xtp-smart/plugins"} 创建后立即打开。</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <Input
@@ -174,9 +181,9 @@ export function LocalWorkspaceTab(props: Props) {
             />
             <label className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm">
               <div className="min-w-0">
-                <div className="font-medium">初始化git仓库</div>
+                <div className="font-medium">初始化 Git 仓库</div>
                 <div className="text-xs text-muted-foreground">
-                  在创建工作区后运行 <code>git init</code>
+                  创建工作区后自动执行 <code>git init</code>
                 </div>
               </div>
               <Switch checked={gitNew} onCheckedChange={setGitNew} />
@@ -202,9 +209,9 @@ export function LocalWorkspaceTab(props: Props) {
           <div className="space-y-3">
             <label className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm">
               <div className="min-w-0">
-                <div className="font-medium">初始化git仓库</div>
+                <div className="font-medium">初始化 Git 仓库</div>
                 <div className="text-xs text-muted-foreground">
-                  在创建工作区后运行 <code>git init</code>
+                  打开工作区时自动执行 <code>git init</code>
                 </div>
               </div>
               <Switch checked={gitOpen} onCheckedChange={setGitOpen} />

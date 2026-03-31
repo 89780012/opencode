@@ -6,7 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"net/url"
+	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -14,110 +14,62 @@ import (
 	cfg "strategy-service/internal/config"
 	"strategy-service/internal/logs"
 	"strategy-service/internal/meta"
+	rt "strategy-service/internal/runtime"
 	"strategy-service/internal/smartx"
-	"strategy-service/internal/tool"
 )
 
-func (a *API) tools(w http.ResponseWriter, r *http.Request) {
+type startupTool struct {
+	ID        string    `json:"id"`
+	Label     string    `json:"label"`
+	Installed bool      `json:"installed"`
+	Status    string    `json:"status"`
+	Source    string    `json:"source,omitempty"`
+	Path      string    `json:"path,omitempty"`
+	Version   string    `json:"version,omitempty"`
+	Message   string    `json:"message,omitempty"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type startupState struct {
+	Ready    bool        `json:"ready"`
+	Summary  string      `json:"summary"`
+	Opencode startupTool `json:"opencode"`
+	Git      startupTool `json:"git"`
+}
+
+func (a *API) startup(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
 		return
 	}
 
-	slog.Debug("tools list request")
-	write(w, http.StatusOK, "ok", a.svc.List(r.Context()))
+	write(w, http.StatusOK, "ok", a.inspectStartup(r.Context()))
 }
 
-func (a *API) install(w http.ResponseWriter, r *http.Request) {
+func (a *API) startupPrepare(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
 		return
 	}
 
-	id, action, ok := toolAction(r.URL.Path)
-	if !ok {
-		write(w, http.StatusNotFound, "task not found", nil)
+	state := a.inspectStartup(r.Context())
+	if state.Opencode.Installed {
+		write(w, http.StatusOK, "ok", state)
 		return
 	}
 
-	name, parseErr := url.PathUnescape(id)
-	if parseErr != nil {
-		write(w, http.StatusBadRequest, "invalid tool id", nil)
+	if !a.rt.Has("opencode") {
+		write(w, http.StatusServiceUnavailable, "builtin opencode runtime not found", state)
 		return
 	}
 
-	slog.Info("tool action request", "tool", name, "action", action)
-
-	var (
-		task tool.Task
-		err  error
-	)
-	switch action {
-	case "install":
-		task, err = a.svc.Install(context.Background(), name)
-	case "uninstall":
-		task, err = a.svc.Uninstall(context.Background(), name)
-	case "reinstall":
-		task, err = a.svc.Reinstall(context.Background(), name)
-	default:
-		write(w, http.StatusNotFound, "task not found", nil)
+	if _, err := a.rt.Ensure(r.Context(), "opencode"); err != nil {
+		slog.Error("startup prepare failed", "tool", "opencode", "error", err)
+		write(w, http.StatusServiceUnavailable, err.Error(), a.inspectStartup(r.Context()))
 		return
 	}
 
-	if err == nil {
-		slog.Info("tool action started", "tool", name, "action", action, "task_id", task.ID)
-		write(w, http.StatusOK, "ok", task)
-		return
-	}
-
-	if errors.Is(err, tool.ErrBusy()) {
-		slog.Warn("tool action busy", "tool", name, "action", action)
-		write(w, http.StatusConflict, err.Error(), nil)
-		return
-	}
-
-	if errors.Is(err, tool.ErrTool()) {
-		slog.Warn("tool action unsupported", "tool", name, "action", action)
-		write(w, http.StatusBadRequest, err.Error(), nil)
-		return
-	}
-
-	slog.Error("tool action failed", "tool", name, "action", action, "error", err)
-	write(w, http.StatusBadRequest, err.Error(), nil)
-}
-
-func toolAction(path string) (string, string, bool) {
-	for _, action := range []string{"install", "uninstall", "reinstall"} {
-		id, ok := cut(path, "/api/system/tools/", "/"+action)
-		if ok {
-			return id, action, true
-		}
-	}
-
-	return "", "", false
-}
-
-func (a *API) task(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
-		return
-	}
-
-	id := strings.TrimPrefix(r.URL.Path, "/api/system/tasks/")
-	id, err := url.PathUnescape(id)
-	if err != nil || id == "" {
-		write(w, http.StatusBadRequest, "invalid task id", nil)
-		return
-	}
-
-	task, ok := a.svc.Get(id)
-	if !ok {
-		slog.Debug("task not found", "task_id", id)
-		write(w, http.StatusNotFound, "task not found", nil)
-		return
-	}
-
-	write(w, http.StatusOK, "ok", task)
+	write(w, http.StatusOK, "ok", a.inspectStartup(r.Context()))
 }
 
 func (a *API) config(w http.ResponseWriter, r *http.Request) {
@@ -151,6 +103,83 @@ func (a *API) config(w http.ResponseWriter, r *http.Request) {
 	}
 
 	write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
+}
+
+func (a *API) inspectStartup(ctx context.Context) startupState {
+	op := a.inspectRuntime(ctx, "opencode")
+	git := a.inspectRuntime(ctx, "git")
+
+	out := startupState{
+		Ready:    op.Installed,
+		Opencode: op,
+		Git:      git,
+	}
+
+	if !op.Installed {
+		out.Summary = "系统会优先准备 OpenCode，确保 AI 策略研发环境可以直接进入。"
+		return out
+	}
+	if git.Source == string(rt.SourceSystem) {
+		out.Summary = "已检测到系统 Git，启动 OpenCode 时会自动继承系统 Git。"
+		return out
+	}
+	if git.Source == string(rt.SourceBuiltin) {
+		out.Summary = "未检测到系统 Git，启动 OpenCode 时会自动注入内置 Git。"
+		return out
+	}
+	out.Summary = "AI 策略研发环境已准备完成。"
+	return out
+}
+
+func (a *API) inspectRuntime(ctx context.Context, id string) startupTool {
+	out := startupTool{
+		ID:        id,
+		Label:     label(id),
+		Status:    "missing",
+		UpdatedAt: time.Now(),
+	}
+
+	row, err := a.rt.Resolve(ctx, id)
+	if err != nil {
+		out.Status = "failed"
+		out.Message = err.Error()
+		return out
+	}
+
+	if !row.Found {
+		out.Message = row.Message
+		return out
+	}
+
+	out.Installed = true
+	out.Status = "installed"
+	out.Source = string(row.Source)
+	out.Path = row.Path
+	out.Version = version(ctx, row.Path)
+	return out
+}
+
+func version(ctx context.Context, path string) string {
+	sub, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(sub, path, "--version")
+	out, err := cmd.CombinedOutput()
+	text := strings.TrimSpace(string(out))
+	if err != nil {
+		return text
+	}
+	return text
+}
+
+func label(id string) string {
+	if id == "git" {
+		return "Git"
+	}
+	if id == "opencode" {
+		return "OpenCode"
+	}
+	return id
 }
 
 func (a *API) version(w http.ResponseWriter, r *http.Request) {

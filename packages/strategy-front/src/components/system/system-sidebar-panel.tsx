@@ -1,4 +1,4 @@
-import { Boxes, Palette, PlayCircle, ScrollText } from "lucide-react"
+import { Palette, PlayCircle, ScrollText } from "lucide-react"
 import { NavLink, useLocation } from "react-router-dom"
 import {
   SidebarContent,
@@ -16,25 +16,19 @@ const items = [
     icon: Palette,
     title: "外观",
     url: "/app/settings/appearance",
-    text: "管理主题模式和主题色，让桌面端界面风格保持一致。",
+    text: "管理主题模式与主题色，让桌面界面风格保持一致。",
   },
   {
     icon: PlayCircle,
     title: "运行",
     url: "/app/settings/runtime",
-    text: "查看 opencode 运行状态、启动方式、进程信息和最近输出。",
+    text: "查看 OpenCode 运行状态、启动方式、进程信息和最近输出。",
   },
   {
     icon: ScrollText,
     title: "日志",
     url: "/app/settings/logs",
-    text: "查看 strategy-service 与 opencode 启动日志，并配置默认查看行数。",
-  },
-  {
-    icon: Boxes,
-    title: "工具",
-    url: "/app/settings/tools",
-    text: "保留本地依赖检测与一键安装，作为系统设置的一部分。",
+    text: "查看 strategy-service 与 OpenCode 启动日志，并配置默认查看行数。",
   },
 ]
 
@@ -48,7 +42,7 @@ export function SystemSidebarPanel() {
         <div className="space-y-1">
           <div className="text-sm font-semibold">系统设置</div>
           <p className="text-muted-foreground text-xs leading-5">
-            把桌面端常驻配置收敛到一个地方，包含外观、运行、日志和工具管理。
+            把桌面端常驻配置收敛到一个地方，包含外观、运行与日志。
           </p>
         </div>
       </SidebarHeader>

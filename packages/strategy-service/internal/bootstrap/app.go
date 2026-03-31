@@ -13,8 +13,8 @@ import (
 	"strategy-service/internal/asset"
 	conf "strategy-service/internal/config"
 	"strategy-service/internal/oprun"
+	rt "strategy-service/internal/runtime"
 	"strategy-service/internal/smartx"
-	"strategy-service/internal/tool"
 	web "strategy-service/internal/web"
 )
 
@@ -44,9 +44,39 @@ func New(cfg Config) (*Service, error) {
 		}
 	}
 
+	run := rt.New(rt.Config{
+		Root: cfg.Runtime,
+		Over: map[string]string{
+			"opencode": cfg.Opencode.Bin,
+		},
+	})
+	if row, err := run.Resolve(context.Background(), "opencode"); err == nil {
+		if row.Found && row.Source == rt.SourceConfig {
+			cfg.Opencode.Bin = row.Path
+		} else if run.Has("opencode") {
+			if out, err := run.Ensure(context.Background(), "opencode"); err == nil && out.Found {
+				cfg.Opencode.Bin = out.Path
+			}
+		} else if row.Found {
+			cfg.Opencode.Bin = row.Path
+		}
+	}
+	if row, err := run.Resolve(context.Background(), "git"); err == nil {
+		if !row.Found && run.Has("git") {
+			if out, err := run.Ensure(context.Background(), "git"); err == nil && out.Found {
+				row = out
+			}
+		}
+		if row.Found {
+			cfg.Opencode.GitBin = row.Path
+			cfg.Opencode.GitSource = string(row.Source)
+			slog.Info("opencode git resolved", "bin", row.Path, "source", row.Source)
+		}
+	}
+
 	mux := http.NewServeMux()
 	op := oprun.New(oprun.Config(cfg.Opencode))
-	api := web.NewAPI(tool.NewService(), op, &conf.Store{}, smartx.New(smartx.Config{
+	api := web.NewAPI(run, op, &conf.Store{}, smartx.New(smartx.Config{
 		Platform: cfg.Platform,
 		Account:  cfg.Account,
 		WindowId: cfg.WindowId,

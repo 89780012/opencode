@@ -69,5 +69,39 @@ if (bin) {
 await fs.rm(dist, { force: true, recursive: true })
 await fs.mkdir(path.dirname(dist), { recursive: true })
 await fs.cp(path.join(build, "bin"), dist, { recursive: true })
+await stageRuntime(root, dist)
 
 console.log(`desktop bundle copied to ${dist}`)
+
+async function stageRuntime(root: string, dist: string) {
+  const src = path.join(root, "runtime", target())
+  const dst = path.join(dist, "runtime")
+  const stat = await fs.stat(src).catch(() => null)
+  if (!stat?.isDirectory()) {
+    return
+  }
+
+  await fs.rm(dst, { force: true, recursive: true })
+  await fs.cp(src, dst, { recursive: true })
+}
+
+function target() {
+  return `${os()}-${arch()}`
+}
+
+function arch() {
+  if (process.arch === "x64") {
+    return "x64"
+  }
+  if (process.arch === "arm64") {
+    return "arm64"
+  }
+  return process.arch
+}
+
+function os() {
+  if (process.platform === "win32") {
+    return "windows"
+  }
+  return process.platform
+}
