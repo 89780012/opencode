@@ -1,79 +1,91 @@
 "use client"
 
-import { Bot, Command, MessageSquareText, PlugZap, ServerCog, Sparkles } from "lucide-react"
+import { Bot, Command, MessageSquareText, Settings2, PlugZap, ServerCog, Sparkles } from "lucide-react"
 import { NavLink, useLocation } from "react-router-dom"
-import { AgentSidebarPanel } from "@/components/agent/agent-sidebar-panel"
-import { HomeSidebarPanel } from "@/components/home/home-sidebar-panel"
-import { McpSidebarPanel } from "@/components/mcp/mcp-sidebar-panel"
-import { NavUser } from "@/components/nav-user"
-import { ProviderSidebarPanel } from "@/components/provider/provider-sidebar-panel"
-import { SkillSidebarPanel } from "@/components/skill/skill-sidebar-panel"
-import { SystemSidebarPanel } from "@/components/system/system-sidebar-panel"
+import { useSystem } from "@/components/system/system-provider"
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarTrigger,
 } from "@/components/ui/sidebar"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
-const data = {
-  nav: [
-    {
-      title: "对话",
-      url: "/app",
-      icon: MessageSquareText,
-    },
-    {
-      title: "提供商",
-      url: "/app/providers",
-      icon: PlugZap,
-    },
-    {
-      title: "MCP 服务",
-      url: "/app/mcp",
-      icon: ServerCog,
-    },
-    {
-      title: "Agents",
-      url: "/app/agents",
-      icon: Bot,
-    },
-    {
-      title: "Skills",
-      url: "/app/skills",
-      icon: Sparkles,
-    },
-  ],
+const nav = [
+  {
+    title: "对话",
+    url: "/app",
+    icon: MessageSquareText,
+  },
+  {
+    title: "提供商",
+    url: "/app/providers",
+    icon: PlugZap,
+  },
+  {
+    title: "MCP 服务",
+    url: "/app/mcp",
+    icon: ServerCog,
+  },
+  {
+    title: "Agents",
+    url: "/app/agents",
+    icon: Bot,
+  },
+  {
+    title: "Skills",
+    url: "/app/skills",
+    icon: Sparkles,
+  },
+  {
+    title: "设置",
+    url: "/app/settings",
+    icon: Settings2,
+  },
+]
+
+function tone(kind: "dev" | "stable") {
+  if (kind === "stable") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700"
+  }
+
+  return "border-amber-200 bg-amber-50 text-amber-700"
+}
+
+function label(kind: "dev" | "stable") {
+  if (kind === "stable") {
+    return "生产版"
+  }
+
+  return "开发版"
 }
 
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const route = useLocation()
+  const { ver, vload, verr } = useSystem()
   const path = route.pathname
-  const home = path === "/app"
-  const provider = path.startsWith("/app/providers")
-  const mcp = path.startsWith("/app/mcp")
-  const agent = path.startsWith("/app/agents")
-  const skill = path.startsWith("/app/skills")
-  const system = path.startsWith("/app/settings") || path.startsWith("/app/installer")
-  const pick = (url: string) => (url === "/app" ? path === "/app" : path.startsWith(url))
+  const row = ver.current
+  const pick = (url: string) => (url === "/app" ? path === url : path.startsWith(url))
 
   return (
-    <Sidebar collapsible="icon" className="overflow-hidden *:data-[sidebar=sidebar]:flex-row" {...props}>
-      <Sidebar collapsible="none" className="w-[calc(var(--sidebar-width-icon)+1px)]! border-r">
-        <SidebarHeader>
-          <SidebarMenu>
+    <Sidebar collapsible="icon" {...props}>
+      <SidebarHeader className="gap-3 border-b">
+        <div className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
+          <SidebarMenu className="flex-1 group-data-[collapsible=icon]:hidden">
             <SidebarMenuItem>
               <SidebarMenuButton size="lg" asChild className="md:h-8 md:p-0">
                 <NavLink to="/app">
                   <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
                     <Command className="size-4" />
                   </div>
-                  <div className="grid flex-1 text-left text-sm leading-tight">
+                  <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
                     <span className="truncate font-medium">Strategy</span>
                     <span className="truncate text-xs">Desktop</span>
                   </div>
@@ -81,55 +93,65 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
-        </SidebarHeader>
-        <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupContent className="px-1.5 md:px-0">
-              <SidebarMenu>
-                {data.nav.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      asChild
-                      tooltip={{
-                        children: item.title,
-                        hidden: false,
-                      }}
-                      isActive={pick(item.url)}
-                      className="px-2.5 md:px-2"
-                    >
-                      <NavLink to={item.url}>
-                        <item.icon />
-                        <span>{item.title}</span>
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        </SidebarContent>
-        <SidebarFooter>
-          <NavUser />
-        </SidebarFooter>
-      </Sidebar>
+          <SidebarTrigger className="size-8 shrink-0" />
+        </div>
+      </SidebarHeader>
 
-      <Sidebar collapsible="none" className="flex-1">
-        {home ? (
-          <HomeSidebarPanel />
-        ) : provider ? (
-          <ProviderSidebarPanel />
-        ) : mcp ? (
-          <McpSidebarPanel />
-        ) : agent ? (
-          <AgentSidebarPanel />
-        ) : skill ? (
-          <SkillSidebarPanel />
-        ) : system ? (
-          <SystemSidebarPanel />
-        ) : (
-          <HomeSidebarPanel />
-        )}
-      </Sidebar>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>主要</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {nav.map((item) => (
+                <SidebarMenuItem key={item.url}>
+                  <SidebarMenuButton
+                    asChild
+                    tooltip={{
+                      children: item.title,
+                      hidden: false,
+                    }}
+                    isActive={pick(item.url)}
+                  >
+                    <NavLink to={item.url}>
+                      <item.icon />
+                      <span>{item.title}</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+
+      <SidebarFooter>
+        <div className="px-2 group-data-[collapsible=icon]:hidden">
+          {vload ? (
+            <div className="text-muted-foreground rounded-md border px-2 py-1 text-xs">读取版本中...</div>
+          ) : verr ? (
+            <div className="text-muted-foreground rounded-md border px-2 py-1 text-xs">版本信息不可用</div>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className={`inline-flex w-full items-center justify-center rounded-md border px-2 py-1 text-xs font-medium ${tone(row.channel)}`}
+                >
+                  <span className="truncate">{`${label(row.channel)} ${row.version}`}</span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={8} className="max-w-64 space-y-1 px-3 py-2">
+                <div>版本: {row.version}</div>
+                <div>通道: {label(row.channel)}</div>
+                <div>环境: {row.env === "production" ? "生产" : "开发"}</div>
+                {row.commit ? <div>Commit: {row.commit}</div> : null}
+                <div>工作区: {row.dirty ? "dirty" : "clean"}</div>
+                {row.built_at ? <div>构建时间: {row.built_at}</div> : null}
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </div>
+      </SidebarFooter>
     </Sidebar>
   )
 }

@@ -3,16 +3,15 @@ import { useState } from "react"
 import { toast } from "sonner"
 import { workspaceApi } from "@/api/modules/workspace"
 import { LocalWorkspaceList } from "@/components/workspace/local-workspace-list"
+import { WorkspaceCreateDialog } from "@/components/workspace/workspace-create-dialog"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
 import { SidebarContent, SidebarGroup, SidebarGroupContent, SidebarHeader } from "@/components/ui/sidebar"
 import { useWorkspaceList } from "@/data/global-data-provider"
 import type { LocalWorkspace } from "@/types/workspace"
@@ -22,10 +21,7 @@ interface Props {
 }
 
 function note(err: unknown, text: string) {
-  if (err instanceof Error && err.message) {
-    return err.message
-  }
-
+  if (err instanceof Error && err.message) return err.message
   return text
 }
 
@@ -34,8 +30,6 @@ export function LocalWorkspaceTab(props: Props) {
   const selectedPath = selected?.path ?? null
   const [createOpen, setCreateOpen] = useState(false)
   const [openOpen, setOpenOpen] = useState(false)
-  const [name, setName] = useState("")
-  const [busy, setBusy] = useState(false)
 
   const onPick = async (item: LocalWorkspace) => {
     try {
@@ -52,31 +46,6 @@ export function LocalWorkspaceTab(props: Props) {
 
   const onRefresh = async () => {
     await refresh()
-  }
-
-  const onCreate = async () => {
-    const value = name.trim()
-    if (!value) {
-      toast.error("工作区名称不能为空")
-      return
-    }
-
-    setBusy(true)
-    try {
-      const data = await workspaceApi.createWorkspace(value)
-      const next = await workspaceApi.openWorkspace(data.workspace.path)
-      await refresh()
-      select(next.workspace)
-      props.onPick?.()
-      setCreateOpen(false)
-      setName("")
-      toast.success(`工作区已创建: ${data.workspace.name}`)
-    } catch (err) {
-      console.error("Failed to create workspace", err)
-      toast.error(note(err, "创建工作区失败"))
-    } finally {
-      setBusy(false)
-    }
   }
 
   return (
@@ -126,39 +95,13 @@ export function LocalWorkspaceTab(props: Props) {
         </SidebarGroup>
       </SidebarContent>
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>创建工作区</DialogTitle>
-            <DialogDescription>在 {basePath || "~/.xtp-smart/plugins"} 创建后立即打开。</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <Input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="工作区名称"
-              onKeyDown={(event) => {
-                if (event.key !== "Enter") {
-                  return
-                }
-                event.preventDefault()
-                void onCreate()
-              }}
-            />
-            <div className="rounded-md border px-3 py-2 text-sm text-muted-foreground">
-              创建后会自动初始化 Git 仓库。
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>
-              取消
-            </Button>
-            <Button onClick={() => void onCreate()} disabled={busy}>
-              {busy ? "创建中..." : "创建并打开"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <WorkspaceCreateDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onDone={() => {
+          props.onPick?.()
+        }}
+      />
 
       <Dialog open={openOpen} onOpenChange={setOpenOpen}>
         <DialogContent className="sm:max-w-2xl">

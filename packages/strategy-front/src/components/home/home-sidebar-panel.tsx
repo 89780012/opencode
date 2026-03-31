@@ -8,9 +8,13 @@ import { LocalWorkspaceTab } from "@/components/workspace/local-workspace-tab"
 
 type Tab = "workspace" | "session"
 
-export function HomeSidebarPanel() {
+interface Props {
+  start?: Tab
+}
+
+export function HomeSidebarPanel(props: Props) {
   const { selected: workspace } = useWorkspaceList()
-  const [tab, setTab] = useState<Tab>(workspace ? "session" : "workspace")
+  const [tab, setTab] = useState<Tab>(props.start ?? (workspace ? "session" : "workspace"))
 
   return (
     <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)} className="flex h-full min-h-0 flex-col gap-0">
