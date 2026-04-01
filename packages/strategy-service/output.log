@@ -142,3 +142,17 @@ Error: Cannot find module 'F:\code\opencode\packages\strategy-service\INAME'
 (node:22496) ExperimentalWarning: The fs.promises API is experimental
 
 (node:28964) ExperimentalWarning: The fs.promises API is experimental
+
+(node:21752) ExperimentalWarning: The fs.promises API is experimental
+readShortcutLink Error: Failed to read shortcut link
+    at fe.checkOnesession (C:\Users\Admin\AppData\Local\Programs\xtp_rich_client\resources\app.smart\main.js:80:57806)
+    at new fe (C:\Users\Admin\AppData\Local\Programs\xtp_rich_client\resources\app.smart\main.js:80:55319)
+    at C:\Users\Admin\AppData\Local\Programs\xtp_rich_client\resources\app.smart\main.js:80:91174
+
+(node:27896) ExperimentalWarning: The fs.promises API is experimental
+
+(node:26316) ExperimentalWarning: The fs.promises API is experimental
+readShortcutLink Error: Failed to read shortcut link
+    at fe.checkOnesession (C:\Users\Admin\AppData\Local\Programs\xtp_rich_client\resources\app.smart\main.js:80:57806)
+    at new fe (C:\Users\Admin\AppData\Local\Programs\xtp_rich_client\resources\app.smart\main.js:80:55319)
+    at C:\Users\Admin\AppData\Local\Programs\xtp_rich_client\resources\app.smart\main.js:80:91174

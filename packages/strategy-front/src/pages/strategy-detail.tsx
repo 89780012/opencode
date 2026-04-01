@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ArrowLeft, FolderCode, Plus, RefreshCw, Square } from "lucide-react"
+import { ArrowLeft, FolderCode, Plus, RefreshCw } from "lucide-react"
 import { Link, useParams } from "react-router-dom"
 import { toast } from "sonner"
 import { chatApi } from "@/api/modules"
@@ -36,16 +36,12 @@ export default function StrategyDetailPage() {
   )
   const [open, setOpen] = useState(false)
   const [file, setFile] = useState<string | null>(null)
-  const { selectedSessionId, creating, createSession, selectSession, sessions, ensureSessions } = useChatSessions(path)
-  const { status } = useChatSessionDetail(path, selectedSessionId)
+  const { selectedSessionId, creating, createSession, selectSession, sessions, ensureSessions, loading: sessionLoading } =
+    useChatSessions(path)
+  const { status, messages, eventErr, loading: detailLoading } = useChatSessionDetail(path, selectedSessionId)
   const busy = !!selectedSessionId && status.type !== "idle"
 
   const model = composer.model ? `${composer.model.providerID}/${composer.model.modelID}` : undefined
-  const current = useMemo(
-    () => sessions.find((item) => item.id === selectedSessionId) ?? null,
-    [selectedSessionId, sessions],
-  )
-
   useEffect(() => {
     if (!workspace) return
     select(workspace)
@@ -181,13 +177,22 @@ export default function StrategyDetailPage() {
         <div className="min-h-0 flex-1 px-4 pb-4">
           <StrategyChatPanel
             workspace={workspace}
+            selectedSessionId={selectedSessionId}
+            sessionLoading={sessionLoading}
+            detailLoading={detailLoading}
+            messages={messages}
+            status={status}
+            eventErr={eventErr}
             agents={ags.names}
             models={catalog.visibleModels}
             agent={composer.agent?.name}
             model={model}
             variant={composer.variant}
             variants={composer.variants}
+            creating={creating}
             load={ags.load || catalog.load}
+            onCreate={createSession}
+            onSelectSession={selectSession}
             onAgent={setAgent}
             onModel={setModel}
             onVariant={setVariant}

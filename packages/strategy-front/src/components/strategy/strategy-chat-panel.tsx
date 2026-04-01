@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react"
+import { useMemo } from "react"
 import { toast } from "sonner"
 import { ChatEmptyState } from "@/components/chat/chat-empty-state"
 import { ChatMessageList } from "@/components/chat-message-list"
@@ -9,23 +9,31 @@ import { TodoPanel } from "@/components/chat/todo-panel"
 import { useChatEvents } from "@/hooks/use-chat-events"
 import { useChatPermission } from "@/hooks/use-chat-permission"
 import { useChatQuestion } from "@/hooks/use-chat-question"
-import { useChatSessionDetail } from "@/hooks/use-chat-session-detail"
-import { useChatSessions } from "@/hooks/use-chat-sessions"
 import { useChatTodo } from "@/hooks/use-chat-todo"
 import { usePromptSubmit } from "@/hooks/use-prompt-submit"
 import { useSessionDraft } from "@/hooks/use-session-draft"
+import type { ChatMessageInfo, ChatStatus } from "@/types/chat"
 import type { ComposerModel } from "@/types/composer"
 import type { LocalWorkspace } from "@/types/workspace"
 
 interface Props {
   workspace: LocalWorkspace
+  selectedSessionId: string | null
+  sessionLoading: boolean
+  detailLoading: boolean
+  messages: ChatMessageInfo[]
+  status: ChatStatus
+  eventErr?: string
   agents: string[]
   models: ComposerModel[]
   agent?: string
   model?: string
   variant?: string | null
   variants: string[]
+  creating: boolean
   load?: boolean
+  onCreate: () => Promise<unknown>
+  onSelectSession: (value: string | null) => void
   onAgent: (value: string) => void
   onModel: (value: string) => void
   onVariant: (value: string) => void
@@ -36,15 +44,12 @@ interface Props {
 export function StrategyChatPanel(props: Props) {
   useChatEvents(props.workspace.path)
 
-  const { selectedSessionId, loading, creating, createSession, selectSession, sessions, ensureSessions } =
-    useChatSessions(props.workspace.path)
-  const draft = useSessionDraft(props.workspace.path, selectedSessionId)
-  const { messages, status, eventErr, loading: detail } = useChatSessionDetail(props.workspace.path, selectedSessionId)
-  const permission = useChatPermission(props.workspace.path, selectedSessionId)
-  const question = useChatQuestion(props.workspace.path, selectedSessionId)
-  const busy = !!selectedSessionId && status.type !== "idle"
+  const draft = useSessionDraft(props.workspace.path, props.selectedSessionId)
+  const permission = useChatPermission(props.workspace.path, props.selectedSessionId)
+  const question = useChatQuestion(props.workspace.path, props.selectedSessionId)
+  const busy = !!props.selectedSessionId && props.status.type !== "idle"
   const live = busy || !!permission.req || !!question.req
-  const todo = useChatTodo(props.workspace.path, selectedSessionId, live)
+  const todo = useChatTodo(props.workspace.path, props.selectedSessionId, live)
   const ref = useMemo(() => {
     if (!props.model) return
     const [providerID, ...rest] = props.model.split("/")
@@ -55,23 +60,14 @@ export function StrategyChatPanel(props: Props) {
   }, [props.model])
   const { submitting, submit } = usePromptSubmit({
     workspacePath: props.workspace.path,
-    sessionId: selectedSessionId,
+    sessionId: props.selectedSessionId,
     agent: props.agent,
     model: ref,
     variant: props.variant ?? undefined,
-    createSession,
-    selectSession,
+    createSession: props.onCreate,
+    selectSession: props.onSelectSession,
     onSubmitted: draft.clear,
   })
-
-  useEffect(() => {
-    void ensureSessions()
-  }, [ensureSessions])
-
-  useEffect(() => {
-    if (selectedSessionId || sessions.length === 0) return
-    selectSession(sessions[0].id)
-  }, [selectSession, selectedSessionId, sessions])
 
   const onSubmit = async (value: string) => {
     if (!props.agent || !ref) {
@@ -87,18 +83,18 @@ export function StrategyChatPanel(props: Props) {
     }
   }
 
-  const empty = !detail && messages.length === 0 && !eventErr
+  const empty = !props.sessionLoading && !props.detailLoading && props.messages.length === 0 && !props.eventErr
 
   return (
     <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-transparent">
       <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
         <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
           <ChatMessageList
-            key={`${props.workspace.path}:${selectedSessionId ?? "empty"}`}
-            err={eventErr}
-            messages={messages}
-            loading={detail && !!selectedSessionId}
-            status={status}
+            key={`${props.workspace.path}:${props.selectedSessionId ?? "empty"}`}
+            err={props.eventErr}
+            messages={props.messages}
+            loading={props.detailLoading && !!props.selectedSessionId}
+            status={props.status}
             onOpenDiff={props.onOpenDiff}
           />
           {empty ? (
@@ -159,7 +155,7 @@ export function StrategyChatPanel(props: Props) {
               }}
               onValueChange={draft.setText}
               onVariant={props.onVariant}
-              submitting={submitting || creating || loading}
+              submitting={submitting || props.creating || props.sessionLoading}
               value={draft.text}
               variant={props.variant}
               variants={props.variants}
