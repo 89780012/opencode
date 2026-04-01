@@ -3,6 +3,7 @@ import type { ChatModelRef } from "@/types/chat";
 export interface RuntimeAgent {
   name: string;
   description?: string;
+  scope?: string;
   mode: "subagent" | "primary" | "all";
   native?: boolean;
   hidden?: boolean;
@@ -16,6 +17,7 @@ export interface RuntimeAgent {
 export interface GlobalAgent {
   name: string;
   description?: string;
+  scope?: string;
   mode: "subagent" | "primary" | "all";
   model?: string;
   color?: string;

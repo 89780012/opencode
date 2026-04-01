@@ -3,6 +3,9 @@ package workspace
 type Local struct {
 	Name      string   `json:"name"`
 	Path      string   `json:"path"`
+	Type      string   `json:"type,omitempty"`
+	Template  string   `json:"template,omitempty"`
+	EntryFile string   `json:"entry_file,omitempty"`
 	Keywords  []string `json:"keywords"`
 	VCS       string   `json:"vcs,omitempty"`
 	UpdatedAt int64    `json:"updated_at"`

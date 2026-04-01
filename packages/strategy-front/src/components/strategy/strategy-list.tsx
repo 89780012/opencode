@@ -23,6 +23,12 @@ function time(value?: number) {
   return fmt.format(new Date(value))
 }
 
+function typeLabel(value?: string) {
+  if (value === "python") return "Python"
+  if (value === "js") return "JS"
+  return "SmartX"
+}
+
 function Row(props: {
   item: LocalWorkspace
   onSelect: (item: LocalWorkspace) => void
@@ -35,7 +41,12 @@ function Row(props: {
       onClick={() => props.onSelect(props.item)}
     >
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-semibold text-foreground">{props.item.name}</div>
+        <div className="flex items-center gap-2">
+          <div className="truncate text-sm font-semibold text-foreground">{props.item.name}</div>
+          <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:border-[#33403b] dark:bg-[#171c1b] dark:text-[#d7dfdb]">
+            {typeLabel(props.item.type)}
+          </span>
+        </div>
         <div className="mt-1 inline-flex items-center gap-1.5 text-xs text-muted-foreground dark:text-[#96a39d]">
           <CalendarClock className="size-3.5" />
           {time(props.item.updated_at)}
@@ -87,7 +98,7 @@ export function StrategyList(props: Props) {
         </div>
         <div className="space-y-1">
           <div className="text-base font-semibold">还没有单策略</div>
-          <p className="text-sm text-muted-foreground">新建工作区后会显示在这里，进入后即可开始单策略对话。</p>
+          <p className="text-sm text-muted-foreground">新建工作区后会显示在这里，进入后即可开始聊天和改代码。</p>
         </div>
       </div>
     )

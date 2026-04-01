@@ -17,6 +17,7 @@ var skillDigit = regexp.MustCompile(`^\d+$`)
 type SkillDoc struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	Scope       string `json:"scope,omitempty"`
 	Path        string `json:"path"`
 	Content     string `json:"content"`
 	UpdatedAt   string `json:"updated_at"`
@@ -77,6 +78,7 @@ func parseSkill(path string, body []byte, mod time.Time) (SkillDoc, error) {
 	return SkillDoc{
 		Name:        name,
 		Description: meta["description"],
+		Scope:       meta["scope"],
 		Path:        path,
 		Content:     text,
 		UpdatedAt:   mod.UTC().Format(time.RFC3339),

@@ -162,6 +162,9 @@ function normSkillCfg(input?: Partial<GlobalSkillCatalog> | null): GlobalSkillCa
 function normWorkspace(item: LocalWorkspace): LocalWorkspace {
   return {
     ...item,
+    type: item.type === "smartx" || item.type === "python" || item.type === "js" ? item.type : undefined,
+    template: typeof item.template === "string" ? item.template : undefined,
+    entry_file: typeof item.entry_file === "string" ? item.entry_file : undefined,
     keywords: item.keywords ?? [],
     updated_at: typeof item.updated_at === "number" ? item.updated_at : 0,
   }
@@ -175,10 +178,48 @@ function same(a: LocalWorkspace | null, b: LocalWorkspace) {
   if (a.path !== b.path || a.name !== b.name || a.vcs !== b.vcs) {
     return false
   }
+  if (a.type !== b.type || a.template !== b.template || a.entry_file !== b.entry_file) {
+    return false
+  }
   if (a.keywords.length !== b.keywords.length) {
     return false
   }
   return a.keywords.every((item, i) => item === b.keywords[i])
+}
+
+function scope(value?: string) {
+  return value?.trim().toLowerCase() || ""
+}
+
+function agentScope(name: string, cfg: GlobalAgentCatalog) {
+  const item = cfg.agents.find((row) => row.name === name)
+  if (item?.scope) {
+    return scope(item.scope)
+  }
+  if (name === "strategy") {
+    return "smartx"
+  }
+  return ""
+}
+
+function skillScope(name: string, cfg: GlobalSkillCatalog) {
+  const item = cfg.skills.find((row) => row.name === name)
+  if (item?.scope) {
+    return scope(item.scope)
+  }
+  if (name === "strategy-service") {
+    return "smartx"
+  }
+  return ""
+}
+
+function allow(item?: string, current?: string) {
+  const row = scope(item)
+  const cur = scope(current)
+  if (!row || row === "all") {
+    return true
+  }
+  return row === cur
 }
 
 // 基于 provider 原始数据派生出首页和模型页直接可用的模型目录。
@@ -218,11 +259,18 @@ function buildProvider(providers: List, config: Config, auth: AuthMap): Provider
 // 并行拉取 agent 运行态和全局配置，允许局部失败后继续展示已成功部分。
 async function loadAgent(): Promise<Out<AgentData>> {
   const [run, cfg] = await Promise.allSettled([agentApi.listRuntime(), agentApi.listGlobal()])
+  const doc = cfg.status === "fulfilled" ? normAgentCfg(cfg.value) : emptyAgent.cfg
 
   return {
     data: {
-      run: run.status === "fulfilled" && Array.isArray(run.value) ? run.value : [],
-      cfg: cfg.status === "fulfilled" ? normAgentCfg(cfg.value) : emptyAgent.cfg,
+      run:
+        run.status === "fulfilled" && Array.isArray(run.value)
+          ? run.value.map((item) => ({
+              ...item,
+              scope: agentScope(item.name, doc),
+            }))
+          : [],
+      cfg: doc,
     },
     err: [
       ...(run.status === "rejected" ? [note(run.reason, "Failed to load agent runtime")] : []),
@@ -278,11 +326,18 @@ async function loadMcp(): Promise<Out<McpData>> {
 // 并行拉取 skill 运行态和全局目录。
 async function loadSkill(): Promise<Out<SkillData>> {
   const [run, cfg] = await Promise.allSettled([skillApi.listRuntime(), skillApi.listGlobal()])
+  const doc = cfg.status === "fulfilled" ? normSkillCfg(cfg.value) : emptySkill.cfg
 
   return {
     data: {
-      run: run.status === "fulfilled" && Array.isArray(run.value) ? run.value : [],
-      cfg: cfg.status === "fulfilled" ? normSkillCfg(cfg.value) : emptySkill.cfg,
+      run:
+        run.status === "fulfilled" && Array.isArray(run.value)
+          ? run.value.map((item) => ({
+              ...item,
+              scope: skillScope(item.name, doc),
+            }))
+          : [],
+      cfg: doc,
     },
     err: [
       ...(run.status === "rejected" ? [note(run.reason, "Failed to load skill runtime")] : []),
@@ -540,7 +595,7 @@ export function useGlobalData() {
 }
 
 // 首页聊天场景使用的 agent 目录 hook，返回过滤和排序后的 agent 列表。
-export function useAgentList() {
+export function useAgentList(current?: string) {
   const data = useGlobalData()
   const ensure = data.ensure
   const refresh = data.refresh
@@ -552,7 +607,7 @@ export function useAgentList() {
   const ags = useMemo(
     () =>
       data.agent.data.run
-        .filter((item) => item.mode !== "subagent" && !item.hidden)
+        .filter((item) => item.mode !== "subagent" && !item.hidden && allow(item.scope, current))
         .slice()
         .sort((a, b) => {
           const diff = rankAgent(a.name) - rankAgent(b.name)
@@ -561,7 +616,7 @@ export function useAgentList() {
           }
           return a.name.localeCompare(b.name)
         }),
-    [data.agent.data.run],
+    [current, data.agent.data.run],
   )
 
   return useMemo(

@@ -31,7 +31,7 @@ func EnsureBuiltins() error {
 	}
 
 	// 将workspace下的agents 和 skills copy到用户配置中
-	for _, item := range []string{"agents", "skills" } {
+	for _, item := range []string{"agents", "skills"} {
 		err = sync(filepath.Join(root, item), "workspace/"+item)
 		if err != nil {
 			return err
@@ -82,13 +82,18 @@ func EnsureMCP(url string) error {
 }
 
 // SeedWorkspace copies the builtin workspace template into a new workspace.
-func SeedWorkspace(dir string) error {
-	err := sync(dir, "workspace/template/plugin_python")
+func SeedWorkspace(dir string, item Template) error {
+	err := sync(dir, item.Root)
 	if err != nil {
 		return err
 	}
 
-	return patch(dir)
+	err = patch(dir, item)
+	if err != nil {
+		return err
+	}
+
+	return WriteMeta(dir, item, filepath.Base(dir))
 }
 
 func configRoot() (string, error) {
@@ -152,7 +157,11 @@ func sync(base string, root string) error {
 	})
 }
 
-func patch(dir string) error {
+func patch(dir string, item Template) error {
+	if !item.Package {
+		return nil
+	}
+
 	path := filepath.Join(dir, "package.json")
 	body, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
@@ -172,8 +181,9 @@ func patch(dir string) error {
 	pkg["name"] = name
 	pkg["description"] = name
 	pkg["menuText"] = name
-	pkg["keywords"] = []string{name}
+	pkg["keywords"] = append([]string{name, item.Type}, item.Keywords...)
 	pkg["project_dir"] = filepath.Clean(dir)
+	pkg["project_template"] = item.ID
 
 	body, err = json.MarshalIndent(pkg, "", "    ")
 	if err != nil {

@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"os"
@@ -32,12 +33,42 @@ func local(path string) Local {
 		}
 	}
 
-	return Local{
+	row := Local{
 		Name:      filepath.Base(path),
 		Path:      path,
 		Keywords:  []string{},
 		UpdatedAt: info.ModTime().UnixMilli(),
 	}
+
+	meta, err := asset.ReadMeta(path)
+	if err == nil {
+		row.Type = meta.Type
+		row.Template = meta.Template
+		row.EntryFile = meta.EntryFile
+		row.Keywords = meta.Keywords
+		return row
+	}
+
+	body, err := os.ReadFile(filepath.Join(path, "package.json"))
+	if err != nil {
+		return row
+	}
+
+	pkg := map[string]any{}
+	err = json.Unmarshal(body, &pkg)
+	if err != nil {
+		return row
+	}
+
+	tpl, _ := pkg["project_template"].(string)
+	if tpl == "plugin_python" {
+		row.Type = "smartx"
+		row.Template = "smartx_plugin_python"
+		row.EntryFile = "start.py"
+		row.Keywords = []string{row.Name, "smartx", "python", "plugin"}
+	}
+
+	return row
 }
 
 func (s *Service) List() (ListResult, error) {
@@ -150,8 +181,8 @@ func gitEnv(env []string, row rt.Result) []string {
 }
 
 // 创建工作空间
-func (s *Service) Create(name string, git bool) (CreateResult, error) {
-	slog.Info("workspace create", "name", name)
+func (s *Service) Create(name string, kind string, template string, git bool) (CreateResult, error) {
+	slog.Info("workspace create", "name", name, "type", kind, "template", template)
 	root, err := base()
 	if err != nil {
 		slog.Error("workspace create: base path error", "error", err)
@@ -181,8 +212,17 @@ func (s *Service) Create(name string, git bool) (CreateResult, error) {
 		return CreateResult{}, err
 	}
 
+	item, ok := asset.TemplateByID(template)
+	if !ok {
+		item, ok = asset.TemplateByType(kind)
+	}
+	if !ok {
+		slog.Warn("workspace create: invalid template", "type", kind, "template", template)
+		return CreateResult{}, os.ErrInvalid
+	}
+
 	// 模板文件
-	err = asset.SeedWorkspace(path)
+	err = asset.SeedWorkspace(path, item)
 	if err != nil {
 		slog.Error("workspace create: seed failed", "path", path, "error", err)
 		_ = os.RemoveAll(path)

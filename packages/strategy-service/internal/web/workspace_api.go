@@ -33,8 +33,10 @@ func (a *API) workspaceCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	body := struct {
-		Name string `json:"name"`
-		Git  bool   `json:"git"`
+		Name     string `json:"name"`
+		Type     string `json:"type"`
+		Template string `json:"template"`
+		Git      bool   `json:"git"`
 	}{}
 	err := readJSON(r, &body)
 	if err != nil {
@@ -43,8 +45,8 @@ func (a *API) workspaceCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slog.Info("workspace create", "name", body.Name)
-	data, err := a.ws.Create(body.Name, body.Git)
+	slog.Info("workspace create", "name", body.Name, "type", body.Type, "template", body.Template)
+	data, err := a.ws.Create(body.Name, body.Type, body.Template, body.Git)
 	if err != nil {
 		slog.Error("workspace create failed", "name", body.Name, "error", err)
 		write(w, http.StatusBadRequest, err.Error(), nil)

@@ -18,6 +18,7 @@ var agentDigit = regexp.MustCompile(`^\d+$`)
 type AgentDoc struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	Scope       string `json:"scope,omitempty"`
 	Mode        string `json:"mode"`
 	Model       string `json:"model,omitempty"`
 	Color       string `json:"color,omitempty"`
@@ -128,6 +129,7 @@ func parseAgent(path string, body []byte, mod time.Time) (AgentDoc, error) {
 	return AgentDoc{
 		Name:        name,
 		Description: meta["description"],
+		Scope:       meta["scope"],
 		Mode:        mode,
 		Model:       meta["model"],
 		Color:       meta["color"],

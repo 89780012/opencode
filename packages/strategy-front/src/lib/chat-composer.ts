@@ -36,9 +36,11 @@ export function sameModel(a?: ChatModelRef, b?: ChatModelRef) {
 
 export function rankAgent(name: string) {
   if (name === "strategy") return 0
-  if (name === "build") return 1
-  if (name === "plan") return 2
-  return 3
+  if (name === "python-strategy") return 1
+  if (name === "js-strategy") return 1
+  if (name === "build") return 2
+  if (name === "plan") return 3
+  return 4
 }
 
 // 统一计算当前输入框最终使用的 agent、model、variant。

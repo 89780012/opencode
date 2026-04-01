@@ -1,6 +1,9 @@
 export interface LocalWorkspace {
   name: string;
   path: string;
+  type?: "smartx" | "python" | "js";
+  template?: string;
+  entry_file?: string;
   keywords: string[];
   vcs?: "git";
   updated_at?: number;
@@ -13,6 +16,8 @@ export interface LocalWorkspaceResponse {
 
 export interface CreateWorkspaceRequest {
   name: string;
+  type: "smartx" | "python" | "js";
+  template: string;
   git?: boolean;
 }
 

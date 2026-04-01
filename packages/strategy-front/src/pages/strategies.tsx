@@ -32,7 +32,11 @@ export default function StrategiesPage() {
     const base = [...workspaces].sort((a, b) => (b.updated_at ?? 0) - (a.updated_at ?? 0))
     return base.filter((item) => {
       if (!key) return true
-      return item.name.toLowerCase().includes(key) || item.keywords.some((word) => word.toLowerCase().includes(key))
+      return (
+        item.name.toLowerCase().includes(key) ||
+        item.keywords.some((word) => word.toLowerCase().includes(key)) ||
+        (item.type ?? "").toLowerCase().includes(key)
+      )
     })
   }, [q, workspaces])
 
@@ -68,7 +72,7 @@ export default function StrategiesPage() {
               </div>
               <div className="mt-3 text-3xl font-semibold tracking-tight text-foreground">我的策略</div>
               <p className="mt-1.5 max-w-3xl text-sm leading-6 text-muted-foreground">
-                这里展示你创建的全部工作区策略。进入后可以直接对话，并通过弹框查看代码和改动内容。
+                这里展示你创建的全部策略工作区。支持 SmartX、Python、JS 三种类型，进入后都可以直接聊天并查看代码。
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -99,7 +103,7 @@ export default function StrategiesPage() {
               <Input
                 value={q}
                 onChange={(event) => setQ(event.target.value)}
-                placeholder="搜索策略名称..."
+                placeholder="搜索策略名称、关键词或类型..."
                 className="h-9 rounded-xl border-slate-200 bg-background pl-10 shadow-sm dark:border-[#4f7769] dark:bg-[#1a1f1e] dark:text-[#e3ece7] dark:shadow-none"
               />
             </div>
@@ -111,7 +115,7 @@ export default function StrategiesPage() {
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-6 py-4">
           <div className="flex items-center justify-between gap-3">
             <div className="text-sm font-medium text-foreground">共 {list.length} 个策略</div>
-            <div className="text-xs text-muted-foreground dark:text-slate-400">支持直接进入，也支持在列表中删除对应工作区</div>
+            <div className="text-xs text-muted-foreground dark:text-slate-400">支持直接进入，也支持在列表中删除对应工作区。</div>
           </div>
           <StrategyList
             items={list}
@@ -131,8 +135,8 @@ export default function StrategiesPage() {
         title="删除策略"
         name={item?.name ?? ""}
         desc="删除后会移除对应工作区文件夹，这个操作不可恢复。"
-        onOpenChange={(open) => {
-          if (!open) setItem(null)
+        onOpenChange={(value) => {
+          if (!value) setItem(null)
         }}
         onConfirm={() => void onDelete()}
       />

@@ -88,7 +88,7 @@ func (s *Service) Create(name string, count int, git bool, paths []string) (Crea
 	done := []string{}
 	for i := 0; i < count; i++ {
 		itemName := name + "-" + strconv.Itoa(i+1)
-		out, err := s.ws.Create(itemName, git)
+		out, err := s.ws.Create(itemName, "smartx", "smartx_plugin_python", git)
 		if err != nil {
 			for _, path := range done {
 				_ = os.RemoveAll(path)

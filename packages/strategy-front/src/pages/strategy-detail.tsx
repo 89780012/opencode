@@ -20,11 +20,12 @@ const ctrl =
 export default function StrategyDetailPage() {
   const params = useParams()
   const path = params.strategyID ? decodeStrategyPath(params.strategyID) : ""
-  const ags = useAgentList()
   const catalog = useProviderList()
-  const project = useProjectComposer()
   const { loading, refresh, select, workspaces } = useWorkspaceList()
   const workspace = useMemo(() => workspaces.find((item) => item.path === path) ?? null, [path, workspaces])
+  const kind = workspace?.type ?? "smartx"
+  const ags = useAgentList(kind)
+  const project = useProjectComposer(kind)
   const composer = useMemo(
     () =>
       resolveComposer({
@@ -40,8 +41,8 @@ export default function StrategyDetailPage() {
     useChatSessions(path)
   const { status, messages, eventErr, loading: detailLoading } = useChatSessionDetail(path, selectedSessionId)
   const busy = !!selectedSessionId && status.type !== "idle"
-
   const model = composer.model ? `${composer.model.providerID}/${composer.model.modelID}` : undefined
+
   useEffect(() => {
     if (!workspace) return
     select(workspace)
@@ -128,7 +129,7 @@ export default function StrategyDetailPage() {
   return (
     <>
       <div className="sticky flex h-full min-h-0 flex-col bg-background dark:bg-[#0f1111]">
-        <div className="px-6 pb-1 pt-1 dark:bg-card ">
+        <div className="px-6 pb-1 pt-1 dark:bg-card">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
               <Button variant="outline" size="sm" className={ctrl} asChild>

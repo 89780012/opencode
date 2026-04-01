@@ -14,10 +14,10 @@ export const workspaceApi = {
     return request.get<LocalWorkspaceResponse>("/workspace/list");
   },
 
-  createWorkspace(name: string) {
+  createWorkspace(name: string, type: "smartx" | "python" | "js", template: string) {
     return request.post<CreateWorkspaceResponse, CreateWorkspaceRequest>(
       "/workspace/create",
-      { name, git: true },
+      { name, type, template, git: true },
     );
   },
 

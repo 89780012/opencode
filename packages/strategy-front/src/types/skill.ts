@@ -1,6 +1,7 @@
 export interface RuntimeSkill {
   name: string;
   description: string;
+  scope?: string;
   location: string;
   content: string;
 }
@@ -8,6 +9,7 @@ export interface RuntimeSkill {
 export interface GlobalSkill {
   name: string;
   description: string;
+  scope?: string;
   path: string;
   content: string;
   updated_at: string;

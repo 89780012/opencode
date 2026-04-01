@@ -5,41 +5,65 @@ import type { ProjectComposerState } from "@/types/composer"
 
 type Ctx = {
   ready: boolean
-  state: ProjectComposerState
-  setAgent: (agent?: string) => void
-  setModel: (model?: ChatModelRef) => void
-  setVariant: (variant?: string | null) => void
+  pick: (scope?: string) => ProjectComposerState
+  setAgent: (scope: string | undefined, agent?: string) => void
+  setModel: (scope: string | undefined, model?: ChatModelRef) => void
+  setVariant: (scope: string | undefined, variant?: string | null) => void
 }
 
 const key = "strategy-front.project-composer.v2"
 const max = 5
 const Ctx = createContext<Ctx | null>(null)
+const root = "default"
+
+type Store = {
+  map?: Record<string, ProjectComposerState>
+  agent?: string
+  model?: ChatModelRef
+  variant?: string | null
+  recent?: ChatModelRef[]
+}
+
+function bucket(scope?: string) {
+  return scope?.trim() || root
+}
 
 function parse() {
   if (typeof window === "undefined") {
-    return {}
+    return {} as Record<string, ProjectComposerState>
   }
 
   try {
     const raw = window.localStorage.getItem(key)
     if (!raw) {
-      return {}
+      return {} as Record<string, ProjectComposerState>
     }
-    return JSON.parse(raw) as ProjectComposerState
+    const data = JSON.parse(raw) as Store
+    if (data.map && typeof data.map === "object") {
+      return data.map
+    }
+    return {
+      [root]: {
+        agent: data.agent,
+        model: data.model,
+        variant: data.variant,
+        recent: data.recent,
+      },
+    }
   } catch {
-    return {}
+    return {} as Record<string, ProjectComposerState>
   }
 }
 
-function write(state: ProjectComposerState) {
+function write(state: Record<string, ProjectComposerState>) {
   if (typeof window === "undefined") {
     return
   }
-  window.localStorage.setItem(key, JSON.stringify(state))
+  window.localStorage.setItem(key, JSON.stringify({ map: state }))
 }
 
 export function ProjectComposerProvider(props: { children: ReactNode }) {
-  const [state, setState] = useState<ProjectComposerState>({})
+  const [state, setState] = useState<Record<string, ProjectComposerState>>({})
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
@@ -54,48 +78,65 @@ export function ProjectComposerProvider(props: { children: ReactNode }) {
     write(state)
   }, [ready, state])
 
-  const setAgent = useCallback((agent?: string) => {
+  const pick = useCallback((scope?: string) => state[bucket(scope)] ?? {}, [state])
+
+  const setAgent = useCallback((scope: string | undefined, agent?: string) => {
     setState((prev) => ({
       ...prev,
-      agent,
+      [bucket(scope)]: {
+        ...(prev[bucket(scope)] ?? {}),
+        agent,
+      },
     }))
   }, [])
 
-  const setModel = useCallback((model?: ChatModelRef) => {
+  const setModel = useCallback((scope: string | undefined, model?: ChatModelRef) => {
     setState((prev) => ({
       ...prev,
-      model,
-      recent: !model
-        ? prev.recent
-        : [model, ...(prev.recent ?? []).filter((item) => !sameModel(item, model))].slice(0, max),
+      [bucket(scope)]: {
+        ...(prev[bucket(scope)] ?? {}),
+        model,
+        recent: !model
+          ? prev[bucket(scope)]?.recent
+          : [model, ...((prev[bucket(scope)]?.recent ?? []).filter((item) => !sameModel(item, model)))].slice(0, max),
+      },
     }))
   }, [])
 
-  const setVariant = useCallback((variant?: string | null) => {
+  const setVariant = useCallback((scope: string | undefined, variant?: string | null) => {
     setState((prev) => ({
       ...prev,
-      variant,
+      [bucket(scope)]: {
+        ...(prev[bucket(scope)] ?? {}),
+        variant,
+      },
     }))
   }, [])
 
   const value = useMemo(
     () => ({
       ready,
+      pick,
       setAgent,
       setModel,
       setVariant,
-      state,
     }),
-    [ready, setAgent, setModel, setVariant, state],
+    [pick, ready, setAgent, setModel, setVariant],
   )
 
   return <Ctx.Provider value={value}>{props.children}</Ctx.Provider>
 }
 
-export function useProjectComposerValue() {
+export function useProjectComposerValue(scope?: string) {
   const ctx = useContext(Ctx)
   if (!ctx) {
     throw new Error("ProjectComposerProvider is missing")
   }
-  return ctx
+  return {
+    ready: ctx.ready,
+    state: ctx.pick(scope),
+    setAgent: (agent?: string) => ctx.setAgent(scope, agent),
+    setModel: (model?: ChatModelRef) => ctx.setModel(scope, model),
+    setVariant: (variant?: string | null) => ctx.setVariant(scope, variant),
+  }
 }

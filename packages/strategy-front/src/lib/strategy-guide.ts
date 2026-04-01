@@ -11,6 +11,7 @@ export type Guide = {
 }
 
 export type GroupMode = "split" | "parallel"
+export type StrategyType = "smartx" | "python" | "js"
 
 export function createGuide(): Guide {
   return {
@@ -32,7 +33,9 @@ function text(list: string[]) {
 
 export function buildStrategyPrompt(input: { name: string; guide: Guide; role?: string; peers?: string[] }) {
   const role = input.role ? `你当前负责的角色是：${input.role}。` : ""
-  const peers = input.peers && input.peers.length > 0 ? `如果有并行策略，请注意和这些方向形成区分：${input.peers.join("、")}。` : ""
+  const peers =
+    input.peers && input.peers.length > 0 ? `如果有并行策略，请注意和这些方向形成区分：${input.peers.join("、")}。` : ""
+
   return [
     `请帮我开发一个策略，工作区名称是「${input.name}」。`,
     role,
@@ -50,6 +53,23 @@ export function buildStrategyPrompt(input: { name: string; guide: Guide; role?: 
   ]
     .filter(Boolean)
     .join("\n")
+}
+
+export function buildTemplatePrompt(input: { name: string; type: Exclude<StrategyType, "smartx"> }) {
+  const label = input.type === "python" ? "Python" : "JavaScript"
+  const entry = input.type === "python" ? "main.py" : "index.js"
+  const focus =
+    input.type === "python"
+      ? "请基于当前 Python 模板完成一个可继续迭代的策略脚手架，先解释结构，再直接开始完善代码。"
+      : "请基于当前 JavaScript 模板完成一个可继续迭代的策略脚手架，先解释结构，再直接开始完善代码。"
+
+  return [
+    `请帮我开发一个${label}策略，工作区名称是「${input.name}」。`,
+    `当前模板入口文件是 ${entry}。`,
+    "请先阅读当前工作区模板文件，说明现有结构、入口文件职责和接下来的改造计划。",
+    focus,
+    "请优先保持模板结构清晰、注释简洁，并确保后续可以继续通过聊天直接修改代码。",
+  ].join("\n")
 }
 
 export function buildGroupRoles(mode: GroupMode, count: number) {
