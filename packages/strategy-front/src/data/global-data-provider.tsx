@@ -163,6 +163,7 @@ function normWorkspace(item: LocalWorkspace): LocalWorkspace {
   return {
     ...item,
     keywords: item.keywords ?? [],
+    updated_at: typeof item.updated_at === "number" ? item.updated_at : 0,
   }
 }
 

@@ -28,7 +28,8 @@ interface Props {
   onVariant: (value: string) => void
 }
 
-const item = "h-8 min-w-0 rounded-xl border bg-muted/20 px-2 text-xs shadow-none"
+const item =
+  "h-8 min-w-0 rounded-xl border border-black/8 bg-black/[0.03] px-2 text-xs shadow-none dark:border-white/10 dark:bg-white/[0.04]"
 
 export function PromptBar(props: Props) {
   const model = props.model
@@ -57,7 +58,7 @@ export function PromptBar(props: Props) {
       value={props.value}
     >
       <PromptInputBody>
-        <PromptInputTextarea maxHeight={200} minHeight={72} placeholder="输入你的消息..." />
+        <PromptInputTextarea maxHeight={200} minHeight={64} placeholder="输入你的消息..." />
       </PromptInputBody>
       <PromptInputFooter className="items-end gap-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
@@ -67,12 +68,12 @@ export function PromptBar(props: Props) {
             value={props.agent ?? ""}
           >
             <SelectTrigger className={item}>
-              <SelectValue placeholder="Agent" />
+              <SelectValue placeholder="选择模式" />
             </SelectTrigger>
             <SelectContent>
               {props.agents.map((item) => (
                 <SelectItem key={item} value={item}>
-                  {item === "build" ? "Build" : item === "plan" ? "Plan" : item}
+                  {item === "build" ? "执行" : item === "plan" ? "规划" : item}
                 </SelectItem>
               ))}
             </SelectContent>

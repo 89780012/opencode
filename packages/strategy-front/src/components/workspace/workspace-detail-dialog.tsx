@@ -28,12 +28,16 @@ export function WorkspaceDetailDialog(props: Props) {
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className="flex h-[88vh] max-w-[min(96vw,1400px)] flex-col p-0">
+      <DialogContent className="flex h-[92vh] w-[70vw] max-w-[70vw] min-w-[1200px] flex-col p-0">
         <DialogHeader className="border-b px-6 py-4">
           <DialogTitle>{props.workspace?.name ?? "工作区详情"}</DialogTitle>
         </DialogHeader>
         {props.workspace ? (
-          <Tabs value={view} onValueChange={(value) => setTab(value as Tab)} className="flex min-h-0 flex-1 flex-col gap-0">
+          <Tabs
+            value={view}
+            onValueChange={(value) => setTab(value as Tab)}
+            className="flex min-h-0 flex-1 flex-col gap-0"
+          >
             <div className="border-b px-4 py-2">
               <TabsList className="justify-start">
                 <TabsTrigger value="review">代码变更</TabsTrigger>

@@ -29,6 +29,7 @@ export interface CreateGroupRequest {
   name: string
   count: number
   git?: boolean
+  paths?: string[]
 }
 
 export interface CreateGroupResponse {

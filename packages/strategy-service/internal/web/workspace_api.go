@@ -85,6 +85,40 @@ func (a *API) workspaceOpen(w http.ResponseWriter, r *http.Request) {
 	write(w, http.StatusOK, "ok", data)
 }
 
+func (a *API) workspaceDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
+		return
+	}
+
+	body := struct {
+		Path string `json:"path"`
+	}{}
+	err := readJSON(r, &body)
+	if err != nil {
+		slog.Warn("workspace delete bad request", "error", err)
+		write(w, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+
+	slog.Info("workspace delete", "path", body.Path)
+	err = a.ws.Delete(body.Path)
+	if err != nil {
+		slog.Error("workspace delete failed", "path", body.Path, "error", err)
+		write(w, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+
+	err = a.gs.Prune(body.Path)
+	if err != nil {
+		slog.Error("workspace delete prune failed", "path", body.Path, "error", err)
+		write(w, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+
+	write(w, http.StatusOK, "ok", nil)
+}
+
 func (a *API) workspaceFiles(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)

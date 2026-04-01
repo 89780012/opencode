@@ -175,7 +175,7 @@ export function WorkspaceEditorPane(props: Props) {
         autoSaveId="strategy-front:workspace-editor-split:v1"
         className="min-h-0 min-w-0 flex-1"
       >
-        <ResizablePanel defaultSize={74} minSize={420} className="min-h-0 min-w-0">
+        <ResizablePanel defaultSize={79} minSize={520} className="min-h-0 min-w-0">
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <WorkspaceFileTabs
             open={open}
@@ -203,7 +203,7 @@ export function WorkspaceEditorPane(props: Props) {
           </div>
         </ResizablePanel>
         <ResizableHandle withHandle className="pointer" />
-        <ResizablePanel defaultSize={26} minSize={220} className="min-h-0 min-w-0">
+        <ResizablePanel defaultSize={21} minSize={240} className="min-h-0 min-w-0">
           <WorkspaceFileTree filePaths={paths} activeFilePath={active} onSelectFile={show} />
         </ResizablePanel>
       </ResizablePanelGroup>

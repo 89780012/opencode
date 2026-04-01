@@ -31,11 +31,11 @@ type PromptInputContextValue = {
 const PromptInputContext = createContext<PromptInputContextValue | null>(null)
 
 const usePromptInputContext = () => {
-  const context = useContext(PromptInputContext)
-  if (!context) {
+  const ctx = useContext(PromptInputContext)
+  if (!ctx) {
     throw new Error("PromptInput components must be used inside PromptInput")
   }
-  return context
+  return ctx
 }
 
 export type PromptInputProps = Omit<ComponentProps<"form">, "onSubmit"> & {
@@ -45,7 +45,7 @@ export type PromptInputProps = Omit<ComponentProps<"form">, "onSubmit"> & {
 }
 
 export const PromptInput = ({ className, children, value, onValueChange, onSubmit, ...props }: PromptInputProps) => {
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     onSubmit(
       {
@@ -59,8 +59,11 @@ export const PromptInput = ({ className, children, value, onValueChange, onSubmi
   return (
     <PromptInputContext.Provider value={{ value, onValueChange }}>
       <form
-        className={cn("w-full rounded-2xl border border-[#E5E5E5] bg-background", className)}
-        onSubmit={handleSubmit}
+        className={cn(
+          "w-full rounded-[28px] bg-background/92 shadow-sm ring-1 ring-black/8 backdrop-blur-sm dark:bg-[#111515]/96 dark:ring-white/10",
+          className,
+        )}
+        onSubmit={submit}
         {...props}
       >
         {children}
@@ -72,7 +75,7 @@ export const PromptInput = ({ className, children, value, onValueChange, onSubmi
 export type PromptInputBodyProps = ComponentProps<"div">
 
 export const PromptInputBody = ({ className, ...props }: PromptInputBodyProps) => (
-  <div className={cn("p-1", className)} {...props} />
+  <div className={cn("px-3 pt-3", className)} {...props} />
 )
 
 export type PromptInputTextareaProps = Omit<ComponentProps<"textarea">, "value" | "onChange"> & {
@@ -84,68 +87,55 @@ export const PromptInputTextarea = ({
   className,
   maxHeight = 65,
   minHeight = 65,
-  placeholder = "Type your message...",
+  placeholder = "输入你想执行的策略需求...",
   onKeyDown,
   ...props
 }: PromptInputTextareaProps) => {
   const { value, onValueChange } = usePromptInputContext()
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const [isComposing, setIsComposing] = useState(false)
+  const ref = useRef<HTMLTextAreaElement>(null)
+  const [compose, setCompose] = useState(false)
 
   useEffect(() => {
-    if (!textareaRef.current) {
+    if (!ref.current) {
       return
     }
-    textareaRef.current.style.height = "auto"
-    textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+    ref.current.style.height = "auto"
+    ref.current.style.height = `${ref.current.scrollHeight}px`
   }, [value])
 
-  const handleChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
+  const change = (event: ChangeEvent<HTMLTextAreaElement>) => {
     onValueChange(event.target.value)
   }
 
-  const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+  const keydown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     onKeyDown?.(event)
-    if (event.defaultPrevented) {
-      return
-    }
+    if (event.defaultPrevented) return
+    if (event.key !== "Enter") return
+    if (compose || event.nativeEvent.isComposing) return
+    if (event.shiftKey) return
 
-    if (event.key === "Enter") {
-      if (isComposing || event.nativeEvent.isComposing) {
-        return
-      }
-      if (event.shiftKey) {
-        return
-      }
+    const form = event.currentTarget.form
+    if (!form) return
 
-      const form = event.currentTarget.form
-      if (!form) {
-        return
-      }
+    const btn = form.querySelector('button[type="submit"]') as HTMLButtonElement | null
+    if (btn?.disabled) return
 
-      const submitButton = form.querySelector('button[type="submit"]') as HTMLButtonElement | null
-
-      if (submitButton?.disabled) {
-        return
-      }
-
-      event.preventDefault()
-      form.requestSubmit()
-    }
+    event.preventDefault()
+    form.requestSubmit()
   }
 
   return (
     <textarea
-      ref={textareaRef}
+      ref={ref}
       className={cn(
-        "txt w-full resize-none border-none px-2 pt-1 text-gray-700 outline-none placeholder:text-gray-400",
+        "txt w-full resize-none border-none bg-transparent px-1 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground",
         className,
       )}
       name="message"
-      onChange={handleChange}
-      onCompositionEnd={() => setIsComposing(false)}
-      onCompositionStart={() => setIsComposing(true)}
-      onKeyDown={handleKeyDown}
+      onChange={change}
+      onCompositionEnd={() => setCompose(false)}
+      onCompositionStart={() => setCompose(true)}
+      onKeyDown={keydown}
       placeholder={placeholder}
       rows={1}
       style={{
@@ -162,7 +152,7 @@ export const PromptInputTextarea = ({
 export type PromptInputFooterProps = ComponentProps<"div">
 
 export const PromptInputFooter = ({ className, ...props }: PromptInputFooterProps) => (
-  <div className={cn("flex items-center justify-between p-2", className)} {...props} />
+  <div className={cn("flex items-center justify-between px-3 pb-3 pt-2", className)} {...props} />
 )
 
 export type PromptInputToolsProps = ComponentProps<"div">

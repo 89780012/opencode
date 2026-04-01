@@ -3,6 +3,7 @@ export interface LocalWorkspace {
   path: string;
   keywords: string[];
   vcs?: "git";
+  updated_at?: number;
 }
 
 export interface LocalWorkspaceResponse {

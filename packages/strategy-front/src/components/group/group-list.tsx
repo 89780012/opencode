@@ -1,4 +1,4 @@
-import { ArrowRight, Boxes, CalendarClock, GitBranch, RefreshCw, Sparkles } from "lucide-react"
+import { ArrowRight, Boxes, CalendarClock, RefreshCw, Sparkles, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import type { StrategyGroup } from "@/types/group"
@@ -9,6 +9,7 @@ interface Props {
   error: string | null
   onRetry: () => void
   onSelect: (group: StrategyGroup) => void
+  onDelete: (group: StrategyGroup) => void
 }
 
 const fmt = new Intl.DateTimeFormat("zh-CN", {
@@ -22,7 +23,11 @@ function time(value: number) {
   return fmt.format(new Date(value))
 }
 
-function GroupCard(props: { group: StrategyGroup; onSelect: (group: StrategyGroup) => void }) {
+function GroupCard(props: {
+  group: StrategyGroup
+  onSelect: (group: StrategyGroup) => void
+  onDelete: (group: StrategyGroup) => void
+}) {
   const names = props.group.items.map((item) => item.workspace.name)
   return (
     <Card
@@ -58,25 +63,34 @@ function GroupCard(props: { group: StrategyGroup; onSelect: (group: StrategyGrou
         <div className="flex items-center justify-between border-t pt-2.5 text-sm dark:border-[#2a2f2d]">
           <div className="flex items-center gap-3 text-muted-foreground dark:text-[#96a39d]">
             <span className="inline-flex items-center gap-1.5">
-              <GitBranch className="size-4" />
-              {props.group.count} 条工作线
-            </span>
-            <span className="inline-flex items-center gap-1.5">
               <CalendarClock className="size-4" />
               {time(props.group.updated_at)}
             </span>
           </div>
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 font-medium text-slate-900 dark:text-[#dce7e1]"
-            onClick={(event) => {
-              event.stopPropagation()
-              props.onSelect(props.group)
-            }}
-          >
-            进入
-            <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="inline-flex h-8 items-center gap-1 rounded-lg px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+              onClick={(event) => {
+                event.stopPropagation()
+                props.onDelete(props.group)
+              }}
+            >
+              <Trash2 className="size-3.5" />
+              删除
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 font-medium text-slate-900 dark:text-[#dce7e1]"
+              onClick={(event) => {
+                event.stopPropagation()
+                props.onSelect(props.group)
+              }}
+            >
+              进入
+              <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+            </button>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -117,7 +131,7 @@ export function GroupList(props: Props) {
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
       {props.groups.map((group) => (
-        <GroupCard key={group.id} group={group} onSelect={props.onSelect} />
+        <GroupCard key={group.id} group={group} onSelect={props.onSelect} onDelete={props.onDelete} />
       ))}
     </div>
   )

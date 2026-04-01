@@ -23,10 +23,20 @@ func NewService(rt *rt.Service) *Service {
 }
 
 func local(path string) Local {
+	info, err := os.Stat(path)
+	if err != nil {
+		return Local{
+			Name:     filepath.Base(path),
+			Path:     path,
+			Keywords: []string{},
+		}
+	}
+
 	return Local{
-		Name:     filepath.Base(path),
-		Path:     path,
-		Keywords: []string{},
+		Name:      filepath.Base(path),
+		Path:      path,
+		Keywords:  []string{},
+		UpdatedAt: info.ModTime().UnixMilli(),
 	}
 }
 
@@ -317,4 +327,46 @@ func (s *Service) Content(path string, file string) (FileContentResult, error) {
 		Previewable:   true,
 		Truncated:     cut,
 	}, nil
+}
+
+func (s *Service) Delete(path string) error {
+	slog.Info("workspace delete", "path", path)
+	root, err := base()
+	if err != nil {
+		slog.Error("workspace delete: base path error", "error", err)
+		return err
+	}
+
+	dir, err := safe(root, path)
+	if err != nil {
+		slog.Error("workspace delete: safe path error", "path", path, "error", err)
+		return err
+	}
+	if filepath.Clean(dir) == filepath.Clean(root) {
+		slog.Warn("workspace delete: cannot delete root", "path", path)
+		return os.ErrInvalid
+	}
+
+	info, err := os.Stat(dir)
+	if os.IsNotExist(err) {
+		slog.Warn("workspace delete: path missing", "dir", dir)
+		return nil
+	}
+	if err != nil {
+		slog.Error("workspace delete: stat error", "dir", dir, "error", err)
+		return err
+	}
+	if !info.IsDir() {
+		slog.Warn("workspace delete: not a directory", "dir", dir)
+		return os.ErrInvalid
+	}
+
+	err = os.RemoveAll(dir)
+	if err != nil {
+		slog.Error("workspace delete: remove failed", "dir", dir, "error", err)
+		return err
+	}
+
+	slog.Info("workspace deleted", "dir", dir)
+	return nil
 }

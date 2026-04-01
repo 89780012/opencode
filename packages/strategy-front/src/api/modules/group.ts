@@ -19,11 +19,18 @@ export const groupApi = {
     })
   },
 
-  create(name: string, count: number) {
+  create(name: string, count: number, paths?: string[]) {
     return request.post<CreateGroupResponse, CreateGroupRequest>("/group/create", {
       name,
       count,
       git: true,
+      paths,
+    })
+  },
+
+  remove(id: string) {
+    return request.post<null, { id: string }>("/group/delete", {
+      id,
     })
   },
 }

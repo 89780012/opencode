@@ -20,8 +20,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 
 const nav = [
   {
-    title: "对话",
-    url: "/app",
+    title: "策略",
+    url: "/app/strategies",
     icon: MessageSquareText,
   },
   {
@@ -77,7 +77,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const { ver, vload, verr } = useSystem()
   const path = route.pathname
   const row = ver.current
-  const pick = (url: string) => (url === "/app" ? path === url : path.startsWith(url))
+  const pick = (url: string) => path.startsWith(url)
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -86,13 +86,12 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenu className="flex-1 group-data-[collapsible=icon]:hidden">
             <SidebarMenuItem>
               <SidebarMenuButton size="lg" asChild className="md:h-8 md:p-0">
-                <NavLink to="/app">
+                <NavLink to="/app/strategies">
                   <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
                     <Command className="size-4" />
                   </div>
                   <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-                    <span className="truncate font-medium">Strategy</span>
-                    <span className="truncate text-xs">Desktop</span>
+                    <span className="truncate font-medium">SmartX</span>
                   </div>
                 </NavLink>
               </SidebarMenuButton>

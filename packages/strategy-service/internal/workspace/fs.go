@@ -83,10 +83,15 @@ func listDirs(root string) ([]Local, error) {
 		if !item.IsDir() {
 			continue
 		}
+		info, err := item.Info()
+		if err != nil {
+			return nil, err
+		}
 		out = append(out, Local{
-			Name:     item.Name(),
-			Path:     filepath.Join(root, item.Name()),
-			Keywords: []string{},
+			Name:      item.Name(),
+			Path:      filepath.Join(root, item.Name()),
+			Keywords:  []string{},
+			UpdatedAt: info.ModTime().UnixMilli(),
 		})
 	}
 

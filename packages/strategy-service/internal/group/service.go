@@ -52,13 +52,10 @@ func (s *Service) Detail(id string) (DetailResult, error) {
 	}, nil
 }
 
-func (s *Service) Create(name string, count int, git bool) (CreateResult, error) {
+func (s *Service) Create(name string, count int, git bool, paths []string) (CreateResult, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return CreateResult{}, errors.New("group name is required")
-	}
-	if count < 2 || count > 3 {
-		return CreateResult{}, errors.New("group count must be 2 or 3")
 	}
 
 	rows, err := s.load()
@@ -69,6 +66,13 @@ func (s *Service) Create(name string, count int, git bool) (CreateResult, error)
 		return strings.EqualFold(strings.TrimSpace(row.Name), name)
 	}) {
 		return CreateResult{}, os.ErrExist
+	}
+
+	if len(paths) > 0 {
+		return s.pick(rows, name, paths)
+	}
+	if count < 2 || count > 3 {
+		return CreateResult{}, errors.New("group count must be 2 or 3")
 	}
 
 	now := time.Now().UnixMilli()
@@ -113,6 +117,133 @@ func (s *Service) Create(name string, count int, git bool) (CreateResult, error)
 	return CreateResult{
 		Group: row,
 	}, nil
+}
+
+func (s *Service) pick(rows []Row, name string, paths []string) (CreateResult, error) {
+	if len(paths) < 2 || len(paths) > 3 {
+		return CreateResult{}, errors.New("group count must be 2 or 3")
+	}
+
+	taken := map[string]bool{}
+	for _, row := range rows {
+		for _, item := range row.Items {
+			taken[filepath.Clean(item.Path)] = true
+		}
+	}
+
+	seen := map[string]bool{}
+	items := make([]Item, 0, len(paths))
+	for i, path := range paths {
+		key := filepath.Clean(path)
+		if seen[key] {
+			return CreateResult{}, errors.New("duplicate workspace path")
+		}
+		seen[key] = true
+		if taken[key] {
+			return CreateResult{}, errors.New("workspace already belongs to another group")
+		}
+
+		out, err := s.ws.Open(path, false)
+		if err != nil {
+			return CreateResult{}, err
+		}
+		items = append(items, Item{
+			ID:        next("itm"),
+			Name:      out.Workspace.Name,
+			Path:      out.Workspace.Path,
+			Order:     i,
+			Workspace: out.Workspace,
+		})
+	}
+
+	now := time.Now().UnixMilli()
+	row := Row{
+		ID:        next("grp"),
+		Name:      name,
+		Count:     len(items),
+		CreatedAt: now,
+		UpdatedAt: now,
+		Items:     items,
+	}
+
+	err := s.save(append(rows, row))
+	if err != nil {
+		return CreateResult{}, err
+	}
+
+	return CreateResult{
+		Group: row,
+	}, nil
+}
+
+func (s *Service) Delete(id string) error {
+	rows, err := s.load()
+	if err != nil {
+		return err
+	}
+
+	at := slices.IndexFunc(rows, func(row Row) bool {
+		return row.ID == id
+	})
+	if at < 0 {
+		return os.ErrNotExist
+	}
+
+	row := rows[at]
+	next := append(rows[:at], rows[at+1:]...)
+	err = s.save(next)
+	if err != nil {
+		return err
+	}
+
+	for _, item := range row.Items {
+		err = s.ws.Delete(item.Path)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *Service) Prune(path string) error {
+	rows, err := s.load()
+	if err != nil {
+		return err
+	}
+
+	key := filepath.Clean(path)
+	now := time.Now().UnixMilli()
+	hit := false
+	next := make([]Row, 0, len(rows))
+
+	for _, row := range rows {
+		items := make([]Item, 0, len(row.Items))
+		for _, item := range row.Items {
+			if filepath.Clean(item.Path) == key {
+				hit = true
+				continue
+			}
+			items = append(items, item)
+		}
+		if len(items) == len(row.Items) {
+			next = append(next, row)
+			continue
+		}
+		if len(items) < 2 {
+			continue
+		}
+		row.Items = items
+		row.Count = len(items)
+		row.UpdatedAt = now
+		next = append(next, row)
+	}
+
+	if !hit {
+		return nil
+	}
+
+	return s.save(next)
 }
 
 func (s *Service) path() (string, error) {

@@ -1,10 +1,11 @@
 package workspace
 
 type Local struct {
-	Name     string   `json:"name"`
-	Path     string   `json:"path"`
-	Keywords []string `json:"keywords"`
-	VCS      string   `json:"vcs,omitempty"`
+	Name      string   `json:"name"`
+	Path      string   `json:"path"`
+	Keywords  []string `json:"keywords"`
+	VCS       string   `json:"vcs,omitempty"`
+	UpdatedAt int64    `json:"updated_at"`
 }
 
 type ListResult struct {

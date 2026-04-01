@@ -28,6 +28,10 @@ export const workspaceApi = {
     );
   },
 
+  removeWorkspace(path: string) {
+    return request.post<null, { path: string }>("/workspace/delete", { path });
+  },
+
   getWorkspaceFiles(workspacePath: string) {
     return request.get<WorkspaceFilesResponse>("/workspace/files", {
       params: {

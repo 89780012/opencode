@@ -23,7 +23,7 @@ const mark = (status?: ChatFileDiff["status"]) => {
 
 export function ReviewFileList(props: Props) {
   return (
-    <div className="flex h-full min-h-0 w-full shrink-0 flex-col border-b border-sidebar-border bg-sidebar text-sidebar-foreground lg:w-[280px] lg:border-r lg:border-b-0">
+    <div className="flex h-full min-h-0 w-full shrink-0 flex-col border-b border-sidebar-border bg-sidebar text-sidebar-foreground lg:w-[320px] lg:border-r lg:border-b-0">
       <div className="flex items-center justify-between gap-3 border-b border-sidebar-border px-3 py-2">
         <div className="min-w-0">
           <div className="text-sm font-semibold">代表变更</div>
