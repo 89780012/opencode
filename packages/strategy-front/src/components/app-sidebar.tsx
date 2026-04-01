@@ -1,6 +1,6 @@
 "use client"
 
-import { Bot, Command, MessageSquareText, Settings2, PlugZap, ServerCog, Sparkles } from "lucide-react"
+import { Bot, Boxes, Command, MessageSquareText, PlugZap, ServerCog, Settings2, Sparkles } from "lucide-react"
 import { NavLink, useLocation } from "react-router-dom"
 import { useSystem } from "@/components/system/system-provider"
 import {
@@ -23,6 +23,11 @@ const nav = [
     title: "对话",
     url: "/app",
     icon: MessageSquareText,
+  },
+  {
+    title: "组合策略",
+    url: "/app/groups",
+    icon: Boxes,
   },
   {
     title: "提供商",
@@ -99,7 +104,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>主要</SidebarGroupLabel>
+          <SidebarGroupLabel>主导航</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {nav.map((item) => (

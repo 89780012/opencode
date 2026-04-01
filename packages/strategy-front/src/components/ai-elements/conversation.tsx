@@ -24,6 +24,7 @@ const Context = createContext<{
   wrap: RefObject<HTMLDivElement | null>
   bot: boolean
   jump: (mode?: ScrollBehavior) => void
+  setBody: (node: HTMLDivElement | null) => void
 } | null>(null)
 
 function useConversation() {
@@ -43,7 +44,9 @@ export const Conversation = ({ children, className, onScroll, ...props }: Conver
   const frame = useRef(0)
   const last = useRef(true)
   const [bot, setBot] = useState(true)
-  const [ready, setReady] = useState(false)
+  const setBody = useCallback((node: HTMLDivElement | null) => {
+    body.current = node
+  }, [])
 
   const sync = useCallback(() => {
     const node = root.current
@@ -66,7 +69,6 @@ export const Conversation = ({ children, className, onScroll, ...props }: Conver
   useLayoutEffect(() => {
     jump()
     sync()
-    setReady(true)
   }, [jump, sync])
 
   useEffect(() => {
@@ -94,10 +96,10 @@ export const Conversation = ({ children, className, onScroll, ...props }: Conver
   }, [jump, sync])
 
   return (
-    <Context.Provider value={{ body, wrap, bot, jump }}>
-      <div className="relative min-h-0 flex-1" ref={wrap}>
+    <Context.Provider value={{ body, wrap, bot, jump, setBody }}>
+      <div className="relative flex h-full min-h-0 flex-1 flex-col" ref={wrap}>
         <div
-          className={cn("min-h-0 h-full overflow-y-auto", !ready && "invisible", className)}
+          className={cn("flex min-h-0 flex-1 flex-col overflow-y-auto", className)}
           ref={root}
           role="log"
           {...props}
@@ -117,7 +119,13 @@ export type ConversationContentProps = ComponentProps<"div">
 
 export const ConversationContent = ({ className, ...props }: ConversationContentProps) => {
   const ctx = useConversation()
-  return <div className={cn("flex flex-col gap-4 p-4", className)} ref={ctx.body} {...props} />
+  const ref = useCallback(
+    (node: HTMLDivElement | null) => {
+      ctx.setBody(node)
+    },
+    [ctx],
+  )
+  return <div className={cn("flex flex-col gap-4 p-4", className)} ref={ref} {...props} />
 }
 
 export type ConversationEmptyStateProps = ComponentProps<"div"> & {

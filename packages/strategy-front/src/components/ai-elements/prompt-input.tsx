@@ -1,13 +1,8 @@
-"use client";
+"use client"
 
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import {
-  CornerDownLeftIcon,
-  Loader2Icon,
-  SquareIcon,
-  XIcon,
-} from "lucide-react";
+import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
+import { CornerDownLeftIcon, Loader2Icon, SquareIcon, XIcon } from "lucide-react"
 import {
   type ChangeEvent,
   type ComponentProps,
@@ -19,88 +14,71 @@ import {
   useEffect,
   useRef,
   useState,
-} from "react";
+} from "react"
 
-export type PromptInputStatus = "ready" | "submitted" | "streaming" | "error";
+export type PromptInputStatus = "ready" | "submitted" | "streaming" | "error"
 
 export type PromptInputMessage = {
-  text: string;
-  files: [];
-};
+  text: string
+  files: []
+}
 
 type PromptInputContextValue = {
-  value: string;
-  onValueChange: (value: string) => void;
-};
+  value: string
+  onValueChange: (value: string) => void
+}
 
-const PromptInputContext = createContext<PromptInputContextValue | null>(null);
+const PromptInputContext = createContext<PromptInputContextValue | null>(null)
 
 const usePromptInputContext = () => {
-  const context = useContext(PromptInputContext);
+  const context = useContext(PromptInputContext)
   if (!context) {
-    throw new Error("PromptInput components must be used inside PromptInput");
+    throw new Error("PromptInput components must be used inside PromptInput")
   }
-  return context;
-};
+  return context
+}
 
 export type PromptInputProps = Omit<ComponentProps<"form">, "onSubmit"> & {
-  value: string;
-  onValueChange: (value: string) => void;
-  onSubmit: (
-    message: PromptInputMessage,
-    event: FormEvent<HTMLFormElement>,
-  ) => void;
-};
+  value: string
+  onValueChange: (value: string) => void
+  onSubmit: (message: PromptInputMessage, event: FormEvent<HTMLFormElement>) => void
+}
 
-export const PromptInput = ({
-  className,
-  children,
-  value,
-  onValueChange,
-  onSubmit,
-  ...props
-}: PromptInputProps) => {
+export const PromptInput = ({ className, children, value, onValueChange, onSubmit, ...props }: PromptInputProps) => {
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+    event.preventDefault()
     onSubmit(
       {
         text: value,
         files: [],
       },
       event,
-    );
-  };
+    )
+  }
 
   return (
     <PromptInputContext.Provider value={{ value, onValueChange }}>
       <form
-        className={cn(
-          "w-full rounded-2xl border border-[#E5E5E5] bg-background",
-          className,
-        )}
+        className={cn("w-full rounded-2xl border border-[#E5E5E5] bg-background", className)}
         onSubmit={handleSubmit}
         {...props}
       >
         {children}
       </form>
     </PromptInputContext.Provider>
-  );
-};
+  )
+}
 
-export type PromptInputBodyProps = ComponentProps<"div">;
+export type PromptInputBodyProps = ComponentProps<"div">
 
-export const PromptInputBody = ({
-  className,
-  ...props
-}: PromptInputBodyProps) => <div className={cn("p-1", className)} {...props} />;
+export const PromptInputBody = ({ className, ...props }: PromptInputBodyProps) => (
+  <div className={cn("p-1", className)} {...props} />
+)
 
-export type PromptInputTextareaProps = Omit<
-  ComponentProps<"textarea">,
-  "value" | "onChange"
-> & {
-  maxHeight?: number;
-  minHeight?: number;
-};
+export type PromptInputTextareaProps = Omit<ComponentProps<"textarea">, "value" | "onChange"> & {
+  maxHeight?: number
+  minHeight?: number
+}
 
 export const PromptInputTextarea = ({
   className,
@@ -110,59 +88,57 @@ export const PromptInputTextarea = ({
   onKeyDown,
   ...props
 }: PromptInputTextareaProps) => {
-  const { value, onValueChange } = usePromptInputContext();
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [isComposing, setIsComposing] = useState(false);
+  const { value, onValueChange } = usePromptInputContext()
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [isComposing, setIsComposing] = useState(false)
 
   useEffect(() => {
     if (!textareaRef.current) {
-      return;
+      return
     }
-    textareaRef.current.style.height = "auto";
-    textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-  }, [value]);
+    textareaRef.current.style.height = "auto"
+    textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+  }, [value])
 
   const handleChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
-    onValueChange(event.target.value);
-  };
+    onValueChange(event.target.value)
+  }
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    onKeyDown?.(event);
+    onKeyDown?.(event)
     if (event.defaultPrevented) {
-      return;
+      return
     }
 
     if (event.key === "Enter") {
       if (isComposing || event.nativeEvent.isComposing) {
-        return;
+        return
       }
       if (event.shiftKey) {
-        return;
+        return
       }
 
-      const form = event.currentTarget.form;
+      const form = event.currentTarget.form
       if (!form) {
-        return;
+        return
       }
 
-      const submitButton = form.querySelector(
-        'button[type="submit"]',
-      ) as HTMLButtonElement | null;
+      const submitButton = form.querySelector('button[type="submit"]') as HTMLButtonElement | null
 
       if (submitButton?.disabled) {
-        return;
+        return
       }
 
-      event.preventDefault();
-      form.requestSubmit();
+      event.preventDefault()
+      form.requestSubmit()
     }
-  };
+  }
 
   return (
     <textarea
       ref={textareaRef}
       className={cn(
-        "txt w-full resize-none border-none px-2 pt-1 text-lg text-gray-700 outline-none placeholder:text-gray-400",
+        "txt w-full resize-none border-none px-2 pt-1 text-gray-700 outline-none placeholder:text-gray-400",
         className,
       )}
       name="message"
@@ -180,31 +156,22 @@ export const PromptInputTextarea = ({
       value={value}
       {...props}
     />
-  );
-};
+  )
+}
 
-export type PromptInputFooterProps = ComponentProps<"div">;
+export type PromptInputFooterProps = ComponentProps<"div">
 
-export const PromptInputFooter = ({
-  className,
-  ...props
-}: PromptInputFooterProps) => (
-  <div
-    className={cn("flex items-center justify-between p-2", className)}
-    {...props}
-  />
-);
+export const PromptInputFooter = ({ className, ...props }: PromptInputFooterProps) => (
+  <div className={cn("flex items-center justify-between p-2", className)} {...props} />
+)
 
-export type PromptInputToolsProps = ComponentProps<"div">;
+export type PromptInputToolsProps = ComponentProps<"div">
 
-export const PromptInputTools = ({
-  className,
-  ...props
-}: PromptInputToolsProps) => (
+export const PromptInputTools = ({ className, ...props }: PromptInputToolsProps) => (
   <div className={cn("flex items-center gap-2", className)} {...props} />
-);
+)
 
-export type PromptInputButtonProps = ComponentProps<typeof Button>;
+export type PromptInputButtonProps = ComponentProps<typeof Button>
 
 export const PromptInputButton = ({
   className,
@@ -212,22 +179,11 @@ export const PromptInputButton = ({
   variant = "ghost",
   size = "sm",
   ...props
-}: PromptInputButtonProps) => (
-  <Button
-    className={cn(className)}
-    size={size}
-    type={type}
-    variant={variant}
-    {...props}
-  />
-);
+}: PromptInputButtonProps) => <Button className={cn(className)} size={size} type={type} variant={variant} {...props} />
 
-export type PromptInputSubmitProps = Omit<
-  ComponentProps<typeof Button>,
-  "children"
-> & {
-  status?: PromptInputStatus;
-};
+export type PromptInputSubmitProps = Omit<ComponentProps<typeof Button>, "children"> & {
+  status?: PromptInputStatus
+}
 
 export const PromptInputSubmit = ({
   className,
@@ -236,32 +192,23 @@ export const PromptInputSubmit = ({
   variant = "default",
   ...props
 }: PromptInputSubmitProps) => {
-  let icon = <CornerDownLeftIcon className="size-4" />;
+  let icon = <CornerDownLeftIcon className="size-4" />
 
   if (status === "submitted") {
-    icon = <Loader2Icon className="size-4 animate-spin" />;
+    icon = <Loader2Icon className="size-4 animate-spin" />
   } else if (status === "streaming") {
-    icon = <SquareIcon className="size-4" />;
+    icon = <SquareIcon className="size-4" />
   } else if (status === "error") {
-    icon = <XIcon className="size-4" />;
+    icon = <XIcon className="size-4" />
   }
 
   return (
-    <Button
-      aria-label="Submit"
-      className={cn(className)}
-      size={size}
-      type="submit"
-      variant={variant}
-      {...props}
-    >
+    <Button aria-label="Submit" className={cn(className)} size={size} type="submit" variant={variant} {...props}>
       {icon}
     </Button>
-  );
-};
+  )
+}
 
-export type PromptInputProviderProps = PropsWithChildren;
+export type PromptInputProviderProps = PropsWithChildren
 
-export const PromptInputProvider = ({ children }: PromptInputProviderProps) => (
-  <>{children}</>
-);
+export const PromptInputProvider = ({ children }: PromptInputProviderProps) => <>{children}</>

@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	cfg "strategy-service/internal/config"
+	"strategy-service/internal/group"
 	"strategy-service/internal/oprun"
 	rt "strategy-service/internal/runtime"
 	"strategy-service/internal/smartx"
@@ -12,6 +13,7 @@ import (
 
 type API struct {
 	rt  *rt.Service
+	gs  *group.Service
 	ws  *workspace.Service
 	op  *oprun.Manager
 	cfg *cfg.Store
@@ -31,11 +33,15 @@ func NewAPI(run *rt.Service, op *oprun.Manager, cfg *cfg.Store, sx *smartx.Servi
 
 // Register mounts all API routes onto the provided mux.
 func (a *API) Register(mux *http.ServeMux) {
+	a.gs = group.NewService(a.ws)
 	mux.HandleFunc("/api/health", a.health)
 	mux.HandleFunc("/api/opencode/agents", a.opencodeAgents)
 	mux.HandleFunc("/api/opencode/agents/", a.opencodeAgent)
 	mux.HandleFunc("/api/opencode/skills", a.opencodeSkills)
 	mux.HandleFunc("/api/opencode/skills/", a.opencodeSkill)
+	mux.HandleFunc("/api/group/list", a.groupList)
+	mux.HandleFunc("/api/group/detail", a.groupDetail)
+	mux.HandleFunc("/api/group/create", a.groupCreate)
 	mux.HandleFunc("/api/workspace/list", a.workspaceList)
 	mux.HandleFunc("/api/workspace/create", a.workspaceCreate)
 	mux.HandleFunc("/api/workspace/open", a.workspaceOpen)

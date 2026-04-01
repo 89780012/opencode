@@ -14,6 +14,8 @@ const ProviderPage = lazy(() => import("@/pages/providers"))
 const ProviderOverviewPage = lazy(() => import("@/pages/providers-overview"))
 const ProviderModelsPage = lazy(() => import("@/pages/providers-models"))
 const SkillPage = lazy(() => import("@/pages/skills"))
+const GroupsPage = lazy(() => import("@/pages/groups"))
+const GroupDetailPage = lazy(() => import("@/pages/group-detail"))
 
 function LegacyPage() {
   const route = useLocation()
@@ -89,6 +91,19 @@ const router = createBrowserRouter([
       {
         path: "skills",
         element: <SkillPage />,
+      },
+      {
+        path: "groups",
+        children: [
+          {
+            index: true,
+            element: <GroupsPage />,
+          },
+          {
+            path: ":groupID",
+            element: <GroupDetailPage />,
+          },
+        ],
       },
     ],
   },

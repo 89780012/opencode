@@ -1,10 +1,10 @@
 import { FolderOpen, MessageSquareText } from "lucide-react"
 import { useState } from "react"
-import { useWorkspaceList } from "@/data/global-data-provider"
 import { SessionSidebarPanel } from "@/components/chat/session-sidebar-panel"
 import { SidebarHeader } from "@/components/ui/sidebar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { LocalWorkspaceTab } from "@/components/workspace/local-workspace-tab"
+import { useWorkspaceList } from "@/data/global-data-provider"
 
 type Tab = "workspace" | "session"
 
@@ -21,9 +21,7 @@ export function HomeSidebarPanel(props: Props) {
       <SidebarHeader className="gap-3 border-b p-3">
         <div className="space-y-1">
           <div className="text-sm font-semibold">对话工作台</div>
-          <p className="text-xs leading-5 text-muted-foreground">
-            先选择工作区，再切到会话标签查看或创建该工作区下的会话。
-          </p>
+          <p className="text-xs leading-5 text-muted-foreground">先选择工作区，再查看或创建该工作区下的会话。</p>
         </div>
         <TabsList className="grid h-9 w-full grid-cols-2">
           <TabsTrigger value="workspace" className="gap-2">

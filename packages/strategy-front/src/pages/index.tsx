@@ -271,7 +271,12 @@ export default function Home() {
             <div className="pointer-events-auto inline-flex items-center gap-1 rounded-full border bg-background/95 p-1 shadow-sm backdrop-blur">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="size-8 rounded-full" onClick={() => setNav((prev) => !prev)}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-8 rounded-full"
+                    onClick={() => setNav((prev) => !prev)}
+                  >
                     {nav ? <PanelLeftClose className="size-4" /> : <PanelLeftOpen className="size-4" />}
                   </Button>
                 </TooltipTrigger>
@@ -302,9 +307,19 @@ export default function Home() {
             </div>
             <div className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 px-24 text-center">
               <div className="text-sm font-medium">
-                <span className="inline-block max-w-full truncate rounded-full bg-background/90 px-3 py-1 shadow-sm backdrop-blur">
+                {workspace ? (
+                  <>
+                    <span className="inline-block max-w-full truncate rounded-full bg-background/90 px-3 py-1 shadow-sm backdrop-blur">
+                      {workspace.name}
+                    </span>
+                    <span className="mx-2 inline-block max-w-full truncate rounded-full bg-background/90 px-3 py-1 shadow-sm backdrop-blur"></span>
+                  </>
+                ) : (
+                  <div></div>
+                )}
+                {/* <span className="inline-block max-w-full truncate rounded-full bg-background/90 px-3 py-1 shadow-sm backdrop-blur">
                   {workspace?.name ?? "未选择工作区"}
-                </span>
+                </span> */}
               </div>
             </div>
           </div>
