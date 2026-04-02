@@ -14,6 +14,7 @@ import (
 	cfg "strategy-service/internal/config"
 	"strategy-service/internal/logs"
 	"strategy-service/internal/meta"
+	"strategy-service/internal/proc"
 	rt "strategy-service/internal/runtime"
 	"strategy-service/internal/smartx"
 )
@@ -164,6 +165,7 @@ func version(ctx context.Context, path string) string {
 	defer cancel()
 
 	cmd := exec.CommandContext(sub, path, "--version")
+	proc.Hide(cmd)
 	out, err := cmd.CombinedOutput()
 	text := strings.TrimSpace(string(out))
 	if err != nil {
