@@ -101,6 +101,20 @@ export default function StrategyDetailPage() {
     }
   }, [createSession])
 
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true)
+    try {
+      await refresh()
+    } catch (err) {
+      console.error("Failed to refresh", err)
+      toast.error("刷新失败")
+    } finally {
+      setIsRefreshing(false)
+    }
+  }, [refresh])
+
   if (loading && !workspace) {
     return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">正在加载策略...</div>
   }
@@ -117,9 +131,9 @@ export default function StrategyDetailPage() {
               返回列表
             </Link>
           </Button>
-          <Button variant="outline" onClick={() => void refresh()}>
-            <RefreshCw className="size-4" />
-            刷新
+          <Button variant="outline" onClick={handleRefresh} disabled={isRefreshing}>
+            <RefreshCw className={`size-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? '刷新中...' : '刷新'}
           </Button>
         </div>
       </div>
@@ -138,9 +152,9 @@ export default function StrategyDetailPage() {
               返回列表
             </Link>
           </Button>
-          <Button variant="outline" onClick={() => void refresh()}>
-            <RefreshCw className="size-4" />
-            刷新
+          <Button variant="outline" onClick={handleRefresh} disabled={isRefreshing}>
+            <RefreshCw className={`size-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? '刷新中...' : '刷新'}
           </Button>
         </div>
       </div>
@@ -188,9 +202,9 @@ export default function StrategyDetailPage() {
                 <FolderCode className="size-4" />
                 查看代码
               </Button>
-              <Button variant="outline" size="sm" className={ctrl} onClick={() => void refresh()}>
-                <RefreshCw className="size-4" />
-                刷新
+              <Button variant="outline" size="sm" className={ctrl} onClick={handleRefresh} disabled={isRefreshing}>
+                <RefreshCw className={`size-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                {isRefreshing ? '刷新中...' : '刷新'}
               </Button>
             </div>
           </div>

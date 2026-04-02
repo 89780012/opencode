@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { ArrowLeft, RefreshCw } from "lucide-react"
 import { Link, useSearchParams } from "react-router-dom"
 import { Button } from "@/components/ui/button"
@@ -92,6 +92,16 @@ export default function StrategyMultiPage() {
   const list = useMemo(() => items.filter((item): item is (typeof workspaces)[number] => !!item), [items])
   const missing = useMemo(() => items.some((item) => !item), [items])
   const invalid = paths.length < 2 || paths.length > 3
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refresh();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   if (loading && list.length === 0) {
     return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">正在加载多屏工作区...</div>
@@ -135,9 +145,9 @@ export default function StrategyMultiPage() {
               <div className="text-xs text-muted-foreground">已选择 {list.length} 个策略工作区，正在并行开发。</div>
             </div>
           </div>
-          <Button variant="outline" size="sm" className={ctrl} onClick={() => void refresh()}>
-            <RefreshCw className="size-4" />
-            刷新
+          <Button variant="outline" size="sm" className={ctrl} onClick={handleRefresh} disabled={isRefreshing}>
+            <RefreshCw className={`size-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? '刷新中...' : '刷新'}
           </Button>
         </div>
       </div>

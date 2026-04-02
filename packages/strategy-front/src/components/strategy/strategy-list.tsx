@@ -128,7 +128,7 @@ function Row(props: {
         }
       }}
     >
-      <div className={cn("absolute inset-x-0 top-0 h-20 bg-gradient-to-b", ui.shell)} />
+      {/* <div className={cn("absolute inset-x-0 top-0 h-20 bg-gradient-to-b", ui.shell)} /> */}
 
       <div className="relative flex h-full flex-col px-4 pb-4 pt-4">
         <div className="flex items-center justify-between gap-3">

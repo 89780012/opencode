@@ -260,17 +260,13 @@ export const ChatMessageList = memo(function ChatMessageList(props: Props) {
         ) : null}
         {props.status?.type === "busy" ? (
           <Message from="assistant">
-            <MessageContent>
-              <div className="flex items-center justify-center py-2">
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              </div>
-            </MessageContent>
+            <MessageContent>Loading...</MessageContent>
           </Message>
         ) : null}
         {props.status?.type === "retry" ? (
           <Message from="assistant">
             <MessageContent>
-              重试中 #{props.status.attempt}: {props.status.message}
+              Retry #{props.status.attempt}: {props.status.message}
             </MessageContent>
           </Message>
         ) : null}
