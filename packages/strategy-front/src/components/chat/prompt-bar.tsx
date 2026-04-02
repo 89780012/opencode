@@ -98,21 +98,6 @@ export function PromptBar(props: Props) {
               ))}
             </SelectContent>
           </Select>
-          {/* {props.variants.length > 0 ? (
-            <Select disabled={props.disabled} onValueChange={props.onVariant} value={props.variant ?? "default"}>
-              <SelectTrigger className={`${item} max-w-[120px]`}>
-                <SelectValue placeholder="默认" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="default">默认</SelectItem>
-                {props.variants.map((item) => (
-                  <SelectItem key={item} value={item}>
-                    {item}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : null} */}
         </div>
         <PromptInputSubmit
           className={props.compact ? "size-8" : undefined}

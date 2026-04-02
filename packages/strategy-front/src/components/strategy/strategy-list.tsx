@@ -41,14 +41,6 @@ function sourceLabel(value?: string) {
   return "用户创建"
 }
 
-function subtitle(item: LocalWorkspace) {
-  if (item.missing) return "本地目录暂不可用"
-  if (item.type === "python") return "Python 策略工作区"
-  if (item.type === "js") return "JavaScript 策略工作区"
-  if (item.type === "other") return "自定义策略工作区"
-  return "SmartX 策略工作区"
-}
-
 function tone(value?: string) {
   if (value === "python") {
     return {
@@ -149,8 +141,6 @@ function Row(props: {
                 <div className="truncate text-[18px] font-semibold tracking-tight text-foreground">
                   {props.item.name}
                 </div>
-                {/* <span className="shrink-0 text-muted-foreground/50">·</span> */}
-                {/* <p className="min-w-0 truncate text-sm leading-6 text-muted-foreground">{subtitle(props.item)}</p> */}
               </div>
             </div>
           </div>

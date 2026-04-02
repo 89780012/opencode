@@ -30,7 +30,7 @@ export function WorkspaceDetailDialog(props: Props) {
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className="top-4 right-4 bottom-4 left-4 flex h-auto w-auto max-w-none min-w-0 translate-x-0 translate-y-0 flex-col gap-0 p-0">
+      <DialogContent className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex h-[75%] w-[75%] max-w-none min-w-0 flex-col gap-0 p-0">
         <DialogHeader className="border-b px-6 py-4">
           <DialogTitle>{props.workspace?.name ?? "工作区详情"}</DialogTitle>
         </DialogHeader>
