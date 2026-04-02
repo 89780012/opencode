@@ -11,7 +11,7 @@ export type Guide = {
 }
 
 export type GroupMode = "split" | "parallel"
-export type StrategyType = "smartx" | "python" | "js"
+export type StrategyType = "smartx" | "python" | "js" | "其他"
 
 export function createGuide(): Guide {
   return {

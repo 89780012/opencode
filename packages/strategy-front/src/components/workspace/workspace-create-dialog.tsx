@@ -20,7 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAgentList, useProviderList, useWorkspaceList } from "@/data/global-data-provider"
 import { useProjectComposer } from "@/hooks/use-project-composer"
 import { resolveComposer } from "@/lib/chat-composer"
-import { buildStrategyPrompt, buildTemplatePrompt, createGuide, type StrategyType } from "@/lib/strategy-guide"
+import { buildStrategyPrompt, buildTemplatePrompt, createGuide } from "@/lib/strategy-guide"
 import { encodeStrategyPath } from "@/lib/strategy-path"
 
 interface Props {
@@ -28,6 +28,8 @@ interface Props {
   onOpenChange: (open: boolean) => void
   onDone?: () => void
 }
+
+type Kind = "smartx" | "python" | "js"
 
 const kinds = ["趋势", "均值回归", "突破", "网格", "套利", "自定义"]
 const markets = ["加密", "股票", "ETF", "期货", "外汇"]
@@ -39,7 +41,7 @@ const styles = ["保守", "平衡", "激进"]
 const steps = ["类型", "配置", "确认"]
 
 const cards: Record<
-  StrategyType,
+  Kind,
   {
     title: string
     desc: string
@@ -136,7 +138,7 @@ function Dot(props: { active: boolean; done: boolean; text: string; step: number
 export function WorkspaceCreateDialog(props: Props) {
   const nav = useNavigate()
   const { basePath, refresh, select } = useWorkspaceList()
-  const [kind, setKind] = useState<StrategyType>("smartx")
+  const [kind, setKind] = useState<Kind>("smartx")
   const ags = useAgentList(kind)
   const catalog = useProviderList()
   const project = useProjectComposer(kind)
@@ -310,7 +312,7 @@ export function WorkspaceCreateDialog(props: Props) {
                             ? "border-emerald-300 bg-emerald-50/70 ring-1 ring-emerald-100 dark:border-[#4d6f62] dark:bg-[#15201c] dark:ring-[#30453d]"
                             : "border-slate-200/80 bg-white/90 hover:border-emerald-200 hover:bg-emerald-50/50 dark:border-[#26302c] dark:bg-[#141918] dark:hover:border-[#355145] dark:hover:bg-[#18201d]"
                         }`}
-                        onClick={() => setKind(key as StrategyType)}
+                        onClick={() => setKind(key as Kind)}
                       >
                         <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-[#eef5f1]">
                           {item.icon}

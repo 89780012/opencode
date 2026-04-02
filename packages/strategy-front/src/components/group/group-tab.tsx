@@ -12,6 +12,7 @@ export function GroupTab() {
   const nav = useNavigate()
   const { groups, loading, error, refresh } = useGroupList()
   const [open, setOpen] = useState(false)
+  const occupied = groups.flatMap((group) => group.items.map((item) => item.path))
 
   const onSelect = (group: StrategyGroup) => {
     nav(`/app/groups/${group.id}`)
@@ -38,12 +39,19 @@ export function GroupTab() {
       <SidebarContent className="overflow-hidden">
         <SidebarGroup className="h-full px-0">
           <SidebarGroupContent className="h-full overflow-hidden">
-            <GroupList groups={groups} loading={loading} error={error} onRetry={() => void refresh()} onSelect={onSelect} />
+            <GroupList
+              groups={groups}
+              loading={loading}
+              error={error}
+              onRetry={() => void refresh()}
+              onSelect={onSelect}
+              onDelete={() => {}}
+            />
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
 
-      <GroupCreateDialog open={open} onOpenChange={setOpen} onDone={() => void refresh()} />
+      <GroupCreateDialog open={open} onOpenChange={setOpen} onDone={() => void refresh()} occupied={occupied} />
     </>
   )
 }

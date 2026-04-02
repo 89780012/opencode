@@ -32,7 +32,7 @@ interface Props {
   variants: string[]
   creating: boolean
   load?: boolean
-  onCreate: () => Promise<unknown>
+  onCreate: () => Promise<string>
   onSelectSession: (value: string | null) => void
   onAgent: (value: string) => void
   onModel: (value: string) => void
