@@ -1,7 +1,22 @@
-# Strategy Workspace
+# 通用策略工作区
 
-This workspace is managed by `strategy-service`.
+这是一个由 `strategy-service` 管理的通用工作区模板。
 
-- Add your own files here.
-- Import existing code or notes as needed.
-- Use chat to keep iterating on the workspace.
+它不预置量化策略目录，也不绑定 SmartX、JavaScript 或 Python 的固定工程结构，更适合下面这类场景：
+
+- 先整理已有项目、笔记或研究材料
+- 先写 README、方案说明、任务拆分，再逐步补代码
+- 让 AI 先根据补充说明规划目录结构和实现路径
+
+## 当前特点
+
+- 默认结构最小化
+- 不预置策略入口文件
+- 不预置指标、信号、风控、回测模块
+- 适合作为“从说明开始”的空白工作区
+
+## 建议用法
+
+- 把现有代码、文档或数据拷贝进来
+- 先补充项目目标、范围和下一步计划
+- 再通过对话让 AI 逐步生成所需目录和文件

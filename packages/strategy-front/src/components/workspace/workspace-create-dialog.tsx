@@ -5,7 +5,14 @@ import { toast } from "sonner"
 import { chatApi, workspaceApi } from "@/api/modules"
 import { AutoResizeTextarea } from "@/components/ui/AutoResizeTextarea"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -42,10 +49,34 @@ const styles = ["保守", "平衡", "激进"]
 const steps = ["类型", "配置", "确认"]
 
 const cards: Record<StrategyType, { title: string; desc: string; template: string; icon: ReactNode; root: string }> = {
-  smartx: { title: "SmartX 策略", desc: "适合直接落地成可运行策略工程。", template: "smartx_plugin_python", icon: <Target className="size-4" />, root: "~/.xtp-smart/plugins" },
-  python: { title: "Python 策略", desc: "适合研究、回测与快速迭代。", template: "python_basic", icon: <Cpu className="size-4" />, root: "~/.strategy-service/workspaces" },
-  js: { title: "JS 策略", desc: "适合脚手架、信号实验与服务集成。", template: "js_basic", icon: <Code2 className="size-4" />, root: "~/.strategy-service/workspaces" },
-  other: { title: "其他", desc: "适合整理已有项目或从 README 开始规划。", template: "other_basic", icon: <FileText className="size-4" />, root: "~/.strategy-service/workspaces" },
+  smartx: {
+    title: "SmartX 策略",
+    desc: "适合直接落地成可运行策略工程。",
+    template: "smartx_plugin_python",
+    icon: <Target className="size-4" />,
+    root: "~/.xtp-smart/plugins",
+  },
+  python: {
+    title: "Python 策略",
+    desc: "适合研究、回测与快速迭代, 不依赖SmartX。",
+    template: "python_basic",
+    icon: <Cpu className="size-4" />,
+    root: "~/.strategy-service/workspaces",
+  },
+  js: {
+    title: "JS 策略",
+    desc: "适合脚手架、信号实验与服务集成,不依赖SmartX。",
+    template: "js_basic",
+    icon: <Code2 className="size-4" />,
+    root: "~/.strategy-service/workspaces",
+  },
+  other: {
+    title: "其他",
+    desc: "适合整理已有项目或从 README 开始规划,不依赖SmartX。",
+    template: "other_basic",
+    icon: <FileText className="size-4" />,
+    root: "~/.strategy-service/workspaces",
+  },
 }
 
 function note(err: unknown, fallback: string) {
@@ -69,7 +100,11 @@ function Chip(props: { active: boolean; text: string; onClick: () => void }) {
   return (
     <button
       type="button"
-      className={props.active ? "rounded-full border border-emerald-500/30 bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white" : "rounded-full border border-slate-200/80 bg-white/90 px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-emerald-200 hover:bg-emerald-50/70 hover:text-slate-900 dark:border-[#26302c] dark:bg-[#131817] dark:text-[#b8c5bf]"}
+      className={
+        props.active
+          ? "rounded-full border border-emerald-500/30 bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white"
+          : "rounded-full border border-slate-200/80 bg-white/90 px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-emerald-200 hover:bg-emerald-50/70 hover:text-slate-900 dark:border-[#26302c] dark:bg-[#131817] dark:text-[#b8c5bf]"
+      }
       onClick={props.onClick}
     >
       {props.text}
@@ -92,10 +127,22 @@ function Block(props: { title: string; hint?: string; children: ReactNode }) {
 function Dot(props: { active: boolean; done: boolean; text: string; step: number }) {
   return (
     <div className="flex items-center gap-2">
-      <div className={props.active || props.done ? "flex size-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-semibold text-white dark:bg-[#7aa590] dark:text-[#08110e]" : "flex size-7 items-center justify-center rounded-full bg-slate-100 text-[11px] font-semibold text-slate-500 dark:bg-[#1a211f] dark:text-[#77827d]"}>
+      <div
+        className={
+          props.active || props.done
+            ? "flex size-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-semibold text-white dark:bg-[#7aa590] dark:text-[#08110e]"
+            : "flex size-7 items-center justify-center rounded-full bg-slate-100 text-[11px] font-semibold text-slate-500 dark:bg-[#1a211f] dark:text-[#77827d]"
+        }
+      >
         {props.step}
       </div>
-      <div className={props.active || props.done ? "text-sm font-medium text-slate-900 dark:text-[#eef5f1]" : "text-sm text-slate-500 dark:text-[#77827d]"}>
+      <div
+        className={
+          props.active || props.done
+            ? "text-sm font-medium text-slate-900 dark:text-[#eef5f1]"
+            : "text-sm text-slate-500 dark:text-[#77827d]"
+        }
+      >
         {props.text}
       </div>
     </div>
@@ -109,7 +156,10 @@ export function WorkspaceCreateDialog(props: Props) {
   const ags = useAgentList(kind)
   const catalog = useProviderList()
   const project = useProjectComposer(kind)
-  const composer = useMemo(() => resolveComposer({ agents: ags.ags, catalog, state: project.state }), [ags.ags, catalog, project.state])
+  const composer = useMemo(
+    () => resolveComposer({ agents: ags.ags, catalog, state: project.state }),
+    [ags.ags, catalog, project.state],
+  )
   const [step, setStep] = useState(0)
   const [panel, setPanel] = useState("market")
   const [name, setName] = useState("")
@@ -201,13 +251,25 @@ export function WorkspaceCreateDialog(props: Props) {
   }
 
   return (
-    <Dialog open={props.open} onOpenChange={(open) => { props.onOpenChange(open); if (!open) reset() }}>
+    <Dialog
+      open={props.open}
+      onOpenChange={(open) => {
+        props.onOpenChange(open)
+        if (!open) reset()
+      }}
+    >
       <DialogContent className="flex h-[min(760px,calc(100dvh-32px))] max-h-[calc(100dvh-32px)] w-[min(820px,calc(100vw-24px))] max-w-[1240px] flex-col gap-0 overflow-hidden rounded-[30px] border border-slate-200/80 bg-[#fcfcfa] p-0 shadow-[0_28px_90px_rgba(15,23,42,0.14)] dark:border-[#252e2b] dark:bg-[#101514]">
         <div className="border-b border-slate-200/70 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.14),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(249,250,251,0.94))] px-5 py-4 dark:border-[#202725] dark:bg-[radial-gradient(circle_at_top_left,rgba(122,165,144,0.2),transparent_32%),linear-gradient(180deg,rgba(17,22,21,0.98),rgba(15,20,19,0.95))]">
           <DialogHeader className="mb-3 gap-1 text-left">
-            <div className="text-[11px] font-medium uppercase tracking-[0.24em] text-emerald-700/80 dark:text-[#8eb7a5]">Strategy Lab</div>
-            <DialogTitle className="text-[22px] font-semibold tracking-[0.01em] text-slate-900 dark:text-[#eef5f1]">新建策略</DialogTitle>
-            <DialogDescription className="text-sm leading-6 text-slate-600 dark:text-[#95a39d]">先选择模板，再补齐市场、指标、规则、风控与输出要求。</DialogDescription>
+            <div className="text-[11px] font-medium uppercase tracking-[0.24em] text-emerald-700/80 dark:text-[#8eb7a5]">
+              Strategy Lab
+            </div>
+            <DialogTitle className="text-[22px] font-semibold tracking-[0.01em] text-slate-900 dark:text-[#eef5f1]">
+              新建策略
+            </DialogTitle>
+            <DialogDescription className="text-sm leading-6 text-slate-600 dark:text-[#95a39d]">
+              先选择模板，再补齐市场、指标、规则、风控与输出要求。
+            </DialogDescription>
           </DialogHeader>
           <div className="flex flex-wrap items-center gap-2">
             {steps.map((item, i) => (
@@ -225,20 +287,47 @@ export function WorkspaceCreateDialog(props: Props) {
               <Block title="策略名称" hint="用于工作区目录和默认会话标题">
                 <Label htmlFor="workspace-name">策略名称</Label>
                 <div className="mt-2 grid gap-2 md:grid-cols-[minmax(0,1fr)_180px_auto]">
-                  <Input id="workspace-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="例如：stock-trend" className="h-11 rounded-2xl border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80" />
-                  <Input id="workspace-tail" value={tailname} onChange={(event) => setTailname(event.target.value)} placeholder="随机后缀" className="h-11 rounded-2xl border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80" />
-                  <Button type="button" variant="outline" className="h-11 rounded-2xl border-slate-200/80 bg-white/90 px-3 shadow-none dark:border-[#2c3532] dark:bg-[#151918]" onClick={() => setTailname(tail())}>
+                  <Input
+                    id="workspace-name"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder="例如：stock-trend"
+                    className="h-11 rounded-2xl border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80"
+                  />
+                  <Input
+                    id="workspace-tail"
+                    value={tailname}
+                    onChange={(event) => setTailname(event.target.value)}
+                    placeholder="随机后缀"
+                    className="h-11 rounded-2xl border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 rounded-2xl border-slate-200/80 bg-white/90 px-3 shadow-none dark:border-[#2c3532] dark:bg-[#151918]"
+                    onClick={() => setTailname(tail())}
+                  >
                     <RefreshCw className="size-4" />
                   </Button>
                 </div>
-                <div className="mt-2 text-xs text-slate-500 dark:text-[#809088]">{full ? `创建目录将使用：${full}` : "请填写策略名称，后缀可修改或刷新"}</div>
+                <div className="mt-2 text-xs text-slate-500 dark:text-[#809088]">
+                  {full ? `创建目录将使用：${full}` : "请填写策略名称，后缀可修改或刷新"}
+                </div>
               </Block>
 
               <Block title="策略模板" hint="模板决定初始工程结构与默认 agent">
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                   {Object.entries(cards).map(([key, item]) => (
-                    <button key={key} type="button" className={`rounded-[22px] border px-4 py-4 text-left transition-all ${kind === key ? "border-emerald-300 bg-emerald-50/70 ring-1 ring-emerald-100 dark:border-[#4d6f62] dark:bg-[#15201c]" : "border-slate-200/80 bg-white/90 hover:border-emerald-200 hover:bg-emerald-50/50 dark:border-[#26302c] dark:bg-[#141918]"}`} onClick={() => setKind(key as StrategyType)}>
-                      <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-[#eef5f1]">{item.icon}{item.title}</div>
+                    <button
+                      key={key}
+                      type="button"
+                      className={`rounded-[22px] border px-4 py-4 text-left transition-all ${kind === key ? "border-emerald-300 bg-emerald-50/70 ring-1 ring-emerald-100 dark:border-[#4d6f62] dark:bg-[#15201c]" : "border-slate-200/80 bg-white/90 hover:border-emerald-200 hover:bg-emerald-50/50 dark:border-[#26302c] dark:bg-[#141918]"}`}
+                      onClick={() => setKind(key as StrategyType)}
+                    >
+                      <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-[#eef5f1]">
+                        {item.icon}
+                        {item.title}
+                      </div>
                       <div className="text-xs leading-5 text-slate-600 dark:text-[#93a39c]">{item.desc}</div>
                       <div className="mt-3 text-[11px] text-slate-500 dark:text-[#809088]">模板：{item.template}</div>
                     </button>
@@ -247,8 +336,13 @@ export function WorkspaceCreateDialog(props: Props) {
               </Block>
 
               <div className="grid gap-3 md:grid-cols-[1.2fr_0.8fr]">
-                <div className="rounded-[24px] border border-emerald-200/70 bg-[linear-gradient(180deg,rgba(236,253,245,0.9),rgba(255,255,255,0.8))] px-4 py-3 text-sm leading-6 text-emerald-950/80 dark:border-[#29443b] dark:bg-[linear-gradient(180deg,rgba(20,33,28,0.95),rgba(17,22,21,0.95))] dark:text-[#a7c3b8]">Python、JS 和 SmartX 现在共用一套详细策略画像表单，默认市场是股票。</div>
-                <div className="rounded-[24px] border border-slate-200/80 bg-white/80 px-4 py-3 text-xs leading-6 text-slate-500 dark:border-[#26302c] dark:bg-[#141918] dark:text-[#83928c]">工作区目录<div className="truncate text-sm font-medium text-slate-900 dark:text-[#eef5f1]">{card.root}</div></div>
+                <div className="rounded-[24px] border border-emerald-200/70 bg-[linear-gradient(180deg,rgba(236,253,245,0.9),rgba(255,255,255,0.8))] px-4 py-3 text-sm leading-6 text-emerald-950/80 dark:border-[#29443b] dark:bg-[linear-gradient(180deg,rgba(20,33,28,0.95),rgba(17,22,21,0.95))] dark:text-[#a7c3b8]">
+                  Python、JS 和 SmartX 现在共用一套详细策略画像表单，默认市场是股票。
+                </div>
+                <div className="rounded-[24px] border border-slate-200/80 bg-white/80 px-4 py-3 text-xs leading-6 text-slate-500 dark:border-[#26302c] dark:bg-[#141918] dark:text-[#83928c]">
+                  工作区目录
+                  <div className="truncate text-sm font-medium text-slate-900 dark:text-[#eef5f1]">{card.root}</div>
+                </div>
               </div>
             </div>
           ) : null}
@@ -259,61 +353,306 @@ export function WorkspaceCreateDialog(props: Props) {
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-slate-200/70 bg-white/80 px-4 py-3 dark:border-[#26302c] dark:bg-[#141918]">
                   <div>
                     <div className="text-sm font-semibold text-slate-900 dark:text-[#eef5f1]">补齐策略画像</div>
-                    <div className="text-xs text-slate-500 dark:text-[#809088]">统一描述市场、指标、交易规则、风控和输出要求。</div>
+                    <div className="text-xs text-slate-500 dark:text-[#809088]">
+                      统一描述市场、指标、交易规则、风控和输出要求。
+                    </div>
                   </div>
-                  <div className="rounded-full border border-emerald-200/80 bg-emerald-50/80 px-3 py-1 text-xs font-medium text-emerald-900 dark:border-[#355145] dark:bg-[#17211d] dark:text-[#a8c6bb]">{guide.kind} / {guide.market} / {guide.tf}</div>
+                  <div className="rounded-full border border-emerald-200/80 bg-emerald-50/80 px-3 py-1 text-xs font-medium text-emerald-900 dark:border-[#355145] dark:bg-[#17211d] dark:text-[#a8c6bb]">
+                    {guide.kind} / {guide.market} / {guide.tf}
+                  </div>
                 </div>
                 <TabsList className="grid h-11 w-full grid-cols-4 rounded-2xl bg-slate-100/90 p-1 dark:bg-[#171d1b]">
-                  <TabsTrigger value="market" className="rounded-xl px-3 text-sm">市场</TabsTrigger>
-                  <TabsTrigger value="logic" className="rounded-xl px-3 text-sm">逻辑</TabsTrigger>
-                  <TabsTrigger value="risk" className="rounded-xl px-3 text-sm">风控</TabsTrigger>
-                  <TabsTrigger value="output" className="rounded-xl px-3 text-sm">输出</TabsTrigger>
+                  <TabsTrigger value="market" className="rounded-xl px-3 text-sm">
+                    市场
+                  </TabsTrigger>
+                  <TabsTrigger value="logic" className="rounded-xl px-3 text-sm">
+                    逻辑
+                  </TabsTrigger>
+                  <TabsTrigger value="risk" className="rounded-xl px-3 text-sm">
+                    风控
+                  </TabsTrigger>
+                  <TabsTrigger value="output" className="rounded-xl px-3 text-sm">
+                    输出
+                  </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="market" className="space-y-4">
-                  <Block title="策略框架"><div className="flex flex-wrap gap-2">{kinds.map((item) => <Chip key={item} text={item} active={guide.kind === item} onClick={() => setGuide((prev) => ({ ...prev, kind: item }))} />)}</div></Block>
+                  <Block title="策略框架">
+                    <div className="flex flex-wrap gap-2">
+                      {kinds.map((item) => (
+                        <Chip
+                          key={item}
+                          text={item}
+                          active={guide.kind === item}
+                          onClick={() => setGuide((prev) => ({ ...prev, kind: item }))}
+                        />
+                      ))}
+                    </div>
+                  </Block>
                   <div className="grid gap-4 xl:grid-cols-3">
-                    <Block title="市场"><div className="flex flex-wrap gap-2">{markets.map((item) => <Chip key={item} text={item} active={guide.market === item} onClick={() => setGuide((prev) => ({ ...prev, market: item }))} />)}</div></Block>
-                    <Block title="标的池"><div className="flex flex-wrap gap-2">{pools.map((item) => <Chip key={item} text={item} active={guide.pool === item} onClick={() => setGuide((prev) => ({ ...prev, pool: item }))} />)}</div></Block>
-                    <Block title="周期"><div className="flex flex-wrap gap-2">{tfs.map((item) => <Chip key={item} text={item} active={guide.tf === item} onClick={() => setGuide((prev) => ({ ...prev, tf: item }))} />)}</div></Block>
+                    <Block title="市场">
+                      <div className="flex flex-wrap gap-2">
+                        {markets.map((item) => (
+                          <Chip
+                            key={item}
+                            text={item}
+                            active={guide.market === item}
+                            onClick={() => setGuide((prev) => ({ ...prev, market: item }))}
+                          />
+                        ))}
+                      </div>
+                    </Block>
+                    <Block title="标的池">
+                      <div className="flex flex-wrap gap-2">
+                        {pools.map((item) => (
+                          <Chip
+                            key={item}
+                            text={item}
+                            active={guide.pool === item}
+                            onClick={() => setGuide((prev) => ({ ...prev, pool: item }))}
+                          />
+                        ))}
+                      </div>
+                    </Block>
+                    <Block title="周期">
+                      <div className="flex flex-wrap gap-2">
+                        {tfs.map((item) => (
+                          <Chip
+                            key={item}
+                            text={item}
+                            active={guide.tf === item}
+                            onClick={() => setGuide((prev) => ({ ...prev, tf: item }))}
+                          />
+                        ))}
+                      </div>
+                    </Block>
                   </div>
                   <div className="grid gap-4 xl:grid-cols-3">
-                    <Block title="方向"><div className="flex flex-wrap gap-2">{sides.map((item) => <Chip key={item} text={item} active={guide.side === item} onClick={() => setGuide((prev) => ({ ...prev, side: item }))} />)}</div></Block>
-                    <Block title="持仓周期"><div className="flex flex-wrap gap-2">{holds.map((item) => <Chip key={item} text={item} active={guide.hold === item} onClick={() => setGuide((prev) => ({ ...prev, hold: item }))} />)}</div></Block>
-                    <Block title="开发风格"><div className="flex flex-wrap gap-2">{styles.map((item) => <Chip key={item} text={item} active={guide.style === item} onClick={() => setGuide((prev) => ({ ...prev, style: item }))} />)}</div></Block>
+                    <Block title="方向">
+                      <div className="flex flex-wrap gap-2">
+                        {sides.map((item) => (
+                          <Chip
+                            key={item}
+                            text={item}
+                            active={guide.side === item}
+                            onClick={() => setGuide((prev) => ({ ...prev, side: item }))}
+                          />
+                        ))}
+                      </div>
+                    </Block>
+                    <Block title="持仓周期">
+                      <div className="flex flex-wrap gap-2">
+                        {holds.map((item) => (
+                          <Chip
+                            key={item}
+                            text={item}
+                            active={guide.hold === item}
+                            onClick={() => setGuide((prev) => ({ ...prev, hold: item }))}
+                          />
+                        ))}
+                      </div>
+                    </Block>
+                    <Block title="开发风格">
+                      <div className="flex flex-wrap gap-2">
+                        {styles.map((item) => (
+                          <Chip
+                            key={item}
+                            text={item}
+                            active={guide.style === item}
+                            onClick={() => setGuide((prev) => ({ ...prev, style: item }))}
+                          />
+                        ))}
+                      </div>
+                    </Block>
                   </div>
                 </TabsContent>
 
                 <TabsContent value="logic" className="space-y-4">
-                  <Block title="信号来源"><div className="flex flex-wrap gap-2">{sources.map((item) => <Chip key={item} text={item} active={guide.source.includes(item)} onClick={() => setGuide((prev) => ({ ...prev, source: toggle(prev.source, item) }))} />)}</div></Block>
-                  <Block title="指标与因子" hint="建议至少选择 1 到 3 项"><div className="flex flex-wrap gap-2">{factors.map((item) => <Chip key={item} text={item} active={guide.factor.includes(item)} onClick={() => setGuide((prev) => ({ ...prev, factor: toggle(prev.factor, item) }))} />)}</div></Block>
+                  <Block title="信号来源">
+                    <div className="flex flex-wrap gap-2">
+                      {sources.map((item) => (
+                        <Chip
+                          key={item}
+                          text={item}
+                          active={guide.source.includes(item)}
+                          onClick={() => setGuide((prev) => ({ ...prev, source: toggle(prev.source, item) }))}
+                        />
+                      ))}
+                    </div>
+                  </Block>
+                  <Block title="指标与因子" hint="建议至少选择 1 到 3 项">
+                    <div className="flex flex-wrap gap-2">
+                      {factors.map((item) => (
+                        <Chip
+                          key={item}
+                          text={item}
+                          active={guide.factor.includes(item)}
+                          onClick={() => setGuide((prev) => ({ ...prev, factor: toggle(prev.factor, item) }))}
+                        />
+                      ))}
+                    </div>
+                  </Block>
                   <div className="grid gap-4 xl:grid-cols-3">
-                    <Block title="过滤条件"><div className="flex flex-wrap gap-2">{filters.map((item) => <Chip key={item} text={item} active={guide.filter.includes(item)} onClick={() => setGuide((prev) => ({ ...prev, filter: toggle(prev.filter, item) }))} />)}</div></Block>
-                    <Block title="入场规则"><div className="flex flex-wrap gap-2">{entries.map((item) => <Chip key={item} text={item} active={guide.entry.includes(item)} onClick={() => setGuide((prev) => ({ ...prev, entry: toggle(prev.entry, item) }))} />)}</div></Block>
-                    <Block title="出场规则"><div className="flex flex-wrap gap-2">{exits.map((item) => <Chip key={item} text={item} active={guide.exit.includes(item)} onClick={() => setGuide((prev) => ({ ...prev, exit: toggle(prev.exit, item) }))} />)}</div></Block>
+                    <Block title="过滤条件">
+                      <div className="flex flex-wrap gap-2">
+                        {filters.map((item) => (
+                          <Chip
+                            key={item}
+                            text={item}
+                            active={guide.filter.includes(item)}
+                            onClick={() => setGuide((prev) => ({ ...prev, filter: toggle(prev.filter, item) }))}
+                          />
+                        ))}
+                      </div>
+                    </Block>
+                    <Block title="入场规则">
+                      <div className="flex flex-wrap gap-2">
+                        {entries.map((item) => (
+                          <Chip
+                            key={item}
+                            text={item}
+                            active={guide.entry.includes(item)}
+                            onClick={() => setGuide((prev) => ({ ...prev, entry: toggle(prev.entry, item) }))}
+                          />
+                        ))}
+                      </div>
+                    </Block>
+                    <Block title="出场规则">
+                      <div className="flex flex-wrap gap-2">
+                        {exits.map((item) => (
+                          <Chip
+                            key={item}
+                            text={item}
+                            active={guide.exit.includes(item)}
+                            onClick={() => setGuide((prev) => ({ ...prev, exit: toggle(prev.exit, item) }))}
+                          />
+                        ))}
+                      </div>
+                    </Block>
                   </div>
                 </TabsContent>
 
                 <TabsContent value="risk" className="space-y-4">
-                  <Block title="风控重点"><div className="flex flex-wrap gap-2">{risks.map((item) => <Chip key={item} text={item} active={guide.risk.includes(item)} onClick={() => setGuide((prev) => ({ ...prev, risk: toggle(prev.risk, item) }))} />)}</div></Block>
+                  <Block title="风控重点">
+                    <div className="flex flex-wrap gap-2">
+                      {risks.map((item) => (
+                        <Chip
+                          key={item}
+                          text={item}
+                          active={guide.risk.includes(item)}
+                          onClick={() => setGuide((prev) => ({ ...prev, risk: toggle(prev.risk, item) }))}
+                        />
+                      ))}
+                    </div>
+                  </Block>
                   <div className="grid gap-4 xl:grid-cols-[1fr_1fr_1.1fr]">
-                    <Block title="止盈止损"><div className="flex flex-wrap gap-2">{stops.map((item) => <Chip key={item} text={item} active={guide.stop.includes(item)} onClick={() => setGuide((prev) => ({ ...prev, stop: toggle(prev.stop, item) }))} />)}</div></Block>
-                    <Block title="仓位方式"><div className="flex flex-wrap gap-2">{poses.map((item) => <Chip key={item} text={item} active={guide.pos === item} onClick={() => setGuide((prev) => ({ ...prev, pos: item }))} />)}</div></Block>
-                    <Block title="交易约束"><div className="flex flex-wrap gap-2">{limits.map((item) => <Chip key={item} text={item} active={guide.limit.includes(item)} onClick={() => setGuide((prev) => ({ ...prev, limit: toggle(prev.limit, item) }))} />)}</div></Block>
+                    <Block title="止盈止损">
+                      <div className="flex flex-wrap gap-2">
+                        {stops.map((item) => (
+                          <Chip
+                            key={item}
+                            text={item}
+                            active={guide.stop.includes(item)}
+                            onClick={() => setGuide((prev) => ({ ...prev, stop: toggle(prev.stop, item) }))}
+                          />
+                        ))}
+                      </div>
+                    </Block>
+                    <Block title="仓位方式">
+                      <div className="flex flex-wrap gap-2">
+                        {poses.map((item) => (
+                          <Chip
+                            key={item}
+                            text={item}
+                            active={guide.pos === item}
+                            onClick={() => setGuide((prev) => ({ ...prev, pos: item }))}
+                          />
+                        ))}
+                      </div>
+                    </Block>
+                    <Block title="交易约束">
+                      <div className="flex flex-wrap gap-2">
+                        {limits.map((item) => (
+                          <Chip
+                            key={item}
+                            text={item}
+                            active={guide.limit.includes(item)}
+                            onClick={() => setGuide((prev) => ({ ...prev, limit: toggle(prev.limit, item) }))}
+                          />
+                        ))}
+                      </div>
+                    </Block>
                   </div>
                 </TabsContent>
 
                 <TabsContent value="output" className="space-y-4">
-                  <Block title="输出要求"><div className="flex flex-wrap gap-2">{outputs.map((item) => <Chip key={item} text={item} active={guide.output.includes(item)} onClick={() => setGuide((prev) => ({ ...prev, output: toggle(prev.output, item) }))} />)}</div></Block>
-                  <Block title="核心目标"><div className="rounded-[20px] bg-white/90 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]"><AutoResizeTextarea value={guide.target} onChange={(value) => setGuide((prev) => ({ ...prev, target: value }))} height={110} placeholder="例如：先给出适合股票日线趋势策略的完整框架，再输出可回测的初版代码。" /></div></Block>
-                  <Block title="补充说明"><div className="rounded-[20px] bg-white/90 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]"><AutoResizeTextarea value={guide.note} onChange={(value) => setGuide((prev) => ({ ...prev, note: value }))} height={130} placeholder="例如：优先考虑股票市场，默认日线级别，不追求高频；代码要清晰，方便后续继续调参。" /></div></Block>
-                  <Block title="额外落地要求"><div className="rounded-[20px] bg-white/90 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]"><AutoResizeTextarea value={brief} onChange={setBrief} height={110} placeholder={kind === "python" ? "例如：拆出 indicators、signals、risk、backtest 四个模块。" : kind === "js" ? "例如：拆出指标、信号、执行入口与配置文件。" : "例如：代码先按 SmartX 工程方式组织，关键参数集中管理。"} /></div></Block>
+                  <Block title="输出要求">
+                    <div className="flex flex-wrap gap-2">
+                      {outputs.map((item) => (
+                        <Chip
+                          key={item}
+                          text={item}
+                          active={guide.output.includes(item)}
+                          onClick={() => setGuide((prev) => ({ ...prev, output: toggle(prev.output, item) }))}
+                        />
+                      ))}
+                    </div>
+                  </Block>
+                  <Block title="核心目标">
+                    <div className="rounded-[20px] bg-white/90 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]">
+                      <AutoResizeTextarea
+                        value={guide.target}
+                        onChange={(value) => setGuide((prev) => ({ ...prev, target: value }))}
+                        height={110}
+                        placeholder="例如：先给出适合股票日线趋势策略的完整框架，再输出可回测的初版代码。"
+                      />
+                    </div>
+                  </Block>
+                  <Block title="补充说明">
+                    <div className="rounded-[20px] bg-white/90 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]">
+                      <AutoResizeTextarea
+                        value={guide.note}
+                        onChange={(value) => setGuide((prev) => ({ ...prev, note: value }))}
+                        height={130}
+                        placeholder="例如：优先考虑股票市场，默认日线级别，不追求高频；代码要清晰，方便后续继续调参。"
+                      />
+                    </div>
+                  </Block>
+                  <Block title="额外落地要求">
+                    <div className="rounded-[20px] bg-white/90 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]">
+                      <AutoResizeTextarea
+                        value={brief}
+                        onChange={setBrief}
+                        height={110}
+                        placeholder={
+                          kind === "python"
+                            ? "例如：拆出 indicators、signals、risk、backtest 四个模块。"
+                            : kind === "js"
+                              ? "例如：拆出指标、信号、执行入口与配置文件。"
+                              : "例如：代码先按 SmartX 工程方式组织，关键参数集中管理。"
+                        }
+                      />
+                    </div>
+                  </Block>
                 </TabsContent>
               </Tabs>
             ) : (
               <div className="space-y-4">
-                <Block title="通用工作区说明" hint={`当前模板：${card.template}`}><div className="text-sm leading-6 text-slate-600 dark:text-[#93a39c]">其他类型会先创建通用工作区，再基于你填写的策略画像整理 README、目录结构与后续改造计划。</div></Block>
-                <Block title="补充说明"><div className="rounded-[20px] bg-white/92 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]"><AutoResizeTextarea value={brief} onChange={setBrief} height={220} placeholder="例如：先整理目录用途，给出策略说明、后续拆分方案与最小可维护结构。" /></div></Block>
+                <Block title="通用工作区说明" hint={`当前模板：${card.template}`}>
+                  <div className="text-sm leading-6 text-slate-600 dark:text-[#93a39c]">
+                    其他类型会先创建通用工作区，再基于你填写的策略画像整理 README、目录结构与后续改造计划。
+                  </div>
+                </Block>
+                <Block title="补充说明">
+                  <div className="rounded-[20px] bg-white/92 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]">
+                    <AutoResizeTextarea
+                      value={brief}
+                      onChange={setBrief}
+                      height={220}
+                      placeholder="例如：先整理目录用途，给出策略说明、后续拆分方案与最小可维护结构。"
+                    />
+                  </div>
+                </Block>
               </div>
             )
           ) : null}
@@ -326,15 +665,34 @@ export function WorkspaceCreateDialog(props: Props) {
                     <div className="space-y-2">
                       <Label>使用模式</Label>
                       <Select value={composer.agent?.name} onValueChange={setAgent}>
-                        <SelectTrigger className="h-10 w-full rounded-2xl border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2d3733]"><SelectValue placeholder="选择模式" /></SelectTrigger>
-                        <SelectContent>{ags.ags.map((item) => <SelectItem key={item.name} value={item.name}>{item.name}</SelectItem>)}</SelectContent>
+                        <SelectTrigger className="h-10 w-full rounded-2xl border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2d3733]">
+                          <SelectValue placeholder="选择模式" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ags.ags.map((item) => (
+                            <SelectItem key={item.name} value={item.name}>
+                              {item.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-2">
                       <Label>使用模型</Label>
                       <Select value={model} onValueChange={setModel}>
-                        <SelectTrigger className="h-10 w-full rounded-2xl border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2d3733]"><SelectValue placeholder="选择模型" /></SelectTrigger>
-                        <SelectContent>{catalog.connectedModels.map((item) => { const value = `${item.provider.id}/${item.id}`; return <SelectItem key={value} value={value}>{value}</SelectItem> })}</SelectContent>
+                        <SelectTrigger className="h-10 w-full rounded-2xl border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2d3733]">
+                          <SelectValue placeholder="选择模型" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {catalog.connectedModels.map((item) => {
+                            const value = `${item.provider.id}/${item.id}`
+                            return (
+                              <SelectItem key={value} value={value}>
+                                {value}
+                              </SelectItem>
+                            )
+                          })}
+                        </SelectContent>
                       </Select>
                     </div>
                   </div>
@@ -357,13 +715,22 @@ export function WorkspaceCreateDialog(props: Props) {
               </div>
               {rich ? (
                 <Block title="首条引导消息" hint="创建后会自动发送到首个会话">
-                  <div className="rounded-[20px] bg-white/92 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]"><AutoResizeTextarea value={prompt} onChange={setPrompt} height={420} placeholder="这里会自动生成引导消息，你也可以继续调整。" /></div>
+                  <div className="rounded-[20px] bg-white/92 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]">
+                    <AutoResizeTextarea
+                      value={prompt}
+                      onChange={setPrompt}
+                      height={420}
+                      placeholder="这里会自动生成引导消息，你也可以继续调整。"
+                    />
+                  </div>
                 </Block>
               ) : (
                 <Block title="确认创建" hint="通用工作区不会预填策略引导">
                   <div className="text-sm leading-6 text-slate-600 dark:text-[#93a39c]">
                     其他类型会直接创建通用工作区。
-                    {brief.trim() ? " 你填写的补充说明会在创建后作为首条消息发送。" : " 如果没有补充说明，就只创建工作区，不自动填充引导消息。"}
+                    {brief.trim()
+                      ? " 你填写的补充说明会在创建后作为首条消息发送。"
+                      : " 如果没有补充说明，就只创建工作区，不自动填充引导消息。"}
                   </div>
                 </Block>
               )}
@@ -372,11 +739,30 @@ export function WorkspaceCreateDialog(props: Props) {
         </div>
 
         <DialogFooter className="border-t border-slate-200/70 bg-[linear-gradient(180deg,rgba(249,250,251,0.7),rgba(255,255,255,0.92))] px-5 py-4 dark:border-[#202725] dark:bg-[linear-gradient(180deg,rgba(16,21,20,0.8),rgba(16,21,20,0.96))]">
-          <Button variant="outline" className="rounded-xl border-slate-200/80 bg-white/90 shadow-none dark:border-[#2c3532] dark:bg-[#151918]" onClick={() => (step === 0 ? props.onOpenChange(false) : setStep((prev) => prev - 1))} disabled={busy}>{step === 0 ? "取消" : "上一步"}</Button>
+          <Button
+            variant="outline"
+            className="rounded-xl border-slate-200/80 bg-white/90 shadow-none dark:border-[#2c3532] dark:bg-[#151918]"
+            onClick={() => (step === 0 ? props.onOpenChange(false) : setStep((prev) => prev - 1))}
+            disabled={busy}
+          >
+            {step === 0 ? "取消" : "上一步"}
+          </Button>
           {step < 2 ? (
-            <Button className="rounded-xl bg-slate-900 text-white hover:bg-slate-800 dark:bg-[#7aa590] dark:text-[#08110e] dark:hover:bg-[#8bb09f]" onClick={next} disabled={busy}>下一步</Button>
+            <Button
+              className="rounded-xl bg-slate-900 text-white hover:bg-slate-800 dark:bg-[#7aa590] dark:text-[#08110e] dark:hover:bg-[#8bb09f]"
+              onClick={next}
+              disabled={busy}
+            >
+              下一步
+            </Button>
           ) : (
-            <Button className="rounded-xl bg-slate-900 text-white hover:bg-slate-800 dark:bg-[#7aa590] dark:text-[#08110e] dark:hover:bg-[#8bb09f]" onClick={() => void create()} disabled={busy}>{busy ? "创建中..." : "创建并进入策略页"}</Button>
+            <Button
+              className="rounded-xl bg-slate-900 text-white hover:bg-slate-800 dark:bg-[#7aa590] dark:text-[#08110e] dark:hover:bg-[#8bb09f]"
+              onClick={() => void create()}
+              disabled={busy}
+            >
+              {busy ? "创建中..." : "创建并进入策略页"}
+            </Button>
           )}
         </DialogFooter>
       </DialogContent>

@@ -75,7 +75,12 @@ export function StrategyImportDialog(props: Props) {
         <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="strategy-import-path">目录路径</Label>
-            <Input id="strategy-import-path" value={path} onChange={(event) => setPath(event.target.value)} placeholder="例如：C:\\code\\my-strategy" />
+            <Input
+              id="strategy-import-path"
+              value={path}
+              onChange={(event) => setPath(event.target.value)}
+              placeholder="例如：C:\\code\\my-strategy"
+            />
           </div>
 
           <div className="space-y-2">
@@ -95,8 +100,12 @@ export function StrategyImportDialog(props: Props) {
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => props.onOpenChange(false)} disabled={busy}>取消</Button>
-          <Button onClick={() => void submit()} disabled={busy}>{busy ? "导入中..." : "导入"}</Button>
+          <Button variant="outline" onClick={() => props.onOpenChange(false)} disabled={busy}>
+            取消
+          </Button>
+          <Button onClick={() => void submit()} disabled={busy}>
+            {busy ? "导入中..." : "导入"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
