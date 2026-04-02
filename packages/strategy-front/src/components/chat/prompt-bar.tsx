@@ -31,7 +31,9 @@ interface Props {
 }
 
 const item =
-  "h-8 min-w-0 rounded-xl border border-black/8 bg-black/[0.03] px-2 text-xs shadow-none dark:border-white/10 dark:bg-white/[0.04]"
+  "min-w-0 rounded-md border border-black/10 bg-background text-xs text-foreground shadow-none dark:border-white/12 dark:bg-white/[0.04]"
+
+const menu = "custom-scrollbar max-h-[240px] overflow-y-auto rounded-md border-black/10 dark:border-white/12"
 
 export function PromptBar(props: Props) {
   const model = props.model
@@ -44,7 +46,7 @@ export function PromptBar(props: Props) {
   const max = props.compact ? 144 : 200
   const foot = props.compact ? "items-end gap-2 px-2.5 pb-2.5 pt-1.5" : "items-end gap-3"
   const tone = props.compact ? "text-[13px]" : undefined
-  const ctrl = props.compact ? "h-7" : ""
+  const ctrl = props.compact ? "h-7" : "h-8"
 
   useEffect(() => {
     if (!pick) return
@@ -75,22 +77,22 @@ export function PromptBar(props: Props) {
             onValueChange={props.onAgent}
             value={props.agent ?? ""}
           >
-            <SelectTrigger className={`${ctrl} ${item}`}>
-              <SelectValue placeholder="选择模式" />
+            <SelectTrigger className={`${ctrl} ${item} w-[140px] px-2.5`}>
+              <SelectValue placeholder="选择 agent" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent align="start" className={menu} position="popper">
               {props.agents.map((item) => (
                 <SelectItem key={item} value={item}>
-                  {item === "build" ? "执行" : item === "plan" ? "规划" : item}
+                  {item}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
           <Select disabled={props.disabled || models.length === 0} onValueChange={onModel} value={pick}>
-            <SelectTrigger className={`${ctrl} ${item} max-w-[220px]`}>
+            <SelectTrigger className={`${ctrl} ${item} max-w-[260px] px-2.5`}>
               <SelectValue placeholder="选择模型" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent align="start" className={menu} position="popper">
               {models.map((item) => (
                 <SelectItem key={`${item.provider.id}/${item.id}`} value={`${item.provider.id}/${item.id}`}>
                   {`${item.id} (${item.provider.id})`}
