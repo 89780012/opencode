@@ -15,6 +15,8 @@ import type {
   ChatToolState,
 } from "@/types/chat"
 
+const pane = "custom-scrollbar mt-2 max-h-64 space-y-2 overflow-y-auto pr-1"
+
 interface Props {
   messages: ChatMessageInfo[]
   status?: ChatStatus
@@ -115,15 +117,15 @@ function renderTool(part: ChatToolPart) {
         <div className="font-medium">工具调用:{part.tool}</div>
         <div className="text-muted-foreground text-xs">{state.status}</div>
       </summary>
-      <pre className="custom-scrollbar mt-2 overflow-x-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">
-        {JSON.stringify(state.input, null, 2)}
-      </pre>
-      {"output" in state && state.output ? (
-        <pre className="custom-scrollbar mt-2 overflow-x-auto whitespace-pre-wrap break-words text-xs">
-          {state.output}
+      <div className={pane}>
+        <pre className="overflow-x-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">
+          {JSON.stringify(state.input, null, 2)}
         </pre>
-      ) : null}
-      {"error" in state && state.error ? <div className="mt-2 text-xs text-red-600">{state.error}</div> : null}
+        {"output" in state && state.output ? (
+          <pre className="overflow-x-auto whitespace-pre-wrap break-words text-xs">{state.output}</pre>
+        ) : null}
+        {"error" in state && state.error ? <div className="text-xs text-red-600">{state.error}</div> : null}
+      </div>
     </details>
   )
 }
@@ -139,7 +141,7 @@ function renderPart(part: ChatPart, role: ChatMessageInfo["role"], onOpenDiff?: 
       return (
         <details className="rounded-lg border bg-muted/20 px-3 py-2 text-sm">
           <summary className="cursor-pointer font-medium">思考中</summary>
-          <div className="mt-2 whitespace-pre-wrap break-words text-muted-foreground">{part.text}</div>
+          <div className={cn(pane, "whitespace-pre-wrap break-words text-muted-foreground")}>{part.text}</div>
         </details>
       )
     case "tool":
@@ -174,9 +176,7 @@ function renderPart(part: ChatPart, role: ChatMessageInfo["role"], onOpenDiff?: 
       return (
         <details className="rounded-lg border bg-muted/20 px-3 py-2 text-sm">
           <summary className="cursor-pointer font-medium">Snapshot</summary>
-          <pre className="custom-scrollbar mt-2 overflow-x-auto whitespace-pre-wrap break-words text-xs">
-            {part.snapshot}
-          </pre>
+          <pre className={cn(pane, "overflow-x-auto whitespace-pre-wrap break-words text-xs")}>{part.snapshot}</pre>
         </details>
       )
     case "patch":
@@ -186,7 +186,7 @@ function renderPart(part: ChatPart, role: ChatMessageInfo["role"], onOpenDiff?: 
             <span>Patch {part.hash}</span>
             <span className="text-xs text-muted-foreground">{part.files.length} files</span>
           </summary>
-          <div className="mt-2 flex flex-wrap gap-2">
+          <div className={cn(pane, "flex flex-wrap content-start gap-2")}>
             {part.files.map((item) => (
               <button
                 key={item}

@@ -40,7 +40,7 @@ interface Props {
 const ctrl =
   "rounded-xl border border-black/8 bg-black/[0.03] text-xs shadow-none hover:bg-black/[0.05] dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.06]"
 
-export function GroupChatPanel(props: Props) {
+export function MultiWorkspaceChatPanel(props: Props) {
   useChatEvents(props.workspace.path)
 
   const { select } = useWorkspaceList()
@@ -57,9 +57,9 @@ export function GroupChatPanel(props: Props) {
   const todo = useChatTodo(props.workspace.path, selectedSessionId, live)
   const ref = useMemo(() => {
     if (!props.model) return
-    const [providerID, ...rest] = props.model.split("/")
+    const [pid, ...rest] = props.model.split("/")
     return {
-      providerID,
+      providerID: pid,
       modelID: rest.join("/"),
     }
   }, [props.model])
@@ -191,8 +191,8 @@ export function GroupChatPanel(props: Props) {
           ) : null}
         </div>
 
-        <div className="shrink-0 px-1 pb-2 pt-2">
-          <div className="mx-auto max-w-[780px] space-y-3">
+        <div className="shrink-0 px-1 pb-1.5 pt-1">
+          <div className="mx-auto flex max-w-[780px] flex-col gap-1.5">
             {permission.req ? (
               <PermissionPanel
                 key={permission.req.id}
@@ -219,12 +219,13 @@ export function GroupChatPanel(props: Props) {
                 }}
               />
             ) : null}
-            {todo.visible ? <TodoPanel todos={todo.todos} collapsed={todo.collapsed} preview={todo.preview} /> : null}
-            <div className="max-w-[780px] p-2">
+            {todo.visible ? <TodoPanel todos={todo.todos} collapsed={todo.collapsed} compact preview={todo.preview} /> : null}
+            <div className="w-full">
               <PromptBar
                 agent={props.agent}
                 agents={props.agents}
                 busy={busy}
+                compact
                 disabled={props.load}
                 model={props.model}
                 models={props.models}

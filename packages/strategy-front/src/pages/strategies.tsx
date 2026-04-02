@@ -1,16 +1,17 @@
 import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { Boxes, FolderInput, Plus, RefreshCw, Search } from "lucide-react"
+import { Boxes, FolderInput, LayoutGrid, Plus, RefreshCw, Search, X } from "lucide-react"
 import { toast } from "sonner"
 import { workspaceApi } from "@/api/modules/workspace"
 import { DeleteConfirmDialog } from "@/components/shared/delete-confirm-dialog"
 import { StrategyImportDialog } from "@/components/strategy/strategy-import-dialog"
 import { StrategyList } from "@/components/strategy/strategy-list"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { WorkspaceCreateDialog } from "@/components/workspace/workspace-create-dialog"
 import { useWorkspaceList } from "@/data/global-data-provider"
-import { encodeStrategyPath } from "@/lib/strategy-path"
+import { encodeStrategyPath, encodeStrategyQuery } from "@/lib/strategy-path"
 import { cn } from "@/lib/utils"
 import type { LocalWorkspace } from "@/types/workspace"
 
@@ -28,6 +29,8 @@ export default function StrategiesPage() {
   const [q, setQ] = useState("")
   const [item, setItem] = useState<LocalWorkspace | null>(null)
   const [busy, setBusy] = useState(false)
+  const [selecting, setSelecting] = useState(false)
+  const [selected, setSelected] = useState<string[]>([])
 
   const list = useMemo(() => {
     const key = q.trim().toLowerCase()
@@ -47,6 +50,34 @@ export default function StrategiesPage() {
     nav(`/app/strategies/${encodeStrategyPath(item.path)}`)
   }
 
+  const toggle = (item: LocalWorkspace) => {
+    if (item.missing) {
+      toast.error("目录缺失的策略不能进入多屏开发")
+      return
+    }
+
+    setSelected((prev) => {
+      if (prev.includes(item.path)) return prev.filter((path) => path !== item.path)
+      if (prev.length >= 3) {
+        toast.error("多屏开发最多选择 3 个策略")
+        return prev
+      }
+      return [...prev, item.path]
+    })
+  }
+
+  const openMulti = () => {
+    if (!selecting) {
+      setSelecting(true)
+      return
+    }
+    if (selected.length < 2) {
+      toast.error("请至少选择 2 个策略进入多屏开发")
+      return
+    }
+    nav(`/app/strategies/multi?${encodeStrategyQuery(selected)}`)
+  }
+
   const onDelete = async () => {
     if (!item) return
     setBusy(true)
@@ -54,8 +85,8 @@ export default function StrategiesPage() {
       await workspaceApi.removeWorkspace(item.path)
       toast.success(`已从列表移除策略：${item.name}`)
       await refresh()
+      setSelected((prev) => prev.filter((path) => path !== item.path))
       setItem(null)
-      window.dispatchEvent(new Event("group:changed"))
     } catch (err) {
       toast.error(note(err, `移除 ${item.name} 失败`))
     } finally {
@@ -75,7 +106,7 @@ export default function StrategiesPage() {
               </div>
               <div className="mt-3 text-3xl font-semibold tracking-tight text-foreground">我的策略</div>
               <p className="mt-1.5 max-w-3xl text-sm leading-6 text-muted-foreground">
-                这里展示注册表中的全部策略工作区。支持 SmartX、Python、JS、其他四种类型，也支持导入任意目录并做逻辑删除。
+                这里展示注册表中的全部策略工作区。支持 SmartX、Python、JS 和其他类型，也支持导入任意目录并做逻辑移除。
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -127,9 +158,61 @@ export default function StrategiesPage() {
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-6 py-4">
           <div className="flex items-center justify-between gap-3">
             <div className="text-sm font-medium text-foreground">共 {list.length} 个策略</div>
-            <div className="text-xs text-muted-foreground dark:text-slate-400">删除只会从 JSON 注册表里移除，不会删除本地文件夹。</div>
+            <div className="text-xs text-muted-foreground dark:text-slate-400">
+              删除只会从 JSON 注册表里移除，不会删除本地文件夹。
+            </div>
           </div>
-          <StrategyList items={list} loading={loading} error={error} onRetry={() => void refresh()} onSelect={onSelect} onDelete={setItem} />
+          {selecting ? (
+            <Card className="sticky top-0 z-10 gap-0 rounded-2xl border-primary/20 bg-background/95 py-0 shadow-sm backdrop-blur">
+              <CardContent className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                <div className="space-y-1">
+                  <div className="text-sm font-medium text-foreground">多屏开发选择中</div>
+                  <div className="text-xs text-muted-foreground">
+                    选择 2 到 3 个策略工作区后进入多屏开发。默认点击卡片仍是单屏开发，只有当前模式下才会变成选择。
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="rounded-full border bg-muted/40 px-3 py-1 text-xs font-medium text-foreground">
+                    已选 {selected.length}/3
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8"
+                    onClick={() => {
+                      setSelecting(false)
+                      setSelected([])
+                    }}
+                  >
+                    <X className="size-4" />
+                    取消
+                  </Button>
+                  <Button size="sm" className="h-8" onClick={openMulti} disabled={selected.length < 2}>
+                    <LayoutGrid className="size-4" />
+                    进入多屏开发
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" className="h-8" onClick={openMulti}>
+                <LayoutGrid className="size-4" />
+                多屏开发
+              </Button>
+            </div>
+          )}
+          <StrategyList
+            items={list}
+            loading={loading}
+            error={error}
+            onRetry={() => void refresh()}
+            onSelect={onSelect}
+            onDelete={setItem}
+            selecting={selecting}
+            selected={selected}
+            onToggle={toggle}
+          />
         </div>
       </div>
 

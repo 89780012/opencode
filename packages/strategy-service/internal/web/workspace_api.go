@@ -141,13 +141,6 @@ func (a *API) workspaceDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = a.gs.Prune(body.Path)
-	if err != nil {
-		slog.Error("workspace delete prune failed", "path", body.Path, "error", err)
-		write(w, http.StatusBadRequest, err.Error(), nil)
-		return
-	}
-
 	write(w, http.StatusOK, "ok", nil)
 }
 

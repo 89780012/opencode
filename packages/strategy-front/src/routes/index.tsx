@@ -6,6 +6,7 @@ const AppShellPage = lazy(() => import("@/pages/app-shell"))
 const IndexPage = lazy(() => import("@/pages/index"))
 const StrategiesPage = lazy(() => import("@/pages/strategies"))
 const StrategyDetailPage = lazy(() => import("@/pages/strategy-detail"))
+const StrategyMultiPage = lazy(() => import("@/pages/strategy-multi"))
 const SettingsPage = lazy(() => import("@/pages/settings"))
 const SettingsAppearancePage = lazy(() => import("@/pages/settings-appearance"))
 const SettingsRuntimePage = lazy(() => import("@/pages/settings-runtime"))
@@ -16,8 +17,6 @@ const ProviderPage = lazy(() => import("@/pages/providers"))
 const ProviderOverviewPage = lazy(() => import("@/pages/providers-overview"))
 const ProviderModelsPage = lazy(() => import("@/pages/providers-models"))
 const SkillPage = lazy(() => import("@/pages/skills"))
-const GroupsPage = lazy(() => import("@/pages/groups"))
-const GroupDetailPage = lazy(() => import("@/pages/group-detail"))
 
 function LegacyPage() {
   const route = useLocation()
@@ -46,21 +45,12 @@ const router = createBrowserRouter([
             element: <StrategiesPage />,
           },
           {
+            path: "multi",
+            element: <StrategyMultiPage />,
+          },
+          {
             path: ":strategyID",
             element: <StrategyDetailPage />,
-          },
-        ],
-      },
-      {
-        path: "groups",
-        children: [
-          {
-            index: true,
-            element: <GroupsPage />,
-          },
-          {
-            path: ":groupID",
-            element: <GroupDetailPage />,
           },
         ],
       },

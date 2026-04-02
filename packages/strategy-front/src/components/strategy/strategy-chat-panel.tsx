@@ -110,8 +110,8 @@ export function StrategyChatPanel(props: Props) {
         </div>
       </div>
 
-      <div className="shrink-0 px-2 pb-2 pt-3">
-        <div className="mx-auto max-w-[780px] space-y-3">
+      <div className="shrink-0 px-2 pb-2 pt-1">
+        <div className="mx-auto flex max-w-[780px] flex-col gap-1.5">
           {permission.req ? (
             <PermissionPanel
               key={permission.req.id}
@@ -139,7 +139,7 @@ export function StrategyChatPanel(props: Props) {
             />
           ) : null}
           {todo.visible ? <TodoPanel todos={todo.todos} collapsed={todo.collapsed} preview={todo.preview} /> : null}
-          <div className="max-w-[780px] p-2">
+          <div className="w-full">
             <PromptBar
               agent={props.agent}
               agents={props.agents}

@@ -1,6 +1,6 @@
 "use client"
 
-import { Bot, Boxes, Command, MessageSquareText, PlugZap, ServerCog, Settings2, Sparkles } from "lucide-react"
+import { Bot, Command, MessageSquareText, PlugZap, ServerCog, Settings2, Sparkles } from "lucide-react"
 import { NavLink, useLocation } from "react-router-dom"
 import { useSystem } from "@/components/system/system-provider"
 import {
@@ -23,11 +23,6 @@ const nav = [
     title: "策略",
     url: "/app/strategies",
     icon: MessageSquareText,
-  },
-  {
-    title: "组合策略",
-    url: "/app/groups",
-    icon: Boxes,
   },
   {
     title: "提供商",
