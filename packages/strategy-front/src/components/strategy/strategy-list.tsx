@@ -116,7 +116,7 @@ function Row(props: {
       role="button"
       tabIndex={0}
       className={cn(
-        "group relative min-h-[180px] cursor-pointer gap-0 overflow-hidden rounded-[26px] border py-0 text-left shadow-[0_18px_36px_-30px_rgba(15,23,42,0.35)] transition-all duration-200 hover:-translate-y-1 hover:border-primary/25 hover:shadow-[0_22px_42px_-28px_rgba(15,23,42,0.38)] dark:shadow-black/20",
+        "group relative min-h-[180px] cursor-pointer gap-0 overflow-hidden rounded-xl border py-0 text-left shadow-[0_18px_36px_-30px_rgba(15,23,42,0.35)] transition-all duration-200 hover:-translate-y-1 hover:border-primary/25 hover:shadow-[0_22px_42px_-28px_rgba(15,23,42,0.38)] dark:shadow-black/20",
         props.selected &&
           "border-primary/55 shadow-[0_0_0_1px_hsl(var(--primary)/0.16),0_22px_40px_-28px_rgba(15,23,42,0.4)]",
       )}
