@@ -23,7 +23,7 @@ export default function StrategyDetailPage() {
   const catalog = useProviderList()
   const { loading, refresh, select, workspaces } = useWorkspaceList()
   const workspace = useMemo(() => workspaces.find((item) => item.path === path) ?? null, [path, workspaces])
-  const kind = workspace?.type ?? "smartx"
+  const kind = workspace?.type ?? "other"
   const ags = useAgentList(kind)
   const project = useProjectComposer(kind)
   const composer = useMemo(
@@ -110,6 +110,27 @@ export default function StrategyDetailPage() {
       <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
         <div className="text-base font-semibold">策略加载失败</div>
         <div className="text-sm text-muted-foreground">未找到对应的策略工作区。</div>
+        <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <Link to="/app/strategies">
+              <ArrowLeft className="size-4" />
+              返回列表
+            </Link>
+          </Button>
+          <Button variant="outline" onClick={() => void refresh()}>
+            <RefreshCw className="size-4" />
+            刷新
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (workspace.missing) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+        <div className="text-base font-semibold">策略目录不存在</div>
+        <div className="text-sm text-muted-foreground">这个策略仍在注册表中，但本地目录已经缺失。你可以重新导入，或从列表中移除它。</div>
         <div className="flex gap-2">
           <Button variant="outline" asChild>
             <Link to="/app/strategies">

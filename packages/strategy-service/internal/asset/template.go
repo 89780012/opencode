@@ -49,6 +49,13 @@ func templates() map[string]Template {
 			EntryFile: "index.js",
 			Keywords:  []string{"javascript", "js"},
 		},
+		"other_basic": {
+			Type:      "other",
+			ID:        "other_basic",
+			Root:      "workspace/template/other_basic",
+			EntryFile: "README.md",
+			Keywords:  []string{"other"},
+		},
 	}
 }
 

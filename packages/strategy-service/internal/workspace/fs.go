@@ -39,6 +39,20 @@ func base() (string, error) {
 	return dir, nil
 }
 
+func root() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+
+	dir := filepath.Join(home, ".strategy-service", "workspaces")
+	err = os.MkdirAll(dir, 0o755)
+	if err != nil {
+		return "", err
+	}
+	return dir, nil
+}
+
 func safe(root string, path string) (string, error) {
 	if strings.TrimSpace(path) == "" {
 		return "", errors.New("path is required")

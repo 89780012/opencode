@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"strategy-service/internal/asset"
@@ -16,11 +17,15 @@ import (
 )
 
 type Service struct {
-	rt *rt.Service
+	rt  *rt.Service
+	doc *store
 }
 
 func NewService(rt *rt.Service) *Service {
-	return &Service{rt: rt}
+	return &Service{
+		rt:  rt,
+		doc: &store{},
+	}
 }
 
 func local(path string) Local {
@@ -30,6 +35,7 @@ func local(path string) Local {
 			Name:     filepath.Base(path),
 			Path:     path,
 			Keywords: []string{},
+			Missing:  true,
 		}
 	}
 
@@ -71,23 +77,54 @@ func local(path string) Local {
 	return row
 }
 
+func (s *Service) row(item Local) Local {
+	out := local(item.Path)
+	out.ID = item.ID
+	out.Source = item.Source
+	out.Managed = item.Managed
+	if out.Name == "" {
+		out.Name = item.Name
+	}
+	if out.Type == "" {
+		out.Type = item.Type
+	}
+	if out.Template == "" {
+		out.Template = item.Template
+	}
+	if out.EntryFile == "" {
+		out.EntryFile = item.EntryFile
+	}
+	if len(out.Keywords) == 0 {
+		out.Keywords = item.Keywords
+	}
+	if out.UpdatedAt == 0 {
+		out.UpdatedAt = item.UpdatedAt
+	}
+	return out
+}
+
 func (s *Service) List() (ListResult, error) {
-	root, err := base()
+	base, err := base()
 	if err != nil {
 		slog.Error("workspace list: base path error", "error", err)
 		return ListResult{}, err
 	}
 
-	items, err := listDirs(root)
+	rows, err := s.doc.load()
 	if err != nil {
-		slog.Error("workspace list: listDirs failed", "root", root, "error", err)
+		slog.Error("workspace list: load failed", "error", err)
 		return ListResult{}, err
 	}
 
-	slog.Info("workspace list", "root", root, "count", len(items))
+	out := make([]Local, 0, len(rows))
+	for _, item := range rows {
+		out = append(out, s.row(item))
+	}
+
+	slog.Info("workspace list", "count", len(out))
 	return ListResult{
-		BasePath:   root,
-		Workspaces: items,
+		BasePath:   base,
+		Workspaces: out,
 	}, nil
 }
 
@@ -180,10 +217,67 @@ func gitEnv(env []string, row rt.Result) []string {
 	return out
 }
 
-// 创建工作空间
+func workspaceRoot(kind string) (string, error) {
+	if strings.EqualFold(strings.TrimSpace(kind), "smartx") {
+		return base()
+	}
+	return root()
+}
+
+func (s *Service) put(item Local) error {
+	rows, err := s.doc.load()
+	if err != nil {
+		return err
+	}
+
+	key := filepath.Clean(item.Path)
+	at := slices.IndexFunc(rows, func(row Local) bool {
+		return filepath.Clean(row.Path) == key
+	})
+	if at >= 0 {
+		rows[at] = item
+	} else {
+		rows = append(rows, item)
+	}
+	return s.doc.save(rows)
+}
+
+func (s *Service) pick(path string) (Local, error) {
+	rows, err := s.doc.load()
+	if err != nil {
+		return Local{}, err
+	}
+
+	key := filepath.Clean(path)
+	at := slices.IndexFunc(rows, func(row Local) bool {
+		return filepath.Clean(row.Path) == key
+	})
+	if at < 0 {
+		return Local{}, os.ErrNotExist
+	}
+	return rows[at], nil
+}
+
+func (s *Service) dir(path string) (string, error) {
+	row, err := s.pick(path)
+	if err != nil {
+		return "", err
+	}
+
+	dir := filepath.Clean(row.Path)
+	info, err := os.Stat(dir)
+	if err != nil {
+		return "", err
+	}
+	if !info.IsDir() {
+		return "", os.ErrInvalid
+	}
+	return dir, nil
+}
+
 func (s *Service) Create(name string, kind string, template string, git bool) (CreateResult, error) {
 	slog.Info("workspace create", "name", name, "type", kind, "template", template)
-	root, err := base()
+	root, err := workspaceRoot(kind)
 	if err != nil {
 		slog.Error("workspace create: base path error", "error", err)
 		return CreateResult{}, err
@@ -221,7 +315,6 @@ func (s *Service) Create(name string, kind string, template string, git bool) (C
 		return CreateResult{}, os.ErrInvalid
 	}
 
-	// 模板文件
 	err = asset.SeedWorkspace(path, item)
 	if err != nil {
 		slog.Error("workspace create: seed failed", "path", path, "error", err)
@@ -238,40 +331,28 @@ func (s *Service) Create(name string, kind string, template string, git bool) (C
 		}
 	}
 
+	row := local(path)
+	row.ID = next()
+	row.Source = "user_created"
+	row.Managed = true
+	err = s.put(row)
+	if err != nil {
+		return CreateResult{}, err
+	}
+
 	slog.Info("workspace created", "name", name, "path", path)
 	return CreateResult{
 		BasePath:  root,
-		Workspace: local(path),
+		Workspace: row,
 	}, nil
 }
 
-// 打开工作空间
 func (s *Service) Open(path string, git bool) (OpenResult, error) {
 	slog.Info("workspace open", "path", path)
-	root, err := base()
+	dir, err := s.dir(path)
 	if err != nil {
-		slog.Error("workspace open: base path error", "error", err)
+		slog.Error("workspace open: resolve path error", "path", path, "error", err)
 		return OpenResult{}, err
-	}
-
-	dir, err := safe(root, path)
-	if err != nil {
-		slog.Error("workspace open: safe path error", "path", path, "error", err)
-		return OpenResult{}, err
-	}
-	if filepath.Clean(dir) == filepath.Clean(root) {
-		slog.Warn("workspace open: cannot open root", "path", path)
-		return OpenResult{}, os.ErrNotExist
-	}
-
-	info, err := os.Stat(dir)
-	if err != nil {
-		slog.Error("workspace open: stat error", "dir", dir, "error", err)
-		return OpenResult{}, err
-	}
-	if !info.IsDir() {
-		slog.Warn("workspace open: not a directory", "dir", dir)
-		return OpenResult{}, os.ErrInvalid
 	}
 
 	if git {
@@ -282,23 +363,83 @@ func (s *Service) Open(path string, git bool) (OpenResult, error) {
 		}
 	}
 
+	item, err := s.pick(dir)
+	if err != nil {
+		return OpenResult{}, err
+	}
+	row := s.row(item)
+	err = s.put(row)
+	if err != nil {
+		return OpenResult{}, err
+	}
+
 	slog.Info("workspace opened", "dir", dir)
 	return OpenResult{
-		BasePath:  root,
-		Workspace: local(dir),
+		BasePath:  dir,
+		Workspace: row,
+	}, nil
+}
+
+func (s *Service) Import(path string, typ string, git bool) (OpenResult, error) {
+	slog.Info("workspace import", "path", path, "type", typ)
+	dir := filepath.Clean(strings.TrimSpace(path))
+	if dir == "" {
+		return OpenResult{}, errors.New("path is required")
+	}
+
+	info, err := os.Stat(dir)
+	if err != nil {
+		return OpenResult{}, err
+	}
+	if !info.IsDir() {
+		return OpenResult{}, os.ErrInvalid
+	}
+
+	if git {
+		err = s.initGit(context.Background(), dir)
+		if err != nil {
+			return OpenResult{}, err
+		}
+	}
+
+	row := local(dir)
+	if row.Type == "" {
+		row.Type = kind(typ)
+	}
+	if row.Type == "" {
+		row.Type = "other"
+	}
+	if len(row.Keywords) == 0 {
+		row.Keywords = uniq([]string{row.Name, row.Type})
+	}
+
+	old, err := s.pick(dir)
+	if err == nil {
+		row.ID = old.ID
+		row.Source = old.Source
+		row.Managed = old.Managed
+	} else {
+		row.ID = next()
+		row.Source = "imported"
+		row.Managed = false
+	}
+
+	err = s.put(row)
+	if err != nil {
+		return OpenResult{}, err
+	}
+
+	return OpenResult{
+		BasePath:  dir,
+		Workspace: row,
 	}, nil
 }
 
 func (s *Service) Files(path string) (FilesResult, error) {
 	slog.Debug("workspace files", "path", path)
-	root, err := base()
+	dir, err := s.dir(path)
 	if err != nil {
-		return FilesResult{}, err
-	}
-
-	dir, err := safe(root, path)
-	if err != nil {
-		slog.Error("workspace files: safe path error", "path", path, "error", err)
+		slog.Error("workspace files: resolve path error", "path", path, "error", err)
 		return FilesResult{}, err
 	}
 
@@ -318,14 +459,9 @@ func (s *Service) Files(path string) (FilesResult, error) {
 
 func (s *Service) Content(path string, file string) (FileContentResult, error) {
 	slog.Debug("workspace content", "path", path, "file", file)
-	root, err := base()
+	dir, err := s.dir(path)
 	if err != nil {
-		return FileContentResult{}, err
-	}
-
-	dir, err := safe(root, path)
-	if err != nil {
-		slog.Error("workspace content: safe path error", "path", path, "error", err)
+		slog.Error("workspace content: resolve path error", "path", path, "error", err)
 		return FileContentResult{}, err
 	}
 
@@ -371,42 +507,31 @@ func (s *Service) Content(path string, file string) (FileContentResult, error) {
 
 func (s *Service) Delete(path string) error {
 	slog.Info("workspace delete", "path", path)
-	root, err := base()
+	rows, err := s.doc.load()
 	if err != nil {
-		slog.Error("workspace delete: base path error", "error", err)
+		slog.Error("workspace delete: load failed", "error", err)
 		return err
 	}
 
-	dir, err := safe(root, path)
-	if err != nil {
-		slog.Error("workspace delete: safe path error", "path", path, "error", err)
-		return err
+	key := filepath.Clean(path)
+	next := make([]Local, 0, len(rows))
+	hit := false
+	for _, item := range rows {
+		if filepath.Clean(item.Path) == key {
+			hit = true
+			continue
+		}
+		next = append(next, item)
 	}
-	if filepath.Clean(dir) == filepath.Clean(root) {
-		slog.Warn("workspace delete: cannot delete root", "path", path)
-		return os.ErrInvalid
-	}
-
-	info, err := os.Stat(dir)
-	if os.IsNotExist(err) {
-		slog.Warn("workspace delete: path missing", "dir", dir)
+	if !hit {
 		return nil
 	}
-	if err != nil {
-		slog.Error("workspace delete: stat error", "dir", dir, "error", err)
-		return err
-	}
-	if !info.IsDir() {
-		slog.Warn("workspace delete: not a directory", "dir", dir)
-		return os.ErrInvalid
-	}
 
-	err = os.RemoveAll(dir)
+	err = s.doc.save(next)
 	if err != nil {
-		slog.Error("workspace delete: remove failed", "dir", dir, "error", err)
 		return err
 	}
 
-	slog.Info("workspace deleted", "dir", dir)
+	slog.Info("workspace removed", "path", key)
 	return nil
 }

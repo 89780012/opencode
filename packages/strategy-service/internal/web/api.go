@@ -45,6 +45,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/group/delete", a.groupDelete)
 	mux.HandleFunc("/api/workspace/list", a.workspaceList)
 	mux.HandleFunc("/api/workspace/create", a.workspaceCreate)
+	mux.HandleFunc("/api/workspace/import", a.workspaceImport)
 	mux.HandleFunc("/api/workspace/delete", a.workspaceDelete)
 	mux.HandleFunc("/api/workspace/open", a.workspaceOpen)
 	mux.HandleFunc("/api/workspace/files", a.workspaceFiles)

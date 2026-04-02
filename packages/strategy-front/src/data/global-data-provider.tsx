@@ -162,10 +162,19 @@ function normSkillCfg(input?: Partial<GlobalSkillCatalog> | null): GlobalSkillCa
 function normWorkspace(item: LocalWorkspace): LocalWorkspace {
   return {
     ...item,
-    type: item.type === "smartx" || item.type === "python" || item.type === "js" ? item.type : undefined,
+    type:
+      item.type === "smartx" || item.type === "python" || item.type === "js" || item.type === "other"
+        ? item.type
+        : undefined,
     template: typeof item.template === "string" ? item.template : undefined,
     entry_file: typeof item.entry_file === "string" ? item.entry_file : undefined,
     keywords: item.keywords ?? [],
+    source:
+      item.source === "default_plugin" || item.source === "user_created" || item.source === "imported"
+        ? item.source
+        : undefined,
+    managed: !!item.managed,
+    missing: !!item.missing,
     updated_at: typeof item.updated_at === "number" ? item.updated_at : 0,
   }
 }
@@ -179,6 +188,9 @@ function same(a: LocalWorkspace | null, b: LocalWorkspace) {
     return false
   }
   if (a.type !== b.type || a.template !== b.template || a.entry_file !== b.entry_file) {
+    return false
+  }
+  if (a.source !== b.source || a.managed !== b.managed || a.missing !== b.missing) {
     return false
   }
   if (a.keywords.length !== b.keywords.length) {

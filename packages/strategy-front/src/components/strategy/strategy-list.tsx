@@ -26,7 +26,14 @@ function time(value?: number) {
 function typeLabel(value?: string) {
   if (value === "python") return "Python"
   if (value === "js") return "JS"
+  if (value === "other") return "其他"
   return "SmartX"
+}
+
+function sourceLabel(value?: string) {
+  if (value === "default_plugin") return "默认插件"
+  if (value === "imported") return "已导入"
+  return "用户创建"
 }
 
 function Row(props: {
@@ -41,11 +48,19 @@ function Row(props: {
       onClick={() => props.onSelect(props.item)}
     >
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="truncate text-sm font-semibold text-foreground">{props.item.name}</div>
           <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:border-[#33403b] dark:bg-[#171c1b] dark:text-[#d7dfdb]">
             {typeLabel(props.item.type)}
           </span>
+          <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-500 dark:border-[#33403b] dark:bg-[#121616] dark:text-[#aab7b1]">
+            {sourceLabel(props.item.source)}
+          </span>
+          {props.item.missing ? (
+            <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+              目录缺失
+            </span>
+          ) : null}
         </div>
         <div className="mt-1 inline-flex items-center gap-1.5 text-xs text-muted-foreground dark:text-[#96a39d]">
           <CalendarClock className="size-3.5" />
@@ -97,8 +112,8 @@ export function StrategyList(props: Props) {
           <Sparkles className="size-5" />
         </div>
         <div className="space-y-1">
-          <div className="text-base font-semibold">还没有单策略</div>
-          <p className="text-sm text-muted-foreground">新建工作区后会显示在这里，进入后即可开始聊天和改代码。</p>
+          <div className="text-base font-semibold">还没有策略</div>
+          <p className="text-sm text-muted-foreground">新建、导入或迁移后的策略都会展示在这里。</p>
         </div>
       </div>
     )

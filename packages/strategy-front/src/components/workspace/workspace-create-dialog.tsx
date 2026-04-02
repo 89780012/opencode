@@ -1,8 +1,9 @@
 import { useMemo, useState, type ReactNode } from "react"
-import { ChevronRight, Code2, Cpu, Target } from "lucide-react"
+import { ChevronRight, Code2, Cpu, FileText, Target } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 import { chatApi, workspaceApi } from "@/api/modules"
+import { AutoResizeTextarea } from "@/components/ui/AutoResizeTextarea"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -14,13 +15,12 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { AutoResizeTextarea } from "@/components/ui/AutoResizeTextarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAgentList, useProviderList, useWorkspaceList } from "@/data/global-data-provider"
 import { useProjectComposer } from "@/hooks/use-project-composer"
 import { resolveComposer } from "@/lib/chat-composer"
-import { buildStrategyPrompt, buildTemplatePrompt, createGuide } from "@/lib/strategy-guide"
+import { buildStrategyPrompt, buildTemplatePrompt, createGuide, type StrategyType } from "@/lib/strategy-guide"
 import { encodeStrategyPath } from "@/lib/strategy-path"
 
 interface Props {
@@ -28,8 +28,6 @@ interface Props {
   onOpenChange: (open: boolean) => void
   onDone?: () => void
 }
-
-type Kind = "smartx" | "python" | "js"
 
 const kinds = ["趋势", "均值回归", "突破", "网格", "套利", "自定义"]
 const markets = ["加密", "股票", "ETF", "期货", "外汇"]
@@ -41,31 +39,42 @@ const styles = ["保守", "平衡", "激进"]
 const steps = ["类型", "配置", "确认"]
 
 const cards: Record<
-  Kind,
+  StrategyType,
   {
     title: string
     desc: string
     template: string
     icon: ReactNode
+    root: string
   }
 > = {
   smartx: {
     title: "SmartX 策略",
-    desc: "沿用现有 SmartX 插件模板，适合当前策略研发流程。",
+    desc: "继续使用 SmartX 插件模板，目录创建在 ~/.xtp-smart/plugins。",
     template: "smartx_plugin_python",
     icon: <Target className="size-4" />,
+    root: "~/.xtp-smart/plugins",
   },
   python: {
     title: "Python 策略",
-    desc: "创建一个轻量 Python 模板工作区，进入后也可以继续聊天改代码。",
+    desc: "创建轻量 Python 工作区，目录创建在 ~/.strategy-service/workspaces。",
     template: "python_basic",
     icon: <Cpu className="size-4" />,
+    root: "~/.strategy-service/workspaces",
   },
   js: {
     title: "JS 策略",
-    desc: "创建一个轻量 JavaScript 模板工作区，进入后也可以继续聊天改代码。",
+    desc: "创建轻量 JavaScript 工作区，目录创建在 ~/.strategy-service/workspaces。",
     template: "js_basic",
     icon: <Code2 className="size-4" />,
+    root: "~/.strategy-service/workspaces",
+  },
+  other: {
+    title: "其他",
+    desc: "创建通用工作区，适合非 SmartX 项目或自由结构目录。",
+    template: "other_basic",
+    icon: <FileText className="size-4" />,
+    root: "~/.strategy-service/workspaces",
   },
 }
 
@@ -94,13 +103,9 @@ function Chip(props: { active: boolean; text: string; onClick: () => void }) {
   )
 }
 
-function Block(props: { title: string; hint?: string; children: ReactNode; className?: string }) {
+function Block(props: { title: string; hint?: string; children: ReactNode }) {
   return (
-    <section
-      className={`rounded-[24px] border border-slate-200/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.92))] p-4 dark:border-[#26302c] dark:bg-[linear-gradient(180deg,rgba(21,26,25,0.98),rgba(17,22,21,0.94))] ${
-        props.className ?? ""
-      }`}
-    >
+    <section className="rounded-[24px] border border-slate-200/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.92))] p-4 dark:border-[#26302c] dark:bg-[linear-gradient(180deg,rgba(21,26,25,0.98),rgba(17,22,21,0.94))]">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="text-sm font-semibold text-slate-900 dark:text-[#eef5f1]">{props.title}</div>
         {props.hint ? <div className="text-[11px] text-slate-500 dark:text-[#809088]">{props.hint}</div> : null}
@@ -137,8 +142,8 @@ function Dot(props: { active: boolean; done: boolean; text: string; step: number
 
 export function WorkspaceCreateDialog(props: Props) {
   const nav = useNavigate()
-  const { basePath, refresh, select } = useWorkspaceList()
-  const [kind, setKind] = useState<Kind>("smartx")
+  const { refresh, select } = useWorkspaceList()
+  const [kind, setKind] = useState<StrategyType>("smartx")
   const ags = useAgentList(kind)
   const catalog = useProviderList()
   const project = useProjectComposer(kind)
@@ -159,6 +164,17 @@ export function WorkspaceCreateDialog(props: Props) {
   const [prompt, setPrompt] = useState("")
   const [busy, setBusy] = useState(false)
   const model = composer.model ? `${composer.model.providerID}/${composer.model.modelID}` : ""
+  const card = cards[kind]
+
+  const reset = () => {
+    setStep(0)
+    setPanel("base")
+    setKind("smartx")
+    setName("")
+    setGuide(createGuide())
+    setBrief("")
+    setPrompt("")
+  }
 
   const setAgent = (value: string) => {
     if (!ags.ags.some((item) => item.name === value)) return
@@ -172,23 +188,8 @@ export function WorkspaceCreateDialog(props: Props) {
     project.setModel({ providerID, modelID })
   }
 
-  const reset = () => {
-    setStep(0)
-    setPanel("base")
-    setKind("smartx")
-    setName("")
-    setGuide(createGuide())
-    setBrief("")
-    setPrompt("")
-  }
-
-  const template = cards[kind].template
-
   const buildPrompt = () => {
-    const base =
-      kind === "smartx"
-        ? buildStrategyPrompt({ name: name.trim(), guide })
-        : buildTemplatePrompt({ name: name.trim(), type: kind })
+    const base = kind === "smartx" ? buildStrategyPrompt({ name: name.trim(), guide }) : buildTemplatePrompt({ name: name.trim(), type: kind })
     if (!brief.trim()) {
       return base
     }
@@ -219,7 +220,7 @@ export function WorkspaceCreateDialog(props: Props) {
 
     setBusy(true)
     try {
-      const data = await workspaceApi.createWorkspace(value, kind, template)
+      const data = await workspaceApi.createWorkspace(value, kind, card.template)
       await refresh()
       select(data.workspace)
 
@@ -228,12 +229,7 @@ export function WorkspaceCreateDialog(props: Props) {
         agent: composer.agent.name,
         model: composer.model,
         variant: composer.variant,
-        parts: [
-          {
-            type: "text",
-            text: prompt || buildPrompt(),
-          },
-        ],
+        parts: [{ type: "text", text: prompt || buildPrompt() }],
       })
 
       props.onDone?.()
@@ -261,18 +257,14 @@ export function WorkspaceCreateDialog(props: Props) {
         <div className="border-b border-slate-200/70 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.14),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(249,250,251,0.94))] px-5 py-4 dark:border-[#202725] dark:bg-[radial-gradient(circle_at_top_left,rgba(122,165,144,0.2),transparent_32%),linear-gradient(180deg,rgba(17,22,21,0.98),rgba(15,20,19,0.95))]">
           <div className="mb-3 flex items-center justify-between gap-3">
             <DialogHeader className="gap-1 text-left">
-              <div className="text-[11px] font-medium uppercase tracking-[0.24em] text-emerald-700/80 dark:text-[#8eb7a5]">
-                Strategy Lab
-              </div>
-              <DialogTitle className="text-[22px] font-semibold tracking-[0.01em] text-slate-900 dark:text-[#eef5f1]">
-                新建策略
-              </DialogTitle>
+              <div className="text-[11px] font-medium uppercase tracking-[0.24em] text-emerald-700/80 dark:text-[#8eb7a5]">Strategy Lab</div>
+              <DialogTitle className="text-[22px] font-semibold tracking-[0.01em] text-slate-900 dark:text-[#eef5f1]">新建策略</DialogTitle>
               <DialogDescription className="text-sm leading-6 text-slate-600 dark:text-[#95a39d]">
-                先选择策略类型，再生成工作区并自动进入首轮聊天改代码。
+                先选择策略类型，再创建工作区，并自动进入首轮聊天改代码。
               </DialogDescription>
             </DialogHeader>
             <div className="hidden rounded-full border border-emerald-200/80 bg-white/80 px-3 py-1 text-[11px] text-emerald-800 shadow-sm backdrop-blur md:block dark:border-[#355145] dark:bg-[#141b19] dark:text-[#a7c5b9]">
-              类型化创建
+              注册表驱动
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -299,8 +291,8 @@ export function WorkspaceCreateDialog(props: Props) {
                 />
               </Block>
 
-              <Block title="策略类型" hint="不同类型会加载不同模板与 agent">
-                <div className="grid gap-3 md:grid-cols-3">
+              <Block title="策略类型" hint="不同类型会加载不同模板和 agent">
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                   {Object.entries(cards).map(([key, item]) => {
                     const active = kind === key
                     return (
@@ -312,7 +304,7 @@ export function WorkspaceCreateDialog(props: Props) {
                             ? "border-emerald-300 bg-emerald-50/70 ring-1 ring-emerald-100 dark:border-[#4d6f62] dark:bg-[#15201c] dark:ring-[#30453d]"
                             : "border-slate-200/80 bg-white/90 hover:border-emerald-200 hover:bg-emerald-50/50 dark:border-[#26302c] dark:bg-[#141918] dark:hover:border-[#355145] dark:hover:bg-[#18201d]"
                         }`}
-                        onClick={() => setKind(key as Kind)}
+                        onClick={() => setKind(key as StrategyType)}
                       >
                         <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-[#eef5f1]">
                           {item.icon}
@@ -332,9 +324,7 @@ export function WorkspaceCreateDialog(props: Props) {
                 </div>
                 <div className="rounded-[24px] border border-slate-200/80 bg-white/80 px-4 py-3 text-xs leading-6 text-slate-500 dark:border-[#26302c] dark:bg-[#141918] dark:text-[#83928c]">
                   工作区目录
-                  <div className="truncate text-sm font-medium text-slate-900 dark:text-[#eef5f1]">
-                    {basePath || "~/.xtp-smart/plugins"}
-                  </div>
+                  <div className="truncate text-sm font-medium text-slate-900 dark:text-[#eef5f1]">{card.root}</div>
                 </div>
               </div>
             </div>
@@ -346,21 +336,15 @@ export function WorkspaceCreateDialog(props: Props) {
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-slate-200/70 bg-white/80 px-4 py-3 dark:border-[#26302c] dark:bg-[#141918]">
                   <div>
                     <div className="text-sm font-semibold text-slate-900 dark:text-[#eef5f1]">补齐策略画像</div>
-                    <div className="text-xs text-slate-500 dark:text-[#809088]">
-                      SmartX 策略继续使用当前引导式表单，便于首轮生成更完整的策略方案。
-                    </div>
+                    <div className="text-xs text-slate-500 dark:text-[#809088]">SmartX 策略继续使用引导式表单，便于首轮生成更完整的策略方案。</div>
                   </div>
                   <div className="rounded-full border border-emerald-200/80 bg-emerald-50/80 px-3 py-1 text-xs font-medium text-emerald-900 dark:border-[#355145] dark:bg-[#17211d] dark:text-[#a8c6bb]">
                     {guide.kind} / {guide.market} / {guide.tf}
                   </div>
                 </div>
                 <TabsList className="grid h-11 w-full grid-cols-2 rounded-2xl bg-slate-100/90 p-1 dark:bg-[#171d1b]">
-                  <TabsTrigger value="base" className="rounded-xl px-3 text-sm">
-                    基础参数
-                  </TabsTrigger>
-                  <TabsTrigger value="goal" className="rounded-xl px-3 text-sm">
-                    风控与输出
-                  </TabsTrigger>
+                  <TabsTrigger value="base" className="rounded-xl px-3 text-sm">基础参数</TabsTrigger>
+                  <TabsTrigger value="goal" className="rounded-xl px-3 text-sm">风控与输出</TabsTrigger>
                 </TabsList>
                 <TabsContent value="base" className="space-y-4">
                   <Block title="策略方向">
@@ -398,12 +382,7 @@ export function WorkspaceCreateDialog(props: Props) {
                   <Block title="风控重点">
                     <div className="flex flex-wrap gap-2">
                       {risks.map((item) => (
-                        <Chip
-                          key={item}
-                          text={item}
-                          active={guide.risk.includes(item)}
-                          onClick={() => setGuide((prev) => ({ ...prev, risk: toggle(prev.risk, item) }))}
-                        />
+                        <Chip key={item} text={item} active={guide.risk.includes(item)} onClick={() => setGuide((prev) => ({ ...prev, risk: toggle(prev.risk, item) }))} />
                       ))}
                     </div>
                   </Block>
@@ -418,12 +397,7 @@ export function WorkspaceCreateDialog(props: Props) {
                     <Block title="输出要求">
                       <div className="flex flex-wrap gap-2">
                         {outputs.map((item) => (
-                          <Chip
-                            key={item}
-                            text={item}
-                            active={guide.output.includes(item)}
-                            onClick={() => setGuide((prev) => ({ ...prev, output: toggle(prev.output, item) }))}
-                          />
+                          <Chip key={item} text={item} active={guide.output.includes(item)} onClick={() => setGuide((prev) => ({ ...prev, output: toggle(prev.output, item) }))} />
                         ))}
                       </div>
                     </Block>
@@ -442,11 +416,13 @@ export function WorkspaceCreateDialog(props: Props) {
               </Tabs>
             ) : (
               <div className="space-y-4">
-                <Block title="模板说明" hint={`当前模板：${template}`}>
+                <Block title="模板说明" hint={`当前模板：${card.template}`}>
                   <div className="text-sm leading-6 text-slate-600 dark:text-[#93a39c]">
                     {kind === "python"
-                      ? "Python 策略会先创建一个简单的 `main.py` 模板，并自动发起一轮聊天，让 AI 继续扩展项目结构和实现代码。"
-                      : "JS 策略会先创建一个简单的 `index.js` 模板，并自动发起一轮聊天，让 AI 继续扩展项目结构和实现代码。"}
+                      ? "Python 策略会先创建一个简单的 main.py 模板，并自动发起一轮聊天，让 AI 继续扩展项目结构和实现代码。"
+                      : kind === "js"
+                        ? "JS 策略会先创建一个简单的 index.js 模板，并自动发起一轮聊天，让 AI 继续扩展项目结构和实现代码。"
+                        : "其他类型会先创建一个通用 README.md 工作区，并自动发起一轮聊天，帮助你整理结构、导入代码或继续扩展文件。"}
                   </div>
                 </Block>
                 <Block title="补充说明" hint="描述你希望首轮重点完成的内容">
@@ -455,8 +431,11 @@ export function WorkspaceCreateDialog(props: Props) {
                       value={brief}
                       onChange={setBrief}
                       height={220}
-                      placeholder={kind === "python" ? "例如：先搭一个可扩展的 Python 策略骨架，并预留参数配置。"
-                        : "例如：先搭一个可扩展的 JS 策略骨架，并预留信号处理与执行入口。"}
+                      placeholder={kind === "python"
+                        ? "例如：先搭一个可扩展的 Python 策略骨架，并预留参数配置。"
+                        : kind === "js"
+                          ? "例如：先搭一个可扩展的 JS 策略骨架，并预留信号处理与执行入口。"
+                          : "例如：先整理目录用途，补一个最小可维护结构，并说明下一步改造建议。"}
                     />
                   </div>
                 </Block>
@@ -469,7 +448,7 @@ export function WorkspaceCreateDialog(props: Props) {
               <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
                 <div className="rounded-[24px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.92))] p-4 dark:border-[#26302c] dark:bg-[linear-gradient(180deg,rgba(21,26,25,0.98),rgba(17,22,21,0.94))]">
                   <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-[#eef5f1]">
-                    {cards[kind].icon}
+                    {card.icon}
                     当前创建配置
                   </div>
                   <div className="mb-4 grid gap-3">
@@ -481,9 +460,7 @@ export function WorkspaceCreateDialog(props: Props) {
                         </SelectTrigger>
                         <SelectContent className="min-w-[var(--radix-select-trigger-width)]">
                           {ags.ags.map((item) => (
-                            <SelectItem key={item.name} value={item.name}>
-                              {item.name}
-                            </SelectItem>
+                            <SelectItem key={item.name} value={item.name}>{item.name}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -497,20 +474,17 @@ export function WorkspaceCreateDialog(props: Props) {
                         <SelectContent className="min-w-[var(--radix-select-trigger-width)]">
                           {catalog.connectedModels.map((item) => {
                             const value = `${item.provider.id}/${item.id}`
-                            return (
-                              <SelectItem key={value} value={value}>
-                                {value}
-                              </SelectItem>
-                            )
+                            return <SelectItem key={value} value={value}>{value}</SelectItem>
                           })}
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
                   <div className="space-y-2 text-sm text-slate-600 dark:text-[#9aaba4]">
-                    <div>类型：{cards[kind].title}</div>
-                    <div>模板：{template}</div>
+                    <div>类型：{card.title}</div>
+                    <div>模板：{card.template}</div>
                     <div>名称：{name || "-"}</div>
+                    <div>目录：{card.root}</div>
                     {kind === "smartx" ? (
                       <>
                         <div>方向：{guide.kind}</div>
@@ -546,19 +520,11 @@ export function WorkspaceCreateDialog(props: Props) {
             {step === 0 ? "取消" : "上一步"}
           </Button>
           {step < 2 ? (
-            <Button
-              className="rounded-xl bg-slate-900 text-white hover:bg-slate-800 dark:bg-[#7aa590] dark:text-[#08110e] dark:hover:bg-[#8bb09f]"
-              onClick={next}
-              disabled={busy}
-            >
+            <Button className="rounded-xl bg-slate-900 text-white hover:bg-slate-800 dark:bg-[#7aa590] dark:text-[#08110e] dark:hover:bg-[#8bb09f]" onClick={next} disabled={busy}>
               下一步
             </Button>
           ) : (
-            <Button
-              className="rounded-xl bg-slate-900 text-white hover:bg-slate-800 dark:bg-[#7aa590] dark:text-[#08110e] dark:hover:bg-[#8bb09f]"
-              onClick={() => void create()}
-              disabled={busy}
-            >
+            <Button className="rounded-xl bg-slate-900 text-white hover:bg-slate-800 dark:bg-[#7aa590] dark:text-[#08110e] dark:hover:bg-[#8bb09f]" onClick={() => void create()} disabled={busy}>
               {busy ? "创建中..." : "创建并进入策略页"}
             </Button>
           )}

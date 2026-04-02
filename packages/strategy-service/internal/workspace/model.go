@@ -1,6 +1,7 @@
 package workspace
 
 type Local struct {
+	ID        string   `json:"id,omitempty"`
 	Name      string   `json:"name"`
 	Path      string   `json:"path"`
 	Type      string   `json:"type,omitempty"`
@@ -8,6 +9,9 @@ type Local struct {
 	EntryFile string   `json:"entry_file,omitempty"`
 	Keywords  []string `json:"keywords"`
 	VCS       string   `json:"vcs,omitempty"`
+	Source    string   `json:"source,omitempty"`
+	Managed   bool     `json:"managed,omitempty"`
+	Missing   bool     `json:"missing,omitempty"`
 	UpdatedAt int64    `json:"updated_at"`
 }
 

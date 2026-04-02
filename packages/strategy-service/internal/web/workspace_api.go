@@ -87,6 +87,36 @@ func (a *API) workspaceOpen(w http.ResponseWriter, r *http.Request) {
 	write(w, http.StatusOK, "ok", data)
 }
 
+func (a *API) workspaceImport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
+		return
+	}
+
+	body := struct {
+		Path string `json:"path"`
+		Type string `json:"type"`
+		Git  bool   `json:"git"`
+	}{}
+	err := readJSON(r, &body)
+	if err != nil {
+		slog.Warn("workspace import bad request", "error", err)
+		write(w, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+
+	slog.Info("workspace import", "path", body.Path, "type", body.Type)
+	data, err := a.ws.Import(body.Path, body.Type, body.Git)
+	if err != nil {
+		slog.Error("workspace import failed", "path", body.Path, "error", err)
+		write(w, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+
+	data.Workspace = workspace.Enrich(r.Context(), []workspace.Local{data.Workspace}, a.op)[0]
+	write(w, http.StatusOK, "ok", data)
+}
+
 func (a *API) workspaceDelete(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)

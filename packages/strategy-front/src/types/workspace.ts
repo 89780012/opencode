@@ -1,11 +1,15 @@
 export interface LocalWorkspace {
+  id?: string;
   name: string;
   path: string;
-  type?: "smartx" | "python" | "js";
+  type?: "smartx" | "python" | "js" | "other";
   template?: string;
   entry_file?: string;
   keywords: string[];
   vcs?: "git";
+  source?: "default_plugin" | "user_created" | "imported";
+  managed?: boolean;
+  missing?: boolean;
   updated_at?: number;
 }
 
@@ -16,7 +20,7 @@ export interface LocalWorkspaceResponse {
 
 export interface CreateWorkspaceRequest {
   name: string;
-  type: "smartx" | "python" | "js";
+  type: "smartx" | "python" | "js" | "other";
   template: string;
   git?: boolean;
 }
@@ -28,6 +32,12 @@ export interface CreateWorkspaceResponse {
 
 export interface OpenWorkspaceRequest {
   path: string;
+  git?: boolean;
+}
+
+export interface ImportWorkspaceRequest {
+  path: string;
+  type?: "smartx" | "python" | "js" | "other";
   git?: boolean;
 }
 

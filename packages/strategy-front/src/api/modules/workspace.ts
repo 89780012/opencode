@@ -2,6 +2,7 @@ import { request } from "@/api/client";
 import type {
   CreateWorkspaceRequest,
   CreateWorkspaceResponse,
+  ImportWorkspaceRequest,
   LocalWorkspaceResponse,
   OpenWorkspaceRequest,
   OpenWorkspaceResponse,
@@ -14,10 +15,17 @@ export const workspaceApi = {
     return request.get<LocalWorkspaceResponse>("/workspace/list");
   },
 
-  createWorkspace(name: string, type: "smartx" | "python" | "js", template: string) {
+  createWorkspace(name: string, type: "smartx" | "python" | "js" | "other", template: string) {
     return request.post<CreateWorkspaceResponse, CreateWorkspaceRequest>(
       "/workspace/create",
       { name, type, template, git: true },
+    );
+  },
+
+  importWorkspace(path: string, type?: "smartx" | "python" | "js" | "other") {
+    return request.post<OpenWorkspaceResponse, ImportWorkspaceRequest>(
+      "/workspace/import",
+      { path, type, git: false },
     );
   },
 

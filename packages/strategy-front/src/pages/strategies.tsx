@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { Boxes, Plus, RefreshCw, Search } from "lucide-react"
+import { Boxes, FolderInput, Plus, RefreshCw, Search } from "lucide-react"
 import { toast } from "sonner"
 import { workspaceApi } from "@/api/modules/workspace"
 import { DeleteConfirmDialog } from "@/components/shared/delete-confirm-dialog"
+import { StrategyImportDialog } from "@/components/strategy/strategy-import-dialog"
 import { StrategyList } from "@/components/strategy/strategy-list"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,8 +22,9 @@ function note(err: unknown, text: string) {
 
 export default function StrategiesPage() {
   const nav = useNavigate()
-  const { workspaces, loading, error, refresh } = useWorkspaceList()
+  const { workspaces, loading, error, refresh, select } = useWorkspaceList()
   const [open, setOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const [q, setQ] = useState("")
   const [item, setItem] = useState<LocalWorkspace | null>(null)
   const [busy, setBusy] = useState(false)
@@ -35,7 +37,8 @@ export default function StrategiesPage() {
       return (
         item.name.toLowerCase().includes(key) ||
         item.keywords.some((word) => word.toLowerCase().includes(key)) ||
-        (item.type ?? "").toLowerCase().includes(key)
+        (item.type ?? "").toLowerCase().includes(key) ||
+        (item.source ?? "").toLowerCase().includes(key)
       )
     })
   }, [q, workspaces])
@@ -49,12 +52,12 @@ export default function StrategiesPage() {
     setBusy(true)
     try {
       await workspaceApi.removeWorkspace(item.path)
-      toast.success(`已删除策略：${item.name}`)
+      toast.success(`已从列表移除策略：${item.name}`)
       await refresh()
       setItem(null)
       window.dispatchEvent(new Event("group:changed"))
     } catch (err) {
-      toast.error(note(err, `删除 ${item.name} 失败`))
+      toast.error(note(err, `移除 ${item.name} 失败`))
     } finally {
       setBusy(false)
     }
@@ -72,10 +75,10 @@ export default function StrategiesPage() {
               </div>
               <div className="mt-3 text-3xl font-semibold tracking-tight text-foreground">我的策略</div>
               <p className="mt-1.5 max-w-3xl text-sm leading-6 text-muted-foreground">
-                这里展示你创建的全部策略工作区。支持 SmartX、Python、JS 三种类型，进入后都可以直接聊天并查看代码。
+                这里展示注册表中的全部策略工作区。支持 SmartX、Python、JS、其他四种类型，也支持导入任意目录并做逻辑删除。
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -85,6 +88,15 @@ export default function StrategiesPage() {
               >
                 <RefreshCw className={cn("size-4", loading && "animate-spin")} />
                 刷新
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-slate-200 bg-white text-slate-900 hover:bg-slate-100 dark:border-[#33403b] dark:bg-[#171c1b] dark:text-[#e3ece7] dark:hover:bg-[#1d2321]"
+                onClick={() => setImportOpen(true)}
+              >
+                <FolderInput className="size-4" />
+                导入目录
               </Button>
               <Button
                 size="sm"
@@ -103,7 +115,7 @@ export default function StrategiesPage() {
               <Input
                 value={q}
                 onChange={(event) => setQ(event.target.value)}
-                placeholder="搜索策略名称、关键词或类型..."
+                placeholder="搜索策略名称、关键词、类型或来源..."
                 className="h-9 rounded-xl border-slate-200 bg-background pl-10 shadow-sm dark:border-[#4f7769] dark:bg-[#1a1f1e] dark:text-[#e3ece7] dark:shadow-none"
               />
             </div>
@@ -115,26 +127,28 @@ export default function StrategiesPage() {
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-6 py-4">
           <div className="flex items-center justify-between gap-3">
             <div className="text-sm font-medium text-foreground">共 {list.length} 个策略</div>
-            <div className="text-xs text-muted-foreground dark:text-slate-400">支持直接进入，也支持在列表中删除对应工作区。</div>
+            <div className="text-xs text-muted-foreground dark:text-slate-400">删除只会从 JSON 注册表里移除，不会删除本地文件夹。</div>
           </div>
-          <StrategyList
-            items={list}
-            loading={loading}
-            error={error}
-            onRetry={() => void refresh()}
-            onSelect={onSelect}
-            onDelete={setItem}
-          />
+          <StrategyList items={list} loading={loading} error={error} onRetry={() => void refresh()} onSelect={onSelect} onDelete={setItem} />
         </div>
       </div>
 
       <WorkspaceCreateDialog open={open} onOpenChange={setOpen} />
+      <StrategyImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onDone={async (item) => {
+          await refresh()
+          select(item)
+          nav(`/app/strategies/${encodeStrategyPath(item.path)}`)
+        }}
+      />
       <DeleteConfirmDialog
         open={!!item}
         busy={busy}
-        title="删除策略"
+        title="从列表移除策略"
         name={item?.name ?? ""}
-        desc="删除后会移除对应工作区文件夹，这个操作不可恢复。"
+        desc="移除后只会删除策略注册表中的记录，不会删除本地目录。之后仍可再次导入。"
         onOpenChange={(value) => {
           if (!value) setItem(null)
         }}
