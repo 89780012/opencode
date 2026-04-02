@@ -52,6 +52,19 @@ const router = createBrowserRouter([
         ],
       },
       {
+        path: "groups",
+        children: [
+          {
+            index: true,
+            element: <GroupsPage />,
+          },
+          {
+            path: ":groupID",
+            element: <GroupDetailPage />,
+          },
+        ],
+      },
+      {
         path: "providers",
         element: <ProviderPage />,
         children: [
@@ -106,19 +119,6 @@ const router = createBrowserRouter([
       {
         path: "skills",
         element: <SkillPage />,
-      },
-      {
-        path: "groups",
-        children: [
-          {
-            index: true,
-            element: <GroupsPage />,
-          },
-          {
-            path: ":groupID",
-            element: <GroupDetailPage />,
-          },
-        ],
       },
     ],
   },

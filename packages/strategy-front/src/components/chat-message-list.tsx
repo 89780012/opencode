@@ -181,8 +181,11 @@ function renderPart(part: ChatPart, role: ChatMessageInfo["role"], onOpenDiff?: 
       )
     case "patch":
       return (
-        <div className="rounded-lg border px-3 py-2 text-sm">
-          <div className="font-medium">Patch {part.hash}</div>
+        <details className="rounded-lg border px-3 py-2 text-sm">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 font-medium [&::-webkit-details-marker]:hidden">
+            <span>Patch {part.hash}</span>
+            <span className="text-xs text-muted-foreground">{part.files.length} files</span>
+          </summary>
           <div className="mt-2 flex flex-wrap gap-2">
             {part.files.map((item) => (
               <button
@@ -198,7 +201,7 @@ function renderPart(part: ChatPart, role: ChatMessageInfo["role"], onOpenDiff?: 
               </button>
             ))}
           </div>
-        </div>
+        </details>
       )
     case "agent":
       return <div className="rounded-lg border px-3 py-2 text-xs text-muted-foreground">Agent: {part.name}</div>

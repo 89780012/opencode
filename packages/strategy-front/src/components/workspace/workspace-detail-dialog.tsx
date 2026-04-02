@@ -18,17 +18,19 @@ interface Props {
 
 export function WorkspaceDetailDialog(props: Props) {
   const [tab, setTab] = useState<Tab>(props.file ? "review" : "files")
-  const view = props.file ? "review" : tab
+  const view = tab
   const review = useChatReview(props.workspace?.path, props.sessionId, props.open && view === "review")
 
   useEffect(() => {
+    if (!props.open) return
     if (!props.file) return
+    setTab("review")
     review.open(props.file)
-  }, [props.file, review])
+  }, [props.file, props.open, review.open])
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className="flex h-[92vh] w-[70vw] max-w-[70vw] min-w-[1200px] flex-col p-0">
+      <DialogContent className="top-4 right-4 bottom-4 left-4 flex h-auto w-auto max-w-none min-w-0 translate-x-0 translate-y-0 flex-col gap-0 p-0">
         <DialogHeader className="border-b px-6 py-4">
           <DialogTitle>{props.workspace?.name ?? "工作区详情"}</DialogTitle>
         </DialogHeader>
