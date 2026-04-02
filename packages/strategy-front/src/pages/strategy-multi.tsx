@@ -7,6 +7,7 @@ import { useAgentList, useProviderList, useWorkspaceList } from "@/data/global-d
 import { useProjectComposer } from "@/hooks/use-project-composer"
 import { resolveComposer } from "@/lib/chat-composer"
 import { decodeStrategyPath } from "@/lib/strategy-path"
+import type { LocalWorkspace } from "@/types/workspace"
 
 const ctrl =
   "rounded-xl border border-black/8 bg-black/[0.03] text-xs shadow-none hover:bg-black/[0.05] dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.06]"
@@ -16,12 +17,10 @@ function cols(size: number) {
   return "grid-cols-1 xl:grid-cols-2"
 }
 
-export default function StrategyMultiPage() {
-  const [query] = useSearchParams()
-  const { loading, refresh, workspaces } = useWorkspaceList()
+function Panel(props: { workspace: LocalWorkspace }) {
   const catalog = useProviderList()
   const ags = useAgentList()
-  const project = useProjectComposer()
+  const project = useProjectComposer(props.workspace.path)
   const composer = useMemo(
     () =>
       resolveComposer({
@@ -31,21 +30,6 @@ export default function StrategyMultiPage() {
       }),
     [ags.ags, catalog, project.state],
   )
-  const paths = useMemo(
-    () =>
-      query
-        .getAll("path")
-        .map((item) => decodeStrategyPath(item))
-        .filter(Boolean),
-    [query],
-  )
-  const items = useMemo(() => {
-    const map = new Map(workspaces.map((item) => [item.path, item]))
-    return paths.map((path) => map.get(path) ?? null)
-  }, [paths, workspaces])
-  const list = useMemo(() => items.filter((item): item is (typeof workspaces)[number] => !!item), [items])
-  const missing = useMemo(() => items.some((item) => !item), [items])
-  const invalid = paths.length < 2 || paths.length > 3
   const model = composer.model ? `${composer.model.providerID}/${composer.model.modelID}` : undefined
 
   const setAgent = useCallback(
@@ -72,6 +56,42 @@ export default function StrategyMultiPage() {
     },
     [project],
   )
+
+  return (
+    <MultiWorkspaceChatPanel
+      workspace={props.workspace}
+      agents={ags.names}
+      models={catalog.visibleModels}
+      agent={composer.agent?.name}
+      model={model}
+      variant={composer.variant}
+      variants={composer.variants}
+      load={ags.load || catalog.load}
+      onAgent={setAgent}
+      onModel={setModel}
+      onVariant={setVariant}
+    />
+  )
+}
+
+export default function StrategyMultiPage() {
+  const [query] = useSearchParams()
+  const { loading, refresh, workspaces } = useWorkspaceList()
+  const paths = useMemo(
+    () =>
+      query
+        .getAll("path")
+        .map((item) => decodeStrategyPath(item))
+        .filter(Boolean),
+    [query],
+  )
+  const items = useMemo(() => {
+    const map = new Map(workspaces.map((item) => [item.path, item]))
+    return paths.map((path) => map.get(path) ?? null)
+  }, [paths, workspaces])
+  const list = useMemo(() => items.filter((item): item is (typeof workspaces)[number] => !!item), [items])
+  const missing = useMemo(() => items.some((item) => !item), [items])
+  const invalid = paths.length < 2 || paths.length > 3
 
   if (loading && list.length === 0) {
     return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">正在加载多屏工作区...</div>
@@ -128,19 +148,7 @@ export default function StrategyMultiPage() {
         >
           {list.map((item) => (
             <div key={item.path} className="min-h-0 px-2">
-              <MultiWorkspaceChatPanel
-                workspace={item}
-                agents={ags.names}
-                models={catalog.visibleModels}
-                agent={composer.agent?.name}
-                model={model}
-                variant={composer.variant}
-                variants={composer.variants}
-                load={ags.load || catalog.load}
-                onAgent={setAgent}
-                onModel={setModel}
-                onVariant={setVariant}
-              />
+              <Panel workspace={item} />
             </div>
           ))}
         </div>
