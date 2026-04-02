@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { MultiWorkspaceChatPanel } from "@/components/workspace/multi-workspace-chat-panel"
 import { useAgentList, useProviderList, useWorkspaceList } from "@/data/global-data-provider"
 import { useProjectComposer } from "@/hooks/use-project-composer"
+import { useChatSessions } from "@/hooks/use-chat-sessions";
 import { resolveComposer } from "@/lib/chat-composer"
 import { decodeStrategyPath } from "@/lib/strategy-path"
 import type { LocalWorkspace } from "@/types/workspace"
@@ -21,6 +22,7 @@ function Panel(props: { workspace: LocalWorkspace }) {
   const catalog = useProviderList()
   const ags = useAgentList()
   const project = useProjectComposer(props.workspace.path)
+  const { loading: sessionLoading } = useChatSessions(props.workspace.path)
   const composer = useMemo(
     () =>
       resolveComposer({
@@ -58,19 +60,26 @@ function Panel(props: { workspace: LocalWorkspace }) {
   )
 
   return (
-    <MultiWorkspaceChatPanel
-      workspace={props.workspace}
-      agents={ags.names}
-      models={catalog.visibleModels}
-      agent={composer.agent?.name}
-      model={model}
-      variant={composer.variant}
-      variants={composer.variants}
-      load={ags.load || catalog.load}
-      onAgent={setAgent}
-      onModel={setModel}
-      onVariant={setVariant}
-    />
+    <div className="relative">
+      <MultiWorkspaceChatPanel
+        workspace={props.workspace}
+        agents={ags.names}
+        models={catalog.visibleModels}
+        agent={composer.agent?.name}
+        model={model}
+        variant={composer.variant}
+        variants={composer.variants}
+        load={ags.load || catalog.load}
+        onAgent={setAgent}
+        onModel={setModel}
+        onVariant={setVariant}
+      />
+      {sessionLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-background/50 dark:bg-background/30 backdrop-blur-sm">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
+      )}
+    </div>
   )
 }
 

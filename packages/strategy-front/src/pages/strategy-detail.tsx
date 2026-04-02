@@ -210,7 +210,7 @@ export default function StrategyDetailPage() {
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 px-4 pb-4">
+        <div className="min-h-0 flex-1 px-4 pb-4 relative">
           <StrategyChatPanel
             workspace={workspace}
             selectedSessionId={selectedSessionId}
@@ -240,6 +240,11 @@ export default function StrategyDetailPage() {
               setOpen(true)
             }}
           />
+          {(sessionLoading || detailLoading) && (
+            <div className="absolute inset-0 flex items-center justify-center bg-background/50 dark:bg-background/30 backdrop-blur-sm">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            </div>
+          )}
         </div>
       </div>
 
