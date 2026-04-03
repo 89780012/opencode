@@ -193,6 +193,7 @@ export function WorkspaceDetailPane(props: Props) {
 
         setFiles((prev) => ({ ...prev, [path]: data }))
         setDrafts((prev) => (path in prev ? prev : { ...prev, [path]: data.content }))
+        setDirty((prev) => ({ ...prev, [path]: false }))
       } catch (err) {
         console.error("failed to load workspace file content", err)
         if (cur.current === base) {
@@ -221,49 +222,69 @@ export function WorkspaceDetailPane(props: Props) {
         return
       }
 
+      if (!(active in files)) {
+        return
+      }
+
       setDrafts((prev) => ({ ...prev, [active]: value }))
       setDirty((prev) => ({ ...prev, [active]: value !== (files[active]?.content ?? "") }))
     },
     [active, files],
   )
 
-  const save = useCallback(async () => {
-    if (!props.workspace || !active) {
+  const save = useCallback(async (path?: string) => {
+    if (!props.workspace) {
       return
     }
 
-    const file = files[active]
-    if (!file?.previewable || file.binary || file.truncated || !dirty[active]) {
+    const next = path ?? active
+    if (!next) {
       return
     }
 
-    const body = drafts[active] ?? file.content
+    const file = files[next]
+    if (!file?.previewable || file.binary || file.truncated || !dirty[next]) {
+      return
+    }
+
+    const body = drafts[next] ?? file.content
     const base = props.workspace.path
-    setSaving((prev) => ({ ...prev, [active]: true }))
-    setErrs((prev) => ({ ...prev, [active]: null }))
+    setSaving((prev) => ({ ...prev, [next]: true }))
+    setErrs((prev) => ({ ...prev, [next]: null }))
 
     try {
-      const data = await workspaceApi.saveWorkspaceFileContent(base, active, body)
+      const data = await workspaceApi.saveWorkspaceFileContent(base, next, body)
       if (cur.current !== base) {
         return
       }
 
-      setFiles((prev) => ({ ...prev, [active]: data }))
-      setDrafts((prev) => ({ ...prev, [active]: data.content }))
-      setDirty((prev) => ({ ...prev, [active]: false }))
-      toast.success(`已保存 ${active}`)
+      setFiles((prev) => ({ ...prev, [next]: data }))
+      setDrafts((prev) => ({ ...prev, [next]: data.content }))
+      setDirty((prev) => ({ ...prev, [next]: false }))
+      toast.success(`已保存 ${next}`)
     } catch (err) {
       console.error("failed to save workspace file content", err)
       if (cur.current === base) {
-        setErrs((prev) => ({ ...prev, [active]: "保存文件失败" }))
+        setErrs((prev) => ({ ...prev, [next]: "保存文件失败" }))
       }
       toast.error("保存文件失败")
     } finally {
       if (cur.current === base) {
-        setSaving((prev) => ({ ...prev, [active]: false }))
+        setSaving((prev) => ({ ...prev, [next]: false }))
       }
     }
   }, [active, dirty, drafts, files, props.workspace])
+
+  const saveAll = useCallback(async () => {
+    const list = Object.keys(dirty).filter((path) => dirty[path])
+    if (list.length === 0) {
+      return
+    }
+
+    for (const path of list) {
+      await save(path)
+    }
+  }, [dirty, save])
 
   if (!props.workspace) {
     return null
@@ -272,10 +293,10 @@ export function WorkspaceDetailPane(props: Props) {
   const file = active ? (files[active] ?? null) : null
   const fileError = active ? (errs[active] ?? null) : null
   const fileLoading = active ? (busy[active] ?? false) : false
-  const fileSaving = active ? (saving[active] ?? false) : false
   const value = active ? (drafts[active] ?? files[active]?.content ?? "") : ""
   const lock = !!file?.truncated || (!file?.previewable && !fileLoading)
   const count = Object.values(dirty).filter(Boolean).length
+  const savingAny = Object.values(saving).some(Boolean)
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col bg-[linear-gradient(180deg,#fcfcfb,#f7f7f4)] dark:bg-[linear-gradient(180deg,#101514,#0f1211)]">
@@ -315,11 +336,11 @@ export function WorkspaceDetailPane(props: Props) {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => void save()}
-                      disabled={lock || !active || !dirty[active] || fileSaving}
+                      onClick={() => void saveAll()}
+                      disabled={count === 0 || savingAny}
                     >
                       <Save className="size-4" />
-                      {fileSaving ? "保存中..." : "保存"}
+                      {savingAny ? "保存中..." : count > 1 ? "全部保存" : "保存"}
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => void load()} disabled={loading}>
                       <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />

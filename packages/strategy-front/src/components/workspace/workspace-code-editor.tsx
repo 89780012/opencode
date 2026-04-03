@@ -74,7 +74,10 @@ export function WorkspaceCodeEditor(props: Props) {
         path={props.activeFilePath}
         value={props.value}
         language={editorLanguage(props.activeFilePath)}
-        onChange={(value) => {
+        onChange={(value, ev) => {
+          if (ev?.isFlush || ev?.changes.length === 0) {
+            return
+          }
           props.onChange?.(value ?? "")
         }}
         onMount={(ed, monaco) => {
