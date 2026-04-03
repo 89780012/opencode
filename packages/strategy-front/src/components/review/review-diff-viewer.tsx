@@ -1,4 +1,5 @@
 import { DiffEditor, type MonacoDiffEditor } from "@monaco-editor/react"
+import { useTheme } from "next-themes"
 import { useEffect, useRef } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { editorLanguage } from "@/lib/editor-language"
@@ -13,6 +14,8 @@ interface Props {
 
 export function ReviewDiffViewer(props: Props) {
   const ref = useRef<MonacoDiffEditor | null>(null)
+  const { resolvedTheme } = useTheme()
+  const theme = resolvedTheme === "dark" ? "strategy-dark" : "strategy-light"
 
   useEffect(() => {
     return () => {
@@ -62,6 +65,7 @@ export function ReviewDiffViewer(props: Props) {
           key={props.diff.file}
           height="100%"
           width="100%"
+          theme={theme}
           original={props.diff.before}
           modified={props.diff.after}
           language={editorLanguage(props.diff.file)}

@@ -9,9 +9,9 @@ import { PromptBar } from "@/components/chat/prompt-bar"
 import { QuestionPanel } from "@/components/chat/question-panel"
 import { TodoPanel } from "@/components/chat/todo-panel"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { WorkspaceDetailDialog } from "@/components/workspace/workspace-detail-dialog"
-import { useWorkspaceList } from "@/data/global-data-provider"
+import { WorkspaceDetailPane, type WorkspaceDetailTab } from "@/components/workspace/workspace-detail-pane"
 import { useChatEvents } from "@/hooks/use-chat-events"
 import { useChatPermission } from "@/hooks/use-chat-permission"
 import { useChatQuestion } from "@/hooks/use-chat-question"
@@ -43,11 +43,9 @@ const ctrl =
 
 export function MultiWorkspaceChatPanel(props: Props) {
   useChatEvents(props.workspace.path)
-  const onLoad = props.onLoad
-
-  const { select } = useWorkspaceList()
   const [open, setOpen] = useState(false)
   const [file, setFile] = useState<string | null>(null)
+  const [tab, setTab] = useState<WorkspaceDetailTab>("files")
   const { selectedSessionId, loading, creating, createSession, selectSession, sessions, ensureSessions } =
     useChatSessions(props.workspace.path)
   const draft = useSessionDraft(props.workspace.path, selectedSessionId)
@@ -58,7 +56,9 @@ export function MultiWorkspaceChatPanel(props: Props) {
   const live = busy || !!permission.req || !!question.req
   const todo = useChatTodo(props.workspace.path, selectedSessionId, live)
   const ref = useMemo(() => {
-    if (!props.model) return
+    if (!props.model) {
+      return
+    }
     const [pid, ...rest] = props.model.split("/")
     return {
       providerID: pid,
@@ -81,13 +81,15 @@ export function MultiWorkspaceChatPanel(props: Props) {
   }, [ensureSessions])
 
   useEffect(() => {
-    if (selectedSessionId || sessions.length === 0) return
+    if (selectedSessionId || sessions.length === 0) {
+      return
+    }
     selectSession(sessions[0].id)
   }, [selectSession, selectedSessionId, sessions])
 
   useEffect(() => {
-    onLoad?.(loading && sessions.length === 0)
-  }, [loading, onLoad, sessions.length])
+    props.onLoad?.(loading && sessions.length === 0)
+  }, [loading, props, sessions.length])
 
   const onSubmit = async (value: string) => {
     if (!props.agent || !ref) {
@@ -104,7 +106,9 @@ export function MultiWorkspaceChatPanel(props: Props) {
   }
 
   const onAbort = async () => {
-    if (!selectedSessionId || !busy) return
+    if (!selectedSessionId || !busy) {
+      return
+    }
     try {
       await chatApi.abortSession(props.workspace.path, selectedSessionId)
     } catch (err) {
@@ -121,11 +125,6 @@ export function MultiWorkspaceChatPanel(props: Props) {
       toast.error("新建会话失败")
     }
   }, [createSession])
-
-  const openDiff = useCallback((path: string) => {
-    setFile(path)
-    setOpen(true)
-  }, [])
 
   const empty = !detail && messages.length === 0 && !eventErr
 
@@ -159,7 +158,8 @@ export function MultiWorkspaceChatPanel(props: Props) {
                 size="sm"
                 className={ctrl}
                 onClick={() => {
-                  select(props.workspace)
+                  setFile(null)
+                  setTab("files")
                   setOpen(true)
                 }}
               >
@@ -183,14 +183,18 @@ export function MultiWorkspaceChatPanel(props: Props) {
             messages={messages}
             loading={detail && !!selectedSessionId}
             status={status}
-            onOpenDiff={openDiff}
+            onOpenDiff={(path) => {
+              setFile(path)
+              setTab("review")
+              setOpen(true)
+            }}
           />
           {empty ? (
             <ChatEmptyState
               title="这一屏还没有对话"
               desc="可以把这一屏当成一个独立策略位，直接描述当前屏要研究的方向，让 AI 并行推进不同策略。"
               tips={[
-                "例如：这一屏专门写做多趋势策略，重点处理入场和加仓。",
+                "例如：这一屏专门做趋势策略，重点处理入场和加仓。",
                 "例如：这一屏负责均值回归版本，并和其它屏形成不同思路对比。",
               ]}
             />
@@ -255,18 +259,37 @@ export function MultiWorkspaceChatPanel(props: Props) {
         </div>
       </section>
 
-      <WorkspaceDetailDialog
+      <Dialog
         open={open}
-        workspace={props.workspace}
-        sessionId={selectedSessionId}
-        file={file}
         onOpenChange={(value) => {
           setOpen(value)
           if (!value) {
             setFile(null)
+            setTab("files")
           }
         }}
-      />
+      >
+        <DialogContent
+          showCloseButton={false}
+          className="flex h-[min(900px,calc(100dvh-28px))] max-h-[calc(100dvh-28px)] w-[min(1400px,calc(100vw-28px))] max-w-[calc(100vw-28px)] min-w-0 flex-col gap-0 overflow-hidden rounded-[28px] border border-slate-200/80 bg-[#fcfcfa] p-0 shadow-[0_28px_90px_rgba(15,23,42,0.14)] dark:border-[#252e2b] dark:bg-[#101514]"
+        >
+          <WorkspaceDetailPane
+            open={open}
+            tab={tab}
+            workspace={props.workspace}
+            sessionId={selectedSessionId}
+            file={file}
+            onTab={setTab}
+            onOpenChange={(value) => {
+              setOpen(value)
+              if (!value) {
+                setFile(null)
+                setTab("files")
+              }
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

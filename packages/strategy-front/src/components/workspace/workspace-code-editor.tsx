@@ -1,4 +1,5 @@
 import { Editor } from "@monaco-editor/react"
+import { useTheme } from "next-themes"
 import { Skeleton } from "@/components/ui/skeleton"
 import { editorLanguage } from "@/lib/editor-language"
 import type { WorkspaceFileContentResponse } from "@/types/workspace"
@@ -28,6 +29,9 @@ const note = (file: WorkspaceFileContentResponse | null) => {
 }
 
 export function WorkspaceCodeEditor(props: Props) {
+  const { resolvedTheme } = useTheme()
+  const theme = resolvedTheme === "dark" ? "strategy-dark" : "strategy-light"
+
   if (props.loading) {
     return (
       <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col gap-3 p-4">
@@ -66,6 +70,7 @@ export function WorkspaceCodeEditor(props: Props) {
       <Editor
         height="100%"
         width="100%"
+        theme={theme}
         path={props.activeFilePath}
         value={props.value}
         language={editorLanguage(props.activeFilePath)}
