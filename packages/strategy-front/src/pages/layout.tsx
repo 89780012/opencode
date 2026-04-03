@@ -8,7 +8,7 @@ export default function Layout() {
     <SidebarProvider
       style={
         {
-          "--sidebar-width": "280px",
+          "--sidebar-width": "250px",
         } as CSSProperties
       }
     >
