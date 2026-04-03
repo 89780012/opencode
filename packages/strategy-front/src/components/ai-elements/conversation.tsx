@@ -97,9 +97,9 @@ export const Conversation = ({ children, className, onScroll, ...props }: Conver
 
   return (
     <Context.Provider value={{ body, wrap, bot, jump, setBody }}>
-      <div className="relative flex h-full min-h-0 flex-1 flex-col" ref={wrap}>
+      <div className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col" ref={wrap}>
         <div
-          className={cn("flex min-h-0 flex-1 flex-col overflow-y-auto", className)}
+          className={cn("flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto", className)}
           ref={root}
           role="log"
           {...props}
@@ -125,7 +125,7 @@ export const ConversationContent = ({ className, ...props }: ConversationContent
     },
     [ctx],
   )
-  return <div className={cn("flex flex-col gap-4 p-4", className)} ref={ref} {...props} />
+  return <div className={cn("flex min-w-0 flex-col gap-4 p-4", className)} ref={ref} {...props} />
 }
 
 export type ConversationEmptyStateProps = ComponentProps<"div"> & {
