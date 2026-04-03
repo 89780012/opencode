@@ -131,14 +131,14 @@ export function MultiWorkspaceChatPanel(props: Props) {
   return (
     <>
       <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-transparent">
-        <div className="shrink-0 px-2 pb-1 pt-1">
+        <div className="shrink-0 px-2 py-0.5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-semibold text-foreground">{props.workspace.name}</div>
+              <div className="truncate text-xs font-medium text-muted-foreground">{props.workspace.name}</div>
             </div>
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <Select value={selectedSessionId ?? ""} onValueChange={selectSession} disabled={sessions.length === 0}>
-                <SelectTrigger className={`h-8 w-[172px] ${ctrl}`}>
+                <SelectTrigger className={`h-7 w-[164px] ${ctrl}`}>
                   <SelectValue placeholder={sessions.length === 0 ? "暂无会话" : "选择会话"} />
                 </SelectTrigger>
                 <SelectContent>
@@ -149,14 +149,14 @@ export function MultiWorkspaceChatPanel(props: Props) {
                   ))}
                 </SelectContent>
               </Select>
-              <Button variant="outline" size="sm" className={ctrl} onClick={() => void onCreate()} disabled={creating}>
+              <Button variant="outline" size="sm" className={`h-7 ${ctrl}`} onClick={() => void onCreate()} disabled={creating}>
                 <Plus className="size-4" />
                 新建
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                className={ctrl}
+                className={`h-7 ${ctrl}`}
                 onClick={() => {
                   setFile(null)
                   setTab("files")
@@ -167,7 +167,7 @@ export function MultiWorkspaceChatPanel(props: Props) {
                 代码
               </Button>
               {busy ? (
-                <Button variant="outline" size="sm" className={ctrl} onClick={() => void onAbort()}>
+                <Button variant="outline" size="sm" className={`h-7 ${ctrl}`} onClick={() => void onAbort()}>
                   <Square className="size-4" />
                   停止
                 </Button>
@@ -176,7 +176,7 @@ export function MultiWorkspaceChatPanel(props: Props) {
           </div>
         </div>
 
-        <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden px-2">
+        <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden px-1.5">
           <ChatMessageList
             key={`${props.workspace.path}:${selectedSessionId ?? "empty"}`}
             err={eventErr}
@@ -201,8 +201,8 @@ export function MultiWorkspaceChatPanel(props: Props) {
           ) : null}
         </div>
 
-        <div className="shrink-0 px-2 pb-2 pt-1">
-          <div className="mx-auto flex w-full max-w-[780px] flex-col gap-1.5">
+        <div className="shrink-0 px-1.5 pb-1.5 pt-0.5">
+          <div className="flex w-full flex-col gap-1.5">
             {permission.req ? (
               <PermissionPanel
                 key={permission.req.id}
