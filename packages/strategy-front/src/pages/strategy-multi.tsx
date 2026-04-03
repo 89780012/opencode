@@ -18,7 +18,7 @@ function cols(size: number) {
   return "grid-cols-1 xl:grid-cols-2"
 }
 
-function Panel(props: { workspace: LocalWorkspace }) {
+function Panel(props: { workspace: LocalWorkspace; onLoad: (value: boolean) => void }) {
   const catalog = useProviderList()
   const ags = useAgentList()
   const project = useProjectComposer(props.workspace.path)
@@ -60,7 +60,7 @@ function Panel(props: { workspace: LocalWorkspace }) {
   )
 
   return (
-    <div className="relative">
+    <div className="relative h-full min-h-0">
       <MultiWorkspaceChatPanel
         workspace={props.workspace}
         agents={ags.names}
@@ -73,9 +73,10 @@ function Panel(props: { workspace: LocalWorkspace }) {
         onAgent={setAgent}
         onModel={setModel}
         onVariant={setVariant}
+        onLoad={props.onLoad}
       />
       {sessionLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-background/50 dark:bg-background/30 backdrop-blur-sm">
+        <div className="absolute inset-0 flex items-center justify-center bg-background dark:bg-[#0f1111]">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
       )}
@@ -101,16 +102,25 @@ export default function StrategyMultiPage() {
   const list = useMemo(() => items.filter((item): item is (typeof workspaces)[number] => !!item), [items])
   const missing = useMemo(() => items.some((item) => !item), [items])
   const invalid = paths.length < 2 || paths.length > 3
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [loads, setLoads] = useState<Record<string, boolean>>({})
+  const busy = list.some((item) => loads[item.path] !== false)
 
   const handleRefresh = async () => {
-    setIsRefreshing(true);
+    setIsRefreshing(true)
     try {
-      await refresh();
+      await refresh()
     } finally {
-      setIsRefreshing(false);
+      setIsRefreshing(false)
     }
-  };
+  }
+
+  const onLoad = useCallback((path: string, value: boolean) => {
+    setLoads((prev) => {
+      if (prev[path] === value) return prev
+      return { ...prev, [path]: value }
+    })
+  }, [])
 
   if (loading && list.length === 0) {
     return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">正在加载多屏工作区...</div>
@@ -141,7 +151,7 @@ export default function StrategyMultiPage() {
 
   return (
     <div className="sticky flex h-full min-h-0 flex-col bg-background dark:bg-[#0f1111]">
-      <div className="border-b px-6 pb-2 pt-2 dark:bg-card">
+      <div className="px-6 pb-1 pt-1 dark:bg-card">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <Button variant="outline" size="sm" className={ctrl} asChild>
@@ -161,16 +171,21 @@ export default function StrategyMultiPage() {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-hidden px-4 pb-4 pt-3">
+      <div className="relative min-h-0 flex-1 px-4 pb-4">
         <div
-          className={`grid h-full min-h-0 auto-rows-fr divide-y divide-black/6 overflow-hidden rounded-[28px] bg-transparent dark:divide-white/8 ${cols(list.length)} 2xl:divide-y-0 2xl:divide-x`}
+          className={`grid h-full min-h-0 auto-rows-fr overflow-hidden ${cols(list.length)} xl:divide-x xl:divide-black/6 xl:dark:divide-white/8`}
         >
           {list.map((item) => (
-            <div key={item.path} className="min-h-0 px-2">
-              <Panel workspace={item} />
-            </div>
+            <section key={item.path} className="min-h-0 min-w-0 first:pl-0 xl:px-3 xl:first:pl-0 xl:last:pr-0">
+              <Panel workspace={item} onLoad={(value) => onLoad(item.path, value)} />
+            </section>
           ))}
         </div>
+        {busy ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-background dark:bg-[#0f1111]">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          </div>
+        ) : null}
       </div>
     </div>
   )

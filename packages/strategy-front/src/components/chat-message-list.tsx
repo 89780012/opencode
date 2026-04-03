@@ -244,8 +244,8 @@ const ChatMessageItem = memo(function ChatMessageItem(props: {
 
 export const ChatMessageList = memo(function ChatMessageList(props: Props) {
   return (
-    <Conversation className="custom-scrollbar-2 h-full flex-1">
-      <ConversationContent className="mx-auto w-full max-w-[776px]">
+    <Conversation className="custom-scrollbar-2 h-full min-w-0 flex-1">
+      <ConversationContent className="mx-auto min-w-0 w-full max-w-[776px]">
         {props.messages.map((info) => (
           <ChatMessageItem key={info.id} info={info} onOpenDiff={props.onOpenDiff} />
         ))}

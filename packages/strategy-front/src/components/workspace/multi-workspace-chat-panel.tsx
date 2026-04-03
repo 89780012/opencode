@@ -35,6 +35,7 @@ interface Props {
   onAgent: (value: string) => void
   onModel: (value: string) => void
   onVariant: (value: string) => void
+  onLoad?: (value: boolean) => void
 }
 
 const ctrl =
@@ -83,6 +84,10 @@ export function MultiWorkspaceChatPanel(props: Props) {
     selectSession(sessions[0].id)
   }, [selectSession, selectedSessionId, sessions])
 
+  useEffect(() => {
+    props.onLoad?.(loading || detail)
+  }, [detail, loading, props.onLoad])
+
   const onSubmit = async (value: string) => {
     if (!props.agent || !ref) {
       toast.error("请先选择模式和模型")
@@ -126,9 +131,9 @@ export function MultiWorkspaceChatPanel(props: Props) {
   return (
     <>
       <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-transparent">
-        <div className="px-1 pb-1 pt-1">
+        <div className="shrink-0 px-2 pb-1 pt-1">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-semibold text-foreground">{props.workspace.name}</div>
             </div>
             <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -170,7 +175,7 @@ export function MultiWorkspaceChatPanel(props: Props) {
           </div>
         </div>
 
-        <div className="relative min-h-0 min-w-0 flex-1 px-1">
+        <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden px-2">
           <ChatMessageList
             key={`${props.workspace.path}:${selectedSessionId ?? "empty"}`}
             err={eventErr}
@@ -191,8 +196,8 @@ export function MultiWorkspaceChatPanel(props: Props) {
           ) : null}
         </div>
 
-        <div className="shrink-0 px-1 pb-1.5 pt-1">
-          <div className="mx-auto flex max-w-[780px] flex-col gap-1.5">
+        <div className="shrink-0 px-2 pb-2 pt-1">
+          <div className="mx-auto flex w-full max-w-[780px] flex-col gap-1.5">
             {permission.req ? (
               <PermissionPanel
                 key={permission.req.id}
