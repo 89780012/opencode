@@ -43,6 +43,7 @@ const ctrl =
 
 export function MultiWorkspaceChatPanel(props: Props) {
   useChatEvents(props.workspace.path)
+  const onLoad = props.onLoad
 
   const { select } = useWorkspaceList()
   const [open, setOpen] = useState(false)
@@ -85,8 +86,8 @@ export function MultiWorkspaceChatPanel(props: Props) {
   }, [selectSession, selectedSessionId, sessions])
 
   useEffect(() => {
-    props.onLoad?.(loading || detail)
-  }, [detail, loading, props.onLoad])
+    onLoad?.(loading && sessions.length === 0)
+  }, [loading, onLoad, sessions.length])
 
   const onSubmit = async (value: string) => {
     if (!props.agent || !ref) {
