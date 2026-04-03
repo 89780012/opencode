@@ -164,21 +164,46 @@ func (a *API) workspaceFiles(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) workspaceFileContent(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
+	if r.Method == http.MethodGet {
+		wsPath := r.URL.Query().Get("workspace_path")
+		filePath := r.URL.Query().Get("file_path")
+		slog.Debug("workspace file-content request", "workspace_path", wsPath, "file_path", filePath)
+		data, err := a.ws.Content(wsPath, filePath)
+		if err != nil {
+			slog.Error("workspace file-content failed", "workspace_path", wsPath, "file_path", filePath, "error", err)
+			write(w, http.StatusBadRequest, err.Error(), nil)
+			return
+		}
+
+		slog.Debug("workspace file-content", "file_path", filePath, "size", data.Size, "binary", data.Binary)
+		write(w, http.StatusOK, "ok", data)
 		return
 	}
 
-	wsPath := r.URL.Query().Get("workspace_path")
-	filePath := r.URL.Query().Get("file_path")
-	slog.Debug("workspace file-content request", "workspace_path", wsPath, "file_path", filePath)
-	data, err := a.ws.Content(wsPath, filePath)
-	if err != nil {
-		slog.Error("workspace file-content failed", "workspace_path", wsPath, "file_path", filePath, "error", err)
-		write(w, http.StatusBadRequest, err.Error(), nil)
+	if r.Method == http.MethodPut {
+		body := struct {
+			WorkspacePath string `json:"workspace_path"`
+			FilePath      string `json:"file_path"`
+			Content       string `json:"content"`
+		}{}
+		err := readJSON(r, &body)
+		if err != nil {
+			slog.Warn("workspace file-content bad request", "error", err)
+			write(w, http.StatusBadRequest, err.Error(), nil)
+			return
+		}
+
+		slog.Info("workspace file save", "workspace_path", body.WorkspacePath, "file_path", body.FilePath)
+		data, err := a.ws.Write(body.WorkspacePath, body.FilePath, body.Content)
+		if err != nil {
+			slog.Error("workspace file save failed", "workspace_path", body.WorkspacePath, "file_path", body.FilePath, "error", err)
+			write(w, http.StatusBadRequest, err.Error(), nil)
+			return
+		}
+
+		write(w, http.StatusOK, "ok", data)
 		return
 	}
 
-	slog.Debug("workspace file-content", "file_path", filePath, "size", data.Size, "binary", data.Binary)
-	write(w, http.StatusOK, "ok", data)
+	write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
 }

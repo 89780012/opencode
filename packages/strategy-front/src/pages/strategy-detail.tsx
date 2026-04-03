@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ArrowLeft, FolderCode, Plus, RefreshCw } from "lucide-react"
+import { ArrowLeft, PanelRightClose, PanelRightOpen, Plus, RefreshCw } from "lucide-react"
 import { Link, useParams } from "react-router-dom"
 import { toast } from "sonner"
 import { chatApi } from "@/api/modules"
 import { StrategyChatPanel } from "@/components/strategy/strategy-chat-panel"
 import { Button } from "@/components/ui/button"
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { WorkspaceDetailDialog } from "@/components/workspace/workspace-detail-dialog"
+import { WorkspaceDetailPane, type WorkspaceDetailTab } from "@/components/workspace/workspace-detail-pane"
 import { useAgentList, useProviderList, useWorkspaceList } from "@/data/global-data-provider"
 import { useChatSessionDetail } from "@/hooks/use-chat-session-detail"
 import { useChatSessions } from "@/hooks/use-chat-sessions"
@@ -37,6 +38,7 @@ export default function StrategyDetailPage() {
   )
   const [open, setOpen] = useState(false)
   const [file, setFile] = useState<string | null>(null)
+  const [tab, setTab] = useState<WorkspaceDetailTab>("files")
   const {
     selectedSessionId,
     creating,
@@ -49,9 +51,12 @@ export default function StrategyDetailPage() {
   const { status, messages, eventErr, loading: detailLoading } = useChatSessionDetail(path, selectedSessionId)
   const busy = !!selectedSessionId && status.type !== "idle"
   const model = composer.model ? `${composer.model.providerID}/${composer.model.modelID}` : undefined
+  const [spin, setSpin] = useState(false)
 
   useEffect(() => {
-    if (!workspace) return
+    if (!workspace) {
+      return
+    }
     select(workspace)
   }, [select, workspace])
 
@@ -60,13 +65,17 @@ export default function StrategyDetailPage() {
   }, [ensureSessions])
 
   useEffect(() => {
-    if (selectedSessionId || sessions.length === 0) return
+    if (selectedSessionId || sessions.length === 0) {
+      return
+    }
     selectSession(sessions[0].id)
   }, [selectSession, selectedSessionId, sessions])
 
   const setAgent = useCallback(
     (value: string) => {
-      if (!ags.ags.some((item) => item.name === value)) return
+      if (!ags.ags.some((item) => item.name === value)) {
+        return
+      }
       project.setAgent(value)
     },
     [ags.ags, project],
@@ -76,7 +85,9 @@ export default function StrategyDetailPage() {
     (value: string) => {
       const [providerID, ...rest] = value.split("/")
       const modelID = rest.join("/")
-      if (!catalog.connectedModels.some((item) => item.provider.id === providerID && item.id === modelID)) return
+      if (!catalog.connectedModels.some((item) => item.provider.id === providerID && item.id === modelID)) {
+        return
+      }
       project.setModel({ providerID, modelID })
     },
     [catalog.connectedModels, project],
@@ -90,12 +101,15 @@ export default function StrategyDetailPage() {
   )
 
   const onAbort = useCallback(async () => {
-    if (!selectedSessionId || !busy) return
+    if (!selectedSessionId || !busy) {
+      return
+    }
+
     try {
       await chatApi.abortSession(path, selectedSessionId)
     } catch (err) {
       console.error("Failed to abort prompt", err)
-      toast.error("停止失败")
+      toast.error("停止会话失败")
     }
   }, [busy, path, selectedSessionId])
 
@@ -108,17 +122,15 @@ export default function StrategyDetailPage() {
     }
   }, [createSession])
 
-  const [isRefreshing, setIsRefreshing] = useState(false)
-
-  const handleRefresh = useCallback(async () => {
-    setIsRefreshing(true)
+  const onRefresh = useCallback(async () => {
+    setSpin(true)
     try {
       await refresh()
     } catch (err) {
       console.error("Failed to refresh", err)
       toast.error("刷新失败")
     } finally {
-      setIsRefreshing(false)
+      setSpin(false)
     }
   }, [refresh])
 
@@ -138,9 +150,9 @@ export default function StrategyDetailPage() {
               返回列表
             </Link>
           </Button>
-          <Button variant="outline" onClick={handleRefresh} disabled={isRefreshing}>
-            <RefreshCw className={`size-4 ${isRefreshing ? "animate-spin" : ""}`} />
-            {isRefreshing ? "刷新中..." : "刷新"}
+          <Button variant="outline" onClick={onRefresh} disabled={spin}>
+            <RefreshCw className={`size-4 ${spin ? "animate-spin" : ""}`} />
+            {spin ? "刷新中..." : "刷新"}
           </Button>
         </div>
       </div>
@@ -151,9 +163,7 @@ export default function StrategyDetailPage() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
         <div className="text-base font-semibold">策略目录不存在</div>
-        <div className="text-sm text-muted-foreground">
-          这个策略仍在注册表中，但本地目录已经缺失。你可以重新导入，或从列表中移除它。
-        </div>
+        <div className="text-sm text-muted-foreground">这个策略仍在列表中，但本地目录已经缺失。你可以重新导入，或从列表中移除它。</div>
         <div className="flex gap-2">
           <Button variant="outline" asChild>
             <Link to="/app/strategies">
@@ -161,9 +171,9 @@ export default function StrategyDetailPage() {
               返回列表
             </Link>
           </Button>
-          <Button variant="outline" onClick={handleRefresh} disabled={isRefreshing}>
-            <RefreshCw className={`size-4 ${isRefreshing ? "animate-spin" : ""}`} />
-            {isRefreshing ? "刷新中..." : "刷新"}
+          <Button variant="outline" onClick={onRefresh} disabled={spin}>
+            <RefreshCw className={`size-4 ${spin ? "animate-spin" : ""}`} />
+            {spin ? "刷新中..." : "刷新"}
           </Button>
         </div>
       </div>
@@ -171,104 +181,119 @@ export default function StrategyDetailPage() {
   }
 
   return (
-    <>
-      <div className="sticky flex h-full min-h-0 flex-col bg-background dark:bg-[#0f1111]">
-        <div className="px-6 pb-1 pt-1 dark:bg-card">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-              <Button variant="outline" size="sm" className={`${ctrl} w-8 h-8 rounded-full overflow-hidden`} asChild>
-                <Link to="/app/strategies">
-                  <ArrowLeft className="size-4" />
-                </Link>
-              </Button>
-            </div>
-            <div className="flex items-center gap-2">
-              <Select value={selectedSessionId ?? ""} onValueChange={selectSession} disabled={sessions.length === 0}>
-                <SelectTrigger className={`h-8 w-[190px] ${ctrl}`}>
-                  <SelectValue placeholder={sessions.length === 0 ? "暂无会话" : "选择会话"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {sessions.map((item) => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {item.title || "未命名会话"}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button variant="outline" size="sm" className={ctrl} onClick={() => void onCreate()} disabled={creating}>
-                <Plus className="size-4" />
-                新建会话
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className={ctrl}
-                onClick={() => {
-                  setFile(null)
-                  setOpen(true)
-                }}
-              >
-                <FolderCode className="size-4" />
-                查看代码
-              </Button>
-              <Button variant="outline" size="sm" className={ctrl} onClick={handleRefresh} disabled={isRefreshing}>
-                <RefreshCw className={`size-4 ${isRefreshing ? "animate-spin" : ""}`} />
-                {isRefreshing ? "刷新中..." : "刷新"}
-              </Button>
-            </div>
+    <div className="sticky flex h-full min-h-0 flex-col bg-background dark:bg-[#0f1111]">
+      <div className="px-6 pb-1 pt-1 dark:bg-card">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" className={`${ctrl} h-8 w-8 overflow-hidden rounded-full`} asChild>
+              <Link to="/app/strategies">
+                <ArrowLeft className="size-4" />
+              </Link>
+            </Button>
           </div>
-        </div>
-
-        <div className="min-h-0 flex-1 px-4 pb-4 relative">
-          <StrategyChatPanel
-            workspace={workspace}
-            selectedSessionId={selectedSessionId}
-            sessionLoading={sessionLoading}
-            detailLoading={detailLoading}
-            messages={messages}
-            status={status}
-            eventErr={eventErr}
-            agents={ags.names}
-            models={catalog.visibleModels}
-            agent={composer.agent?.name}
-            model={model}
-            variant={composer.variant}
-            variants={composer.variants}
-            creating={creating}
-            load={ags.load || catalog.load}
-            onCreate={createSession}
-            onSelectSession={selectSession}
-            onAgent={setAgent}
-            onModel={setModel}
-            onVariant={setVariant}
-            onAbort={() => {
-              void onAbort()
-            }}
-            onOpenDiff={(value) => {
-              setFile(value)
-              setOpen(true)
-            }}
-          />
-          {(sessionLoading || detailLoading) && (
-            <div className="absolute inset-0 flex items-center justify-center bg-background/50 dark:bg-background/30 backdrop-blur-sm">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            <Select value={selectedSessionId ?? ""} onValueChange={selectSession} disabled={sessions.length === 0}>
+              <SelectTrigger className={`h-8 w-[190px] ${ctrl}`}>
+                <SelectValue placeholder={sessions.length === 0 ? "暂无会话" : "选择会话"} />
+              </SelectTrigger>
+              <SelectContent>
+                {sessions.map((item) => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.title || "未命名会话"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="sm" className={ctrl} onClick={() => void onCreate()} disabled={creating}>
+              <Plus className="size-4" />
+              新建会话
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className={ctrl}
+              onClick={() => {
+                setFile(null)
+                setTab("files")
+                setOpen((prev) => !prev)
+              }}
+            >
+              {open ? <PanelRightClose className="size-4" /> : <PanelRightOpen className="size-4" />}
+              {open ? "收起代码" : "查看代码"}
+            </Button>
+            <Button variant="outline" size="sm" className={ctrl} onClick={onRefresh} disabled={spin}>
+              <RefreshCw className={`size-4 ${spin ? "animate-spin" : ""}`} />
+              {spin ? "刷新中..." : "刷新"}
+            </Button>
+          </div>
         </div>
       </div>
 
-      <WorkspaceDetailDialog
-        open={open}
-        workspace={workspace}
-        sessionId={selectedSessionId}
-        file={file}
-        onOpenChange={(value) => {
-          setOpen(value)
-          if (!value) {
-            setFile(null)
-          }
-        }}
-      />
-    </>
+      <div className="relative min-h-0 flex-1 px-4 pb-4">
+        <ResizablePanelGroup
+          direction="horizontal"
+          autoSaveId="strategy-front:strategy-detail-split:v1"
+          collapsed={!open}
+          className="h-full min-h-0 rounded-[24px] border border-black/6 bg-background/80 shadow-[0_18px_60px_rgba(15,23,42,0.08)] dark:border-white/8 dark:bg-[#0f1111]"
+        >
+          <ResizablePanel defaultSize={62} minSize={420} className="min-h-0 min-w-0">
+            <StrategyChatPanel
+              workspace={workspace}
+              selectedSessionId={selectedSessionId}
+              sessionLoading={sessionLoading}
+              detailLoading={detailLoading}
+              messages={messages}
+              status={status}
+              eventErr={eventErr}
+              agents={ags.names}
+              models={catalog.visibleModels}
+              agent={composer.agent?.name}
+              model={model}
+              variant={composer.variant}
+              variants={composer.variants}
+              creating={creating}
+              load={ags.load || catalog.load}
+              onCreate={createSession}
+              onSelectSession={selectSession}
+              onAgent={setAgent}
+              onModel={setModel}
+              onVariant={setVariant}
+              onAbort={() => {
+                void onAbort()
+              }}
+              onOpenDiff={(value) => {
+                setFile(value)
+                setTab("review")
+                setOpen(true)
+              }}
+            />
+          </ResizablePanel>
+          <ResizableHandle withHandle className="pointer" />
+          <ResizablePanel defaultSize={38} minSize={360} className="min-h-0 min-w-0 border-l border-black/6 dark:border-white/8">
+            <WorkspaceDetailPane
+              open={open}
+              tab={tab}
+              workspace={workspace}
+              sessionId={selectedSessionId}
+              file={file}
+              onTab={setTab}
+              onOpenChange={(value) => {
+                setOpen(value)
+                if (!value) {
+                  setFile(null)
+                  setTab("files")
+                }
+              }}
+            />
+          </ResizablePanel>
+        </ResizablePanelGroup>
+
+        {(sessionLoading || detailLoading) && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm dark:bg-background/30">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          </div>
+        )}
+      </div>
+    </div>
   )
 }

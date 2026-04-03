@@ -66,3 +66,9 @@ export interface WorkspaceFileContentResponse {
   truncated: boolean;
   reason?: string;
 }
+
+export interface UpdateWorkspaceFileRequest {
+  workspace_path: string;
+  file_path: string;
+  content: string;
+}

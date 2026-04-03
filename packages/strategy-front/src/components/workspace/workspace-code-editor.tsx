@@ -8,6 +8,10 @@ interface Props {
   error: string | null
   activeFilePath: string | null
   file: WorkspaceFileContentResponse | null
+  value: string
+  readonly?: boolean
+  onChange?: (value: string) => void
+  onSave?: () => void
 }
 
 const note = (file: WorkspaceFileContentResponse | null) => {
@@ -56,19 +60,27 @@ export function WorkspaceCodeEditor(props: Props) {
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       {props.file?.truncated ? (
         <div className="border-b bg-amber-50 px-3 py-2 text-xs text-amber-800">
-          This preview was truncated because the file is large.
+          文件过大，当前内容已截断。为避免误覆盖，此文件暂不支持直接保存。
         </div>
       ) : null}
       <Editor
         height="100%"
         width="100%"
         path={props.activeFilePath}
-        value={props.file?.content ?? ""}
+        value={props.value}
         language={editorLanguage(props.activeFilePath)}
+        onChange={(value) => {
+          props.onChange?.(value ?? "")
+        }}
+        onMount={(ed, monaco) => {
+          ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+            props.onSave?.()
+          })
+        }}
         options={{
           automaticLayout: true,
           minimap: { enabled: false },
-          readOnly: true,
+          readOnly: !!props.readonly,
           wordWrap: "off",
           scrollBeyondLastColumn: 5,
         }}

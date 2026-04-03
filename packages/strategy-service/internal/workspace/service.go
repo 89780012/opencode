@@ -505,6 +505,43 @@ func (s *Service) Content(path string, file string) (FileContentResult, error) {
 	}, nil
 }
 
+func (s *Service) Write(path string, file string, body string) (FileContentResult, error) {
+	slog.Info("workspace write", "path", path, "file", file)
+	dir, err := s.dir(path)
+	if err != nil {
+		slog.Error("workspace write: resolve path error", "path", path, "error", err)
+		return FileContentResult{}, err
+	}
+
+	target, err := safe(dir, filepath.Join(dir, file))
+	if err != nil {
+		slog.Error("workspace write: safe file error", "file", file, "error", err)
+		return FileContentResult{}, err
+	}
+
+	info, err := os.Stat(target)
+	if err != nil && !os.IsNotExist(err) {
+		slog.Error("workspace write: stat failed", "target", target, "error", err)
+		return FileContentResult{}, err
+	}
+	if err == nil && info.IsDir() {
+		return FileContentResult{}, os.ErrInvalid
+	}
+
+	mode := os.FileMode(0o644)
+	if info != nil {
+		mode = info.Mode().Perm()
+	}
+
+	err = os.WriteFile(target, []byte(body), mode)
+	if err != nil {
+		slog.Error("workspace write: save failed", "target", target, "error", err)
+		return FileContentResult{}, err
+	}
+
+	return s.Content(path, file)
+}
+
 func (s *Service) Delete(path string) error {
 	slog.Info("workspace delete", "path", path)
 	rows, err := s.doc.load()

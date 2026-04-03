@@ -6,6 +6,7 @@ import type {
   LocalWorkspaceResponse,
   OpenWorkspaceRequest,
   OpenWorkspaceResponse,
+  UpdateWorkspaceFileRequest,
   WorkspaceFileContentResponse,
   WorkspaceFilesResponse,
 } from "@/types/workspace";
@@ -54,6 +55,14 @@ export const workspaceApi = {
         workspace_path: workspacePath,
         file_path: filePath,
       },
+    });
+  },
+
+  saveWorkspaceFileContent(workspacePath: string, filePath: string, content: string) {
+    return request.put<WorkspaceFileContentResponse, UpdateWorkspaceFileRequest>("/workspace/file-content", {
+      workspace_path: workspacePath,
+      file_path: filePath,
+      content,
     });
   },
 };
