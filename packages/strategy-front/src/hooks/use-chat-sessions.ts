@@ -4,11 +4,13 @@ import { useAppDispatch } from "@/hooks/useAppDispatch"
 import { useAppSelector } from "@/hooks/useAppSelector"
 import { setSelectedWorkspaceSession, setWorkspaceSessions, upsertWorkspaceSession } from "@/store/chat-session-slice"
 
+const empty: never[] = []
+
 export function useChatSessions(workspacePath?: string | null) {
   const dispatch = useAppDispatch()
   const key = workspacePath ?? ""
   const loaded = useAppSelector((state) => (key ? (state.chatSession.loaded[key] ?? false) : false))
-  const sessions = useAppSelector((state) => (key ? (state.chatSession.sessions[key] ?? []) : []))
+  const sessions = useAppSelector((state) => (key ? (state.chatSession.sessions[key] ?? empty) : empty))
   const selectedSessionId = useAppSelector((state) => (key ? (state.chatSession.selected[key] ?? null) : null))
   const [loading, setLoading] = useState(false)
   const [creating, setCreating] = useState(false)

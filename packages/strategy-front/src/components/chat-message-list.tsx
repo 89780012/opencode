@@ -16,6 +16,7 @@ import type {
 } from "@/types/chat"
 
 const pane = "custom-scrollbar mt-2 max-h-64 space-y-2 overflow-y-auto pr-1"
+const empty: ChatPart[] = []
 
 interface Props {
   messages: ChatMessageInfo[]
@@ -224,8 +225,8 @@ const ChatMessageItem = memo(function ChatMessageItem(props: {
   info: ChatMessageInfo
   onOpenDiff?: (file: string) => void
 }) {
-  const parts = useAppSelector((state) => state.chatSession.parts[props.info.id] ?? [])
-  const body = parts.length > 0 ? parts : []
+  const parts = useAppSelector((state) => state.chatSession.parts[props.info.id] ?? empty)
+  const body = parts.length > 0 ? parts : empty
   const err = props.info.role === "assistant" ? errorText(props.info.error) : undefined
 
   return (

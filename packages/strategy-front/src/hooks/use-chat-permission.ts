@@ -6,6 +6,8 @@ import { sessionPermissionRequest } from "@/lib/session-request-tree";
 import { applyWorkspaceEvent, setPendingPermissions } from "@/store/chat-session-slice";
 import type { PermissionRequest } from "@/types/chat";
 
+const empty: never[] = []
+
 export function useChatPermission(
   workspacePath?: string | null,
   sessionID?: string | null,
@@ -14,7 +16,7 @@ export function useChatPermission(
   const [sending, setSending] = useState(false);
   const loaded = useAppSelector((state) => state.chatSession.permissionLoaded);
   const sessions = useAppSelector((state) =>
-    workspacePath ? (state.chatSession.sessions[workspacePath] ?? []) : [],
+    workspacePath ? (state.chatSession.sessions[workspacePath] ?? empty) : empty,
   );
   const reqs = useAppSelector((state) => state.chatSession.permissions);
 

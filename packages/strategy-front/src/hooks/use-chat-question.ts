@@ -6,12 +6,14 @@ import { sessionQuestionRequest } from "@/lib/session-request-tree";
 import { setPendingQuestions } from "@/store/chat-session-slice";
 import type { ChatQuestionAnswer } from "@/types/chat";
 
+const empty: never[] = []
+
 export function useChatQuestion(workspacePath?: string | null, sessionID?: string | null) {
   const dispatch = useAppDispatch();
   const [sending, setSending] = useState(false);
   const loaded = useAppSelector((state) => state.chatSession.questionLoaded);
   const sessions = useAppSelector((state) =>
-    workspacePath ? (state.chatSession.sessions[workspacePath] ?? []) : [],
+    workspacePath ? (state.chatSession.sessions[workspacePath] ?? empty) : empty,
   );
   const reqs = useAppSelector((state) => state.chatSession.questions);
 
