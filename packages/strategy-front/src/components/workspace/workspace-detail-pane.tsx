@@ -45,6 +45,7 @@ export function WorkspaceDetailPane(props: Props) {
   const last = useRef<string | null>(null)
   const openRef = useRef<string[]>([])
   const activeRef = useRef<string | null>(null)
+  const dirtyRef = useRef<Record<string, boolean>>({})
 
   useEffect(() => {
     cur.current = props.workspace?.path ?? ""
@@ -58,7 +59,11 @@ export function WorkspaceDetailPane(props: Props) {
     activeRef.current = active
   }, [active])
 
-  const load = useCallback(async () => {
+  useEffect(() => {
+    dirtyRef.current = dirty
+  }, [dirty])
+
+  const load = useCallback(async (force?: boolean) => {
     if (!props.workspace) {
       return
     }
@@ -102,13 +107,20 @@ export function WorkspaceDetailPane(props: Props) {
 
       const open = openRef.current.filter((path) => seen.has(path))
       const active = activeRef.current && seen.has(activeRef.current) ? activeRef.current : (open[0] ?? null)
+      const dirty = dirtyRef.current
 
-      setFiles((prev) => Object.fromEntries(Object.entries(prev).filter(([path]) => seen.has(path))))
-      setDrafts((prev) => Object.fromEntries(Object.entries(prev).filter(([path]) => seen.has(path))))
+      setFiles((prev) =>
+        Object.fromEntries(Object.entries(prev).filter(([path]) => seen.has(path) && (!force || dirty[path]))),
+      )
+      setDrafts((prev) =>
+        Object.fromEntries(Object.entries(prev).filter(([path]) => seen.has(path) && (!force || dirty[path]))),
+      )
       setDirty((prev) => Object.fromEntries(Object.entries(prev).filter(([path]) => seen.has(path) && prev[path])))
       setBusy((prev) => Object.fromEntries(Object.entries(prev).filter(([path]) => seen.has(path))))
       setSaving((prev) => Object.fromEntries(Object.entries(prev).filter(([path]) => seen.has(path))))
-      setErrs((prev) => Object.fromEntries(Object.entries(prev).filter(([path]) => seen.has(path))))
+      setErrs((prev) =>
+        Object.fromEntries(Object.entries(prev).filter(([path]) => seen.has(path) && (!force || dirty[path]))),
+      )
       setOpen(open)
       setActive(active)
       last.current = props.workspace.path
@@ -176,8 +188,8 @@ export function WorkspaceDetailPane(props: Props) {
   }, [])
 
   const read = useCallback(
-    async (path: string) => {
-      if (!props.workspace || files[path] || busy[path]) {
+    async (path: string, force?: boolean) => {
+      if (!props.workspace || busy[path] || (files[path] && !force)) {
         return
       }
 
@@ -342,7 +354,7 @@ export function WorkspaceDetailPane(props: Props) {
                       <Save className="size-4" />
                       {savingAny ? "保存中..." : count > 1 ? "全部保存" : "保存"}
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => void load()} disabled={loading}>
+                    <Button size="sm" variant="outline" onClick={() => void load(true)} disabled={loading}>
                       <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
                       {loading ? "刷新中..." : "刷新"}
                     </Button>
