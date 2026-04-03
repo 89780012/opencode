@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { FolderCode, Plus, Square } from "lucide-react"
 import { toast } from "sonner"
-import { chatApi } from "@/api/modules"
 import { ChatEmptyState } from "@/components/chat/chat-empty-state"
 import { ChatMessageList } from "@/components/chat-message-list"
 import { PermissionPanel } from "@/components/chat/permission-panel"
@@ -15,8 +14,7 @@ import { WorkspaceDetailPane, type WorkspaceDetailTab } from "@/components/works
 import { useChatEvents } from "@/hooks/use-chat-events"
 import { useChatPermission } from "@/hooks/use-chat-permission"
 import { useChatQuestion } from "@/hooks/use-chat-question"
-import { useChatSessionDetail } from "@/hooks/use-chat-session-detail"
-import { useChatSessions } from "@/hooks/use-chat-sessions"
+import { useStrategySession } from "@/hooks/use-strategy-session"
 import { useChatTodo } from "@/hooks/use-chat-todo"
 import { usePromptSubmit } from "@/hooks/use-prompt-submit"
 import { useSessionDraft } from "@/hooks/use-session-draft"
@@ -46,15 +44,12 @@ export function MultiWorkspaceChatPanel(props: Props) {
   const [open, setOpen] = useState(false)
   const [file, setFile] = useState<string | null>(null)
   const [tab, setTab] = useState<WorkspaceDetailTab>("files")
-  const { selectedSessionId, loading, creating, createSession, selectSession, sessions, ensureSessions } =
-    useChatSessions(props.workspace.path)
-  const draft = useSessionDraft(props.workspace.path, selectedSessionId)
-  const { messages, status, eventErr, loading: detail } = useChatSessionDetail(props.workspace.path, selectedSessionId)
-  const permission = useChatPermission(props.workspace.path, selectedSessionId)
-  const question = useChatQuestion(props.workspace.path, selectedSessionId)
-  const busy = !!selectedSessionId && status.type !== "idle"
-  const live = busy || !!permission.req || !!question.req
-  const todo = useChatTodo(props.workspace.path, selectedSessionId, live)
+  const chat = useStrategySession(props.workspace.path)
+  const draft = useSessionDraft(props.workspace.path, chat.selectedSessionId)
+  const permission = useChatPermission(props.workspace.path, chat.selectedSessionId)
+  const question = useChatQuestion(props.workspace.path, chat.selectedSessionId)
+  const live = chat.busy || !!permission.req || !!question.req
+  const todo = useChatTodo(props.workspace.path, chat.selectedSessionId, live)
   const ref = useMemo(() => {
     if (!props.model) {
       return
@@ -67,29 +62,18 @@ export function MultiWorkspaceChatPanel(props: Props) {
   }, [props.model])
   const { submitting, submit } = usePromptSubmit({
     workspacePath: props.workspace.path,
-    sessionId: selectedSessionId,
+    sessionId: chat.selectedSessionId,
     agent: props.agent,
     model: ref,
     variant: props.variant ?? undefined,
-    createSession,
-    selectSession,
+    createSession: chat.createSession,
+    selectSession: chat.selectSession,
     onSubmitted: draft.clear,
   })
 
   useEffect(() => {
-    void ensureSessions()
-  }, [ensureSessions])
-
-  useEffect(() => {
-    if (selectedSessionId || sessions.length === 0) {
-      return
-    }
-    selectSession(sessions[0].id)
-  }, [selectSession, selectedSessionId, sessions])
-
-  useEffect(() => {
-    props.onLoad?.(loading && sessions.length === 0)
-  }, [loading, props, sessions.length])
+    props.onLoad?.(chat.sessionLoading && chat.sessions.length === 0)
+  }, [chat.sessionLoading, chat.sessions.length, props])
 
   const onSubmit = async (value: string) => {
     if (!props.agent || !ref) {
@@ -106,11 +90,8 @@ export function MultiWorkspaceChatPanel(props: Props) {
   }
 
   const onAbort = async () => {
-    if (!selectedSessionId || !busy) {
-      return
-    }
     try {
-      await chatApi.abortSession(props.workspace.path, selectedSessionId)
+      await chat.abortSession()
     } catch (err) {
       console.error("Failed to abort prompt", err)
       toast.error("停止失败")
@@ -119,14 +100,14 @@ export function MultiWorkspaceChatPanel(props: Props) {
 
   const onCreate = useCallback(async () => {
     try {
-      await createSession()
+      await chat.createSession()
     } catch (err) {
       console.error("Failed to create session", err)
       toast.error("新建会话失败")
     }
-  }, [createSession])
+  }, [chat])
 
-  const empty = !detail && messages.length === 0 && !eventErr
+  const empty = !chat.detailLoading && chat.messages.length === 0 && !chat.eventErr
 
   return (
     <>
@@ -137,12 +118,16 @@ export function MultiWorkspaceChatPanel(props: Props) {
               <div className="truncate text-xs font-medium text-muted-foreground">{props.workspace.name}</div>
             </div>
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <Select value={selectedSessionId ?? ""} onValueChange={selectSession} disabled={sessions.length === 0}>
+              <Select
+                value={chat.selectedSessionId ?? ""}
+                onValueChange={chat.selectSession}
+                disabled={chat.sessions.length === 0}
+              >
                 <SelectTrigger className={`h-7 w-[164px] ${ctrl}`}>
-                  <SelectValue placeholder={sessions.length === 0 ? "暂无会话" : "选择会话"} />
+                  <SelectValue placeholder={chat.sessions.length === 0 ? "暂无会话" : "选择会话"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {sessions.map((item) => (
+                  {chat.sessions.map((item) => (
                     <SelectItem key={item.id} value={item.id}>
                       {item.title || "未命名会话"}
                     </SelectItem>
@@ -154,7 +139,7 @@ export function MultiWorkspaceChatPanel(props: Props) {
                 size="sm"
                 className={`h-7 ${ctrl}`}
                 onClick={() => void onCreate()}
-                disabled={creating}
+                disabled={chat.creating}
               >
                 <Plus className="size-4" />
                 新建
@@ -172,7 +157,7 @@ export function MultiWorkspaceChatPanel(props: Props) {
                 <FolderCode className="size-4" />
                 代码
               </Button>
-              {busy ? (
+              {chat.busy ? (
                 <Button variant="outline" size="sm" className={`h-7 ${ctrl}`} onClick={() => void onAbort()}>
                   <Square className="size-4" />
                   停止
@@ -184,11 +169,11 @@ export function MultiWorkspaceChatPanel(props: Props) {
 
         <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden px-1.5">
           <ChatMessageList
-            key={`${props.workspace.path}:${selectedSessionId ?? "empty"}`}
-            err={eventErr}
-            messages={messages}
-            loading={detail && !!selectedSessionId}
-            status={status}
+            key={`${props.workspace.path}:${chat.selectedSessionId ?? "empty"}`}
+            err={chat.eventErr}
+            messages={chat.messages}
+            loading={chat.detailLoading && !!chat.selectedSessionId}
+            status={chat.status}
             onOpenDiff={(path) => {
               setFile(path)
               setTab("review")
@@ -198,7 +183,7 @@ export function MultiWorkspaceChatPanel(props: Props) {
           {empty ? (
             <ChatEmptyState
               title="这一屏还没有对话"
-              desc="可以把这一屏当成一个独立策略位，直接描述当前屏要研究的方向，让 AI 并行推进不同策略。"
+              desc="可以把这一屏当成一个独立策略位，直接描述当前要研究的方向，让 AI 并行推进不同策略。"
               tips={[
                 "例如：这一屏专门做趋势策略，重点处理入场和加仓。",
                 "例如：这一屏负责均值回归版本，并和其它屏形成不同思路对比。",
@@ -242,7 +227,7 @@ export function MultiWorkspaceChatPanel(props: Props) {
               <PromptBar
                 agent={props.agent}
                 agents={props.agents}
-                busy={busy}
+                busy={chat.busy}
                 compact
                 disabled={props.load}
                 model={props.model}
@@ -257,7 +242,7 @@ export function MultiWorkspaceChatPanel(props: Props) {
                 }}
                 onValueChange={draft.setText}
                 onVariant={props.onVariant}
-                submitting={submitting || creating || loading}
+                submitting={submitting || chat.creating || chat.sessionLoading}
                 value={draft.text}
                 variant={props.variant}
                 variants={props.variants}
@@ -285,7 +270,7 @@ export function MultiWorkspaceChatPanel(props: Props) {
             open={open}
             tab={tab}
             workspace={props.workspace}
-            sessionId={selectedSessionId}
+            sessionId={chat.selectedSessionId}
             file={file}
             onTab={setTab}
             onOpenChange={(value) => {

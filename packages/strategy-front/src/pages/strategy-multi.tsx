@@ -5,10 +5,9 @@ import { Button } from "@/components/ui/button"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { MultiWorkspaceChatPanel } from "@/components/workspace/multi-workspace-chat-panel"
-import { useAgentList, useProviderList, useWorkspaceList } from "@/data/global-data-provider"
+import { useWorkspaceList } from "@/data/global-data-provider"
 import { useChatSessions } from "@/hooks/use-chat-sessions"
-import { useProjectComposer } from "@/hooks/use-project-composer"
-import { resolveComposer } from "@/lib/chat-composer"
+import { useStrategyComposer } from "@/hooks/use-strategy-composer"
 import { decodeStrategyPath } from "@/lib/strategy-path"
 import type { LocalWorkspace } from "@/types/workspace"
 
@@ -45,60 +44,23 @@ function useWide() {
 }
 
 function Panel(props: { workspace: LocalWorkspace; onLoad: (value: boolean) => void }) {
-  const catalog = useProviderList()
-  const ags = useAgentList()
-  const project = useProjectComposer(props.workspace.path)
   const { loading } = useChatSessions(props.workspace.path)
-  const composer = useMemo(
-    () =>
-      resolveComposer({
-        agents: ags.ags,
-        catalog,
-        state: project.state,
-      }),
-    [ags.ags, catalog, project.state],
-  )
-  const model = composer.model ? `${composer.model.providerID}/${composer.model.modelID}` : undefined
-
-  const onAgent = useCallback(
-    (value: string) => {
-      if (!ags.ags.some((item) => item.name === value)) return
-      project.setAgent(value)
-    },
-    [ags.ags, project],
-  )
-
-  const onModel = useCallback(
-    (value: string) => {
-      const [pid, ...rest] = value.split("/")
-      const mid = rest.join("/")
-      if (!catalog.connectedModels.some((item) => item.provider.id === pid && item.id === mid)) return
-      project.setModel({ providerID: pid, modelID: mid })
-    },
-    [catalog.connectedModels, project],
-  )
-
-  const onVariant = useCallback(
-    (value: string) => {
-      project.setVariant(value === "default" ? null : value)
-    },
-    [project],
-  )
+  const composer = useStrategyComposer(props.workspace.path)
 
   return (
     <div className="relative h-full min-h-0">
       <MultiWorkspaceChatPanel
         workspace={props.workspace}
-        agents={ags.names}
-        models={catalog.visibleModels}
-        agent={composer.agent?.name}
-        model={model}
+        agents={composer.agents}
+        models={composer.models}
+        agent={composer.agent}
+        model={composer.model}
         variant={composer.variant}
         variants={composer.variants}
-        load={ags.load || catalog.load}
-        onAgent={onAgent}
-        onModel={onModel}
-        onVariant={onVariant}
+        load={composer.load}
+        onAgent={composer.setAgent}
+        onModel={composer.setModel}
+        onVariant={composer.setVariant}
         onLoad={props.onLoad}
       />
       {loading ? (
@@ -178,9 +140,9 @@ export default function StrategyMultiPage() {
   if (invalid || missing || list.length < 2) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-        <div className="text-base font-semibold">多屏开发加载失败</div>
+        <div className="text-base font-semibold">多屏视图加载失败</div>
         <div className="text-sm text-muted-foreground">
-          {invalid ? "请选择 2 到 3 个策略工作区进入多屏开发。" : "部分策略工作区不存在，或仍在加载中。"}
+          {invalid ? "请选择 2 到 3 个策略工作区进入多屏视图。" : "部分策略工作区不存在，或仍在加载中。"}
         </div>
         <div className="flex gap-2">
           <Button variant="outline" asChild>

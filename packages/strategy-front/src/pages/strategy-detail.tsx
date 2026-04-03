@@ -2,17 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { ArrowLeft, PanelRightClose, PanelRightOpen, Plus, RefreshCw } from "lucide-react"
 import { Link, useParams } from "react-router-dom"
 import { toast } from "sonner"
-import { chatApi } from "@/api/modules"
 import { StrategyChatPanel } from "@/components/strategy/strategy-chat-panel"
 import { Button } from "@/components/ui/button"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { WorkspaceDetailPane, type WorkspaceDetailTab } from "@/components/workspace/workspace-detail-pane"
-import { useAgentList, useProviderList, useWorkspaceList } from "@/data/global-data-provider"
-import { useChatSessionDetail } from "@/hooks/use-chat-session-detail"
-import { useChatSessions } from "@/hooks/use-chat-sessions"
-import { useProjectComposer } from "@/hooks/use-project-composer"
-import { resolveComposer } from "@/lib/chat-composer"
+import { useWorkspaceList } from "@/data/global-data-provider"
+import { useStrategyComposer } from "@/hooks/use-strategy-composer"
+import { useStrategySession } from "@/hooks/use-strategy-session"
 import { decodeStrategyPath } from "@/lib/strategy-path"
 
 const ctrl =
@@ -21,36 +18,14 @@ const ctrl =
 export default function StrategyDetailPage() {
   const params = useParams()
   const path = params.strategyID ? decodeStrategyPath(params.strategyID) : ""
-  const catalog = useProviderList()
   const { loading, refresh, select, workspaces } = useWorkspaceList()
   const workspace = useMemo(() => workspaces.find((item) => item.path === path) ?? null, [path, workspaces])
   const kind = workspace?.type ?? "other"
-  const ags = useAgentList(kind)
-  const project = useProjectComposer(kind)
-  const composer = useMemo(
-    () =>
-      resolveComposer({
-        agents: ags.ags,
-        catalog,
-        state: project.state,
-      }),
-    [ags.ags, catalog, project.state],
-  )
+  const composer = useStrategyComposer(kind, kind)
+  const chat = useStrategySession(path)
   const [open, setOpen] = useState(false)
   const [file, setFile] = useState<string | null>(null)
   const [tab, setTab] = useState<WorkspaceDetailTab>("files")
-  const {
-    selectedSessionId,
-    creating,
-    createSession,
-    selectSession,
-    sessions,
-    ensureSessions,
-    loading: sessionLoading,
-  } = useChatSessions(path)
-  const { status, messages, eventErr, loading: detailLoading } = useChatSessionDetail(path, selectedSessionId)
-  const busy = !!selectedSessionId && status.type !== "idle"
-  const model = composer.model ? `${composer.model.providerID}/${composer.model.modelID}` : undefined
   const [spin, setSpin] = useState(false)
 
   useEffect(() => {
@@ -60,67 +35,23 @@ export default function StrategyDetailPage() {
     select(workspace)
   }, [select, workspace])
 
-  useEffect(() => {
-    void ensureSessions()
-  }, [ensureSessions])
-
-  useEffect(() => {
-    if (selectedSessionId || sessions.length === 0) {
-      return
-    }
-    selectSession(sessions[0].id)
-  }, [selectSession, selectedSessionId, sessions])
-
-  const setAgent = useCallback(
-    (value: string) => {
-      if (!ags.ags.some((item) => item.name === value)) {
-        return
-      }
-      project.setAgent(value)
-    },
-    [ags.ags, project],
-  )
-
-  const setModel = useCallback(
-    (value: string) => {
-      const [providerID, ...rest] = value.split("/")
-      const modelID = rest.join("/")
-      if (!catalog.connectedModels.some((item) => item.provider.id === providerID && item.id === modelID)) {
-        return
-      }
-      project.setModel({ providerID, modelID })
-    },
-    [catalog.connectedModels, project],
-  )
-
-  const setVariant = useCallback(
-    (value: string) => {
-      project.setVariant(value === "default" ? null : value)
-    },
-    [project],
-  )
-
   const onAbort = useCallback(async () => {
-    if (!selectedSessionId || !busy) {
-      return
-    }
-
     try {
-      await chatApi.abortSession(path, selectedSessionId)
+      await chat.abortSession()
     } catch (err) {
       console.error("Failed to abort prompt", err)
       toast.error("停止会话失败")
     }
-  }, [busy, path, selectedSessionId])
+  }, [chat])
 
   const onCreate = useCallback(async () => {
     try {
-      await createSession()
+      await chat.createSession()
     } catch (err) {
       console.error("Failed to create session", err)
       toast.error("新建会话失败")
     }
-  }, [createSession])
+  }, [chat])
 
   const onRefresh = useCallback(async () => {
     setSpin(true)
@@ -128,7 +59,7 @@ export default function StrategyDetailPage() {
       await refresh()
     } catch (err) {
       console.error("Failed to refresh", err)
-      toast.error("刷新失败")
+      toast.error("鍒锋柊澶辫触")
     } finally {
       setSpin(false)
     }
@@ -163,7 +94,7 @@ export default function StrategyDetailPage() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
         <div className="text-base font-semibold">策略目录不存在</div>
-        <div className="text-sm text-muted-foreground">这个策略仍在列表中，但本地目录已经缺失。你可以重新导入，或从列表中移除它。</div>
+        <div className="text-sm text-muted-foreground">这个策略仍在列表中，但本地目录已经缺失。</div>
         <div className="flex gap-2">
           <Button variant="outline" asChild>
             <Link to="/app/strategies">
@@ -192,19 +123,23 @@ export default function StrategyDetailPage() {
             </Button>
           </div>
           <div className="flex items-center gap-2">
-            <Select value={selectedSessionId ?? ""} onValueChange={selectSession} disabled={sessions.length === 0}>
+            <Select
+              value={chat.selectedSessionId ?? ""}
+              onValueChange={chat.selectSession}
+              disabled={chat.sessions.length === 0}
+            >
               <SelectTrigger className={`h-8 w-[190px] ${ctrl}`}>
-                <SelectValue placeholder={sessions.length === 0 ? "暂无会话" : "选择会话"} />
+                <SelectValue placeholder={chat.sessions.length === 0 ? "暂无会话" : "选择会话"} />
               </SelectTrigger>
               <SelectContent>
-                {sessions.map((item) => (
+                {chat.sessions.map((item) => (
                   <SelectItem key={item.id} value={item.id}>
                     {item.title || "未命名会话"}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" size="sm" className={ctrl} onClick={() => void onCreate()} disabled={creating}>
+            <Button variant="outline" size="sm" className={ctrl} onClick={() => void onCreate()} disabled={chat.creating}>
               <Plus className="size-4" />
               新建会话
             </Button>
@@ -239,25 +174,25 @@ export default function StrategyDetailPage() {
           <ResizablePanel defaultSize={62} minSize={420} className="min-h-0 min-w-0">
             <StrategyChatPanel
               workspace={workspace}
-              selectedSessionId={selectedSessionId}
-              sessionLoading={sessionLoading}
-              detailLoading={detailLoading}
-              messages={messages}
-              status={status}
-              eventErr={eventErr}
-              agents={ags.names}
-              models={catalog.visibleModels}
-              agent={composer.agent?.name}
-              model={model}
+              selectedSessionId={chat.selectedSessionId}
+              sessionLoading={chat.sessionLoading}
+              detailLoading={chat.detailLoading}
+              messages={chat.messages}
+              status={chat.status}
+              eventErr={chat.eventErr}
+              agents={composer.agents}
+              models={composer.models}
+              agent={composer.agent}
+              model={composer.model}
               variant={composer.variant}
               variants={composer.variants}
-              creating={creating}
-              load={ags.load || catalog.load}
-              onCreate={createSession}
-              onSelectSession={selectSession}
-              onAgent={setAgent}
-              onModel={setModel}
-              onVariant={setVariant}
+              creating={chat.creating}
+              load={composer.load}
+              onCreate={chat.createSession}
+              onSelectSession={chat.selectSession}
+              onAgent={composer.setAgent}
+              onModel={composer.setModel}
+              onVariant={composer.setVariant}
               onAbort={() => {
                 void onAbort()
               }}
@@ -274,7 +209,7 @@ export default function StrategyDetailPage() {
               open={open}
               tab={tab}
               workspace={workspace}
-              sessionId={selectedSessionId}
+              sessionId={chat.selectedSessionId}
               file={file}
               onTab={setTab}
               onOpenChange={(value) => {
@@ -288,7 +223,7 @@ export default function StrategyDetailPage() {
           </ResizablePanel>
         </ResizablePanelGroup>
 
-        {(sessionLoading || detailLoading) && (
+        {(chat.sessionLoading || chat.detailLoading) && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm dark:bg-background/30">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>
