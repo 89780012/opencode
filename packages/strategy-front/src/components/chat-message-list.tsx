@@ -261,7 +261,7 @@ export const ChatMessageList = memo(function ChatMessageList(props: Props) {
         {props.status?.type === "busy" ? (
           <Message from="assistant">
             <MessageContent>
-              <div className="flex items-center justify-center py-2">
+              <div className="flex py-2">
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
               </div>
             </MessageContent>

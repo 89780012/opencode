@@ -82,6 +82,11 @@ export interface ModelCfg {
   [key: string]: unknown;
 }
 
+export interface DetectModel {
+  id: string;
+  name: string;
+}
+
 export interface ProviderCfg {
   npm?: string;
   name?: string;

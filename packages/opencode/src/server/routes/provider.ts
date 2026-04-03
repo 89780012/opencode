@@ -82,6 +82,29 @@ export const ProviderRoutes = lazy(() =>
       },
     )
     .post(
+      "/models",
+      describeRoute({
+        summary: "Discover provider models",
+        description: "Fetch models from an OpenAI-compatible provider using temporary form settings.",
+        operationId: "provider.models.discover",
+        responses: {
+          200: {
+            description: "Detected models",
+            content: {
+              "application/json": {
+                schema: resolver(z.array(Provider.DetectModel)),
+              },
+            },
+          },
+          ...errors(400),
+        },
+      }),
+      validator("json", Provider.DetectInput),
+      async (c) => {
+        return c.json(await Provider.discover(c.req.valid("json")))
+      },
+    )
+    .post(
       "/:providerID/oauth/authorize",
       describeRoute({
         summary: "OAuth authorize",

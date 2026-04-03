@@ -756,6 +756,24 @@ export namespace Provider {
     })
   export type Info = z.infer<typeof Info>
 
+  export const DetectInput = z.object({
+    baseURL: z.string(),
+    apiKey: z.string().optional(),
+    headers: z.record(z.string(), z.string()).optional(),
+  })
+  export type DetectInput = z.infer<typeof DetectInput>
+
+  export const DetectModel = z.object({
+    id: z.string(),
+    name: z.string(),
+  })
+  export type DetectModel = z.infer<typeof DetectModel>
+
+  function resolve(value?: string) {
+    if (!value) return ""
+    return value.replace(/\{env:([^}]+)\}/g, (_, key) => Env.get(String(key)) ?? "")
+  }
+
   function fromModelsDevModel(provider: ModelsDev.Provider, model: ModelsDev.Model): Model {
     const m: Model = {
       id: ModelID.make(model.id),
@@ -1131,6 +1149,77 @@ export namespace Provider {
     return state().then((state) => state.providers)
   }
 
+  export async function discover(input: DetectInput) {
+    const base = resolve(input.baseURL).trim().replace(/\/+$/, "")
+    if (!base) throw new Error("baseURL is required")
+
+    const headers = new Headers()
+    headers.set("accept", "application/json")
+
+    for (const [key, value] of Object.entries(input.headers ?? {})) {
+      const k = key.trim()
+      const v = resolve(value).trim()
+      if (!k || !v) continue
+      headers.set(k, v)
+    }
+
+    const key = resolve(input.apiKey).trim()
+    if (key && !headers.has("authorization")) {
+      headers.set("authorization", `Bearer ${key}`)
+    }
+
+    const url = base.endsWith("/models") ? base : `${base}/models`
+    const res = await fetch(url, { headers })
+    const body = await res.json().catch(() => undefined)
+
+    if (!res.ok) {
+      const msg =
+        typeof body === "object" &&
+        body &&
+        "error" in body &&
+        typeof body.error === "object" &&
+        body.error &&
+        "message" in body.error &&
+        typeof body.error.message === "string"
+          ? body.error.message
+          : `Failed to fetch models: ${res.status}`
+      throw new Error(msg)
+    }
+
+    const data: unknown[] = Array.isArray(body)
+      ? body
+      : typeof body === "object" && body
+        ? Array.isArray(body.data)
+          ? body.data
+          : Array.isArray(body.models)
+            ? body.models
+            : []
+        : []
+
+    return data
+      .flatMap<DetectModel>((item) => {
+        const id =
+          typeof item === "object" &&
+          item &&
+          "id" in item &&
+          typeof item.id === "string" &&
+          item.id.trim()
+            ? item.id.trim()
+            : ""
+        if (!id) return []
+        const name =
+          typeof item === "object" &&
+          item &&
+          "name" in item &&
+          typeof item.name === "string" &&
+          item.name.trim()
+            ? item.name.trim()
+            : id
+        return [{ id, name }]
+      })
+      .sort((a: DetectModel, b: DetectModel) => a.id.localeCompare(b.id))
+  }
+
   async function getSDK(model: Model) {
     try {
       using _ = log.time("getSDK", {
@@ -1451,3 +1540,4 @@ export namespace Provider {
     }),
   )
 }
+

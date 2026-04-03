@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
 import { Loader2, Plus, Trash2 } from "lucide-react";
@@ -41,6 +41,7 @@ const init = (): Form => ({
 export function ProviderCustomDialog(props: Props) {
   const [form, setForm] = useState<Form>(init);
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const disabled = useMemo(() => props.cfg.disabled_providers ?? [], [props.cfg]);
 
@@ -49,6 +50,7 @@ export function ProviderCustomDialog(props: Props) {
     if (!next) {
       setForm(init());
       setBusy(false);
+      setLoading(false);
       setErr("");
     }
   }
@@ -59,6 +61,60 @@ export function ProviderCustomDialog(props: Props) {
       [key]: value,
       err: key === "apiKey" ? prev.err : { ...prev.err, [key]: undefined },
     }));
+  }
+
+  async function discover() {
+    const baseURL = form.baseURL.trim();
+    const msg =
+      !baseURL
+        ? "请输入服务地址后再获取模型"
+        : !/^https?:\/\//.test(baseURL)
+          ? "服务地址必须以 http:// 或 https:// 开头"
+          : "";
+
+    if (msg) {
+      setForm((prev) => ({
+        ...prev,
+        err: { ...prev.err, baseURL: msg },
+      }));
+      setErr("");
+      return;
+    }
+
+    setLoading(true);
+    setErr("");
+
+    try {
+      const rows = await providerApi.discover({
+        baseURL,
+        apiKey: form.apiKey.trim() || undefined,
+        headers: Object.fromEntries(
+          form.headers
+            .map((item) => [item.key.trim(), item.value.trim()] as const)
+            .filter(([key, value]) => key && value),
+        ),
+      });
+
+      if (rows.length === 0) {
+        setErr("未获取到可用模型");
+        return;
+      }
+
+      setForm((prev) => ({
+        ...prev,
+        err: { ...prev.err, baseURL: undefined },
+        models: rows.map((item) => ({
+          row: modelRow().row,
+          id: item.id,
+          name: item.name,
+          err: {},
+        })),
+      }));
+    } catch (error) {
+      setErr(text(error, "获取模型失败"));
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function save(e: React.FormEvent) {
@@ -122,7 +178,7 @@ export function ProviderCustomDialog(props: Props) {
         <DialogHeader>
           <DialogTitle>自定义 provider</DialogTitle>
           <DialogDescription>
-            配置一个兼容 OpenAI 的 provider，并定义它的可见模型列表。
+            配置一个兼容 OpenAI 的 provider，并通过你输入的服务地址主动获取模型列表。
           </DialogDescription>
         </DialogHeader>
         <form className="space-y-6" onSubmit={save}>
@@ -180,21 +236,14 @@ export function ProviderCustomDialog(props: Props) {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <Label>模型</Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      setForm((prev) => ({
-                        ...prev,
-                        models: [...prev.models, modelRow()],
-                      }))
-                    }
-                  >
-                    <Plus className="size-4" />
-                    添加模型
+                  <Button type="button" variant="outline" size="sm" disabled={busy || loading} onClick={discover}>
+                    {loading ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+                    获取模型
                   </Button>
                 </div>
+                <p className="text-sm text-muted-foreground">
+                  会按你输入的 URL、API Key 和自定义请求头请求模型接口。支持基础 URL 与完整 /v1/models 地址。
+                </p>
                 <div className="space-y-3">
                   {form.models.map((item, idx) => (
                     <div key={item.row} className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
@@ -332,10 +381,10 @@ export function ProviderCustomDialog(props: Props) {
           {err ? <p className="text-sm text-red-600">{err}</p> : null}
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => close(false)} disabled={busy}>
+            <Button type="button" variant="outline" onClick={() => close(false)} disabled={busy || loading}>
               取消
             </Button>
-            <Button type="submit" disabled={busy}>
+            <Button type="submit" disabled={busy || loading}>
               {busy ? (
                 <>
                   <Loader2 className="size-4 animate-spin" />
