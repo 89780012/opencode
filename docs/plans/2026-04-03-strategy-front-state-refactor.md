@@ -833,3 +833,41 @@ Frequent commits are preferred if a PR needs to be split into preparatory cleanu
 
 - `StrategyChatPanel` still consumes externally supplied session/composer props and is already thinner after PR1
 - `MultiWorkspaceChatPanel` had a duplicate chat-session orchestration path and is now aligned with the new shared hook
+
+### 2026-04-03 PR2 Completed
+
+**Status:** done
+
+**Implemented:**
+
+- Added `packages/strategy-front/src/lib/workspace-editor-reducer.ts`
+- Refactored `packages/strategy-front/src/components/workspace/workspace-editor-pane.tsx` from many local `useState` calls to `useReducer`
+- Moved editor transitions for:
+  - workspace file list loading
+  - tab open/close
+  - active file switching
+  - file content loading
+  - draft changes
+  - save start/success/failure
+
+**Behavior preserved intentionally:**
+
+- `WorkspaceFileTabs`, `WorkspaceCodeEditor`, and `WorkspaceFileTree` public props were kept stable
+- dirty draft counting and active tab behavior remain in the editor pane layer
+- async race protection for workspace switching still uses a `ref`
+
+**Validation run:**
+
+- `cmd /c npx eslint src/components/workspace/workspace-editor-pane.tsx src/lib/workspace-editor-reducer.ts`
+- Result: pass
+
+**Blocked package-wide validation:**
+
+- `cmd /c bun run build`
+- Result: still blocked by the same pre-existing unrelated error in `packages/strategy-front/src/pages/strategies.tsx`
+- Error: `TS6133: 'Boxes' is declared but its value is never read.`
+
+**Notes for PR3:**
+
+- editor state is now concentrated enough that chat async state can be cleaned up separately without overlapping too much with file editing behavior
+- reducer currently handles the heaviest reset/prune logic that used to be spread across `load`, `read`, and `save`

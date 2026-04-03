@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useReducer, useRef } from "react"
 import { RefreshCw, Save } from "lucide-react"
 import { toast } from "sonner"
 import { workspaceApi } from "@/api/modules/workspace"
@@ -8,7 +8,8 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { WorkspaceCodeEditor } from "@/components/workspace/workspace-code-editor"
 import { WorkspaceFileTabs } from "@/components/workspace/workspace-file-tabs"
 import { WorkspaceFileTree } from "@/components/workspace/workspace-file-tree"
-import type { LocalWorkspace, WorkspaceFileContentResponse } from "@/types/workspace"
+import { init, reduce } from "@/lib/workspace-editor-reducer"
+import type { LocalWorkspace } from "@/types/workspace"
 
 interface Props {
   workspace: LocalWorkspace
@@ -19,284 +20,144 @@ interface Props {
 }
 
 export function WorkspaceEditorPane(props: Props) {
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [paths, setPaths] = useState<string[]>([])
-  const [files, setFiles] = useState<Record<string, WorkspaceFileContentResponse>>({})
-  const [drafts, setDrafts] = useState<Record<string, string>>({})
-  const [dirty, setDirty] = useState<Record<string, boolean>>({})
-  const [open, setOpen] = useState<string[]>([])
-  const [active, setActive] = useState<string | null>(null)
-  const [busy, setBusy] = useState<Record<string, boolean>>({})
-  const [saving, setSaving] = useState<Record<string, boolean>>({})
-  const [errs, setErrs] = useState<Record<string, string | null>>({})
+  const [state, dispatch] = useReducer(reduce, props.workspace.path, init)
   const cur = useRef(props.workspace.path)
-  const last = useRef<string | null>(null)
-  const openRef = useRef<string[]>([])
-  const activeRef = useRef<string | null>(null)
-  const dirtyRef = useRef<Record<string, boolean>>({})
 
   useEffect(() => {
     cur.current = props.workspace.path
   }, [props.workspace.path])
 
-  useEffect(() => {
-    openRef.current = open
-  }, [open])
+  const load = useCallback(
+    async (force?: boolean) => {
+      const ws = props.workspace.path
+      const reset = state.ws !== ws
+      dispatch({ type: "load_start", ws, reset })
 
-  useEffect(() => {
-    activeRef.current = active
-  }, [active])
-
-  useEffect(() => {
-    dirtyRef.current = dirty
-  }, [dirty])
-
-  const load = useCallback(async (force?: boolean) => {
-    setLoading(true)
-    setError(null)
-
-    const same = last.current === props.workspace.path
-    if (!same) {
-      setPaths([])
-      setFiles({})
-      setDrafts({})
-      setDirty({})
-      setBusy({})
-      setSaving({})
-      setErrs({})
-      setOpen([])
-      setActive(null)
-    }
-
-    try {
-      const data = await workspaceApi.getWorkspaceFiles(props.workspace.path)
-      const next = (data.files ?? []).map((item) => item.path).sort()
-      const seen = new Set(next)
-
-      setPaths(next)
-
-      if (!same) {
-        const path = props.path && seen.has(props.path) ? props.path : (next[0] ?? null)
-        setFiles({})
-        setDrafts({})
-        setDirty({})
-        setBusy({})
-        setSaving({})
-        setErrs({})
-        setOpen(path ? [path] : [])
-        setActive(path)
-        last.current = props.workspace.path
-        return
+      try {
+        const data = await workspaceApi.getWorkspaceFiles(ws)
+        if (cur.current !== ws) {
+          return
+        }
+        const paths = (data.files ?? []).map((item) => item.path).sort()
+        const seen = new Set(paths)
+        const active = reset ? (props.path && seen.has(props.path) ? props.path : (paths[0] ?? null)) : null
+        dispatch({ type: "files_loaded", ws, paths, active, force: !!force })
+      } catch (err) {
+        console.error("failed to load workspace files", err)
+        if (cur.current === ws) {
+          dispatch({ type: "load_failed", ws, error: "加载工作区文件失败" })
+        }
       }
-
-      const open = openRef.current.filter((path) => seen.has(path))
-      const active = activeRef.current && seen.has(activeRef.current) ? activeRef.current : (open[0] ?? null)
-      const dirty = dirtyRef.current
-
-      setFiles((prev) =>
-        Object.fromEntries(Object.entries(prev).filter(([path]) => seen.has(path) && (!force || dirty[path]))),
-      )
-      setDrafts((prev) =>
-        Object.fromEntries(Object.entries(prev).filter(([path]) => seen.has(path) && (!force || dirty[path]))),
-      )
-      setDirty((prev) => Object.fromEntries(Object.entries(prev).filter(([path]) => seen.has(path) && prev[path])))
-      setBusy((prev) => Object.fromEntries(Object.entries(prev).filter(([path]) => seen.has(path))))
-      setSaving((prev) => Object.fromEntries(Object.entries(prev).filter(([path]) => seen.has(path))))
-      setErrs((prev) =>
-        Object.fromEntries(Object.entries(prev).filter(([path]) => seen.has(path) && (!force || dirty[path]))),
-      )
-      setOpen(open)
-      setActive(active)
-      last.current = props.workspace.path
-    } catch (err) {
-      console.error("failed to load workspace files", err)
-      setPaths([])
-      setFiles({})
-      setDrafts({})
-      setDirty({})
-      setSaving({})
-      setError("加载工作区文件失败")
-    } finally {
-      setLoading(false)
-    }
-  }, [props.path, props.workspace.path])
+    },
+    [props.path, props.workspace.path, state.ws],
+  )
 
   useEffect(() => {
     void load()
   }, [load])
 
-  const show = useCallback((path: string) => {
-    setOpen((prev) => (prev.includes(path) ? prev : [...prev, path]))
-    setActive(path)
-  }, [])
-
   const tree = useMemo(() => {
     if (!props.paths || props.paths.length === 0) {
-      return paths
+      return state.paths
     }
     const seen = new Set(props.paths)
-    return paths.filter((item) => seen.has(item))
-  }, [paths, props.paths])
+    return state.paths.filter((item) => seen.has(item))
+  }, [props.paths, state.paths])
 
   useEffect(() => {
     if (!props.path || !tree.includes(props.path)) {
       return
     }
-    show(props.path)
-  }, [props.path, show, tree])
+    dispatch({ type: "tab_opened", path: props.path })
+  }, [props.path, tree])
 
   useEffect(() => {
-    if (!active || tree.includes(active)) {
+    if (!state.active || tree.includes(state.active)) {
       return
     }
-    setActive(tree[0] ?? null)
-  }, [active, tree])
-
-  const drop = useCallback((path: string) => {
-    const open = openRef.current
-    const at = open.indexOf(path)
-    const next = open.filter((item) => item !== path)
-
-    setOpen(next)
-
-    if (activeRef.current === path) {
-      setActive(open[at + 1] ?? open[at - 1] ?? null)
-      return
-    }
-
-    if (activeRef.current && !next.includes(activeRef.current)) {
-      setActive(next[0] ?? null)
-    }
-  }, [])
+    dispatch({ type: "active_set", path: tree[0] ?? null })
+  }, [state.active, tree])
 
   const read = useCallback(
     async (path: string, force?: boolean) => {
-      if (busy[path] || (files[path] && !force)) {
+      if (state.busy[path] || (state.files[path] && !force)) {
         return
       }
 
-      const base = props.workspace.path
-      setBusy((prev) => ({ ...prev, [path]: true }))
-      setErrs((prev) => ({ ...prev, [path]: null }))
+      const ws = props.workspace.path
+      dispatch({ type: "file_load_started", path })
 
       try {
-        const data = await workspaceApi.getWorkspaceFileContent(base, path)
-        if (cur.current !== base) {
+        const data = await workspaceApi.getWorkspaceFileContent(ws, path)
+        if (cur.current !== ws) {
           return
         }
-
-        setFiles((prev) => ({
-          ...prev,
-          [path]: data,
-        }))
-        setDrafts((prev) => (path in prev ? prev : { ...prev, [path]: data.content }))
+        dispatch({ type: "file_load_succeeded", path, data })
       } catch (err) {
         console.error("failed to load workspace file content", err)
-        if (cur.current === base) {
-          setErrs((prev) => ({
-            ...prev,
-            [path]: "这个文件暂不支持预览",
-          }))
-        }
-      } finally {
-        if (cur.current === base) {
-          setBusy((prev) => ({
-            ...prev,
-            [path]: false,
-          }))
+        if (cur.current === ws) {
+          dispatch({ type: "file_load_failed", path, error: "这个文件暂不支持预览" })
         }
       }
     },
-    [busy, files, props.workspace.path],
+    [props.workspace.path, state.busy, state.files],
   )
 
   useEffect(() => {
-    if (!active || files[active] || busy[active]) {
+    if (!state.active || state.files[state.active] || state.busy[state.active]) {
       return
     }
-
-    void read(active)
-  }, [active, busy, files, read])
+    void read(state.active)
+  }, [read, state.active, state.busy, state.files])
 
   const change = useCallback(
     (value: string) => {
-      if (!active) {
+      if (!state.active) {
         return
       }
-
-      setDrafts((prev) => ({
-        ...prev,
-        [active]: value,
-      }))
-      setDirty((prev) => ({
-        ...prev,
-        [active]: value !== (files[active]?.content ?? ""),
-      }))
+      dispatch({ type: "draft_changed", path: state.active, value })
     },
-    [active, files],
+    [state.active],
   )
 
   const save = useCallback(async () => {
-    if (!active || props.readonly) {
+    if (!state.active || props.readonly) {
       return
     }
 
-    const file = files[active]
-    if (!file?.previewable || file.binary || file.truncated || !dirty[active]) {
+    const file = state.files[state.active]
+    if (!file?.previewable || file.binary || file.truncated || !state.dirty[state.active]) {
       return
     }
 
-    const body = drafts[active] ?? file.content
-    const base = props.workspace.path
-    setSaving((prev) => ({ ...prev, [active]: true }))
-    setErrs((prev) => ({ ...prev, [active]: null }))
+    const path = state.active
+    const body = state.drafts[path] ?? file.content
+    const ws = props.workspace.path
+    dispatch({ type: "save_started", path })
 
     try {
-      const data = await workspaceApi.saveWorkspaceFileContent(base, active, body)
-      if (cur.current !== base) {
+      const data = await workspaceApi.saveWorkspaceFileContent(ws, path, body)
+      if (cur.current !== ws) {
         return
       }
-
-      setFiles((prev) => ({
-        ...prev,
-        [active]: data,
-      }))
-      setDrafts((prev) => ({
-        ...prev,
-        [active]: data.content,
-      }))
-      setDirty((prev) => ({
-        ...prev,
-        [active]: false,
-      }))
-      toast.success(`已保存 ${active}`)
+      dispatch({ type: "save_succeeded", path, data })
+      toast.success(`已保存 ${path}`)
     } catch (err) {
       console.error("failed to save workspace file content", err)
-      if (cur.current === base) {
-        setErrs((prev) => ({
-          ...prev,
-          [active]: "保存文件失败",
-        }))
+      if (cur.current === ws) {
+        dispatch({ type: "save_failed", path, error: "保存文件失败" })
       }
       toast.error("保存文件失败")
-    } finally {
-      if (cur.current === base) {
-        setSaving((prev) => ({
-          ...prev,
-          [active]: false,
-        }))
-      }
     }
-  }, [active, dirty, drafts, files, props.readonly, props.workspace.path])
+  }, [props.readonly, props.workspace.path, state.active, state.dirty, state.drafts, state.files])
 
-  const file = active ? (files[active] ?? null) : null
-  const fileError = active ? (errs[active] ?? null) : null
-  const fileLoading = active ? (busy[active] ?? false) : false
-  const fileSaving = active ? (saving[active] ?? false) : false
-  const value = active ? (drafts[active] ?? files[active]?.content ?? "") : ""
+  const file = state.active ? (state.files[state.active] ?? null) : null
+  const fileError = state.active ? (state.errs[state.active] ?? null) : null
+  const fileLoading = state.active ? (state.busy[state.active] ?? false) : false
+  const fileSaving = state.active ? (state.saving[state.active] ?? false) : false
+  const value = state.active ? (state.drafts[state.active] ?? state.files[state.active]?.content ?? "") : ""
   const lock = !!props.readonly || !!file?.truncated || (!file?.previewable && !fileLoading)
-  const count = useMemo(() => Object.values(dirty).filter(Boolean).length, [dirty])
+  const count = useMemo(() => Object.values(state.dirty).filter(Boolean).length, [state.dirty])
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col bg-background">
@@ -304,10 +165,10 @@ export function WorkspaceEditorPane(props: Props) {
         <ResizablePanel defaultSize={76} minSize={420} className="min-h-0 min-w-0">
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <WorkspaceFileTabs
-              open={open}
-              active={active}
-              onPick={setActive}
-              onClose={drop}
+              open={state.open}
+              active={state.active}
+              onPick={(path) => dispatch({ type: "active_set", path })}
+              onClose={(path) => dispatch({ type: "tab_closed", path })}
               side={
                 <>
                   {count > 0 ? (
@@ -315,21 +176,21 @@ export function WorkspaceEditorPane(props: Props) {
                       {count} 未保存
                     </span>
                   ) : null}
-                  <Button size="sm" variant="outline" onClick={() => void save()} disabled={lock || !active || !dirty[active] || fileSaving}>
+                  <Button size="sm" variant="outline" onClick={() => void save()} disabled={lock || !state.active || !state.dirty[state.active] || fileSaving}>
                     <Save className="size-4" />
                     {fileSaving ? "保存中..." : "保存"}
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => void load(true)} disabled={loading}>
-                    <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
-                    {loading ? "刷新中..." : "刷新"}
+                  <Button size="sm" variant="outline" onClick={() => void load(true)} disabled={state.loading}>
+                    <RefreshCw className={`size-4 ${state.loading ? "animate-spin" : ""}`} />
+                    {state.loading ? "刷新中..." : "刷新"}
                   </Button>
                 </>
               }
             />
             <WorkspaceCodeEditor
-              loading={loading || fileLoading}
-              error={error || fileError}
-              activeFilePath={active}
+              loading={state.loading || fileLoading}
+              error={state.error || fileError}
+              activeFilePath={state.active}
               file={file}
               value={value}
               readonly={lock}
@@ -350,7 +211,11 @@ export function WorkspaceEditorPane(props: Props) {
               </div>
               {props.side}
             </div>
-            <WorkspaceFileTree filePaths={tree} activeFilePath={active} onSelectFile={show} />
+            <WorkspaceFileTree
+              filePaths={tree}
+              activeFilePath={state.active}
+              onSelectFile={(path) => dispatch({ type: "tab_opened", path })}
+            />
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
