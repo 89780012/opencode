@@ -144,7 +144,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
                 <div>通道: {label(row.channel)}</div>
                 <div>环境: {row.env === "production" ? "生产" : "开发"}</div>
                 {row.commit ? <div>Commit: {row.commit}</div> : null}
-                <div>工作区: {row.dirty ? "dirty" : "clean"}</div>
+                {/* <div>工作区: {row.dirty ? "dirty" : "clean"}</div> */}
                 {row.built_at ? <div>构建时间: {row.built_at}</div> : null}
               </TooltipContent>
             </Tooltip>

@@ -100,10 +100,6 @@ export default function StrategiesPage() {
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-6 py-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 dark:border-[#33403b] dark:bg-[#171c1b] dark:text-[#d7dfdb]">
-                <Boxes className="size-3.5" />
-                单策略
-              </div>
               <div className="mt-3 text-3xl font-semibold tracking-tight text-foreground">我的策略</div>
               <p className="mt-1.5 max-w-3xl text-sm leading-6 text-muted-foreground">
                 这里展示注册表中的全部策略工作区。支持 SmartX、Python、JS 和其他类型，也支持导入任意目录并做逻辑移除。
