@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { ArrowLeft, LayoutGrid, RefreshCw } from "lucide-react"
 import { Link, useSearchParams } from "react-router-dom"
 import { Button } from "@/components/ui/button"
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { MultiWorkspaceChatPanel } from "@/components/workspace/multi-workspace-chat-panel"
 import { useAgentList, useProviderList, useWorkspaceList } from "@/data/global-data-provider"
@@ -23,9 +24,10 @@ const box = [
   "dark:border-white/8 dark:bg-[#13181b]",
 ].join(" ")
 
-function cols(size: number) {
-  if (size === 3) return "grid-cols-1 xl:grid-cols-3"
-  return "grid-cols-1 xl:grid-cols-2"
+function size(size: number, i: number) {
+  if (size === 2) return 50
+  if (i === 0) return 34
+  return 50
 }
 
 function useWide() {
@@ -154,6 +156,19 @@ export default function StrategyMultiPage() {
     })
   }, [])
 
+  const pane = useCallback(
+    (item: (typeof list)[number]) => (
+      <section className={`${box} relative h-full min-h-0 min-w-0 overflow-hidden`}>
+        <div className="flex h-full min-h-0 min-w-0 flex-col">
+          <div className="min-h-0 flex-1 px-0.5 pb-0.5 pt-2">
+            <Panel workspace={item} onLoad={(value) => onLoad(item.path, value)} />
+          </div>
+        </div>
+      </section>
+    ),
+    [onLoad],
+  )
+
   if (loading && list.length === 0) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-muted-foreground">正在加载多屏工作区...</div>
@@ -211,17 +226,47 @@ export default function StrategyMultiPage() {
         <div className={`${shell} flex h-full min-h-0 flex-col overflow-hidden`}>
           <div className="relative min-h-0 flex-1 p-1.5">
             {wide ? (
-              <div className={`grid h-full min-h-0 auto-rows-fr gap-1.5 ${cols(list.length)}`}>
-                {list.map((item, i) => (
-                  <section key={item.path} className={`${box} relative min-h-0 min-w-0 overflow-hidden`}>
-                    <div className="flex h-full min-h-0 min-w-0 flex-col">
-                      <div className="min-h-0 flex-1 px-0.5 pb-0.5 pt-2">
-                        <Panel workspace={item} onLoad={(value) => onLoad(item.path, value)} />
-                      </div>
-                    </div>
-                  </section>
-                ))}
-              </div>
+              list.length === 2 ? (
+                <ResizablePanelGroup
+                  direction="horizontal"
+                  autoSaveId="strategy-front:strategy-multi-split:v3"
+                  className="h-full min-h-0"
+                >
+                  <ResizablePanel defaultSize={size(list.length, 0)} minSize={320} className="min-h-0 min-w-0">
+                    {pane(list[0])}
+                  </ResizablePanel>
+                  <ResizableHandle withHandle className="pointer" />
+                  <ResizablePanel defaultSize={size(list.length, 1)} minSize={320} className="min-h-0 min-w-0">
+                    {pane(list[1])}
+                  </ResizablePanel>
+                </ResizablePanelGroup>
+              ) : (
+                <ResizablePanelGroup
+                  direction="horizontal"
+                  autoSaveId="strategy-front:strategy-multi-split:v4"
+                  className="h-full min-h-0"
+                >
+                  <ResizablePanel defaultSize={size(list.length, 0)} minSize={300} className="min-h-0 min-w-0">
+                    {pane(list[0])}
+                  </ResizablePanel>
+                  <ResizableHandle withHandle className="pointer" />
+                  <ResizablePanel defaultSize={66} minSize={620} className="min-h-0 min-w-0">
+                    <ResizablePanelGroup
+                      direction="horizontal"
+                      autoSaveId="strategy-front:strategy-multi-split:v4:right"
+                      className="h-full min-h-0"
+                    >
+                      <ResizablePanel defaultSize={size(list.length, 1)} minSize={300} className="min-h-0 min-w-0">
+                        {pane(list[1])}
+                      </ResizablePanel>
+                      <ResizableHandle withHandle className="pointer" />
+                      <ResizablePanel defaultSize={size(list.length, 2)} minSize={300} className="min-h-0 min-w-0">
+                        {pane(list[2])}
+                      </ResizablePanel>
+                    </ResizablePanelGroup>
+                  </ResizablePanel>
+                </ResizablePanelGroup>
+              )
             ) : (
               <Tabs value={tab} onValueChange={setTab} className="flex h-full min-h-0 flex-1 flex-col gap-2">
                 <div className="overflow-x-auto">
@@ -240,19 +285,13 @@ export default function StrategyMultiPage() {
                     ))}
                   </TabsList>
                 </div>
-                {list.map((item, i) => (
+                {list.map((item) => (
                   <TabsContent
                     key={item.path}
                     value={item.path}
                     className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden"
                   >
-                    <section className={`${box} relative h-full min-h-0 min-w-0 overflow-hidden`}>
-                      <div className="flex h-full min-h-0 min-w-0 flex-col">
-                        <div className="min-h-0 flex-1 px-0.5 pb-0.5 pt-2">
-                          <Panel workspace={item} onLoad={(value) => onLoad(item.path, value)} />
-                        </div>
-                      </div>
-                    </section>
+                    {pane(item)}
                   </TabsContent>
                 ))}
               </Tabs>

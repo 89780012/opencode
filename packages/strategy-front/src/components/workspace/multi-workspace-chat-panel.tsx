@@ -149,7 +149,13 @@ export function MultiWorkspaceChatPanel(props: Props) {
                   ))}
                 </SelectContent>
               </Select>
-              <Button variant="outline" size="sm" className={`h-7 ${ctrl}`} onClick={() => void onCreate()} disabled={creating}>
+              <Button
+                variant="outline"
+                size="sm"
+                className={`h-7 ${ctrl}`}
+                onClick={() => void onCreate()}
+                disabled={creating}
+              >
                 <Plus className="size-4" />
                 新建
               </Button>
@@ -201,7 +207,7 @@ export function MultiWorkspaceChatPanel(props: Props) {
           ) : null}
         </div>
 
-        <div className="shrink-0 px-1.5 pb-1.5 pt-0.5">
+        <div className="shrink-0 px-4 pb-1.5 pt-0.5">
           <div className="flex w-full flex-col gap-1.5">
             {permission.req ? (
               <PermissionPanel
@@ -229,7 +235,9 @@ export function MultiWorkspaceChatPanel(props: Props) {
                 }}
               />
             ) : null}
-            {todo.visible ? <TodoPanel todos={todo.todos} collapsed={todo.collapsed} compact preview={todo.preview} /> : null}
+            {todo.visible ? (
+              <TodoPanel todos={todo.todos} collapsed={todo.collapsed} compact preview={todo.preview} />
+            ) : null}
             <div className="w-full">
               <PromptBar
                 agent={props.agent}
