@@ -1,31 +1,40 @@
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useMemo } from "react"
 import { chatApi } from "@/api/modules"
 import { useAppDispatch } from "@/hooks/useAppDispatch"
 import { useAppSelector } from "@/hooks/useAppSelector"
-import { setSelectedWorkspaceSession, setWorkspaceSessions, upsertWorkspaceSession } from "@/store/chat-session-slice"
-
-const empty: never[] = []
+import {
+  setSelectedWorkspaceSession,
+  setWorkspaceSessionCreating,
+  setWorkspaceSessionLoading,
+  setWorkspaceSessions,
+  upsertWorkspaceSession,
+} from "@/store/chat-session-slice"
+import {
+  selectSelectedSessionId,
+  selectWorkspaceSessionCreating,
+  selectWorkspaceSessionLoaded,
+  selectWorkspaceSessionLoading,
+  selectWorkspaceSessions,
+} from "@/store/chat-session-selectors"
 
 export function useChatSessions(workspacePath?: string | null) {
   const dispatch = useAppDispatch()
-  const key = workspacePath ?? ""
-  const loaded = useAppSelector((state) => (key ? (state.chatSession.loaded[key] ?? false) : false))
-  const sessions = useAppSelector((state) => (key ? (state.chatSession.sessions[key] ?? empty) : empty))
-  const selectedSessionId = useAppSelector((state) => (key ? (state.chatSession.selected[key] ?? null) : null))
-  const [loading, setLoading] = useState(false)
-  const [creating, setCreating] = useState(false)
+  const loaded = useAppSelector((state) => selectWorkspaceSessionLoaded(state, workspacePath))
+  const sessions = useAppSelector((state) => selectWorkspaceSessions(state, workspacePath))
+  const selectedSessionId = useAppSelector((state) => selectSelectedSessionId(state, workspacePath))
+  const loading = useAppSelector((state) => selectWorkspaceSessionLoading(state, workspacePath))
+  const creating = useAppSelector((state) => selectWorkspaceSessionCreating(state, workspacePath))
 
-  // 刷新session
   const refreshSessions = useCallback(async () => {
     if (!workspacePath) {
       return
     }
-    setLoading(true)
+    dispatch(setWorkspaceSessionLoading({ workspace: workspacePath, loading: true }))
     try {
       const data = await chatApi.listSessions(workspacePath)
       dispatch(setWorkspaceSessions({ workspace: workspacePath, sessions: data }))
     } finally {
-      setLoading(false)
+      dispatch(setWorkspaceSessionLoading({ workspace: workspacePath, loading: false }))
     }
   }, [dispatch, workspacePath])
 
@@ -36,12 +45,11 @@ export function useChatSessions(workspacePath?: string | null) {
     await refreshSessions()
   }, [loaded, refreshSessions, workspacePath])
 
-  // 创建session
   const createSession = useCallback(async () => {
     if (!workspacePath) {
-      throw new Error("需要工作空间")
+      throw new Error("需要工作区路径")
     }
-    setCreating(true)
+    dispatch(setWorkspaceSessionCreating({ workspace: workspacePath, creating: true }))
     try {
       const session = await chatApi.createSession(workspacePath)
       dispatch(upsertWorkspaceSession({ workspace: workspacePath, session }))
@@ -53,11 +61,10 @@ export function useChatSessions(workspacePath?: string | null) {
       )
       return session.id
     } finally {
-      setCreating(false)
+      dispatch(setWorkspaceSessionCreating({ workspace: workspacePath, creating: false }))
     }
   }, [dispatch, workspacePath])
 
-  // 选择session
   const selectSession = useCallback(
     (sessionId: string | null) => {
       if (!workspacePath) {

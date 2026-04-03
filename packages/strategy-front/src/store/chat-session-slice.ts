@@ -16,8 +16,11 @@ type State = ChatStateShape;
 const initialState: State = {
   sessions: {},
   loaded: {},
+  sessionLoading: {},
+  sessionCreating: {},
   selected: {},
   hydrated: {},
+  detailLoading: {},
   messages: {},
   parts: {},
   sessionDiffs: {},
@@ -53,6 +56,18 @@ const slice = createSlice({
       }
       state.selected[action.payload.workspace] = null;
     },
+    setWorkspaceSessionLoading(
+      state,
+      action: PayloadAction<{ workspace: string; loading: boolean }>,
+    ) {
+      state.sessionLoading[action.payload.workspace] = action.payload.loading;
+    },
+    setWorkspaceSessionCreating(
+      state,
+      action: PayloadAction<{ workspace: string; creating: boolean }>,
+    ) {
+      state.sessionCreating[action.payload.workspace] = action.payload.creating;
+    },
     upsertWorkspaceSession(
       state,
       action: PayloadAction<{ workspace: string; session: ChatSessionSummary }>,
@@ -80,6 +95,12 @@ const slice = createSlice({
       action: PayloadAction<{ sessionId: string; records: ChatMessageRecord[] }>,
     ) {
       hydrateChat(state, action.payload.sessionId, action.payload.records);
+    },
+    setSessionDetailLoading(
+      state,
+      action: PayloadAction<{ sessionId: string; loading: boolean }>,
+    ) {
+      state.detailLoading[action.payload.sessionId] = action.payload.loading;
     },
     hydrateSessionDiff(
       state,
@@ -128,10 +149,13 @@ const slice = createSlice({
 
 export const {
   setWorkspaceSessions,
+  setWorkspaceSessionLoading,
+  setWorkspaceSessionCreating,
   upsertWorkspaceSession,
   removeWorkspaceSession,
   setSelectedWorkspaceSession,
   hydrateSessionMessages,
+  setSessionDetailLoading,
   hydrateSessionDiff,
   setSessionTodos,
   setPendingQuestions,

@@ -14,8 +14,11 @@ import type {
 export type ChatStateShape = {
   sessions: Record<string, ChatSessionSummary[]>;
   loaded: Record<string, boolean>;
+  sessionLoading: Record<string, boolean>;
+  sessionCreating: Record<string, boolean>;
   selected: Record<string, string | null>;
   hydrated: Record<string, boolean>;
+  detailLoading: Record<string, boolean>;
   messages: Record<string, ChatMessageInfo[]>;
   parts: Record<string, ChatPart[]>;
   sessionDiffs: Record<string, ChatFileDiff[] | undefined>;
@@ -158,6 +161,7 @@ export function removeSession(state: ChatStateShape, workspace: string, info: Ch
   if (state.selected[workspace] === info.id) {
     state.selected[workspace] = null;
   }
+  delete state.detailLoading[info.id];
   delete state.hydrated[info.id];
   delete state.messages[info.id];
   delete state.status[info.id];

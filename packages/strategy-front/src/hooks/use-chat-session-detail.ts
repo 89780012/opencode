@@ -1,23 +1,25 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo } from "react"
 import { chatApi } from "@/api/modules"
 import { useAppDispatch } from "@/hooks/useAppDispatch"
 import { useAppSelector } from "@/hooks/useAppSelector"
-import { idle } from "@/lib/chat-event-reducer"
-import { hydrateSessionMessages } from "@/store/chat-session-slice"
-import type { ChatMessageInfo } from "@/types/chat"
-
-const empty: ChatMessageInfo[] = []
+import { hydrateSessionMessages, setSessionDetailLoading } from "@/store/chat-session-slice"
+import {
+  selectSessionDetailLoading,
+  selectSessionEventError,
+  selectSessionLoaded,
+  selectSessionMessageError,
+  selectSessionMessages,
+  selectSessionStatus,
+} from "@/store/chat-session-selectors"
 
 export function useChatSessionDetail(workspacePath?: string | null, sessionId?: string | null) {
   const dispatch = useAppDispatch()
-  const loaded = useAppSelector((state) => (sessionId ? (state.chatSession.hydrated[sessionId] ?? false) : false))
-  const messages = useAppSelector((state) =>
-    sessionId ? (state.chatSession.messages[sessionId] ?? empty) : empty,
-  )
-  const status = useAppSelector((state) => (sessionId ? (state.chatSession.status[sessionId] ?? idle) : idle))
-  const messageErr = useAppSelector((state) => (sessionId ? state.chatSession.messageErrs[sessionId] : undefined))
-  const rawEventErr = useAppSelector((state) => (sessionId ? state.chatSession.eventErrs[sessionId] : undefined))
-  const [loading, setLoading] = useState(false)
+  const loaded = useAppSelector((state) => selectSessionLoaded(state, sessionId))
+  const messages = useAppSelector((state) => selectSessionMessages(state, sessionId))
+  const status = useAppSelector((state) => selectSessionStatus(state, sessionId))
+  const messageErr = useAppSelector((state) => selectSessionMessageError(state, sessionId))
+  const rawEventErr = useAppSelector((state) => selectSessionEventError(state, sessionId))
+  const loading = useAppSelector((state) => selectSessionDetailLoading(state, sessionId))
 
   const refresh = useCallback(
     async (target?: string | null) => {
@@ -25,12 +27,12 @@ export function useChatSessionDetail(workspacePath?: string | null, sessionId?: 
       if (!workspacePath || !id) {
         return
       }
-      setLoading(true)
+      dispatch(setSessionDetailLoading({ sessionId: id, loading: true }))
       try {
         const data = await chatApi.getSessionMessages(workspacePath, id)
         dispatch(hydrateSessionMessages({ sessionId: id, records: data }))
       } finally {
-        setLoading(false)
+        dispatch(setSessionDetailLoading({ sessionId: id, loading: false }))
       }
     },
     [dispatch, sessionId, workspacePath],

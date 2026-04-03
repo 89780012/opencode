@@ -871,3 +871,39 @@ Frequent commits are preferred if a PR needs to be split into preparatory cleanu
 
 - editor state is now concentrated enough that chat async state can be cleaned up separately without overlapping too much with file editing behavior
 - reducer currently handles the heaviest reset/prune logic that used to be spread across `load`, `read`, and `save`
+
+### 2026-04-03 PR3 Completed
+
+**Status:** done
+
+**Implemented:**
+
+- Extended `packages/strategy-front/src/lib/chat-event-reducer.ts` state shape with:
+  - `sessionLoading`
+  - `sessionCreating`
+  - `detailLoading`
+- Extended `packages/strategy-front/src/store/chat-session-slice.ts` with process actions for workspace/session loading state
+- Added `packages/strategy-front/src/store/chat-session-selectors.ts`
+- Refactored `packages/strategy-front/src/hooks/use-chat-sessions.ts` to read process state from Redux instead of local `useState`
+- Refactored `packages/strategy-front/src/hooks/use-chat-session-detail.ts` to read detail loading state from Redux instead of local `useState`
+
+**Behavior preserved intentionally:**
+
+- `useChatSessions` still returns `loading`, `creating`, `sessions`, `selectedSessionId`, `ensureSessions`, `refreshSessions`, `createSession`, `selectSession`
+- `useChatSessionDetail` still returns `loading`, `messages`, `status`, `eventErr`, `messageErr`, `refresh`
+- current consumers such as sidebars and strategy pages do not need a broad prop/API migration
+
+**Validation run:**
+
+- `cmd /c npx eslint src/lib/chat-event-reducer.ts src/store/chat-session-slice.ts src/store/chat-session-selectors.ts src/hooks/use-chat-sessions.ts src/hooks/use-chat-session-detail.ts`
+- Result: pass
+
+**Blocked package-wide validation:**
+
+- `cmd /c bun run build`
+- Result: still blocked by the same pre-existing unrelated error in `packages/strategy-front/src/pages/strategies.tsx`
+- Error: `TS6133: 'Boxes' is declared but its value is never read.`
+
+**Notes for PR4:**
+
+- chat session data and chat async process state now share the same owner, so the global resource provider can be simplified without also needing to absorb chat request lifecycle flags
