@@ -15,7 +15,7 @@ import { resolveComposer } from "@/lib/chat-composer"
 import { decodeStrategyPath } from "@/lib/strategy-path"
 
 const ctrl =
-  "rounded-xl border border-black/8 bg-black/[0.03] text-xs shadow-none hover:bg-black/[0.05] dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.06]"
+  "rounded-md border border-black/8 bg-black/[0.03] text-xs shadow-none hover:bg-black/[0.05] dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.06]"
 
 export default function StrategyDetailPage() {
   const params = useParams()
@@ -37,8 +37,15 @@ export default function StrategyDetailPage() {
   )
   const [open, setOpen] = useState(false)
   const [file, setFile] = useState<string | null>(null)
-  const { selectedSessionId, creating, createSession, selectSession, sessions, ensureSessions, loading: sessionLoading } =
-    useChatSessions(path)
+  const {
+    selectedSessionId,
+    creating,
+    createSession,
+    selectSession,
+    sessions,
+    ensureSessions,
+    loading: sessionLoading,
+  } = useChatSessions(path)
   const { status, messages, eventErr, loading: detailLoading } = useChatSessionDetail(path, selectedSessionId)
   const busy = !!selectedSessionId && status.type !== "idle"
   const model = composer.model ? `${composer.model.providerID}/${composer.model.modelID}` : undefined
@@ -132,8 +139,8 @@ export default function StrategyDetailPage() {
             </Link>
           </Button>
           <Button variant="outline" onClick={handleRefresh} disabled={isRefreshing}>
-            <RefreshCw className={`size-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            {isRefreshing ? '刷新中...' : '刷新'}
+            <RefreshCw className={`size-4 ${isRefreshing ? "animate-spin" : ""}`} />
+            {isRefreshing ? "刷新中..." : "刷新"}
           </Button>
         </div>
       </div>
@@ -144,7 +151,9 @@ export default function StrategyDetailPage() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
         <div className="text-base font-semibold">策略目录不存在</div>
-        <div className="text-sm text-muted-foreground">这个策略仍在注册表中，但本地目录已经缺失。你可以重新导入，或从列表中移除它。</div>
+        <div className="text-sm text-muted-foreground">
+          这个策略仍在注册表中，但本地目录已经缺失。你可以重新导入，或从列表中移除它。
+        </div>
         <div className="flex gap-2">
           <Button variant="outline" asChild>
             <Link to="/app/strategies">
@@ -153,8 +162,8 @@ export default function StrategyDetailPage() {
             </Link>
           </Button>
           <Button variant="outline" onClick={handleRefresh} disabled={isRefreshing}>
-            <RefreshCw className={`size-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            {isRefreshing ? '刷新中...' : '刷新'}
+            <RefreshCw className={`size-4 ${isRefreshing ? "animate-spin" : ""}`} />
+            {isRefreshing ? "刷新中..." : "刷新"}
           </Button>
         </div>
       </div>
@@ -167,7 +176,7 @@ export default function StrategyDetailPage() {
         <div className="px-6 pb-1 pt-1 dark:bg-card">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-              <Button variant="outline" size="sm" className={ctrl} asChild>
+              <Button variant="outline" size="sm" className={`${ctrl} w-8 h-8 rounded-full overflow-hidden`} asChild>
                 <Link to="/app/strategies">
                   <ArrowLeft className="size-4" />
                 </Link>
@@ -203,8 +212,8 @@ export default function StrategyDetailPage() {
                 查看代码
               </Button>
               <Button variant="outline" size="sm" className={ctrl} onClick={handleRefresh} disabled={isRefreshing}>
-                <RefreshCw className={`size-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                {isRefreshing ? '刷新中...' : '刷新'}
+                <RefreshCw className={`size-4 ${isRefreshing ? "animate-spin" : ""}`} />
+                {isRefreshing ? "刷新中..." : "刷新"}
               </Button>
             </div>
           </div>

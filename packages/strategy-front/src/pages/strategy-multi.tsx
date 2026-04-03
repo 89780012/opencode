@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { ArrowLeft, RefreshCw } from "lucide-react"
 import { Link, useSearchParams } from "react-router-dom"
 import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { MultiWorkspaceChatPanel } from "@/components/workspace/multi-workspace-chat-panel"
 import { useAgentList, useProviderList, useWorkspaceList } from "@/data/global-data-provider"
 import { useProjectComposer } from "@/hooks/use-project-composer"
@@ -16,6 +17,20 @@ const ctrl =
 function cols(size: number) {
   if (size === 3) return "grid-cols-1 xl:grid-cols-3"
   return "grid-cols-1 xl:grid-cols-2"
+}
+
+function useWide() {
+  const [wide, setWide] = useState(() => window.innerWidth >= 1280)
+
+  useEffect(() => {
+    const mql = window.matchMedia("(min-width: 1280px)")
+    const onChange = () => setWide(window.innerWidth >= 1280)
+    mql.addEventListener("change", onChange)
+    onChange()
+    return () => mql.removeEventListener("change", onChange)
+  }, [])
+
+  return wide
 }
 
 function Panel(props: { workspace: LocalWorkspace; onLoad: (value: boolean) => void }) {
@@ -87,6 +102,7 @@ function Panel(props: { workspace: LocalWorkspace; onLoad: (value: boolean) => v
 export default function StrategyMultiPage() {
   const [query] = useSearchParams()
   const { loading, refresh, workspaces } = useWorkspaceList()
+  const wide = useWide()
   const paths = useMemo(
     () =>
       query
@@ -104,7 +120,14 @@ export default function StrategyMultiPage() {
   const invalid = paths.length < 2 || paths.length > 3
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [loads, setLoads] = useState<Record<string, boolean>>({})
+  const [tab, setTab] = useState("")
   const busy = list.some((item) => loads[item.path] !== false)
+
+  useEffect(() => {
+    if (list.length === 0) return
+    if (list.some((item) => item.path === tab)) return
+    setTab(list[0].path)
+  }, [list, tab])
 
   const handleRefresh = async () => {
     setIsRefreshing(true)
@@ -172,15 +195,36 @@ export default function StrategyMultiPage() {
       </div>
 
       <div className="relative min-h-0 flex-1 px-4 pb-4">
-        <div
-          className={`grid h-full min-h-0 auto-rows-fr overflow-hidden ${cols(list.length)} xl:divide-x xl:divide-black/6 xl:dark:divide-white/8`}
-        >
-          {list.map((item) => (
-            <section key={item.path} className="min-h-0 min-w-0 first:pl-0 xl:px-3 xl:first:pl-0 xl:last:pr-0">
-              <Panel workspace={item} onLoad={(value) => onLoad(item.path, value)} />
-            </section>
-          ))}
-        </div>
+        {wide ? (
+          <div
+            className={`grid h-full min-h-0 auto-rows-fr overflow-hidden ${cols(list.length)} xl:divide-x xl:divide-black/6 xl:dark:divide-white/8`}
+          >
+            {list.map((item) => (
+              <section key={item.path} className="min-h-0 min-w-0 xl:px-3 xl:first:pl-0 xl:last:pr-0">
+                <Panel workspace={item} onLoad={(value) => onLoad(item.path, value)} />
+              </section>
+            ))}
+          </div>
+        ) : (
+          <Tabs value={tab} onValueChange={setTab} className="flex h-full min-h-0 flex-1 flex-col gap-3">
+            <div className="overflow-x-auto pb-1">
+              <TabsList className="min-w-full justify-start gap-1">
+                {list.map((item) => (
+                  <TabsTrigger key={item.path} value={item.path} className="max-w-48 shrink-0">
+                    <span className="truncate">{item.name}</span>
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
+            {list.map((item) => (
+              <TabsContent key={item.path} value={item.path} className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden">
+                <section className="min-h-0 h-full min-w-0">
+                  <Panel workspace={item} onLoad={(value) => onLoad(item.path, value)} />
+                </section>
+              </TabsContent>
+            ))}
+          </Tabs>
+        )}
         {busy ? (
           <div className="absolute inset-0 flex items-center justify-center bg-background dark:bg-[#0f1111]">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />

@@ -114,7 +114,7 @@ function Chip(props: { active: boolean; text: string; onClick: () => void }) {
 
 function Block(props: { title: string; hint?: string; children: ReactNode }) {
   return (
-    <section className="rounded-[24px] border border-slate-200/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.92))] p-4 dark:border-[#26302c] dark:bg-[linear-gradient(180deg,rgba(21,26,25,0.98),rgba(17,22,21,0.94))]">
+    <section className="rounded-md border border-slate-200/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.92))] p-4 dark:border-[#26302c] dark:bg-[linear-gradient(180deg,rgba(21,26,25,0.98),rgba(17,22,21,0.94))]">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="text-sm font-semibold text-slate-900 dark:text-[#eef5f1]">{props.title}</div>
         {props.hint ? <div className="text-[11px] text-slate-500 dark:text-[#809088]">{props.hint}</div> : null}
@@ -292,19 +292,19 @@ export function WorkspaceCreateDialog(props: Props) {
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                     placeholder="例如：stock-trend"
-                    className="h-11 rounded-2xl border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80"
+                    className="h-8 rounded-md border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80"
                   />
                   <Input
                     id="workspace-tail"
                     value={tailname}
                     onChange={(event) => setTailname(event.target.value)}
                     placeholder="随机后缀"
-                    className="h-11 rounded-2xl border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80"
+                    className="h-8 rounded-md border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80"
                   />
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-11 rounded-2xl border-slate-200/80 bg-white/90 px-3 shadow-none dark:border-[#2c3532] dark:bg-[#151918]"
+                    className="h-8 rounded-md border-slate-200/80 bg-white/90 px-3 shadow-none dark:border-[#2c3532] dark:bg-[#151918]"
                     onClick={() => setTailname(tail())}
                   >
                     <RefreshCw className="size-4" />
@@ -321,7 +321,7 @@ export function WorkspaceCreateDialog(props: Props) {
                     <button
                       key={key}
                       type="button"
-                      className={`rounded-[22px] border px-4 py-4 text-left transition-all ${kind === key ? "border-emerald-300 bg-emerald-50/70 ring-1 ring-emerald-100 dark:border-[#4d6f62] dark:bg-[#15201c]" : "border-slate-200/80 bg-white/90 hover:border-emerald-200 hover:bg-emerald-50/50 dark:border-[#26302c] dark:bg-[#141918]"}`}
+                      className={`rounded-md border px-4 py-4 text-left transition-all ${kind === key ? "border-emerald-300 bg-emerald-50/70 ring-1 ring-emerald-100 dark:border-[#4d6f62] dark:bg-[#15201c]" : "border-slate-200/80 bg-white/90 hover:border-emerald-200 hover:bg-emerald-50/50 dark:border-[#26302c] dark:bg-[#141918]"}`}
                       onClick={() => setKind(key as StrategyType)}
                     >
                       <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-[#eef5f1]">
@@ -336,10 +336,10 @@ export function WorkspaceCreateDialog(props: Props) {
               </Block>
 
               <div className="grid gap-3 md:grid-cols-[1.2fr_0.8fr]">
-                <div className="rounded-[24px] border border-emerald-200/70 bg-[linear-gradient(180deg,rgba(236,253,245,0.9),rgba(255,255,255,0.8))] px-4 py-3 text-sm leading-6 text-emerald-950/80 dark:border-[#29443b] dark:bg-[linear-gradient(180deg,rgba(20,33,28,0.95),rgba(17,22,21,0.95))] dark:text-[#a7c3b8]">
+                <div className="rounded-md border border-emerald-200/70 bg-[linear-gradient(180deg,rgba(236,253,245,0.9),rgba(255,255,255,0.8))] px-4 py-3 text-sm leading-6 text-emerald-950/80 dark:border-[#29443b] dark:bg-[linear-gradient(180deg,rgba(20,33,28,0.95),rgba(17,22,21,0.95))] dark:text-[#a7c3b8]">
                   Python、JS 和 SmartX 现在共用一套详细策略画像表单，默认市场是股票。
                 </div>
-                <div className="rounded-[24px] border border-slate-200/80 bg-white/80 px-4 py-3 text-xs leading-6 text-slate-500 dark:border-[#26302c] dark:bg-[#141918] dark:text-[#83928c]">
+                <div className="rounded-md border border-slate-200/80 bg-white/80 px-4 py-3 text-xs leading-6 text-slate-500 dark:border-[#26302c] dark:bg-[#141918] dark:text-[#83928c]">
                   工作区目录
                   <div className="truncate text-sm font-medium text-slate-900 dark:text-[#eef5f1]">{card.root}</div>
                 </div>
@@ -361,17 +361,29 @@ export function WorkspaceCreateDialog(props: Props) {
                     {guide.kind} / {guide.market} / {guide.tf}
                   </div>
                 </div>
-                <TabsList className="grid h-11 w-full grid-cols-4 rounded-2xl bg-slate-100/90 p-1 dark:bg-[#171d1b]">
-                  <TabsTrigger value="market" className="rounded-xl px-3 text-sm">
+                <TabsList className="grid h-12 w-full grid-cols-4 rounded-[22px] border border-slate-200/80 bg-gradient-to-b from-white via-slate-50 to-slate-100/90 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_16px_35px_-28px_rgba(15,23,42,0.35)] dark:border-[#27332e] dark:bg-[linear-gradient(180deg,#1d2522_0%,#161c1a_100%)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                  <TabsTrigger
+                    value="market"
+                    className="rounded-2xl px-3 text-sm font-medium text-slate-500 transition-all hover:text-slate-900 data-[state=active]:border-slate-200/80 data-[state=active]:bg-white data-[state=active]:text-slate-950 data-[state=active]:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.45)] dark:text-[#7f938a] dark:hover:text-[#eef5f1] dark:data-[state=active]:border-[#31413a] dark:data-[state=active]:bg-[#22302b] dark:data-[state=active]:text-[#f4fbf7] dark:data-[state=active]:shadow-[0_12px_26px_-18px_rgba(0,0,0,0.7)]"
+                  >
                     市场
                   </TabsTrigger>
-                  <TabsTrigger value="logic" className="rounded-xl px-3 text-sm">
+                  <TabsTrigger
+                    value="logic"
+                    className="rounded-2xl px-3 text-sm font-medium text-slate-500 transition-all hover:text-slate-900 data-[state=active]:border-slate-200/80 data-[state=active]:bg-white data-[state=active]:text-slate-950 data-[state=active]:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.45)] dark:text-[#7f938a] dark:hover:text-[#eef5f1] dark:data-[state=active]:border-[#31413a] dark:data-[state=active]:bg-[#22302b] dark:data-[state=active]:text-[#f4fbf7] dark:data-[state=active]:shadow-[0_12px_26px_-18px_rgba(0,0,0,0.7)]"
+                  >
                     逻辑
                   </TabsTrigger>
-                  <TabsTrigger value="risk" className="rounded-xl px-3 text-sm">
+                  <TabsTrigger
+                    value="risk"
+                    className="rounded-2xl px-3 text-sm font-medium text-slate-500 transition-all hover:text-slate-900 data-[state=active]:border-slate-200/80 data-[state=active]:bg-white data-[state=active]:text-slate-950 data-[state=active]:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.45)] dark:text-[#7f938a] dark:hover:text-[#eef5f1] dark:data-[state=active]:border-[#31413a] dark:data-[state=active]:bg-[#22302b] dark:data-[state=active]:text-[#f4fbf7] dark:data-[state=active]:shadow-[0_12px_26px_-18px_rgba(0,0,0,0.7)]"
+                  >
                     风控
                   </TabsTrigger>
-                  <TabsTrigger value="output" className="rounded-xl px-3 text-sm">
+                  <TabsTrigger
+                    value="output"
+                    className="rounded-2xl px-3 text-sm font-medium text-slate-500 transition-all hover:text-slate-900 data-[state=active]:border-slate-200/80 data-[state=active]:bg-white data-[state=active]:text-slate-950 data-[state=active]:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.45)] dark:text-[#7f938a] dark:hover:text-[#eef5f1] dark:data-[state=active]:border-[#31413a] dark:data-[state=active]:bg-[#22302b] dark:data-[state=active]:text-[#f4fbf7] dark:data-[state=active]:shadow-[0_12px_26px_-18px_rgba(0,0,0,0.7)]"
+                  >
                     输出
                   </TabsTrigger>
                 </TabsList>
@@ -599,7 +611,7 @@ export function WorkspaceCreateDialog(props: Props) {
                     </div>
                   </Block>
                   <Block title="核心目标">
-                    <div className="rounded-[20px] bg-white/90 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]">
+                    <div className="rounded-md bg-white/90 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]">
                       <AutoResizeTextarea
                         value={guide.target}
                         onChange={(value) => setGuide((prev) => ({ ...prev, target: value }))}
@@ -609,7 +621,7 @@ export function WorkspaceCreateDialog(props: Props) {
                     </div>
                   </Block>
                   <Block title="补充说明">
-                    <div className="rounded-[20px] bg-white/90 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]">
+                    <div className="rounded-md bg-white/90 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]">
                       <AutoResizeTextarea
                         value={guide.note}
                         onChange={(value) => setGuide((prev) => ({ ...prev, note: value }))}
@@ -619,7 +631,7 @@ export function WorkspaceCreateDialog(props: Props) {
                     </div>
                   </Block>
                   <Block title="额外落地要求">
-                    <div className="rounded-[20px] bg-white/90 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]">
+                    <div className="rounded-md bg-white/90 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]">
                       <AutoResizeTextarea
                         value={brief}
                         onChange={setBrief}
@@ -644,7 +656,7 @@ export function WorkspaceCreateDialog(props: Props) {
                   </div>
                 </Block>
                 <Block title="补充说明">
-                  <div className="rounded-[20px] bg-white/92 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]">
+                  <div className="rounded-md bg-white/92 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]">
                     <AutoResizeTextarea
                       value={brief}
                       onChange={setBrief}
@@ -665,7 +677,7 @@ export function WorkspaceCreateDialog(props: Props) {
                     <div className="space-y-2">
                       <Label>使用模式</Label>
                       <Select value={composer.agent?.name} onValueChange={setAgent}>
-                        <SelectTrigger className="h-10 w-full rounded-2xl border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2d3733]">
+                        <SelectTrigger className="h-10 w-full rounded-md border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2d3733]">
                           <SelectValue placeholder="选择模式" />
                         </SelectTrigger>
                         <SelectContent>
@@ -680,7 +692,7 @@ export function WorkspaceCreateDialog(props: Props) {
                     <div className="space-y-2">
                       <Label>使用模型</Label>
                       <Select value={model} onValueChange={setModel}>
-                        <SelectTrigger className="h-10 w-full rounded-2xl border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2d3733]">
+                        <SelectTrigger className="h-10 w-full rounded-md border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2d3733]">
                           <SelectValue placeholder="选择模型" />
                         </SelectTrigger>
                         <SelectContent>
@@ -715,7 +727,7 @@ export function WorkspaceCreateDialog(props: Props) {
               </div>
               {rich ? (
                 <Block title="首条引导消息" hint="创建后会自动发送到首个会话">
-                  <div className="rounded-[20px] bg-white/92 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]">
+                  <div className="rounded-md bg-white/92 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]">
                     <AutoResizeTextarea
                       value={prompt}
                       onChange={setPrompt}
@@ -741,7 +753,7 @@ export function WorkspaceCreateDialog(props: Props) {
         <DialogFooter className="border-t border-slate-200/70 bg-[linear-gradient(180deg,rgba(249,250,251,0.7),rgba(255,255,255,0.92))] px-5 py-4 dark:border-[#202725] dark:bg-[linear-gradient(180deg,rgba(16,21,20,0.8),rgba(16,21,20,0.96))]">
           <Button
             variant="outline"
-            className="rounded-xl border-slate-200/80 bg-white/90 shadow-none dark:border-[#2c3532] dark:bg-[#151918]"
+            className="rounded-md border-slate-200/80 bg-white/90 shadow-none dark:border-[#2c3532] dark:bg-[#151918]"
             onClick={() => (step === 0 ? props.onOpenChange(false) : setStep((prev) => prev - 1))}
             disabled={busy}
           >
@@ -749,7 +761,7 @@ export function WorkspaceCreateDialog(props: Props) {
           </Button>
           {step < 2 ? (
             <Button
-              className="rounded-xl bg-slate-900 text-white hover:bg-slate-800 dark:bg-[#7aa590] dark:text-[#08110e] dark:hover:bg-[#8bb09f]"
+              className="rounded-md bg-slate-900 text-white hover:bg-slate-800 dark:bg-[#7aa590] dark:text-[#08110e] dark:hover:bg-[#8bb09f]"
               onClick={next}
               disabled={busy}
             >
@@ -757,7 +769,7 @@ export function WorkspaceCreateDialog(props: Props) {
             </Button>
           ) : (
             <Button
-              className="rounded-xl bg-slate-900 text-white hover:bg-slate-800 dark:bg-[#7aa590] dark:text-[#08110e] dark:hover:bg-[#8bb09f]"
+              className="rounded-md bg-slate-900 text-white hover:bg-slate-800 dark:bg-[#7aa590] dark:text-[#08110e] dark:hover:bg-[#8bb09f]"
               onClick={() => void create()}
               disabled={busy}
             >
