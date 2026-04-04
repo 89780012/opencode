@@ -37,8 +37,8 @@ export function SessionReviewPanel(props: Props) {
         <div className="text-base font-semibold">暂无代码变更</div>
         <div className="max-w-sm text-sm text-muted-foreground">当这次会话产生文件修改时，这里会按文件列出改动并支持直接查看 diff。</div>
         {props.err ? <div className="text-sm text-destructive">{props.err}</div> : null}
-        <Button variant="outline" onClick={props.onRefresh}>
-          刷新变更
+        <Button variant="outline" onClick={props.onRefresh} disabled={props.loading}>
+          {props.loading ? "刷新中..." : "刷新变更"}
         </Button>
       </div>
     )

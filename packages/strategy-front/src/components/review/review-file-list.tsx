@@ -35,7 +35,7 @@ export function ReviewFileList(props: Props) {
           {props.side}
           <Button size="xs" variant="outline" onClick={props.onRefresh} disabled={props.loading} className="h-7 px-2">
             <RefreshCw className={cn("size-3.5", props.loading ? "animate-spin" : undefined)} />
-            刷新
+            {props.loading ? "刷新中..." : "刷新"}
           </Button>
         </div>
       </div>
