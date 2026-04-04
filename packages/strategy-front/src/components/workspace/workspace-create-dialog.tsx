@@ -72,7 +72,7 @@ const cards: Record<StrategyType, { title: string; desc: string; template: strin
   },
   other: {
     title: "其他",
-    desc: "适合整理已有项目或从 README 开始规划,不依赖SmartX。",
+    desc: "空白项目目录",
     template: "other_basic",
     icon: <FileText className="size-4" />,
     root: "~/.strategy-service/workspaces",
@@ -198,7 +198,7 @@ export function WorkspaceCreateDialog(props: Props) {
 
   const buildPrompt = () => {
     if (kind === "other") {
-      return brief.trim() ? `请帮我整理工作区《${full}》的结构、目标和下一步改造计划。\n补充说明：${brief.trim()}` : ""
+      return brief.trim() ? `补充说明：${brief.trim()}` : ""
     }
     if (kind === "smartx") {
       const base = buildStrategyPrompt({ name: full, guide, type: "smartx" })
@@ -650,18 +650,13 @@ export function WorkspaceCreateDialog(props: Props) {
               </Tabs>
             ) : (
               <div className="space-y-4">
-                <Block title="通用工作区说明" hint={`当前模板：${card.template}`}>
-                  <div className="text-sm leading-6 text-slate-600 dark:text-[#93a39c]">
-                    其他类型会先创建通用工作区，再基于你填写的策略画像整理 README、目录结构与后续改造计划。
-                  </div>
-                </Block>
                 <Block title="补充说明">
                   <div className="rounded-md bg-white/92 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]">
                     <AutoResizeTextarea
                       value={brief}
                       onChange={setBrief}
                       height={220}
-                      placeholder="例如：先整理目录用途，给出策略说明、后续拆分方案与最小可维护结构。"
+                      placeholder="例如：帮我生成一个简单的网格策略"
                     />
                   </div>
                 </Block>
