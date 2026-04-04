@@ -1,5 +1,5 @@
-import { memo } from "react"
-import { CheckCircle2, Circle, ListTodo, LoaderCircle, MinusCircle } from "lucide-react"
+import { memo, useState, type ReactNode } from "react"
+import { CheckCircle2, ChevronDown, Circle, ListTodo, LoaderCircle, MinusCircle } from "lucide-react"
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation"
 import { Message, MessageContent } from "@/components/ai-elements/message"
 import { Response } from "@/components/ai-elements/response"
@@ -107,27 +107,72 @@ function renderTodoTool(part: ChatToolPart) {
   )
 }
 
+function Fold(props: {
+  head: ReactNode
+  side?: ReactNode
+  body: ReactNode
+  open?: boolean
+  tone?: string
+}) {
+  const [open, setOpen] = useState(!!props.open)
+
+  return (
+    <div
+      className={cn(
+        "overflow-hidden rounded-lg border px-3 py-2 text-sm transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+        props.tone,
+      )}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="flex w-full items-center justify-between gap-3 text-left"
+      >
+        <div className="min-w-0 flex-1">{props.head}</div>
+        <div className="flex shrink-0 items-center gap-2">
+          {props.side}
+          <ChevronDown
+            className={cn(
+              "size-4 text-muted-foreground transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+              open ? "rotate-180" : "",
+            )}
+          />
+        </div>
+      </button>
+      <div
+        className={cn(
+          "grid overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+          open ? "grid-rows-[1fr] pt-2 opacity-100" : "grid-rows-[0fr] pt-0 opacity-0",
+        )}
+      >
+        <div className="min-h-0">{props.body}</div>
+      </div>
+    </div>
+  )
+}
+
 function renderTool(part: ChatToolPart) {
   const state = part.state
   if (part.tool === "todowrite" || part.tool === "todoread") {
     return renderTodoTool(part)
   }
   return (
-    <details className="rounded-lg border bg-muted/30 px-3 py-2 text-sm">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
-        <div className="font-medium">工具调用:{part.tool}</div>
-        <div className="text-muted-foreground text-xs">{state.status}</div>
-      </summary>
-      <div className={pane}>
-        <pre className="overflow-x-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">
-          {JSON.stringify(state.input, null, 2)}
-        </pre>
-        {"output" in state && state.output ? (
-          <pre className="overflow-x-auto whitespace-pre-wrap break-words text-xs">{state.output}</pre>
-        ) : null}
-        {"error" in state && state.error ? <div className="text-xs text-red-600">{state.error}</div> : null}
-      </div>
-    </details>
+    <Fold
+      tone="bg-muted/30"
+      head={<div className="font-medium">工具调用:{part.tool}</div>}
+      side={<div className="text-muted-foreground text-xs">{state.status}</div>}
+      body={
+        <div className={pane}>
+          <pre className="overflow-x-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">
+            {JSON.stringify(state.input, null, 2)}
+          </pre>
+          {"output" in state && state.output ? (
+            <pre className="overflow-x-auto whitespace-pre-wrap break-words text-xs">{state.output}</pre>
+          ) : null}
+          {"error" in state && state.error ? <div className="text-xs text-red-600">{state.error}</div> : null}
+        </div>
+      }
+    />
   )
 }
 
@@ -140,10 +185,11 @@ function renderPart(part: ChatPart, role: ChatMessageInfo["role"], onOpenDiff?: 
       return <div className="whitespace-pre-wrap break-words">{part.text}</div>
     case "reasoning":
       return (
-        <details className="rounded-lg border bg-muted/20 px-3 py-2 text-sm">
-          <summary className="cursor-pointer font-medium">思考中</summary>
-          <div className={cn(pane, "whitespace-pre-wrap break-words text-muted-foreground")}>{part.text}</div>
-        </details>
+        <Fold
+          tone="bg-muted/20"
+          head={<div className="font-medium">思考中</div>}
+          body={<div className={cn(pane, "whitespace-pre-wrap break-words text-muted-foreground")}>{part.text}</div>}
+        />
       )
     case "tool":
       return renderTool(part)
@@ -175,34 +221,35 @@ function renderPart(part: ChatPart, role: ChatMessageInfo["role"], onOpenDiff?: 
       )
     case "snapshot":
       return (
-        <details className="rounded-lg border bg-muted/20 px-3 py-2 text-sm">
-          <summary className="cursor-pointer font-medium">Snapshot</summary>
-          <pre className={cn(pane, "overflow-x-auto whitespace-pre-wrap break-words text-xs")}>{part.snapshot}</pre>
-        </details>
+        <Fold
+          tone="bg-muted/20"
+          head={<div className="font-medium">Snapshot</div>}
+          body={<pre className={cn(pane, "overflow-x-auto whitespace-pre-wrap break-words text-xs")}>{part.snapshot}</pre>}
+        />
       )
     case "patch":
       return (
-        <details className="rounded-lg border px-3 py-2 text-sm">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 font-medium [&::-webkit-details-marker]:hidden">
-            <span>Patch {part.hash}</span>
-            <span className="text-xs text-muted-foreground">{part.files.length} files</span>
-          </summary>
-          <div className={cn(pane, "flex flex-wrap content-start gap-2")}>
-            {part.files.map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => onOpenDiff?.(item)}
-                className={cn(
-                  "rounded px-2 py-1 text-xs transition-colors",
-                  onOpenDiff ? "bg-muted hover:bg-primary/10 hover:text-foreground" : "bg-muted",
-                )}
-              >
-                {item}
-              </button>
-            ))}
-          </div>
-        </details>
+        <Fold
+          head={<span className="font-medium">Patch {part.hash}</span>}
+          side={<span className="text-xs text-muted-foreground">{part.files.length} files</span>}
+          body={
+            <div className={cn(pane, "flex flex-wrap content-start gap-2")}>
+              {part.files.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => onOpenDiff?.(item)}
+                  className={cn(
+                    "rounded px-2 py-1 text-xs transition-colors",
+                    onOpenDiff ? "bg-muted hover:bg-primary/10 hover:text-foreground" : "bg-muted",
+                  )}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+          }
+        />
       )
     case "agent":
       return <div className="rounded-lg border px-3 py-2 text-xs text-muted-foreground">Agent: {part.name}</div>

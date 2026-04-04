@@ -59,7 +59,7 @@ export default function StrategyDetailPage() {
       await refresh()
     } catch (err) {
       console.error("Failed to refresh", err)
-      toast.error("鍒锋柊澶辫触")
+      toast.error("刷新失败")
     } finally {
       setSpin(false)
     }

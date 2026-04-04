@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { Boxes, FolderInput, LayoutGrid, Plus, RefreshCw, Search, X } from "lucide-react"
+import { FolderInput, LayoutGrid, Plus, RefreshCw, Search, X } from "lucide-react"
 import { toast } from "sonner"
 import { workspaceApi } from "@/api/modules/workspace"
 import { DeleteConfirmDialog } from "@/components/shared/delete-confirm-dialog"

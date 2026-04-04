@@ -907,3 +907,37 @@ Frequent commits are preferred if a PR needs to be split into preparatory cleanu
 **Notes for PR4:**
 
 - chat session data and chat async process state now share the same owner, so the global resource provider can be simplified without also needing to absorb chat request lifecycle flags
+
+### 2026-04-03 PR4 Completed
+
+**Status:** done
+
+**Implemented:**
+
+- Reworked `packages/strategy-front/src/data/global-data-provider.tsx` into a clean reducer-driven resource cache implementation
+- Kept the public API stable for:
+  - `useGlobalData`
+  - `useAgentList`
+  - `useProviderList`
+  - `useWorkspaceList`
+- Preserved request dedupe and latest-request-wins behavior via the existing `wait` and `seq` refs
+- Simplified selected workspace handling so provider state stores the selected workspace path and derives the selected workspace object from current workspace data
+
+**Behavior preserved intentionally:**
+
+- resource loading still uses `ensure`, `refresh`, `refreshMany`, and `invalidate`
+- pages consuming provider data do not need an API migration
+- workspace selection semantics remain available to list/sidebar consumers
+
+**Validation run:**
+
+- `cmd /c bun run build`
+- Result: provider refactor did not introduce new TypeScript errors
+- Remaining package-wide blocker is still the same pre-existing unrelated error in `packages/strategy-front/src/pages/strategies.tsx`
+- Error: `TS6133: 'Boxes' is declared but its value is never read.`
+
+**Lint note:**
+
+- `cmd /c npx eslint src/data/global-data-provider.tsx`
+- Result: still reports `react-refresh/only-export-components`
+- Reason: the file continues to export both the provider component and shared hooks, which is an older file-structure pattern not changed in this pass to avoid a broad import migration

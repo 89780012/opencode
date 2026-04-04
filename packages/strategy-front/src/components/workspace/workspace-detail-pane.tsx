@@ -354,10 +354,6 @@ export function WorkspaceDetailPane(props: Props) {
                       <Save className="size-4" />
                       {savingAny ? "保存中..." : count > 1 ? "全部保存" : "保存"}
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => void load(true)} disabled={loading}>
-                      <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
-                      {loading ? "刷新中..." : "刷新"}
-                    </Button>
                   </>
                 }
               />
@@ -416,22 +412,28 @@ export function WorkspaceDetailPane(props: Props) {
                     <div className="truncate text-sm font-medium">文件树</div>
                     <div className="shrink-0 text-xs text-muted-foreground">{tree.length} 项</div>
                   </div>
-                  <div className="flex items-center gap-1 rounded-md border bg-background p-1">
-                    {(["all", "changed"] as const).map((item) => (
-                      <button
-                        key={item}
-                        type="button"
-                        onClick={() => setFilter(item)}
-                        className={cn(
-                          "rounded px-2 py-1 text-[11px] font-medium transition-colors",
-                          filter === item
-                            ? "bg-foreground text-background"
-                            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                        )}
-                      >
-                        {item === "all" ? "所有文件" : "仅变更"}
-                      </button>
-                    ))}
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 rounded-md border bg-background p-1">
+                      {(["all", "changed"] as const).map((item) => (
+                        <button
+                          key={item}
+                          type="button"
+                          onClick={() => setFilter(item)}
+                          className={cn(
+                            "rounded px-2 py-1 text-[11px] font-medium transition-colors",
+                            filter === item
+                              ? "bg-foreground text-background"
+                              : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                          )}
+                        >
+                          {item === "all" ? "所有文件" : "仅变更"}
+                        </button>
+                      ))}
+                    </div>
+                    <Button size="xs" variant="outline" onClick={() => void load(true)} disabled={loading} className="h-7 px-2">
+                      <RefreshCw className={cn("size-3.5", loading ? "animate-spin" : undefined)} />
+                      {loading ? "刷新中..." : "刷新"}
+                    </Button>
                   </div>
                 </div>
                 <WorkspaceFileTree
