@@ -12,6 +12,8 @@ import {
   selectSessionStatus,
 } from "@/store/chat-session-selectors"
 
+const loads = new Map<string, Promise<void>>()
+
 export function useChatSessionDetail(workspacePath?: string | null, sessionId?: string | null) {
   const dispatch = useAppDispatch()
   const loaded = useAppSelector((state) => selectSessionLoaded(state, sessionId))
@@ -27,12 +29,30 @@ export function useChatSessionDetail(workspacePath?: string | null, sessionId?: 
       if (!workspacePath || !id) {
         return
       }
+
+      const cur = loads.get(id)
+      if (cur) {
+        return cur
+      }
+
       dispatch(setSessionDetailLoading({ sessionId: id, loading: true }))
+      const task = (async () => {
+        try {
+          const data = await chatApi.getSessionMessages(workspacePath, id)
+          dispatch(hydrateSessionMessages({ sessionId: id, records: data }))
+        } finally {
+          dispatch(setSessionDetailLoading({ sessionId: id, loading: false }))
+        }
+      })()
+
+      loads.set(id, task)
+
       try {
-        const data = await chatApi.getSessionMessages(workspacePath, id)
-        dispatch(hydrateSessionMessages({ sessionId: id, records: data }))
+        await task
       } finally {
-        dispatch(setSessionDetailLoading({ sessionId: id, loading: false }))
+        if (loads.get(id) === task) {
+          loads.delete(id)
+        }
       }
     },
     [dispatch, sessionId, workspacePath],

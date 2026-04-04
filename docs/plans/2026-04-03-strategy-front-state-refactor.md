@@ -941,3 +941,90 @@ Frequent commits are preferred if a PR needs to be split into preparatory cleanu
 - `cmd /c npx eslint src/data/global-data-provider.tsx`
 - Result: still reports `react-refresh/only-export-components`
 - Reason: the file continues to export both the provider component and shared hooks, which is an older file-structure pattern not changed in this pass to avoid a broad import migration
+
+---
+
+## Review Defect Checklist
+
+### 2026-04-04 Review Notes For PR1 To PR4
+
+**Status:** review completed
+
+**Defects found:**
+
+1. **PR3: chat loading state can become incorrect under concurrent requests**
+   - Status: fixed on 2026-04-04
+   - Severity: medium
+   - Files:
+     - `packages/strategy-front/src/hooks/use-chat-sessions.ts`
+     - `packages/strategy-front/src/hooks/use-chat-session-detail.ts`
+     - `packages/strategy-front/src/hooks/use-strategy-session.ts`
+     - `packages/strategy-front/src/components/chat/session-sidebar-panel.tsx`
+   - Problem:
+     - `sessionLoading`, `sessionCreating`, and `detailLoading` were moved into Redux as shared booleans, but there is no request dedupe, request token, or in-flight counter for these async paths.
+     - When two consumers trigger the same workspace/session load at nearly the same time, the earlier-finishing request can set the shared loading flag back to `false` while another request is still running.
+   - Risk:
+     - loading indicators can disappear too early
+     - submit controls can leave the loading state early
+     - pages and sidebars can render inconsistent request state
+   - Suggested fix:
+     - add request dedupe in the hook layer, or
+     - track in-flight request counts / request ids in store instead of plain booleans
+
+2. **PR2: workspace editor reloads workspace files twice when switching workspace**
+   - Status: fixed on 2026-04-04
+   - Severity: medium
+   - Files:
+     - `packages/strategy-front/src/components/workspace/workspace-editor-pane.tsx`
+     - `packages/strategy-front/src/lib/workspace-editor-reducer.ts`
+   - Problem:
+     - `load` depends on `state.ws`
+     - on workspace switch, `dispatch({ type: "load_start" })` updates reducer state first
+     - that state change recreates `load`, which retriggers the `useEffect(() => void load(), [load])`
+   - Risk:
+     - duplicate `getWorkspaceFiles(...)` requests when changing workspace
+     - extra loading flicker and unnecessary network work
+   - Suggested fix:
+     - decouple the effect trigger from reducer state changes, or
+     - compute workspace-switch reset from refs / props rather than from a callback dependency on `state.ws`
+
+3. **PR1: strategy detail refresh failure toast contains garbled text**
+   - Status: fixed on 2026-04-04
+   - Severity: low
+   - File:
+     - `packages/strategy-front/src/pages/strategy-detail.tsx`
+   - Problem:
+     - the refresh error toast text is currently `鍒锋柊澶辫触`
+   - Risk:
+     - users see broken UI text on refresh failure
+   - Suggested fix:
+     - restore the intended Chinese copy, likely `刷新失败`
+
+4. **Validation process gap: plan requires package typecheck, but package has no `typecheck` script**
+   - Status: fixed on 2026-04-04
+   - Severity: low
+   - File:
+     - `packages/strategy-front/package.json`
+   - Problem:
+     - the implementation plan repeatedly says to run `cmd /c bun typecheck`
+     - this package only provides `build` and `lint`; `typecheck` does not exist
+   - Risk:
+     - review / implementation notes can claim a check that was never actually run
+     - future PR validation may follow an invalid command path
+   - Suggested fix:
+     - either add a real `typecheck` script, or
+     - update the plan to use the actual package validation command
+
+**Fix validation after remediation:**
+
+- `cmd /c bun run typecheck`
+- Result: pass
+- `cmd /c bun run build`
+- Result: pass
+- `cmd /c npx eslint src/pages/strategy-detail.tsx src/components/workspace/workspace-editor-pane.tsx src/hooks/use-chat-sessions.ts src/hooks/use-chat-session-detail.ts src/pages/strategies.tsx`
+- Result: pass
+
+**Additional cleanup during validation:**
+
+- Removed the unused `Boxes` import in `packages/strategy-front/src/pages/strategies.tsx`
+- This cleared the old TypeScript blocker so package-wide validation can now complete

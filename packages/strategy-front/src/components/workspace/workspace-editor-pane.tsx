@@ -22,6 +22,7 @@ interface Props {
 export function WorkspaceEditorPane(props: Props) {
   const [state, dispatch] = useReducer(reduce, props.workspace.path, init)
   const cur = useRef(props.workspace.path)
+  const last = useRef(props.workspace.path)
 
   useEffect(() => {
     cur.current = props.workspace.path
@@ -30,7 +31,7 @@ export function WorkspaceEditorPane(props: Props) {
   const load = useCallback(
     async (force?: boolean) => {
       const ws = props.workspace.path
-      const reset = state.ws !== ws
+      const reset = last.current !== ws
       dispatch({ type: "load_start", ws, reset })
 
       try {
@@ -42,14 +43,16 @@ export function WorkspaceEditorPane(props: Props) {
         const seen = new Set(paths)
         const active = reset ? (props.path && seen.has(props.path) ? props.path : (paths[0] ?? null)) : null
         dispatch({ type: "files_loaded", ws, paths, active, force: !!force })
+        last.current = ws
       } catch (err) {
         console.error("failed to load workspace files", err)
         if (cur.current === ws) {
           dispatch({ type: "load_failed", ws, error: "加载工作区文件失败" })
+          last.current = ws
         }
       }
     },
-    [props.path, props.workspace.path, state.ws],
+    [props.path, props.workspace.path],
   )
 
   useEffect(() => {
@@ -161,7 +164,11 @@ export function WorkspaceEditorPane(props: Props) {
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col bg-background">
-      <ResizablePanelGroup direction="horizontal" autoSaveId="strategy-front:workspace-editor-split:v2" className="min-h-0 min-w-0 flex-1">
+      <ResizablePanelGroup
+        direction="horizontal"
+        autoSaveId="strategy-front:workspace-editor-split:v2"
+        className="min-h-0 min-w-0 flex-1"
+      >
         <ResizablePanel defaultSize={76} minSize={420} className="min-h-0 min-w-0">
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <WorkspaceFileTabs
@@ -176,7 +183,12 @@ export function WorkspaceEditorPane(props: Props) {
                       {count} 未保存
                     </span>
                   ) : null}
-                  <Button size="sm" variant="outline" onClick={() => void save()} disabled={lock || !state.active || !state.dirty[state.active] || fileSaving}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void save()}
+                    disabled={lock || !state.active || !state.dirty[state.active] || fileSaving}
+                  >
                     <Save className="size-4" />
                     {fileSaving ? "保存中..." : "保存"}
                   </Button>

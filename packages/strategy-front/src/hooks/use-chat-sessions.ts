@@ -17,6 +17,9 @@ import {
   selectWorkspaceSessions,
 } from "@/store/chat-session-selectors"
 
+const loads = new Map<string, Promise<void>>()
+const creates = new Map<string, Promise<string>>()
+
 export function useChatSessions(workspacePath?: string | null) {
   const dispatch = useAppDispatch()
   const loaded = useAppSelector((state) => selectWorkspaceSessionLoaded(state, workspacePath))
@@ -29,12 +32,30 @@ export function useChatSessions(workspacePath?: string | null) {
     if (!workspacePath) {
       return
     }
+
+    const cur = loads.get(workspacePath)
+    if (cur) {
+      return cur
+    }
+
     dispatch(setWorkspaceSessionLoading({ workspace: workspacePath, loading: true }))
+    const task = (async () => {
+      try {
+        const data = await chatApi.listSessions(workspacePath)
+        dispatch(setWorkspaceSessions({ workspace: workspacePath, sessions: data }))
+      } finally {
+        dispatch(setWorkspaceSessionLoading({ workspace: workspacePath, loading: false }))
+      }
+    })()
+
+    loads.set(workspacePath, task)
+
     try {
-      const data = await chatApi.listSessions(workspacePath)
-      dispatch(setWorkspaceSessions({ workspace: workspacePath, sessions: data }))
+      await task
     } finally {
-      dispatch(setWorkspaceSessionLoading({ workspace: workspacePath, loading: false }))
+      if (loads.get(workspacePath) === task) {
+        loads.delete(workspacePath)
+      }
     }
   }, [dispatch, workspacePath])
 
@@ -49,19 +70,37 @@ export function useChatSessions(workspacePath?: string | null) {
     if (!workspacePath) {
       throw new Error("需要工作区路径")
     }
+
+    const cur = creates.get(workspacePath)
+    if (cur) {
+      return cur
+    }
+
     dispatch(setWorkspaceSessionCreating({ workspace: workspacePath, creating: true }))
+    const task = (async () => {
+      try {
+        const session = await chatApi.createSession(workspacePath)
+        dispatch(upsertWorkspaceSession({ workspace: workspacePath, session }))
+        dispatch(
+          setSelectedWorkspaceSession({
+            workspace: workspacePath,
+            sessionId: session.id,
+          }),
+        )
+        return session.id
+      } finally {
+        dispatch(setWorkspaceSessionCreating({ workspace: workspacePath, creating: false }))
+      }
+    })()
+
+    creates.set(workspacePath, task)
+
     try {
-      const session = await chatApi.createSession(workspacePath)
-      dispatch(upsertWorkspaceSession({ workspace: workspacePath, session }))
-      dispatch(
-        setSelectedWorkspaceSession({
-          workspace: workspacePath,
-          sessionId: session.id,
-        }),
-      )
-      return session.id
+      return await task
     } finally {
-      dispatch(setWorkspaceSessionCreating({ workspace: workspacePath, creating: false }))
+      if (creates.get(workspacePath) === task) {
+        creates.delete(workspacePath)
+      }
     }
   }, [dispatch, workspacePath])
 
