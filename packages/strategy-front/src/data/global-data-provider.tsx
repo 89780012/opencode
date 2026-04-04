@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react"
 import { agentApi, mcpApi, providerApi, skillApi, workspaceApi } from "@/api/modules"
 import { rankAgent } from "@/lib/chat-composer"
 import { latestModels, modelVisible, readModelVisibility } from "@/lib/model-catalog"
@@ -60,6 +60,11 @@ type State = {
   workspace: Box<WorkspaceData>
 }
 
+type Action =
+  | { type: "load_start"; key: Key }
+  | { type: "load_done"; key: Key; box: Box<DataMap[Key]> }
+  | { type: "invalidate"; key: Key }
+
 type Ctx = State & {
   ensure: <K extends Key>(key: K) => Promise<Box<DataMap[K]>>
   refresh: <K extends Key>(key: K) => Promise<Box<DataMap[K]>>
@@ -117,7 +122,6 @@ const emptyWorkspace: WorkspaceData = {
 
 const Ctx = createContext<Ctx | null>(null)
 
-// 为每类资源创建统一的包装状态，页面层只需要消费同一组字段。
 function item<T>(data: T): Box<T> {
   return {
     data,
@@ -129,7 +133,43 @@ function item<T>(data: T): Box<T> {
   }
 }
 
-// 统一归一异常文本，避免页面重复做类型判断。
+function initState(): State {
+  return {
+    agent: item(emptyAgent),
+    provider: item(emptyProvider),
+    mcp: item(emptyMcp),
+    skill: item(emptySkill),
+    workspace: item(emptyWorkspace),
+  }
+}
+
+function reduce(state: State, action: Action): State {
+  if (action.type === "load_start") {
+    return {
+      ...state,
+      [action.key]: {
+        ...state[action.key],
+        load: true,
+      },
+    }
+  }
+
+  if (action.type === "invalidate") {
+    return {
+      ...state,
+      [action.key]: {
+        ...state[action.key],
+        stale: true,
+      },
+    }
+  }
+
+  return {
+    ...state,
+    [action.key]: action.box,
+  }
+}
+
 function note(err: unknown, fallback: string) {
   if (err instanceof Error && err.message) {
     return err.message
@@ -142,7 +182,6 @@ function note(err: unknown, fallback: string) {
   return fallback
 }
 
-// 规整 agent 配置，保证目录和列表字段始终存在。
 function normAgentCfg(input?: Partial<GlobalAgentCatalog> | null): GlobalAgentCatalog {
   return {
     root: typeof input?.root === "string" ? input.root : "",
@@ -150,7 +189,6 @@ function normAgentCfg(input?: Partial<GlobalAgentCatalog> | null): GlobalAgentCa
   }
 }
 
-// 规整 skill 配置，保证目录和列表字段始终存在。
 function normSkillCfg(input?: Partial<GlobalSkillCatalog> | null): GlobalSkillCatalog {
   return {
     root: typeof input?.root === "string" ? input.root : "",
@@ -158,7 +196,6 @@ function normSkillCfg(input?: Partial<GlobalSkillCatalog> | null): GlobalSkillCa
   }
 }
 
-// 统一补齐 workspace 字段，避免服务端缺省值影响前端。
 function normWorkspace(item: LocalWorkspace): LocalWorkspace {
   return {
     ...item,
@@ -177,26 +214,6 @@ function normWorkspace(item: LocalWorkspace): LocalWorkspace {
     missing: !!item.missing,
     updated_at: typeof item.updated_at === "number" ? item.updated_at : 0,
   }
-}
-
-// 判断选中的 workspace 与最新列表中的快照是否一致。
-function same(a: LocalWorkspace | null, b: LocalWorkspace) {
-  if (!a) {
-    return false
-  }
-  if (a.path !== b.path || a.name !== b.name || a.vcs !== b.vcs) {
-    return false
-  }
-  if (a.type !== b.type || a.template !== b.template || a.entry_file !== b.entry_file) {
-    return false
-  }
-  if (a.source !== b.source || a.managed !== b.managed || a.missing !== b.missing) {
-    return false
-  }
-  if (a.keywords.length !== b.keywords.length) {
-    return false
-  }
-  return a.keywords.every((item, i) => item === b.keywords[i])
 }
 
 function scope(value?: string) {
@@ -234,7 +251,6 @@ function allow(item?: string, current?: string) {
   return row === cur
 }
 
-// 基于 provider 原始数据派生出首页和模型页直接可用的模型目录。
 function buildProvider(providers: List, config: Config, auth: AuthMap): ProviderData {
   const user = readModelVisibility()
   const connected = new Set(providers.connected)
@@ -268,7 +284,6 @@ function buildProvider(providers: List, config: Config, auth: AuthMap): Provider
   }
 }
 
-// 并行拉取 agent 运行态和全局配置，允许局部失败后继续展示已成功部分。
 async function loadAgent(): Promise<Out<AgentData>> {
   const [run, cfg] = await Promise.allSettled([agentApi.listRuntime(), agentApi.listGlobal()])
   const doc = cfg.status === "fulfilled" ? normAgentCfg(cfg.value) : emptyAgent.cfg
@@ -293,7 +308,6 @@ async function loadAgent(): Promise<Out<AgentData>> {
   }
 }
 
-// 拉取 provider 目录、全局配置和授权方式，并生成派生模型列表。
 async function loadProvider(): Promise<Out<ProviderData>> {
   const [providers, config, auth] = await Promise.allSettled([
     providerApi.list(),
@@ -317,7 +331,6 @@ async function loadProvider(): Promise<Out<ProviderData>> {
   }
 }
 
-// MCP 同时依赖配置和运行态，这里统一聚合成一个资源。
 async function loadMcp(): Promise<Out<McpData>> {
   const [doc, map] = await Promise.allSettled([mcpApi.config(), mcpApi.status()])
 
@@ -335,7 +348,6 @@ async function loadMcp(): Promise<Out<McpData>> {
   }
 }
 
-// 并行拉取 skill 运行态和全局目录。
 async function loadSkill(): Promise<Out<SkillData>> {
   const [run, cfg] = await Promise.allSettled([skillApi.listRuntime(), skillApi.listGlobal()])
   const doc = cfg.status === "fulfilled" ? normSkillCfg(cfg.value) : emptySkill.cfg
@@ -360,7 +372,6 @@ async function loadSkill(): Promise<Out<SkillData>> {
   }
 }
 
-// 拉取本地 workspace 列表，作为整个应用共享的目录数据源。
 async function loadWorkspace(): Promise<Out<WorkspaceData>> {
   try {
     const data = await workspaceApi.getLocalWorkspaces()
@@ -380,14 +391,8 @@ async function loadWorkspace(): Promise<Out<WorkspaceData>> {
 }
 
 export function GlobalDataProvider(props: { children: ReactNode }) {
-  const [selected, setSelected] = useState<LocalWorkspace | null>(null)
-  const [state, setState] = useState<State>({
-    agent: item(emptyAgent),
-    provider: item(emptyProvider),
-    mcp: item(emptyMcp),
-    skill: item(emptySkill),
-    workspace: item(emptyWorkspace),
-  })
+  const [selected, setSelected] = useState<string | null>(null)
+  const [state, dispatch] = useReducer(reduce, undefined, initState)
   const ref = useRef(state)
   const seq = useRef<Record<Key, number>>({
     agent: 0,
@@ -402,7 +407,6 @@ export function GlobalDataProvider(props: { children: ReactNode }) {
     ref.current = state
   }, [state])
 
-  // 统一真实加载入口，负责请求去重、竞态保护和落库。
   const pull = useCallback(<K extends Key>(key: K, force: boolean) => {
     const cur = wait.current[key] as Promise<Box<DataMap[K]>> | undefined
     if (cur && !force) {
@@ -410,13 +414,7 @@ export function GlobalDataProvider(props: { children: ReactNode }) {
     }
 
     const id = ++seq.current[key]
-    setState((prev) => ({
-      ...prev,
-      [key]: {
-        ...prev[key],
-        load: true,
-      },
-    }))
+    dispatch({ type: "load_start", key })
 
     const task = (
       key === "agent"
@@ -440,10 +438,7 @@ export function GlobalDataProvider(props: { children: ReactNode }) {
         } satisfies Box<DataMap[K]>
 
         if (seq.current[key] === id) {
-          setState((prev) => ({
-            ...prev,
-            [key]: next,
-          }))
+          dispatch({ type: "load_done", key, box: next as Box<DataMap[Key]> })
         }
 
         return next
@@ -452,7 +447,7 @@ export function GlobalDataProvider(props: { children: ReactNode }) {
         const prev = ref.current[key] as Box<DataMap[K]>
         const next = {
           ...prev,
-          err: note(err, `加载 ${key} 失败`),
+          err: note(err, `Failed to load ${key}`),
           load: false,
           ready: true,
           stale: false,
@@ -460,10 +455,7 @@ export function GlobalDataProvider(props: { children: ReactNode }) {
         } satisfies Box<DataMap[K]>
 
         if (seq.current[key] === id) {
-          setState((last) => ({
-            ...last,
-            [key]: next,
-          }))
+          dispatch({ type: "load_done", key, box: next as Box<DataMap[Key]> })
         }
 
         return next
@@ -478,7 +470,6 @@ export function GlobalDataProvider(props: { children: ReactNode }) {
     return task
   }, [])
 
-  // 仅在资源未就绪或已标脏时触发加载，适合页面首次进入时调用。
   const ensure = useCallback(
     <K extends Key>(key: K) => {
       const cur = ref.current[key] as Box<DataMap[K]>
@@ -490,15 +481,11 @@ export function GlobalDataProvider(props: { children: ReactNode }) {
     [pull],
   )
 
-  // 强制刷新指定资源，忽略当前缓存状态。
   const refresh = useCallback(
-    <K extends Key>(key: K) => {
-      return pull(key, true)
-    },
+    <K extends Key>(key: K) => pull(key, true),
     [pull],
   )
 
-  // opencode 重启这类场景会跨多个资源，这里提供批量刷新能力。
   const refreshMany = useCallback(
     async (keys: Key[]) => {
       await Promise.all(keys.map((key) => refresh(key)))
@@ -506,34 +493,23 @@ export function GlobalDataProvider(props: { children: ReactNode }) {
     [refresh],
   )
 
-  // 只标记资源已过期，不立即发请求，等待后续 ensure 或 refresh。
   const invalidate = useCallback((key: Key) => {
-    setState((prev) => ({
-      ...prev,
-      [key]: {
-        ...prev[key],
-        stale: true,
-      },
-    }))
+    dispatch({ type: "invalidate", key })
   }, [])
 
-  // 切换当前选中的 workspace，由全局资源层统一管理。
   const selectWorkspace = useCallback((item: LocalWorkspace) => {
-    setSelected(normWorkspace(item))
+    setSelected(item.path)
   }, [])
 
-  // 清空当前选中的 workspace。
   const clearWorkspace = useCallback(() => {
     setSelected(null)
   }, [])
 
-  // 应用启动时预取关键资源，次级资源放到空闲阶段补齐。
   useEffect(() => {
     void ensure("provider")
     void ensure("agent")
     void ensure("workspace")
 
-    let timer: ReturnType<typeof setTimeout> | undefined
     let idle: number | undefined
 
     const run = () => {
@@ -550,32 +526,16 @@ export function GlobalDataProvider(props: { children: ReactNode }) {
       }
     }
 
-    timer = setTimeout(run, 250)
+    const timer = setTimeout(run, 250)
     return () => {
-      if (timer) {
-        clearTimeout(timer)
-      }
+      clearTimeout(timer)
     }
   }, [ensure])
 
-  // 当 workspace 列表变化时，在全局层自动修正当前选中项。
-  useEffect(() => {
-    if (!state.workspace.ready || !selected?.path) {
-      return
-    }
-
-    const cur = state.workspace.data.workspaces.find((item) => item.path === selected.path)
-    if (!cur) {
-      setSelected(null)
-      return
-    }
-
-    if (same(selected, cur)) {
-      return
-    }
-
-    setSelected(cur)
-  }, [selected, state.workspace.data.workspaces, state.workspace.ready])
+  const current = useMemo(
+    () => (selected ? state.workspace.data.workspaces.find((item) => item.path === selected) ?? null : null),
+    [selected, state.workspace.data.workspaces],
+  )
 
   const value = useMemo(
     () => ({
@@ -588,16 +548,15 @@ export function GlobalDataProvider(props: { children: ReactNode }) {
       selectWorkspace,
       workspace: {
         ...state.workspace,
-        selected,
+        selected: current,
       },
     }),
-    [clearWorkspace, ensure, invalidate, refresh, refreshMany, selectWorkspace, selected, state],
+    [clearWorkspace, current, ensure, invalidate, refresh, refreshMany, selectWorkspace, state],
   )
 
   return <Ctx.Provider value={value}>{props.children}</Ctx.Provider>
 }
 
-// 暴露完整全局资源上下文，供页面做更细粒度控制。
 export function useGlobalData() {
   const ctx = useContext(Ctx)
   if (!ctx) {
@@ -606,7 +565,6 @@ export function useGlobalData() {
   return ctx
 }
 
-// 首页聊天场景使用的 agent 目录 hook，返回过滤和排序后的 agent 列表。
 export function useAgentList(current?: string) {
   const data = useGlobalData()
   const ensure = data.ensure
@@ -644,7 +602,6 @@ export function useAgentList(current?: string) {
   )
 }
 
-// provider 页面和首页模型选择器使用的 provider 目录 hook。
 export function useProviderList() {
   const data = useGlobalData()
   const ensure = data.ensure
@@ -679,7 +636,6 @@ export function useProviderList() {
   )
 }
 
-// workspace 目录 hook，统一返回列表、选中项和操作方法。
 export function useWorkspaceList() {
   const data = useGlobalData()
   const ensure = data.ensure
