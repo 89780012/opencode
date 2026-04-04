@@ -11,9 +11,6 @@ env:
   PLATFORM: "windows"
   ACCOUNT: "53191000978"
   WINDOWID: "1"
-  STRATEGY_IPC_ENABLED: '{{default "true" .STRATEGY_IPC_ENABLED}}'
-  STRATEGY_IPC_PRODUCT: '{{default "IDE" .STRATEGY_IPC_PRODUCT}}'
-  STRATEGY_IPC_VERSION: '{{default "" .STRATEGY_IPC_VERSION}}'
   STRATEGY_OPENCODE_ENABLED: '{{default "true" .STRATEGY_OPENCODE_ENABLED}}'
   STRATEGY_OPENCODE_STARTUP: '{{default "auto" .STRATEGY_OPENCODE_STARTUP}}'
   STRATEGY_OPENCODE_BIN: '{{default "opencode" .STRATEGY_OPENCODE_BIN}}'
@@ -37,9 +34,6 @@ tasks:
       - echo PLATFORM={{.PLATFORM}}
       - echo ACCOUNT={{.ACCOUNT}}
       - echo WINDOWID={{.WINDOWID}}
-      - echo STRATEGY_IPC_ENABLED={{.STRATEGY_IPC_ENABLED}}
-      - echo STRATEGY_IPC_PRODUCT={{.STRATEGY_IPC_PRODUCT}}
-      - echo STRATEGY_IPC_VERSION={{.STRATEGY_IPC_VERSION}}
       - echo STRATEGY_OPENCODE_ENABLED={{.STRATEGY_OPENCODE_ENABLED}}
       - echo STRATEGY_OPENCODE_STARTUP={{.STRATEGY_OPENCODE_STARTUP}}
       - echo STRATEGY_OPENCODE_BIN={{.STRATEGY_OPENCODE_BIN}}
@@ -76,13 +70,6 @@ tasks:
     desc: Run strategy-service with OpenCode integration disabled
     env:
       STRATEGY_OPENCODE_ENABLED: "false"
-    cmds:
-      - task: run
-
-  run:no-ipc:
-    desc: Run strategy-service with IPC disabled
-    env:
-      STRATEGY_IPC_ENABLED: "false"
     cmds:
       - task: run
 

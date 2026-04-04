@@ -95,7 +95,7 @@ func SeedWorkspace(dir string, item Template) error {
 
 	return WriteMeta(dir, item, filepath.Base(dir))
 }
-
+// 创建opencode目录
 func configRoot() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {

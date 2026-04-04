@@ -3,9 +3,9 @@ package runtime
 type Source string
 
 const (
-	SourceConfig  Source = "config"
-	SourceBuiltin Source = "builtin"
-	SourceSystem  Source = "system"
+	SourceConfig  Source = "config"  // 显示配置
+	SourceBuiltin Source = "builtin" // 内置
+	SourceSystem  Source = "system"  // 系统
 )
 
 type Config struct {
@@ -21,9 +21,4 @@ type Result struct {
 	Dir     string
 	Archive string
 	Message string
-}
-
-type Entry struct {
-	Source string `json:"source"`
-	Path   string `json:"path"`
 }

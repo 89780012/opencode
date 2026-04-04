@@ -8,8 +8,6 @@ Cross-platform Go service for `strategy-front`, with Windows-first install flows
 - Supports embedded frontend assets for single-binary builds
 - Exposes `/api/system/startup` for startup runtime detection
 - Exposes `/api/system/startup/prepare` for builtin runtime preparation
-- Exposes `/api/system/ipc/status` for local IPC health and account-cache status
-- Hosts SmartX and ideContinue IPC endpoints with platform-native transports
 - Keeps startup runtime selection focused on `opencode` and `git`
 
 ## Run
@@ -159,24 +157,6 @@ Pass `--clean` to remove the full `dist` directory before building.
 - `HOST` default: `127.0.0.1`
 - `PORT` default: `5000`
 - `STRATEGY_FRONT_DIST` default: `../strategy-front/dist`
-- `STRATEGY_IPC_ENABLED` default: `true`
-- `STRATEGY_IPC_PRODUCT` default: `IDE`
-- `STRATEGY_IPC_VERSION` default: ``
-
-## IPC
-
-`strategy-service` exposes two fixed IPC endpoints:
-
-- `IDESmartXServer`: accepts `accountInfo:<json>` and `accountLogout:<json>`
-- `IDEContinueServer`: accepts `queryAccountInfo` and replies with `queryAccountInfoRsp:<json>`
-
-Transport is platform-native:
-
-- Windows: named pipe
-- Linux/macOS: Unix domain socket
-
-The pipe or socket path is derived from the product data directory, matching the existing JS naming scheme.
-When multiple accounts are cached, the service replies with the last logged-in account.
 
 ## Install strategy
 

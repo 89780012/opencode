@@ -10,34 +10,33 @@ import (
 )
 
 type Config struct {
-	Host     string
-	Port     string
-	Dist     string
-	Runtime  string
-	Opencode OpencodeConfig
-	Platform string
+	Host     string			//策略服务监听地址
+	Port     string			//策略服务监听端口
+	Dist     string			//策略前端静态资源目录
+	Runtime  string			//策略运行目录, root目录
+	Opencode OpencodeConfig //opencode配置
+	Platform string //平台
 	Account  string //账号
 	WindowId string //smartX 客户端实例
-	LogDir   string
+	LogDir   string //策略日志目录
 }
 
 type OpencodeConfig struct {
-	Enabled      bool
-	Startup      string
-	Bin          string
-	GitBin       string
-	GitSource    string
-	Host         string
-	Port         int
-	Cwd          string
-	StartTimeout time.Duration
+	Enabled      bool		//是否开启
+	Startup      string	    //启动方式
+	Bin          string     //opencode二进制文件
+	GitBin       string     //git二进制文件
+	GitSource    string     //git源码
+	Host         string     //opencode服务监听地址
+	Port         int        //opencode服务监听端口
+	Cwd          string		//opencode运行目录
+	StartTimeout time.Duration //启动超时时间
 }
 
 func LoadConfig() Config {
 	host := text("HOST", "127.0.0.1")
 	port := text("PORT", "5000")
 	dist := text("STRATEGY_FRONT_DIST", "../strategy-front/dist")
-	root := text("STRATEGY_RUNTIME_DIR", "")
 	platform := text("PLATFORM", runtime.GOOS)
 	account := text("ACCOUNT", "")
 	windowId := text("WINDOWID", "")
@@ -47,20 +46,19 @@ func LoadConfig() Config {
 		Host:     host,
 		Port:     port,
 		Dist:     dist,
-		Runtime:  root,
 		Platform: platform,
 		LogDir:   logDir,
 		Opencode: OpencodeConfig{
-			Enabled:      truth("STRATEGY_OPENCODE_ENABLED", true),
-			Startup:      text("STRATEGY_OPENCODE_STARTUP", "auto"),
-			Bin:          text("STRATEGY_OPENCODE_BIN", "opencode"),
-			Host:         text("STRATEGY_OPENCODE_HOST", "127.0.0.1"),
-			Port:         number("STRATEGY_OPENCODE_PORT", 4096),
-			Cwd:          text("STRATEGY_OPENCODE_CWD", ""),
-			StartTimeout: span("STRATEGY_OPENCODE_START_TIMEOUT", 30*time.Second),
+			Enabled:      truth("STRATEGY_OPENCODE_ENABLED", true),  //是否开启
+			Startup:      text("STRATEGY_OPENCODE_STARTUP", "auto"), //启动方式
+			Bin:          text("STRATEGY_OPENCODE_BIN", "opencode"), //opencode二进制文件
+			Host:         text("STRATEGY_OPENCODE_HOST", "127.0.0.1"), //opencode服务监听地址
+			Port:         number("STRATEGY_OPENCODE_PORT", 4096), //opencode服务监听端口
+			Cwd:          text("STRATEGY_OPENCODE_CWD", ""), //opencode运行目录
+			StartTimeout: span("STRATEGY_OPENCODE_START_TIMEOUT", 30*time.Second), //opencode启动超时时间
 		},
-		Account:  account,
-		WindowId: windowId,
+		Account:  account, //账号
+		WindowId: windowId, //smartX 窗口实例ID
 	}
 }
 
@@ -90,7 +88,7 @@ func number(key string, fallback int) int {
 		return fallback
 	}
 
-	out, err := strconv.Atoi(value)
+	out, err := strconv.Atoi(value) // Ascii to integer
 	if err != nil || out <= 0 {
 		return fallback
 	}
@@ -103,13 +101,14 @@ func span(key string, fallback time.Duration) time.Duration {
 		return fallback
 	}
 
-	out, err := time.ParseDuration(value)
+	out, err := time.ParseDuration(value) // 将字符串解析为一个持续时间
 	if err != nil || out <= 0 {
 		return fallback
 	}
 	return out
 }
 
+// 获取策略日志目录
 func smartxLog() string {
 	value := strings.TrimSpace(os.Getenv("STRATEGY_SMARTX_LOG_DIR"))
 	if value != "" {

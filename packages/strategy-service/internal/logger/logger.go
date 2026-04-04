@@ -26,13 +26,12 @@ func Init() error {
 	}
 
 	writer = &lumberjack.Logger{
-		Filename:  path,
-		MaxSize:   50, // MB
-		MaxAge:    30, // days
-		Compress:  true,
-		LocalTime: true,
-	}
-
+    Filename:  path,    // 日志文件路径
+    MaxSize:   50,      // 单个日志文件最大50MB
+    MaxAge:    30,      // 日志文件最多保留30天
+    Compress:  true,    // 超过大小或时间的日志文件会自动压缩
+    LocalTime: true,    // 使用本地时间而非UTC时间进行日志轮转
+}
 	level := parseLevel(os.Getenv("STRATEGY_LOG_LEVEL"))
 
 	multi := io.MultiWriter(os.Stdout, writer)

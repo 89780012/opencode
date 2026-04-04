@@ -75,7 +75,7 @@ func (a *API) smartxMCP(w http.ResponseWriter, r *http.Request) {
 		mcpResult(w, req.ID, map[string]any{
 			"tools": []map[string]any{
 				{
-					"name":        "smartx_start",
+					"name":        "start",
 					"description": "Start a SmartX strategy extension through strategy-service.",
 					"inputSchema": map[string]any{
 						"type": "object",
@@ -90,7 +90,7 @@ func (a *API) smartxMCP(w http.ResponseWriter, r *http.Request) {
 					},
 				},
 				{
-					"name":        "smartx_logs",
+					"name":        "logs",
 					"description": "Watch SmartX strategy logs for a short period and return recent updates.",
 					"inputSchema": map[string]any{
 						"type": "object",

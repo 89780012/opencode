@@ -19,25 +19,29 @@ import (
 )
 
 type Service struct {
-	cfg Config
-	srv *http.Server
-	op  *oprun.Manager
+	cfg Config    //配置文件
+	srv *http.Server //http服务
+	op  *oprun.Manager //opencode运行管理
 }
 
 func New(cfg Config) (*Service, error) {
 	slog.Info("initializing service", "addr", cfg.Addr(), "opencode_enabled", cfg.Opencode.Enabled)
 
+	// 将asset资源同步到客户本地，主要是agent 和 skill
 	if err := asset.EnsureBuiltins(); err != nil {
 		slog.Error("builtin opencode asset provision failed", "error", err)
 		return nil, err
 	}
 
+	// 确保opencode资源
 	if cfg.Opencode.Enabled {
+		// 找到可用端口
 		port, err := port(cfg.Opencode.Host, cfg.Opencode.Port)
 		if err != nil {
 			slog.Error("opencode port probe failed", "host", cfg.Opencode.Host, "port", cfg.Opencode.Port, "error", err)
 			return nil, err
 		}
+		// 和可用端口不一致, 则重置配置
 		if port != cfg.Opencode.Port {
 			slog.Info("opencode port adjusted", "host", cfg.Opencode.Host, "from", cfg.Opencode.Port, "to", port)
 			cfg.Opencode.Port = port
@@ -45,37 +49,16 @@ func New(cfg Config) (*Service, error) {
 	}
 
 	run := rt.New(rt.Config{
-		Root: cfg.Runtime,
 		Over: map[string]string{
-			"opencode": cfg.Opencode.Bin,
+			"opencode": cfg.Opencode.Bin,  //opencode运行二进制文件
 		},
 	})
-	if row, err := run.Resolve(context.Background(), "opencode"); err == nil {
-		if row.Found && row.Source == rt.SourceConfig {
-			cfg.Opencode.Bin = row.Path
-		} else if run.Has("opencode") {
-			if out, err := run.Ensure(context.Background(), "opencode"); err == nil && out.Found {
-				cfg.Opencode.Bin = out.Path
-			}
-		} else if row.Found {
-			cfg.Opencode.Bin = row.Path
-		}
-	}
-	if row, err := run.Resolve(context.Background(), "git"); err == nil {
-		if !row.Found && run.Has("git") {
-			if out, err := run.Ensure(context.Background(), "git"); err == nil && out.Found {
-				row = out
-			}
-		}
-		if row.Found {
-			cfg.Opencode.GitBin = row.Path
-			cfg.Opencode.GitSource = string(row.Source)
-			slog.Info("opencode git resolved", "bin", row.Path, "source", row.Source)
-		}
-	}
+	cfg = resolveOpencode(run, cfg)
+	cfg = resolveGit(run, cfg)
 
 	mux := http.NewServeMux()
 	op := oprun.New(oprun.Config(cfg.Opencode))
+	//注册api 端点
 	api := web.NewAPI(run, op, &conf.Store{}, smartx.New(smartx.Config{
 		Platform: cfg.Platform,
 		Account:  cfg.Account,
@@ -98,6 +81,55 @@ func New(cfg Config) (*Service, error) {
 		srv: srv,
 		op:  op,
 	}, nil
+}
+
+func resolveOpencode(run *rt.Service, cfg Config) Config {
+	row, err := run.Resolve(context.Background(), "opencode")
+	if err != nil {
+		return cfg
+	}
+
+	// 配置则直接返回配置
+	if row.Found && row.Source == rt.SourceConfig {
+		cfg.Opencode.Bin = row.Path
+		return cfg
+	}
+
+	if run.Has("opencode") {
+		out, err := run.Ensure(context.Background(), "opencode")
+		if err == nil && out.Found {
+			cfg.Opencode.Bin = out.Path
+		}
+		return cfg
+	}
+
+	if row.Found {
+		cfg.Opencode.Bin = row.Path
+	}
+	return cfg
+}
+
+func resolveGit(run *rt.Service, cfg Config) Config {
+	row, err := run.Resolve(context.Background(), "git")
+	if err != nil {
+		return cfg
+	}
+
+	if !row.Found && run.Has("git") {
+		out, err := run.Ensure(context.Background(), "git")
+		if err == nil && out.Found {
+			row = out
+		}
+	}
+
+	if !row.Found {
+		return cfg
+	}
+
+	cfg.Opencode.GitBin = row.Path
+	cfg.Opencode.GitSource = string(row.Source)
+	slog.Info("opencode git resolved", "bin", row.Path, "source", row.Source)
+	return cfg
 }
 
 func (s *Service) Addr() string {
@@ -135,6 +167,7 @@ func (s *Service) activate(addr string) {
 	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
 		url = "http://" + addr
 	}
+	// 开启mcp服务
 	if err := asset.EnsureMCP(url); err != nil {
 		slog.Error("failed to inject strategy-service mcp config", "url", url, "error", err)
 	}
@@ -143,11 +176,13 @@ func (s *Service) activate(addr string) {
 	}
 
 	slog.Info("auto-starting opencode process")
+	// 自动开启opencode服务
 	if err := s.op.Ensure(context.Background()); err != nil {
 		slog.Error("opencode auto-start failed", "error", err)
 	}
 }
 
+// 找到可用端口
 func port(host string, start int) (int, error) {
 	if start <= 0 {
 		return 0, fmt.Errorf("invalid port: %d", start)
