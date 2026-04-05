@@ -276,6 +276,10 @@ const ChatMessageItem = memo(function ChatMessageItem(props: {
   const body = parts.length > 0 ? parts : empty
   const err = props.info.role === "assistant" ? errorText(props.info.error) : undefined
 
+  if (body.length === 0 && !err) {
+    return null
+  }
+
   return (
     <Message from={props.info.role}>
       <MessageContent>
