@@ -2,11 +2,11 @@ package web
 
 import (
 	"encoding/json"
-	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"strategy-service/internal/meta"
 	"strategy-service/internal/smartx"
 )
@@ -25,12 +25,10 @@ type rpcRes struct {
 	Error   any    `json:"error,omitempty"`
 }
 
-func (a *API) smartxMCP(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodGet || r.Method == http.MethodDelete {
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.Header().Set("Allow", "POST")
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		_ = json.NewEncoder(w).Encode(rpcRes{
+func (a *API) smartxMCP(c *gin.Context) {
+	if c.Request.Method == "GET" || c.Request.Method == "DELETE" {
+		c.Header("Allow", "POST")
+		c.JSON(405, rpcRes{
 			JSONRPC: "2.0",
 			Error: map[string]any{
 				"code":    -32000,
@@ -39,24 +37,24 @@ func (a *API) smartxMCP(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	if r.Method != http.MethodPost {
-		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
+	if c.Request.Method != "POST" {
+		c.JSON(405, envelope{Code: 405, Msg: "method not allowed", Data: nil})
 		return
 	}
 
 	req := rpcReq{}
-	if err := readJSON(r, &req); err != nil {
-		mcpError(w, nil, -32700, "Parse error")
+	if err := c.ShouldBindJSON(&req); err != nil {
+		mcpError(c, nil, -32700, "Parse error")
 		return
 	}
 	if req.JSONRPC != "" && req.JSONRPC != "2.0" {
-		mcpError(w, req.ID, -32600, "Invalid Request")
+		mcpError(c, req.ID, -32600, "Invalid Request")
 		return
 	}
 
 	switch req.Method {
 	case "initialize":
-		mcpResult(w, req.ID, map[string]any{
+		mcpResult(c, req.ID, map[string]any{
 			"protocolVersion": "2025-03-26",
 			"capabilities": map[string]any{
 				"tools": map[string]any{},
@@ -68,11 +66,11 @@ func (a *API) smartxMCP(w http.ResponseWriter, r *http.Request) {
 			"instructions": "Use start to launch SmartX strategies and logs to inspect recent strategy logs.",
 		})
 	case "notifications/initialized":
-		w.WriteHeader(http.StatusAccepted)
+		c.Status(202)
 	case "ping":
-		mcpResult(w, req.ID, map[string]any{})
+		mcpResult(c, req.ID, map[string]any{})
 	case "tools/list":
-		mcpResult(w, req.ID, map[string]any{
+		mcpResult(c, req.ID, map[string]any{
 			"tools": []map[string]any{
 				{
 					"name":        "start",
@@ -123,11 +121,11 @@ func (a *API) smartxMCP(w http.ResponseWriter, r *http.Request) {
 		args, _ := call["arguments"].(map[string]any)
 		switch name {
 		case "start":
-			out, err := a.sx.Start(r.Context(), smartx.Input{
-				Name:     text(args["name"]),
+			out, err := a.sx.Start(c.Request.Context(), smartx.Input{
+				Name: text(args["name"]),
 			})
 			if err != nil {
-				mcpToolResult(w, req.ID, err.Error(), nil, true)
+				mcpToolResult(c, req.ID, err.Error(), nil, true)
 				return
 			}
 			body := map[string]any{
@@ -136,11 +134,11 @@ func (a *API) smartxMCP(w http.ResponseWriter, r *http.Request) {
 				"window_id": out.WindowId,
 				"output":    out.Output,
 			}
-			mcpToolResult(w, req.ID, jsonText(body), body, false)
+			mcpToolResult(c, req.ID, jsonText(body), body, false)
 		case "logs":
-			out, err := a.sx.Watch(r.Context(), text(args["name"]), number(args["tail"]), number(args["limit"]), time.Duration(number(args["seconds"]))*time.Second)
+			out, err := a.sx.Watch(c.Request.Context(), text(args["name"]), number(args["tail"]), number(args["limit"]), time.Duration(number(args["seconds"]))*time.Second)
 			if err != nil {
-				mcpToolResult(w, req.ID, err.Error(), nil, true)
+				mcpToolResult(c, req.ID, err.Error(), nil, true)
 				return
 			}
 			body := map[string]any{
@@ -152,27 +150,25 @@ func (a *API) smartxMCP(w http.ResponseWriter, r *http.Request) {
 				"files":   out.Files,
 				"logs":    out.Logs,
 			}
-			mcpToolResult(w, req.ID, jsonText(body), body, false)
+			mcpToolResult(c, req.ID, jsonText(body), body, false)
 		default:
-			mcpError(w, req.ID, -32601, "Method not found")
+			mcpError(c, req.ID, -32601, "Method not found")
 		}
 	default:
-		mcpError(w, req.ID, -32601, "Method not found")
+		mcpError(c, req.ID, -32601, "Method not found")
 	}
 }
 
-func mcpResult(w http.ResponseWriter, id any, body any) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	_ = json.NewEncoder(w).Encode(rpcRes{
+func mcpResult(c *gin.Context, id any, body any) {
+	c.JSON(200, rpcRes{
 		JSONRPC: "2.0",
 		ID:      id,
 		Result:  body,
 	})
 }
 
-func mcpError(w http.ResponseWriter, id any, code int, msg string) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	_ = json.NewEncoder(w).Encode(rpcRes{
+func mcpError(c *gin.Context, id any, code int, msg string) {
+	c.JSON(200, rpcRes{
 		JSONRPC: "2.0",
 		ID:      id,
 		Error: map[string]any{
@@ -182,8 +178,8 @@ func mcpError(w http.ResponseWriter, id any, code int, msg string) {
 	})
 }
 
-func mcpToolResult(w http.ResponseWriter, id any, text string, body any, bad bool) {
-	mcpResult(w, id, map[string]any{
+func mcpToolResult(c *gin.Context, id any, text string, body any, bad bool) {
+	mcpResult(c, id, map[string]any{
 		"content": []map[string]any{
 			{
 				"type": "text",

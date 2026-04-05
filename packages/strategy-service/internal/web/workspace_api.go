@@ -2,46 +2,35 @@ package web
 
 import (
 	"log/slog"
-	"net/http"
 
+	"github.com/gin-gonic/gin"
 	"strategy-service/internal/workspace"
 )
 
-func (a *API) workspaceList(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
-		return
-	}
-
+func (a *API) workspaceList(c *gin.Context) {
 	slog.Debug("workspace list request")
 	data, err := a.ws.List()
 	if err != nil {
 		slog.Error("workspace list failed", "error", err)
-		write(w, http.StatusBadRequest, err.Error(), nil)
+		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
 		return
 	}
 
-	data.Workspaces = workspace.Enrich(r.Context(), data.Workspaces, a.op)
+	data.Workspaces = workspace.Enrich(c.Request.Context(), data.Workspaces, a.op)
 	slog.Info("workspace list", "count", len(data.Workspaces))
-	write(w, http.StatusOK, "ok", data)
+	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: data})
 }
 
-func (a *API) workspaceCreate(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
-		return
-	}
-
+func (a *API) workspaceCreate(c *gin.Context) {
 	body := struct {
 		Name     string `json:"name"`
 		Type     string `json:"type"`
 		Template string `json:"template"`
 		Git      bool   `json:"git"`
 	}{}
-	err := readJSON(r, &body)
-	if err != nil {
+	if err := c.ShouldBindJSON(&body); err != nil {
 		slog.Warn("workspace create bad request", "error", err)
-		write(w, http.StatusBadRequest, err.Error(), nil)
+		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
 		return
 	}
 
@@ -49,29 +38,23 @@ func (a *API) workspaceCreate(w http.ResponseWriter, r *http.Request) {
 	data, err := a.ws.Create(body.Name, body.Type, body.Template, body.Git)
 	if err != nil {
 		slog.Error("workspace create failed", "name", body.Name, "error", err)
-		write(w, http.StatusBadRequest, err.Error(), nil)
+		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
 		return
 	}
 
-	data.Workspace = workspace.Enrich(r.Context(), []workspace.Local{data.Workspace}, a.op)[0]
+	data.Workspace = workspace.Enrich(c.Request.Context(), []workspace.Local{data.Workspace}, a.op)[0]
 	slog.Info("workspace created", "name", body.Name, "path", data.Workspace.Path)
-	write(w, http.StatusOK, "ok", data)
+	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: data})
 }
 
-func (a *API) workspaceOpen(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
-		return
-	}
-
+func (a *API) workspaceOpen(c *gin.Context) {
 	body := struct {
 		Path string `json:"path"`
 		Git  bool   `json:"git"`
 	}{}
-	err := readJSON(r, &body)
-	if err != nil {
+	if err := c.ShouldBindJSON(&body); err != nil {
 		slog.Warn("workspace open bad request", "error", err)
-		write(w, http.StatusBadRequest, err.Error(), nil)
+		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
 		return
 	}
 
@@ -79,29 +62,23 @@ func (a *API) workspaceOpen(w http.ResponseWriter, r *http.Request) {
 	data, err := a.ws.Open(body.Path, body.Git)
 	if err != nil {
 		slog.Error("workspace open failed", "path", body.Path, "error", err)
-		write(w, http.StatusBadRequest, err.Error(), nil)
+		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
 		return
 	}
 
-	data.Workspace = workspace.Enrich(r.Context(), []workspace.Local{data.Workspace}, a.op)[0]
-	write(w, http.StatusOK, "ok", data)
+	data.Workspace = workspace.Enrich(c.Request.Context(), []workspace.Local{data.Workspace}, a.op)[0]
+	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: data})
 }
 
-func (a *API) workspaceImport(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
-		return
-	}
-
+func (a *API) workspaceImport(c *gin.Context) {
 	body := struct {
 		Path string `json:"path"`
 		Type string `json:"type"`
 		Git  bool   `json:"git"`
 	}{}
-	err := readJSON(r, &body)
-	if err != nil {
+	if err := c.ShouldBindJSON(&body); err != nil {
 		slog.Warn("workspace import bad request", "error", err)
-		write(w, http.StatusBadRequest, err.Error(), nil)
+		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
 		return
 	}
 
@@ -109,101 +86,83 @@ func (a *API) workspaceImport(w http.ResponseWriter, r *http.Request) {
 	data, err := a.ws.Import(body.Path, body.Type, body.Git)
 	if err != nil {
 		slog.Error("workspace import failed", "path", body.Path, "error", err)
-		write(w, http.StatusBadRequest, err.Error(), nil)
+		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
 		return
 	}
 
-	data.Workspace = workspace.Enrich(r.Context(), []workspace.Local{data.Workspace}, a.op)[0]
-	write(w, http.StatusOK, "ok", data)
+	data.Workspace = workspace.Enrich(c.Request.Context(), []workspace.Local{data.Workspace}, a.op)[0]
+	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: data})
 }
 
-func (a *API) workspaceDelete(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
-		return
-	}
-
+func (a *API) workspaceDelete(c *gin.Context) {
 	body := struct {
 		Path string `json:"path"`
 	}{}
-	err := readJSON(r, &body)
-	if err != nil {
+	if err := c.ShouldBindJSON(&body); err != nil {
 		slog.Warn("workspace delete bad request", "error", err)
-		write(w, http.StatusBadRequest, err.Error(), nil)
+		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
 		return
 	}
 
 	slog.Info("workspace delete", "path", body.Path)
-	err = a.ws.Delete(body.Path)
-	if err != nil {
+	if err := a.ws.Delete(body.Path); err != nil {
 		slog.Error("workspace delete failed", "path", body.Path, "error", err)
-		write(w, http.StatusBadRequest, err.Error(), nil)
+		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
 		return
 	}
 
-	write(w, http.StatusOK, "ok", nil)
+	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: nil})
 }
 
-func (a *API) workspaceFiles(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
-		return
-	}
-
-	wsPath := r.URL.Query().Get("workspace_path")
+func (a *API) workspaceFiles(c *gin.Context) {
+	wsPath := c.Query("workspace_path")
 	slog.Debug("workspace files request", "workspace_path", wsPath)
 	data, err := a.ws.Files(wsPath)
 	if err != nil {
 		slog.Error("workspace files failed", "workspace_path", wsPath, "error", err)
-		write(w, http.StatusBadRequest, err.Error(), nil)
+		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
 		return
 	}
 
 	slog.Debug("workspace files", "workspace_path", wsPath, "total", data.TotalFiles)
-	write(w, http.StatusOK, "ok", data)
+	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: data})
 }
 
-func (a *API) workspaceFileContent(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodGet {
-		wsPath := r.URL.Query().Get("workspace_path")
-		filePath := r.URL.Query().Get("file_path")
+func (a *API) workspaceFileContent(c *gin.Context) {
+	if c.Request.Method == "GET" {
+		wsPath := c.Query("workspace_path")
+		filePath := c.Query("file_path")
 		slog.Debug("workspace file-content request", "workspace_path", wsPath, "file_path", filePath)
 		data, err := a.ws.Content(wsPath, filePath)
 		if err != nil {
 			slog.Error("workspace file-content failed", "workspace_path", wsPath, "file_path", filePath, "error", err)
-			write(w, http.StatusBadRequest, err.Error(), nil)
+			c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
 			return
 		}
 
 		slog.Debug("workspace file-content", "file_path", filePath, "size", data.Size, "binary", data.Binary)
-		write(w, http.StatusOK, "ok", data)
+		c.JSON(200, envelope{Code: 200, Msg: "ok", Data: data})
 		return
 	}
 
-	if r.Method == http.MethodPut {
-		body := struct {
-			WorkspacePath string `json:"workspace_path"`
-			FilePath      string `json:"file_path"`
-			Content       string `json:"content"`
-		}{}
-		err := readJSON(r, &body)
-		if err != nil {
-			slog.Warn("workspace file-content bad request", "error", err)
-			write(w, http.StatusBadRequest, err.Error(), nil)
-			return
-		}
-
-		slog.Info("workspace file save", "workspace_path", body.WorkspacePath, "file_path", body.FilePath)
-		data, err := a.ws.Write(body.WorkspacePath, body.FilePath, body.Content)
-		if err != nil {
-			slog.Error("workspace file save failed", "workspace_path", body.WorkspacePath, "file_path", body.FilePath, "error", err)
-			write(w, http.StatusBadRequest, err.Error(), nil)
-			return
-		}
-
-		write(w, http.StatusOK, "ok", data)
+	body := struct {
+		WorkspacePath string `json:"workspace_path"`
+		FilePath      string `json:"file_path"`
+		Content       string `json:"content"`
+	}{}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		slog.Warn("workspace file-content bad request", "error", err)
+		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
 		return
 	}
 
-	write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
+	slog.Info("workspace file save", "workspace_path", body.WorkspacePath, "file_path", body.FilePath)
+	data, err := a.ws.Write(body.WorkspacePath, body.FilePath, body.Content)
+	if err != nil {
+		slog.Error("workspace file save failed", "workspace_path", body.WorkspacePath, "file_path", body.FilePath, "error", err)
+		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
+		return
+	}
+
+	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: data})
 }

@@ -1,8 +1,7 @@
 package web
 
 import (
-	"net/http"
-
+	"github.com/gin-gonic/gin"
 	cfg "strategy-service/internal/config"
 	"strategy-service/internal/logs"
 	"strategy-service/internal/oprun"
@@ -20,6 +19,12 @@ type API struct {
 	log *logs.Hub
 }
 
+type envelope struct {
+	Code int         `json:"code"`
+	Msg  string      `json:"msg"`
+	Data interface{} `json:"data"`
+}
+
 // NewAPI wires the HTTP handlers to the runtime services.
 func NewAPI(run *rt.Service, op *oprun.Manager, cfg *cfg.Store, sx *smartx.Service) *API {
 	return &API{
@@ -32,32 +37,48 @@ func NewAPI(run *rt.Service, op *oprun.Manager, cfg *cfg.Store, sx *smartx.Servi
 	}
 }
 
-// Register mounts all API routes onto the provided mux.
-func (a *API) Register(mux *http.ServeMux) {
-	mux.HandleFunc("/api/health", a.health)
-	mux.HandleFunc("/api/opencode/agents", a.opencodeAgents)
-	mux.HandleFunc("/api/opencode/agents/", a.opencodeAgent)
-	mux.HandleFunc("/api/opencode/skills", a.opencodeSkills)
-	mux.HandleFunc("/api/opencode/skills/", a.opencodeSkill)
-	mux.HandleFunc("/api/workspace/list", a.workspaceList)
-	mux.HandleFunc("/api/workspace/create", a.workspaceCreate)
-	mux.HandleFunc("/api/workspace/import", a.workspaceImport)
-	mux.HandleFunc("/api/workspace/delete", a.workspaceDelete)
-	mux.HandleFunc("/api/workspace/open", a.workspaceOpen)
-	mux.HandleFunc("/api/workspace/files", a.workspaceFiles)
-	mux.HandleFunc("/api/workspace/file-content", a.workspaceFileContent)
-	mux.HandleFunc("/api/system/startup", a.startup)
-	mux.HandleFunc("/api/system/startup/prepare", a.startupPrepare)
-	mux.HandleFunc("/api/system/config", a.config)
-	mux.HandleFunc("/api/system/version", a.version)
-	mux.HandleFunc("/api/logs/sources", a.logSources)
-	mux.HandleFunc("/api/logs/tail", a.logTail)
-	mux.HandleFunc("/mcp", a.smartxMCP)
-	mux.HandleFunc("/api/system/smartx/logs/meta", a.smartxLogsMeta)
-	mux.HandleFunc("/api/system/smartx/logs/watch", a.smartxLogsWatch)
-	mux.HandleFunc("/api/system/smartx/startExtension", a.smartxStart)
-	mux.HandleFunc("/api/system/opencode/status", a.opencodeStatus)
-	mux.HandleFunc("/api/system/opencode/start", a.opencodeStart)
-	mux.HandleFunc("/api/system/opencode/restart", a.opencodeRestart)
-	mux.HandleFunc("/api/system/opencode/stop", a.opencodeStop)
+// Register mounts all API routes onto the provided engine.
+func (a *API) Register(r *gin.Engine) {
+	api := r.Group("/api")
+	api.GET("/health", a.health)
+
+	op := api.Group("/opencode")
+	op.GET("/agents", a.opencodeAgents)
+	op.POST("/agents", a.opencodeAgents)
+	op.PUT("/agents/:name", a.opencodeAgent)
+	op.DELETE("/agents/:name", a.opencodeAgent)
+	op.GET("/skills", a.opencodeSkills)
+	op.POST("/skills", a.opencodeSkills)
+	op.PUT("/skills/:name", a.opencodeSkill)
+	op.DELETE("/skills/:name", a.opencodeSkill)
+
+	ws := api.Group("/workspace")
+	ws.GET("/list", a.workspaceList)
+	ws.POST("/create", a.workspaceCreate)
+	ws.POST("/import", a.workspaceImport)
+	ws.POST("/delete", a.workspaceDelete)
+	ws.POST("/open", a.workspaceOpen)
+	ws.GET("/files", a.workspaceFiles)
+	ws.GET("/file-content", a.workspaceFileContent)
+	ws.PUT("/file-content", a.workspaceFileContent)
+
+	sys := api.Group("/system")
+	sys.GET("/startup", a.startup)
+	sys.POST("/startup/prepare", a.startupPrepare)
+	sys.GET("/config", a.config)
+	sys.PUT("/config", a.config)
+	sys.GET("/version", a.version)
+	sys.GET("/smartx/logs/meta", a.smartxLogsMeta)
+	sys.GET("/smartx/logs/watch", a.smartxLogsWatch)
+	sys.POST("/smartx/startExtension", a.smartxStart)
+	sys.GET("/opencode/status", a.opencodeStatus)
+	sys.POST("/opencode/start", a.opencodeStart)
+	sys.POST("/opencode/restart", a.opencodeRestart)
+	sys.POST("/opencode/stop", a.opencodeStop)
+
+	log := api.Group("/logs")
+	log.GET("/sources", a.logSources)
+	log.GET("/tail", a.logTail)
+
+	r.Any("/mcp", a.smartxMCP)
 }

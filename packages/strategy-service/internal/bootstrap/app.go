@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"strategy-service/internal/asset"
 	conf "strategy-service/internal/config"
 	"strategy-service/internal/oprun"
@@ -19,8 +20,8 @@ import (
 )
 
 type Service struct {
-	cfg Config    //配置文件
-	srv *http.Server //http服务
+	cfg Config         //配置文件
+	srv *http.Server   //http服务
 	op  *oprun.Manager //opencode运行管理
 }
 
@@ -50,13 +51,12 @@ func New(cfg Config) (*Service, error) {
 
 	run := rt.New(rt.Config{
 		Over: map[string]string{
-			"opencode": cfg.Opencode.Bin,  //opencode运行二进制文件
+			"opencode": cfg.Opencode.Bin, //opencode运行二进制文件
 		},
 	})
 	cfg = resolveOpencode(run, cfg)
 	cfg = resolveGit(run, cfg)
 
-	mux := http.NewServeMux()
 	op := oprun.New(oprun.Config(cfg.Opencode))
 	//注册api 端点
 	api := web.NewAPI(run, op, &conf.Store{}, smartx.New(smartx.Config{
@@ -65,10 +65,14 @@ func New(cfg Config) (*Service, error) {
 		WindowId: cfg.WindowId,
 		LogDir:   cfg.LogDir,
 	}))
+
+	gin.SetMode(gin.ReleaseMode)
+	mux := gin.New()
+	mux.Use(gin.Recovery())
 	api.Register(mux)
-	mux.Handle("/opencode/", web.NewOpencodeProxy(op))
-	mux.Handle("/opencode", web.NewOpencodeProxy(op))
-	mux.Handle("/", web.NewStatic(cfg.Dist))
+	mux.Any("/opencode", web.NewOpencodeProxy(op))
+	mux.Any("/opencode/*path", web.NewOpencodeProxy(op))
+	mux.NoRoute(gin.WrapH(web.NewStatic(cfg.Dist)))
 
 	srv := &http.Server{
 		Addr:              cfg.Addr(),

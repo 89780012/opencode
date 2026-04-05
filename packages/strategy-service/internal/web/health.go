@@ -2,20 +2,20 @@ package web
 
 import (
 	"log/slog"
-	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
-func (a *API) health(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
-		return
-	}
-
+func (a *API) health(c *gin.Context) {
 	state := a.op.State()
 	slog.Debug("health check", "opencode_ready", state.Ready, "opencode_status", state.Status)
-	write(w, http.StatusOK, "ok", map[string]any{
-		"status":         "ok",
-		"opencode":       state,
-		"opencode_ready": state.Ready,
+	c.JSON(200, envelope{
+		Code: 200,
+		Msg:  "ok",
+		Data: map[string]any{
+			"status":         "ok",
+			"opencode":       state,
+			"opencode_ready": state.Ready,
+		},
 	})
 }

@@ -6,10 +6,11 @@ import (
 	"net/http/httputil"
 	"strings"
 
+	"github.com/gin-gonic/gin"
 	"strategy-service/internal/oprun"
 )
 
-func NewOpencodeProxy(mgr *oprun.Manager) http.Handler {
+func NewOpencodeProxy(mgr *oprun.Manager) gin.HandlerFunc {
 	target := mgr.Target()
 	proxy := httputil.NewSingleHostReverseProxy(target)
 	proxy.FlushInterval = -1
@@ -27,18 +28,18 @@ func NewOpencodeProxy(mgr *oprun.Manager) http.Handler {
 		}
 	}
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		err := mgr.Ensure(r.Context())
+	return func(c *gin.Context) {
+		err := mgr.Ensure(c.Request.Context())
 		if err != nil {
 			code := http.StatusServiceUnavailable
 			if errors.Is(err, oprun.ErrDisabled()) {
 				code = http.StatusNotImplemented
 			}
-			http.Error(w, err.Error(), code)
+			c.String(code, err.Error())
 			return
 		}
-		proxy.ServeHTTP(w, r)
-	})
+		proxy.ServeHTTP(c.Writer, c.Request)
+	}
 }
 
 func route(path string) string {

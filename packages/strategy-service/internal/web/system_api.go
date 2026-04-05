@@ -5,12 +5,12 @@ import (
 	"errors"
 	"io"
 	"log/slog"
-	"net/http"
 	"os/exec"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	cfg "strategy-service/internal/config"
 	"strategy-service/internal/meta"
 	"strategy-service/internal/proc"
@@ -37,72 +37,56 @@ type startupState struct {
 	Git      startupTool `json:"git"`
 }
 
-func (a *API) startup(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
-		return
-	}
-
-	write(w, http.StatusOK, "ok", a.inspectStartup(r.Context()))
+func (a *API) startup(c *gin.Context) {
+	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: a.inspectStartup(c.Request.Context())})
 }
 
-func (a *API) startupPrepare(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
-		return
-	}
-
-	state := a.inspectStartup(r.Context())
+func (a *API) startupPrepare(c *gin.Context) {
+	state := a.inspectStartup(c.Request.Context())
 	if state.Opencode.Installed {
-		write(w, http.StatusOK, "ok", state)
+		c.JSON(200, envelope{Code: 200, Msg: "ok", Data: state})
 		return
 	}
 
 	if !a.rt.Has("opencode") {
-		write(w, http.StatusServiceUnavailable, "builtin opencode runtime not found", state)
+		c.JSON(503, envelope{Code: 503, Msg: "builtin opencode runtime not found", Data: state})
 		return
 	}
 
-	if _, err := a.rt.Ensure(r.Context(), "opencode"); err != nil {
+	if _, err := a.rt.Ensure(c.Request.Context(), "opencode"); err != nil {
 		slog.Error("startup prepare failed", "tool", "opencode", "error", err)
-		write(w, http.StatusServiceUnavailable, err.Error(), a.inspectStartup(r.Context()))
+		c.JSON(503, envelope{Code: 503, Msg: err.Error(), Data: a.inspectStartup(c.Request.Context())})
 		return
 	}
 
-	write(w, http.StatusOK, "ok", a.inspectStartup(r.Context()))
+	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: a.inspectStartup(c.Request.Context())})
 }
 
-func (a *API) config(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodGet {
+func (a *API) config(c *gin.Context) {
+	if c.Request.Method == "GET" {
 		cfg, err := a.cfg.Load()
 		if err != nil {
-			write(w, http.StatusBadRequest, err.Error(), nil)
+			c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
 			return
 		}
 
-		write(w, http.StatusOK, "ok", cfg)
+		c.JSON(200, envelope{Code: 200, Msg: "ok", Data: cfg})
 		return
 	}
 
-	if r.Method == http.MethodPut {
-		body := cfg.Config{}
-		err := readJSON(r, &body)
-		if err != nil {
-			write(w, http.StatusBadRequest, err.Error(), nil)
-			return
-		}
-
-		cfg, err := a.cfg.Save(body)
-		if err != nil {
-			write(w, http.StatusBadRequest, err.Error(), nil)
-			return
-		}
-
-		write(w, http.StatusOK, "ok", cfg)
+	body := cfg.Config{}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
 		return
 	}
 
-	write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
+	cfg, err := a.cfg.Save(body)
+	if err != nil {
+		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
+		return
+	}
+
+	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: cfg})
 }
 
 func (a *API) inspectStartup(ctx context.Context) startupState {
@@ -183,136 +167,106 @@ func label(id string) string {
 	return id
 }
 
-func (a *API) version(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
-		return
-	}
-
-	write(w, http.StatusOK, "ok", meta.Current())
+func (a *API) version(c *gin.Context) {
+	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: meta.Current()})
 }
 
-func (a *API) logSources(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
-		return
-	}
-
-	limit, err := queryInt(r, "limit", 10)
+func (a *API) logSources(c *gin.Context) {
+	limit, err := queryInt(c, "limit", 10)
 	if err != nil {
-		write(w, http.StatusBadRequest, "invalid limit", nil)
+		c.JSON(400, envelope{Code: 400, Msg: "invalid limit", Data: nil})
 		return
 	}
 
-	out, err := a.log.Sources(r.Context(), limit)
+	out, err := a.log.Sources(c.Request.Context(), limit)
 	if err != nil {
-		write(w, http.StatusBadRequest, err.Error(), nil)
+		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
 		return
 	}
 
-	write(w, http.StatusOK, "ok", map[string]any{"sources": out})
+	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: map[string]any{"sources": out}})
 }
 
-func (a *API) logTail(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
-		return
-	}
-
-	size, err := queryInt(r, "tail", 200)
+func (a *API) logTail(c *gin.Context) {
+	size, err := queryInt(c, "tail", 200)
 	if err != nil {
-		write(w, http.StatusBadRequest, "invalid tail", nil)
+		c.JSON(400, envelope{Code: 400, Msg: "invalid tail", Data: nil})
 		return
 	}
 
-	out, err := a.log.Tail(r.Context(), r.URL.Query().Get("source"), size)
+	out, err := a.log.Tail(c.Request.Context(), c.Query("source"), size)
 	if err != nil {
-		write(w, http.StatusBadRequest, err.Error(), nil)
+		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
 		return
 	}
 
-	write(w, http.StatusOK, "ok", out)
+	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: out})
 }
 
-func (a *API) smartxStart(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
-		return
-	}
-
+func (a *API) smartxStart(c *gin.Context) {
 	body := smartx.Input{}
-	if r.ContentLength != 0 {
-		err := readJSON(r, &body)
+	if c.Request.ContentLength != 0 {
+		err := c.ShouldBindJSON(&body)
 		if err != nil && !errors.Is(err, io.EOF) {
-			write(w, http.StatusBadRequest, err.Error(), nil)
+			c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
 			return
 		}
 	}
 
-	out, err := a.sx.Start(r.Context(), body)
+	out, err := a.sx.Start(c.Request.Context(), body)
 	if err != nil {
 		slog.Warn("smartx startExtension failed", "error", err)
-		write(w, http.StatusBadRequest, err.Error(), nil)
+		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
 		return
 	}
 
-	write(w, http.StatusOK, "ok", out)
+	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: out})
 }
 
-func (a *API) smartxLogsMeta(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
-		return
-	}
-
-	limit, err := queryInt(r, "limit", 3)
+func (a *API) smartxLogsMeta(c *gin.Context) {
+	limit, err := queryInt(c, "limit", 3)
 	if err != nil {
-		write(w, http.StatusBadRequest, "invalid limit", nil)
+		c.JSON(400, envelope{Code: 400, Msg: "invalid limit", Data: nil})
 		return
 	}
 
-	out, err := a.sx.Meta(r.URL.Query().Get("name"), limit)
+	out, err := a.sx.Meta(c.Query("name"), limit)
 	if err != nil {
-		write(w, http.StatusBadRequest, err.Error(), nil)
+		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
 		return
 	}
 
-	write(w, http.StatusOK, "ok", out)
+	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: out})
 }
 
-func (a *API) smartxLogsWatch(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
+func (a *API) smartxLogsWatch(c *gin.Context) {
+	tail, err := queryInt(c, "tail", 200)
+	if err != nil {
+		c.JSON(400, envelope{Code: 400, Msg: "invalid tail", Data: nil})
+		return
+	}
+	limit, err := queryInt(c, "limit", 3)
+	if err != nil {
+		c.JSON(400, envelope{Code: 400, Msg: "invalid limit", Data: nil})
+		return
+	}
+	sec, err := queryInt(c, "seconds", 10)
+	if err != nil {
+		c.JSON(400, envelope{Code: 400, Msg: "invalid seconds", Data: nil})
 		return
 	}
 
-	tail, err := queryInt(r, "tail", 200)
+	out, err := a.sx.Watch(c.Request.Context(), c.Query("name"), tail, limit, time.Duration(sec)*time.Second)
 	if err != nil {
-		write(w, http.StatusBadRequest, "invalid tail", nil)
-		return
-	}
-	limit, err := queryInt(r, "limit", 3)
-	if err != nil {
-		write(w, http.StatusBadRequest, "invalid limit", nil)
-		return
-	}
-	sec, err := queryInt(r, "seconds", 10)
-	if err != nil {
-		write(w, http.StatusBadRequest, "invalid seconds", nil)
+		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
 		return
 	}
 
-	out, err := a.sx.Watch(r.Context(), r.URL.Query().Get("name"), tail, limit, time.Duration(sec)*time.Second)
-	if err != nil {
-		write(w, http.StatusBadRequest, err.Error(), nil)
-		return
-	}
-
-	write(w, http.StatusOK, "ok", out)
+	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: out})
 }
 
-func queryInt(r *http.Request, key string, fallback int) (int, error) {
-	raw := strings.TrimSpace(r.URL.Query().Get(key))
+func queryInt(c *gin.Context, key string, fallback int) (int, error) {
+	raw := strings.TrimSpace(c.Query(key))
 	if raw == "" {
 		return fallback, nil
 	}
