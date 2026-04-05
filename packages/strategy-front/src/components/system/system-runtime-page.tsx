@@ -52,10 +52,7 @@ export function SystemRuntimePage() {
       setLoad(true)
     }
     try {
-      const [state, log] = await Promise.all([
-        systemApi.opencodeStatus(),
-        systemApi.logTail("opencode", 20),
-      ])
+      const [state, log] = await Promise.all([systemApi.opencodeStatus(), systemApi.logTail("opencode", 20)])
       setState(state)
       setLines(log.lines)
     } catch (err) {
@@ -112,7 +109,9 @@ export function SystemRuntimePage() {
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div className="space-y-1">
                 <CardTitle>运行配置</CardTitle>
-                <CardDescription>当前页聚焦 strategy-service 管理的 opencode 运行状态，便于判断是自管进程还是外部进程。</CardDescription>
+                <CardDescription>
+                  当前页聚焦 strategy-service 管理的 opencode 运行状态，便于判断是自管进程还是外部进程。
+                </CardDescription>
               </div>
               <Button variant="outline" onClick={() => void reload()} disabled={load}>
                 {load ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />}
@@ -123,7 +122,9 @@ export function SystemRuntimePage() {
           <CardContent className="grid gap-4 py-6 md:grid-cols-3">
             <div className="rounded-3xl border bg-muted/20 p-4">
               <div className="text-muted-foreground text-xs">状态</div>
-              <div className={`mt-3 inline-flex rounded-full border px-3 py-1 text-xs font-medium ${tone(state)}`}>{state.status}</div>
+              <div className={`mt-3 inline-flex rounded-full border px-3 py-1 text-xs font-medium ${tone(state)}`}>
+                {state.status}
+              </div>
             </div>
             <div className="rounded-3xl border bg-muted/20 p-4">
               <div className="text-muted-foreground text-xs">启动策略</div>
@@ -151,18 +152,6 @@ export function SystemRuntimePage() {
                 <div className="text-muted-foreground text-xs">可执行文件</div>
                 <div className="mt-1 break-all font-medium">{state.bin || "-"}</div>
               </div>
-              <div>
-                <div className="text-muted-foreground text-xs">工作目录</div>
-                <div className="mt-1 break-all font-medium">{state.cwd || "-"}</div>
-              </div>
-              <div>
-                <div className="text-muted-foreground text-xs">最近启动时间</div>
-                <div className="mt-1 font-medium">{stamp(state.started_at)}</div>
-              </div>
-              <div>
-                <div className="text-muted-foreground text-xs">补充说明</div>
-                <div className="mt-1 leading-6">{state.message || "服务可达时，这里通常为空。"}</div>
-              </div>
             </CardContent>
           </Card>
 
@@ -182,7 +171,11 @@ export function SystemRuntimePage() {
                   重启
                 </Button>
                 <Button variant="outline" onClick={() => void run("stop")} disabled={busy !== ""}>
-                  {busy === "stop" ? <Loader2 className="size-4 animate-spin" /> : <SquareTerminal className="size-4" />}
+                  {busy === "stop" ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <SquareTerminal className="size-4" />
+                  )}
                   停止
                 </Button>
               </div>
@@ -192,9 +185,13 @@ export function SystemRuntimePage() {
                   最近输出
                 </div>
                 {lines.length === 0 ? (
-                  <div className="text-muted-foreground text-xs leading-5">当前没有新的 stdout/stderr 输出。若需要长期排查，请到日志页查看落盘文件。</div>
+                  <div className="text-muted-foreground text-xs leading-5">
+                    当前没有新的 stdout/stderr 输出。若需要长期排查，请到日志页查看落盘文件。
+                  </div>
                 ) : (
-                  <pre className="max-h-80 overflow-auto rounded-2xl border bg-background p-3 text-xs whitespace-pre-wrap">{lines.join("\n")}</pre>
+                  <pre className="max-h-80 overflow-auto rounded-2xl border bg-background p-3 text-xs whitespace-pre-wrap">
+                    {lines.join("\n")}
+                  </pre>
                 )}
               </div>
             </CardContent>
