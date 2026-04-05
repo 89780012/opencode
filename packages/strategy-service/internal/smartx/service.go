@@ -28,7 +28,7 @@ type Service struct {
 }
 
 type Input struct {
-	Name     string `json:"name"`
+	Name string `json:"name"`
 }
 
 type Result struct {
@@ -55,6 +55,10 @@ func New(cfg Config) *Service {
 	}
 
 	return &Service{cfg: cfg}
+}
+
+func (s *Service) Dir() (string, error) {
+	return s.logDir()
 }
 
 func (s *Service) Start(ctx context.Context, in Input) (Result, error) {

@@ -27,5 +27,4 @@ type State struct {
 	PID       int        `json:"pid,omitempty"`
 	Message   string     `json:"message,omitempty"`
 	StartedAt *time.Time `json:"started_at,omitempty"`
-	Log       []string   `json:"log,omitempty"`
 }

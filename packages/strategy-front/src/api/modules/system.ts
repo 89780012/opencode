@@ -1,10 +1,10 @@
 import { request } from "@/api/client"
 import type {
-  OpencodeLog,
+  LogSources,
+  LogTail,
   OpencodeState,
   StartupState,
   SystemConfig,
-  SystemLog,
   SystemVersion,
 } from "@/types/system"
 
@@ -29,20 +29,25 @@ export const systemApi = {
     return request.put<SystemConfig, SystemConfig>("/system/config", cfg)
   },
 
-  logs(kind: SystemLog["kind"], tail?: number) {
-    const query = new URLSearchParams({ kind })
+  logSources(limit?: number) {
+    const query = new URLSearchParams()
+    if (limit) {
+      query.set("limit", `${limit}`)
+    }
+    const tail = query.toString()
+    return request.get<LogSources>(tail ? `/logs/sources?${tail}` : "/logs/sources")
+  },
+
+  logTail(source: string, tail?: number) {
+    const query = new URLSearchParams({ source })
     if (tail) {
       query.set("tail", `${tail}`)
     }
-    return request.get<SystemLog>(`/system/logs?${query.toString()}`)
+    return request.get<LogTail>(`/logs/tail?${query.toString()}`)
   },
 
   opencodeStatus() {
     return request.get<OpencodeState>("/system/opencode/status")
-  },
-
-  opencodeLogs() {
-    return request.get<OpencodeLog>("/system/opencode/logs")
   },
 
   opencodeStart() {

@@ -12,7 +12,6 @@ import (
 	"time"
 
 	cfg "strategy-service/internal/config"
-	"strategy-service/internal/logs"
 	"strategy-service/internal/meta"
 	"strategy-service/internal/proc"
 	rt "strategy-service/internal/runtime"
@@ -193,35 +192,46 @@ func (a *API) version(w http.ResponseWriter, r *http.Request) {
 	write(w, http.StatusOK, "ok", meta.Current())
 }
 
-func (a *API) logs(w http.ResponseWriter, r *http.Request) {
+func (a *API) logSources(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
 		return
 	}
 
-	cfg, err := a.cfg.Load()
+	limit, err := queryInt(r, "limit", 10)
+	if err != nil {
+		write(w, http.StatusBadRequest, "invalid limit", nil)
+		return
+	}
+
+	out, err := a.log.Sources(r.Context(), limit)
 	if err != nil {
 		write(w, http.StatusBadRequest, err.Error(), nil)
 		return
 	}
 
-	size := cfg.Logs.Tail
-	raw := strings.TrimSpace(r.URL.Query().Get("tail"))
-	if raw != "" {
-		size, err = strconv.Atoi(raw)
-		if err != nil {
-			write(w, http.StatusBadRequest, "invalid tail", nil)
-			return
-		}
+	write(w, http.StatusOK, "ok", map[string]any{"sources": out})
+}
+
+func (a *API) logTail(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
+		return
 	}
 
-	data, err := logs.Tail(r.URL.Query().Get("kind"), size)
+	size, err := queryInt(r, "tail", 200)
+	if err != nil {
+		write(w, http.StatusBadRequest, "invalid tail", nil)
+		return
+	}
+
+	out, err := a.log.Tail(r.Context(), r.URL.Query().Get("source"), size)
 	if err != nil {
 		write(w, http.StatusBadRequest, err.Error(), nil)
 		return
 	}
 
-	write(w, http.StatusOK, "ok", data)
+	write(w, http.StatusOK, "ok", out)
 }
 
 func (a *API) smartxStart(w http.ResponseWriter, r *http.Request) {

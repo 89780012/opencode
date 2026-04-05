@@ -198,17 +198,6 @@ func (a *API) opencodeStatus(w http.ResponseWriter, r *http.Request) {
 	write(w, http.StatusOK, "ok", a.op.State())
 }
 
-func (a *API) opencodeLogs(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)
-		return
-	}
-
-	write(w, http.StatusOK, "ok", map[string]any{
-		"log": a.op.State().Log,
-	})
-}
-
 func (a *API) opencodeStart(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		write(w, http.StatusMethodNotAllowed, "method not allowed", nil)

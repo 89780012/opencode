@@ -43,6 +43,7 @@ function tone(state: OpencodeState) {
 
 export function SystemRuntimePage() {
   const [state, setState] = useState<OpencodeState>(empty)
+  const [lines, setLines] = useState<string[]>([])
   const [load, setLoad] = useState(true)
   const [busy, setBusy] = useState("")
 
@@ -51,7 +52,12 @@ export function SystemRuntimePage() {
       setLoad(true)
     }
     try {
-      setState(await systemApi.opencodeStatus())
+      const [state, log] = await Promise.all([
+        systemApi.opencodeStatus(),
+        systemApi.logTail("opencode", 20),
+      ])
+      setState(state)
+      setLines(log.lines)
     } catch (err) {
       if (err instanceof Error) {
         toast.error(err.message)
@@ -87,6 +93,7 @@ export function SystemRuntimePage() {
             ? await systemApi.opencodeRestart()
             : await systemApi.opencodeStop()
       setState(next)
+      setLines((await systemApi.logTail("opencode", 20)).lines)
       toast.success("运行状态已更新")
     } catch (err) {
       if (err instanceof Error) {
@@ -96,8 +103,6 @@ export function SystemRuntimePage() {
       setBusy("")
     }
   }
-
-  const lines = state.log?.slice(-20) ?? []
 
   return (
     <div className="bg-background h-full overflow-auto">

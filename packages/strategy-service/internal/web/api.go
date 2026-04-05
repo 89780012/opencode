@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	cfg "strategy-service/internal/config"
+	"strategy-service/internal/logs"
 	"strategy-service/internal/oprun"
 	rt "strategy-service/internal/runtime"
 	"strategy-service/internal/smartx"
@@ -16,6 +17,7 @@ type API struct {
 	op  *oprun.Manager
 	cfg *cfg.Store
 	sx  *smartx.Service
+	log *logs.Hub
 }
 
 // NewAPI wires the HTTP handlers to the runtime services.
@@ -26,6 +28,7 @@ func NewAPI(run *rt.Service, op *oprun.Manager, cfg *cfg.Store, sx *smartx.Servi
 		op:  op,
 		cfg: cfg,
 		sx:  sx,
+		log: logs.New(),
 	}
 }
 
@@ -47,13 +50,13 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/system/startup/prepare", a.startupPrepare)
 	mux.HandleFunc("/api/system/config", a.config)
 	mux.HandleFunc("/api/system/version", a.version)
-	mux.HandleFunc("/api/system/logs", a.logs)
+	mux.HandleFunc("/api/logs/sources", a.logSources)
+	mux.HandleFunc("/api/logs/tail", a.logTail)
 	mux.HandleFunc("/mcp", a.smartxMCP)
 	mux.HandleFunc("/api/system/smartx/logs/meta", a.smartxLogsMeta)
 	mux.HandleFunc("/api/system/smartx/logs/watch", a.smartxLogsWatch)
 	mux.HandleFunc("/api/system/smartx/startExtension", a.smartxStart)
 	mux.HandleFunc("/api/system/opencode/status", a.opencodeStatus)
-	mux.HandleFunc("/api/system/opencode/logs", a.opencodeLogs)
 	mux.HandleFunc("/api/system/opencode/start", a.opencodeStart)
 	mux.HandleFunc("/api/system/opencode/restart", a.opencodeRestart)
 	mux.HandleFunc("/api/system/opencode/stop", a.opencodeStop)

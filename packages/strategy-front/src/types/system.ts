@@ -31,10 +31,26 @@ export interface SystemConfig {
   }
 }
 
-export interface SystemLog {
-  kind: "service" | "opencode"
+export interface LogSource {
+  id: string
+  label: string
+  type: "managed" | "child"
+  format: "json" | "text"
+  path: string
+  watchable: boolean
+  rotated: boolean
+  updated_at?: string
+  size?: number
+}
+
+export interface LogTail {
+  source: LogSource
   path: string
   lines: string[]
+}
+
+export interface LogSources {
+  sources: LogSource[]
 }
 
 export interface OpencodeState {
@@ -50,11 +66,6 @@ export interface OpencodeState {
   pid?: number
   message?: string
   started_at?: string
-  log?: string[]
-}
-
-export interface OpencodeLog {
-  log: string[]
 }
 
 export interface SystemVersionCurrent {
