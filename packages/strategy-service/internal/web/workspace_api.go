@@ -12,13 +12,13 @@ func (a *API) workspaceList(c *gin.Context) {
 	data, err := a.ws.List()
 	if err != nil {
 		slog.Error("workspace list failed", "error", err)
-		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
+		bad(c, err)
 		return
 	}
 
 	data.Workspaces = workspace.Enrich(c.Request.Context(), data.Workspaces, a.op)
 	slog.Info("workspace list", "count", len(data.Workspaces))
-	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: data})
+	ok(c, data)
 }
 
 func (a *API) workspaceCreate(c *gin.Context) {
@@ -30,7 +30,7 @@ func (a *API) workspaceCreate(c *gin.Context) {
 	}{}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		slog.Warn("workspace create bad request", "error", err)
-		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
+		bad(c, err)
 		return
 	}
 
@@ -38,13 +38,13 @@ func (a *API) workspaceCreate(c *gin.Context) {
 	data, err := a.ws.Create(body.Name, body.Type, body.Template, body.Git)
 	if err != nil {
 		slog.Error("workspace create failed", "name", body.Name, "error", err)
-		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
+		bad(c, err)
 		return
 	}
 
 	data.Workspace = workspace.Enrich(c.Request.Context(), []workspace.Local{data.Workspace}, a.op)[0]
 	slog.Info("workspace created", "name", body.Name, "path", data.Workspace.Path)
-	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: data})
+	ok(c, data)
 }
 
 func (a *API) workspaceOpen(c *gin.Context) {
@@ -54,7 +54,7 @@ func (a *API) workspaceOpen(c *gin.Context) {
 	}{}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		slog.Warn("workspace open bad request", "error", err)
-		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
+		bad(c, err)
 		return
 	}
 
@@ -62,12 +62,12 @@ func (a *API) workspaceOpen(c *gin.Context) {
 	data, err := a.ws.Open(body.Path, body.Git)
 	if err != nil {
 		slog.Error("workspace open failed", "path", body.Path, "error", err)
-		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
+		bad(c, err)
 		return
 	}
 
 	data.Workspace = workspace.Enrich(c.Request.Context(), []workspace.Local{data.Workspace}, a.op)[0]
-	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: data})
+	ok(c, data)
 }
 
 func (a *API) workspaceImport(c *gin.Context) {
@@ -78,7 +78,7 @@ func (a *API) workspaceImport(c *gin.Context) {
 	}{}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		slog.Warn("workspace import bad request", "error", err)
-		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
+		bad(c, err)
 		return
 	}
 
@@ -86,12 +86,12 @@ func (a *API) workspaceImport(c *gin.Context) {
 	data, err := a.ws.Import(body.Path, body.Type, body.Git)
 	if err != nil {
 		slog.Error("workspace import failed", "path", body.Path, "error", err)
-		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
+		bad(c, err)
 		return
 	}
 
 	data.Workspace = workspace.Enrich(c.Request.Context(), []workspace.Local{data.Workspace}, a.op)[0]
-	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: data})
+	ok(c, data)
 }
 
 func (a *API) workspaceDelete(c *gin.Context) {
@@ -100,18 +100,18 @@ func (a *API) workspaceDelete(c *gin.Context) {
 	}{}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		slog.Warn("workspace delete bad request", "error", err)
-		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
+		bad(c, err)
 		return
 	}
 
 	slog.Info("workspace delete", "path", body.Path)
 	if err := a.ws.Delete(body.Path); err != nil {
 		slog.Error("workspace delete failed", "path", body.Path, "error", err)
-		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
+		bad(c, err)
 		return
 	}
 
-	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: nil})
+	ok(c, nil)
 }
 
 func (a *API) workspaceFiles(c *gin.Context) {
@@ -120,31 +120,30 @@ func (a *API) workspaceFiles(c *gin.Context) {
 	data, err := a.ws.Files(wsPath)
 	if err != nil {
 		slog.Error("workspace files failed", "workspace_path", wsPath, "error", err)
-		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
+		bad(c, err)
 		return
 	}
 
 	slog.Debug("workspace files", "workspace_path", wsPath, "total", data.TotalFiles)
-	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: data})
+	ok(c, data)
 }
 
-func (a *API) workspaceFileContent(c *gin.Context) {
-	if c.Request.Method == "GET" {
-		wsPath := c.Query("workspace_path")
-		filePath := c.Query("file_path")
-		slog.Debug("workspace file-content request", "workspace_path", wsPath, "file_path", filePath)
-		data, err := a.ws.Content(wsPath, filePath)
-		if err != nil {
-			slog.Error("workspace file-content failed", "workspace_path", wsPath, "file_path", filePath, "error", err)
-			c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
-			return
-		}
-
-		slog.Debug("workspace file-content", "file_path", filePath, "size", data.Size, "binary", data.Binary)
-		c.JSON(200, envelope{Code: 200, Msg: "ok", Data: data})
+func (a *API) workspaceFileGet(c *gin.Context) {
+	wsPath := c.Query("workspace_path")
+	filePath := c.Query("file_path")
+	slog.Debug("workspace file-content request", "workspace_path", wsPath, "file_path", filePath)
+	data, err := a.ws.Content(wsPath, filePath)
+	if err != nil {
+		slog.Error("workspace file-content failed", "workspace_path", wsPath, "file_path", filePath, "error", err)
+		bad(c, err)
 		return
 	}
 
+	slog.Debug("workspace file-content", "file_path", filePath, "size", data.Size, "binary", data.Binary)
+	ok(c, data)
+}
+
+func (a *API) workspaceFilePut(c *gin.Context) {
 	body := struct {
 		WorkspacePath string `json:"workspace_path"`
 		FilePath      string `json:"file_path"`
@@ -152,7 +151,7 @@ func (a *API) workspaceFileContent(c *gin.Context) {
 	}{}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		slog.Warn("workspace file-content bad request", "error", err)
-		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
+		bad(c, err)
 		return
 	}
 
@@ -160,9 +159,9 @@ func (a *API) workspaceFileContent(c *gin.Context) {
 	data, err := a.ws.Write(body.WorkspacePath, body.FilePath, body.Content)
 	if err != nil {
 		slog.Error("workspace file save failed", "workspace_path", body.WorkspacePath, "file_path", body.FilePath, "error", err)
-		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
+		bad(c, err)
 		return
 	}
 
-	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: data})
+	ok(c, data)
 }

@@ -1,6 +1,8 @@
 package web
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	cfg "strategy-service/internal/config"
 	"strategy-service/internal/logs"
@@ -25,6 +27,26 @@ type envelope struct {
 	Data interface{} `json:"data"`
 }
 
+func ok(c *gin.Context, data any) {
+	c.JSON(http.StatusOK, envelope{
+		Code: http.StatusOK,
+		Msg:  "ok",
+		Data: data,
+	})
+}
+
+func fail(c *gin.Context, code int, msg string, data any) {
+	c.JSON(code, envelope{
+		Code: code,
+		Msg:  msg,
+		Data: data,
+	})
+}
+
+func bad(c *gin.Context, err error) {
+	fail(c, http.StatusBadRequest, err.Error(), nil)
+}
+
 // NewAPI wires the HTTP handlers to the runtime services.
 func NewAPI(run *rt.Service, op *oprun.Manager, cfg *cfg.Store, sx *smartx.Service) *API {
 	return &API{
@@ -43,14 +65,14 @@ func (a *API) Register(r *gin.Engine) {
 	api.GET("/health", a.health)
 
 	op := api.Group("/opencode")
-	op.GET("/agents", a.opencodeAgents)
-	op.POST("/agents", a.opencodeAgents)
-	op.PUT("/agents/:name", a.opencodeAgent)
-	op.DELETE("/agents/:name", a.opencodeAgent)
-	op.GET("/skills", a.opencodeSkills)
-	op.POST("/skills", a.opencodeSkills)
-	op.PUT("/skills/:name", a.opencodeSkill)
-	op.DELETE("/skills/:name", a.opencodeSkill)
+	op.GET("/agents", a.opencodeAgentsList)
+	op.POST("/agents", a.opencodeAgentsCreate)
+	op.PUT("/agents/:name", a.opencodeAgentUpdate)
+	op.DELETE("/agents/:name", a.opencodeAgentDelete)
+	op.GET("/skills", a.opencodeSkillsList)
+	op.POST("/skills", a.opencodeSkillsCreate)
+	op.PUT("/skills/:name", a.opencodeSkillUpdate)
+	op.DELETE("/skills/:name", a.opencodeSkillDelete)
 
 	ws := api.Group("/workspace")
 	ws.GET("/list", a.workspaceList)
@@ -59,14 +81,14 @@ func (a *API) Register(r *gin.Engine) {
 	ws.POST("/delete", a.workspaceDelete)
 	ws.POST("/open", a.workspaceOpen)
 	ws.GET("/files", a.workspaceFiles)
-	ws.GET("/file-content", a.workspaceFileContent)
-	ws.PUT("/file-content", a.workspaceFileContent)
+	ws.GET("/file-content", a.workspaceFileGet)
+	ws.PUT("/file-content", a.workspaceFilePut)
 
 	sys := api.Group("/system")
 	sys.GET("/startup", a.startup)
 	sys.POST("/startup/prepare", a.startupPrepare)
-	sys.GET("/config", a.config)
-	sys.PUT("/config", a.config)
+	sys.GET("/config", a.configGet)
+	sys.PUT("/config", a.configPut)
 	sys.GET("/version", a.version)
 	sys.GET("/smartx/logs/meta", a.smartxLogsMeta)
 	sys.GET("/smartx/logs/watch", a.smartxLogsWatch)
@@ -80,5 +102,7 @@ func (a *API) Register(r *gin.Engine) {
 	log.GET("/sources", a.logSources)
 	log.GET("/tail", a.logTail)
 
-	r.Any("/mcp", a.smartxMCP)
+	r.POST("/mcp", a.mcpPost)
+	r.GET("/mcp", a.mcpGet)
+	r.DELETE("/mcp", a.mcpDelete)
 }

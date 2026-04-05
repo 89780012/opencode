@@ -38,55 +38,54 @@ type startupState struct {
 }
 
 func (a *API) startup(c *gin.Context) {
-	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: a.inspectStartup(c.Request.Context())})
+	ok(c, a.inspectStartup(c.Request.Context()))
 }
 
 func (a *API) startupPrepare(c *gin.Context) {
 	state := a.inspectStartup(c.Request.Context())
 	if state.Opencode.Installed {
-		c.JSON(200, envelope{Code: 200, Msg: "ok", Data: state})
+		ok(c, state)
 		return
 	}
 
 	if !a.rt.Has("opencode") {
-		c.JSON(503, envelope{Code: 503, Msg: "builtin opencode runtime not found", Data: state})
+		fail(c, 503, "builtin opencode runtime not found", state)
 		return
 	}
 
 	if _, err := a.rt.Ensure(c.Request.Context(), "opencode"); err != nil {
 		slog.Error("startup prepare failed", "tool", "opencode", "error", err)
-		c.JSON(503, envelope{Code: 503, Msg: err.Error(), Data: a.inspectStartup(c.Request.Context())})
+		fail(c, 503, err.Error(), a.inspectStartup(c.Request.Context()))
 		return
 	}
 
-	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: a.inspectStartup(c.Request.Context())})
+	ok(c, a.inspectStartup(c.Request.Context()))
 }
 
-func (a *API) config(c *gin.Context) {
-	if c.Request.Method == "GET" {
-		cfg, err := a.cfg.Load()
-		if err != nil {
-			c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
-			return
-		}
-
-		c.JSON(200, envelope{Code: 200, Msg: "ok", Data: cfg})
+func (a *API) configGet(c *gin.Context) {
+	cfg, err := a.cfg.Load()
+	if err != nil {
+		bad(c, err)
 		return
 	}
 
+	ok(c, cfg)
+}
+
+func (a *API) configPut(c *gin.Context) {
 	body := cfg.Config{}
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
+		bad(c, err)
 		return
 	}
 
 	cfg, err := a.cfg.Save(body)
 	if err != nil {
-		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
+		bad(c, err)
 		return
 	}
 
-	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: cfg})
+	ok(c, cfg)
 }
 
 func (a *API) inspectStartup(ctx context.Context) startupState {
@@ -168,39 +167,39 @@ func label(id string) string {
 }
 
 func (a *API) version(c *gin.Context) {
-	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: meta.Current()})
+	ok(c, meta.Current())
 }
 
 func (a *API) logSources(c *gin.Context) {
 	limit, err := queryInt(c, "limit", 10)
 	if err != nil {
-		c.JSON(400, envelope{Code: 400, Msg: "invalid limit", Data: nil})
+		fail(c, 400, "invalid limit", nil)
 		return
 	}
 
 	out, err := a.log.Sources(c.Request.Context(), limit)
 	if err != nil {
-		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
+		bad(c, err)
 		return
 	}
 
-	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: map[string]any{"sources": out}})
+	ok(c, map[string]any{"sources": out})
 }
 
 func (a *API) logTail(c *gin.Context) {
 	size, err := queryInt(c, "tail", 200)
 	if err != nil {
-		c.JSON(400, envelope{Code: 400, Msg: "invalid tail", Data: nil})
+		fail(c, 400, "invalid tail", nil)
 		return
 	}
 
 	out, err := a.log.Tail(c.Request.Context(), c.Query("source"), size)
 	if err != nil {
-		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
+		bad(c, err)
 		return
 	}
 
-	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: out})
+	ok(c, out)
 }
 
 func (a *API) smartxStart(c *gin.Context) {
@@ -208,7 +207,7 @@ func (a *API) smartxStart(c *gin.Context) {
 	if c.Request.ContentLength != 0 {
 		err := c.ShouldBindJSON(&body)
 		if err != nil && !errors.Is(err, io.EOF) {
-			c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
+			bad(c, err)
 			return
 		}
 	}
@@ -216,53 +215,53 @@ func (a *API) smartxStart(c *gin.Context) {
 	out, err := a.sx.Start(c.Request.Context(), body)
 	if err != nil {
 		slog.Warn("smartx startExtension failed", "error", err)
-		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
+		bad(c, err)
 		return
 	}
 
-	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: out})
+	ok(c, out)
 }
 
 func (a *API) smartxLogsMeta(c *gin.Context) {
 	limit, err := queryInt(c, "limit", 3)
 	if err != nil {
-		c.JSON(400, envelope{Code: 400, Msg: "invalid limit", Data: nil})
+		fail(c, 400, "invalid limit", nil)
 		return
 	}
 
 	out, err := a.sx.Meta(c.Query("name"), limit)
 	if err != nil {
-		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
+		bad(c, err)
 		return
 	}
 
-	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: out})
+	ok(c, out)
 }
 
 func (a *API) smartxLogsWatch(c *gin.Context) {
 	tail, err := queryInt(c, "tail", 200)
 	if err != nil {
-		c.JSON(400, envelope{Code: 400, Msg: "invalid tail", Data: nil})
+		fail(c, 400, "invalid tail", nil)
 		return
 	}
 	limit, err := queryInt(c, "limit", 3)
 	if err != nil {
-		c.JSON(400, envelope{Code: 400, Msg: "invalid limit", Data: nil})
+		fail(c, 400, "invalid limit", nil)
 		return
 	}
 	sec, err := queryInt(c, "seconds", 10)
 	if err != nil {
-		c.JSON(400, envelope{Code: 400, Msg: "invalid seconds", Data: nil})
+		fail(c, 400, "invalid seconds", nil)
 		return
 	}
 
 	out, err := a.sx.Watch(c.Request.Context(), c.Query("name"), tail, limit, time.Duration(sec)*time.Second)
 	if err != nil {
-		c.JSON(400, envelope{Code: 400, Msg: err.Error(), Data: nil})
+		bad(c, err)
 		return
 	}
 
-	c.JSON(200, envelope{Code: 200, Msg: "ok", Data: out})
+	ok(c, out)
 }
 
 func queryInt(c *gin.Context, key string, fallback int) (int, error) {

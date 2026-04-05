@@ -68,7 +68,7 @@ func New(cfg Config) (*Service, error) {
 
 	gin.SetMode(gin.ReleaseMode)
 	mux := gin.New()
-	mux.Use(gin.Recovery())
+	mux.Use(web.RequestLog(), gin.Recovery())
 	api.Register(mux)
 	mux.Any("/opencode", web.NewOpencodeProxy(op))
 	mux.Any("/opencode/*path", web.NewOpencodeProxy(op))

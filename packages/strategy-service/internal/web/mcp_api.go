@@ -25,23 +25,26 @@ type rpcRes struct {
 	Error   any    `json:"error,omitempty"`
 }
 
-func (a *API) smartxMCP(c *gin.Context) {
-	if c.Request.Method == "GET" || c.Request.Method == "DELETE" {
-		c.Header("Allow", "POST")
-		c.JSON(405, rpcRes{
-			JSONRPC: "2.0",
-			Error: map[string]any{
-				"code":    -32000,
-				"message": "Method not allowed",
-			},
-		})
-		return
-	}
-	if c.Request.Method != "POST" {
-		c.JSON(405, envelope{Code: 405, Msg: "method not allowed", Data: nil})
-		return
-	}
+func (a *API) mcpGet(c *gin.Context) {
+	a.mcpMethodNotAllowed(c)
+}
 
+func (a *API) mcpDelete(c *gin.Context) {
+	a.mcpMethodNotAllowed(c)
+}
+
+func (a *API) mcpMethodNotAllowed(c *gin.Context) {
+	c.Header("Allow", "POST")
+	c.JSON(405, rpcRes{
+		JSONRPC: "2.0",
+		Error: map[string]any{
+			"code":    -32000,
+			"message": "Method not allowed",
+		},
+	})
+}
+
+func (a *API) mcpPost(c *gin.Context) {
 	req := rpcReq{}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		mcpError(c, nil, -32700, "Parse error")
