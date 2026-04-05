@@ -691,7 +691,7 @@ export function WorkspaceCreateDialog(props: Props) {
                           <SelectValue placeholder="选择模型" />
                         </SelectTrigger>
                         <SelectContent>
-                          {catalog.connectedModels.map((item) => {
+                          {catalog.visibleModels.map((item) => {
                             const value = `${item.provider.id}/${item.id}`
                             return (
                               <SelectItem key={value} value={value}>
