@@ -126,6 +126,7 @@ func (m *Manager) Ensure(ctx context.Context) error {
 		m.log.Debug("opencode start already in progress, waiting")
 		return m.await(ctx, ch)
 	}
+	defer m.done()
 
 	m.log.Info("starting opencode process", "bin", m.cfg.Bin, "host", m.cfg.Host, "port", m.cfg.Port)
 	if err := m.spawn(); err != nil {
@@ -136,7 +137,6 @@ func (m *Manager) Ensure(ctx context.Context) error {
 		}
 		m.log.Error("opencode spawn failed", "error", err)
 		m.fail("failed to start opencode", err)
-		m.done()
 		return err
 	}
 
@@ -145,13 +145,11 @@ func (m *Manager) Ensure(ctx context.Context) error {
 		m.log.Error("opencode did not become ready", "error", err, "timeout", m.cfg.StartTimeout)
 		_ = m.Stop(context.Background())
 		m.fail("opencode did not become ready", err)
-		m.done()
 		return err
 	}
 
 	m.log.Info("opencode is ready")
 	m.live()
-	m.done()
 	return nil
 }
 

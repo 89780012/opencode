@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 
 	"strategy-service/internal/asset"
 	"strategy-service/internal/proc"
@@ -19,6 +20,7 @@ import (
 type Service struct {
 	rt  *rt.Service
 	doc *store
+	mu  sync.Mutex
 }
 
 func NewService(rt *rt.Service) *Service {
@@ -110,7 +112,9 @@ func (s *Service) List() (ListResult, error) {
 		return ListResult{}, err
 	}
 
+	s.mu.Lock()
 	rows, err := s.doc.load()
+	s.mu.Unlock()
 	if err != nil {
 		slog.Error("workspace list: load failed", "error", err)
 		return ListResult{}, err
@@ -225,6 +229,9 @@ func workspaceRoot(kind string) (string, error) {
 }
 
 func (s *Service) put(item Local) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	rows, err := s.doc.load()
 	if err != nil {
 		return err
@@ -243,6 +250,9 @@ func (s *Service) put(item Local) error {
 }
 
 func (s *Service) pick(path string) (Local, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	rows, err := s.doc.load()
 	if err != nil {
 		return Local{}, err
@@ -544,6 +554,9 @@ func (s *Service) Write(path string, file string, body string) (FileContentResul
 
 func (s *Service) Delete(path string) error {
 	slog.Info("workspace delete", "path", path)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	rows, err := s.doc.load()
 	if err != nil {
 		slog.Error("workspace delete: load failed", "error", err)

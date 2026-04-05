@@ -60,7 +60,20 @@ func (s *store) save(rows []Local) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, append(body, '\n'), 0o644)
+
+	tmp := path + ".tmp"
+	err = os.WriteFile(tmp, append(body, '\n'), 0o644)
+	if err != nil {
+		return err
+	}
+
+	err = os.Rename(tmp, path)
+	if err == nil {
+		return nil
+	}
+
+	_ = os.Remove(tmp)
+	return err
 }
 
 func (s *store) seed() ([]Local, error) {
