@@ -239,7 +239,7 @@ export function SystemLogsPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4 py-6">
-            <div className="grid gap-4 lg:grid-cols-[0.72fr_1.28fr]">
+            <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
               <div className="rounded-3xl border bg-muted/20 p-4">
                 <div className="mb-3 flex items-center gap-2 text-sm font-medium">
                   <Settings2 className="text-primary size-4" />
@@ -260,7 +260,7 @@ export function SystemLogsPage() {
                   </div>
                 </div>
               </div>
-              <div className="rounded-3xl border bg-muted/20 p-4">
+              <div className="min-w-0 rounded-3xl border bg-muted/20 p-4">
                 <div className="mb-3 flex items-center gap-2 text-sm font-medium">
                   <ScrollText className="text-primary size-4" />
                   最近内容
@@ -275,7 +275,7 @@ export function SystemLogsPage() {
                     当前来源还没有可展示的日志内容。若服务刚启动，稍后刷新即可。
                   </div>
                 ) : (
-                  <pre className="max-h-[65vh] overflow-auto rounded-2xl border bg-background p-4 text-xs whitespace-pre-wrap">
+                  <pre className="max-h-[65vh] min-w-0 w-full overflow-auto rounded-2xl border bg-background p-4 text-xs whitespace-pre-wrap break-words">
                     {lines.join("\n")}
                   </pre>
                 )}
