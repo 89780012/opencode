@@ -4,7 +4,6 @@ import (
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
-	"strategy-service/internal/workspace"
 )
 
 func (a *API) workspaceList(c *gin.Context) {
@@ -16,7 +15,6 @@ func (a *API) workspaceList(c *gin.Context) {
 		return
 	}
 
-	data.Workspaces = workspace.Enrich(c.Request.Context(), data.Workspaces, a.op)
 	slog.Info("workspace list", "count", len(data.Workspaces))
 	ok(c, data)
 }
@@ -42,7 +40,6 @@ func (a *API) workspaceCreate(c *gin.Context) {
 		return
 	}
 
-	data.Workspace = workspace.Enrich(c.Request.Context(), []workspace.Local{data.Workspace}, a.op)[0]
 	slog.Info("workspace created", "name", body.Name, "path", data.Workspace.Path)
 	ok(c, data)
 }
@@ -66,7 +63,6 @@ func (a *API) workspaceOpen(c *gin.Context) {
 		return
 	}
 
-	data.Workspace = workspace.Enrich(c.Request.Context(), []workspace.Local{data.Workspace}, a.op)[0]
 	ok(c, data)
 }
 
@@ -90,7 +86,6 @@ func (a *API) workspaceImport(c *gin.Context) {
 		return
 	}
 
-	data.Workspace = workspace.Enrich(c.Request.Context(), []workspace.Local{data.Workspace}, a.op)[0]
 	ok(c, data)
 }
 
