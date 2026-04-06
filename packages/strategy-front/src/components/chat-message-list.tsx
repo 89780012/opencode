@@ -2,6 +2,7 @@ import { memo, useState, type ReactNode } from "react"
 import { CheckCircle2, ChevronDown, Circle, ListTodo, LoaderCircle, MinusCircle } from "lucide-react"
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation"
 import { Message, MessageContent } from "@/components/ai-elements/message"
+import { ChatImagePart } from "@/components/chat/chat-image-part"
 import { Response } from "@/components/ai-elements/response"
 import { useAppSelector } from "@/hooks/useAppSelector"
 import { cn } from "@/lib/utils"
@@ -205,6 +206,9 @@ function renderPart(part: ChatPart, role: ChatMessageInfo["role"], onOpenDiff?: 
     //     </div>
     //   )
     case "file":
+      if (part.mime.startsWith("image/")) {
+        return <ChatImagePart src={part.url} alt={part.filename ?? "image"} name={part.filename} />
+      }
       return (
         <div className="rounded-lg border px-3 py-2 text-xs">
           <div className="font-medium">{part.filename ?? part.url}</div>

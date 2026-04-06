@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { CornerDownLeftIcon, Loader2Icon, SquareIcon, XIcon } from "lucide-react"
+import type { ChatImageInput, PromptInputMessage } from "@/types/chat"
 import {
   type ChangeEvent,
   type ComponentProps,
@@ -18,14 +19,11 @@ import {
 
 export type PromptInputStatus = "ready" | "submitted" | "streaming" | "error"
 
-export type PromptInputMessage = {
-  text: string
-  files: []
-}
-
 type PromptInputContextValue = {
   value: string
+  files: ChatImageInput[]
   onValueChange: (value: string) => void
+  onFilesChange: (files: ChatImageInput[]) => void
 }
 
 const PromptInputContext = createContext<PromptInputContextValue | null>(null)
@@ -40,24 +38,35 @@ const usePromptInputContext = () => {
 
 export type PromptInputProps = Omit<ComponentProps<"form">, "onSubmit"> & {
   value: string
+  files: ChatImageInput[]
   onValueChange: (value: string) => void
+  onFilesChange: (files: ChatImageInput[]) => void
   onSubmit: (message: PromptInputMessage, event: FormEvent<HTMLFormElement>) => void
 }
 
-export const PromptInput = ({ className, children, value, onValueChange, onSubmit, ...props }: PromptInputProps) => {
+export const PromptInput = ({
+  className,
+  children,
+  value,
+  files,
+  onValueChange,
+  onFilesChange,
+  onSubmit,
+  ...props
+}: PromptInputProps) => {
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     onSubmit(
       {
         text: value,
-        files: [],
+        files,
       },
       event,
     )
   }
 
   return (
-    <PromptInputContext.Provider value={{ value, onValueChange }}>
+    <PromptInputContext.Provider value={{ value, files, onValueChange, onFilesChange }}>
       <form
         className={cn(
           "w-full rounded-[28px] bg-background/92 shadow-sm ring-1 ring-black/8 backdrop-blur-sm dark:bg-[#111515]/96 dark:ring-white/10",

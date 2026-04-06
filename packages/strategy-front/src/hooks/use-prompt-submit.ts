@@ -3,7 +3,7 @@ import { chatApi } from "@/api/modules"
 import { useAppDispatch } from "@/hooks/useAppDispatch"
 import { buildRequestParts } from "@/lib/build-request-parts"
 import { clearSessionEventError, hydrateSessionMessages } from "@/store/chat-session-slice"
-import type { ChatModelRef } from "@/types/chat"
+import type { ChatModelRef, PromptInputMessage } from "@/types/chat"
 
 interface Input {
   workspacePath?: string | null
@@ -21,12 +21,12 @@ export function usePromptSubmit(input: Input) {
   const [submitting, setSubmitting] = useState(false)
 
   const submit = useCallback(
-    async (value: string) => {
+    async (msg: PromptInputMessage) => {
       if (!input.workspacePath || !input.agent || !input.model) {
         return
       }
 
-      const parts = buildRequestParts(value)
+      const parts = buildRequestParts(msg)
       if (parts.length === 0) {
         return
       }

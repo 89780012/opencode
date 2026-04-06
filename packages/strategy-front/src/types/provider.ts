@@ -19,9 +19,28 @@ export interface Model {
     input?: number;
     output: number;
   };
+  modalities?: {
+    input: Array<"text" | "audio" | "image" | "video" | "pdf">;
+    output: Array<"text" | "audio" | "image" | "video" | "pdf">;
+  };
   capabilities?: {
+    attachment?: boolean;
     reasoning?: boolean;
     toolcall?: boolean;
+    input?: {
+      text?: boolean;
+      audio?: boolean;
+      image?: boolean;
+      video?: boolean;
+      pdf?: boolean;
+    };
+    output?: {
+      text?: boolean;
+      audio?: boolean;
+      image?: boolean;
+      video?: boolean;
+      pdf?: boolean;
+    };
     [key: string]: unknown;
   };
   variants?: Record<string, Record<string, unknown>>;

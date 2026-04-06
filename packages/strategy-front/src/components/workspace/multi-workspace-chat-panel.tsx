@@ -18,6 +18,9 @@ import { useStrategySession } from "@/hooks/use-strategy-session"
 import { useChatTodo } from "@/hooks/use-chat-todo"
 import { usePromptSubmit } from "@/hooks/use-prompt-submit"
 import { useSessionDraft } from "@/hooks/use-session-draft"
+import { useSessionFiles } from "@/hooks/use-session-files"
+import { imageModel } from "@/lib/attachment"
+import type { PromptInputMessage } from "@/types/chat"
 import type { ComposerModel } from "@/types/composer"
 import type { LocalWorkspace } from "@/types/workspace"
 
@@ -46,20 +49,24 @@ export function MultiWorkspaceChatPanel(props: Props) {
   const [tab, setTab] = useState<WorkspaceDetailTab>("files")
   const chat = useStrategySession(props.workspace.path)
   const draft = useSessionDraft(props.workspace.path, chat.selectedSessionId)
+  const files = useSessionFiles(props.workspace.path, chat.selectedSessionId)
   const permission = useChatPermission(props.workspace.path, chat.selectedSessionId)
   const question = useChatQuestion(props.workspace.path, chat.selectedSessionId)
   const live = chat.busy || !!permission.req || !!question.req
   const todo = useChatTodo(props.workspace.path, chat.selectedSessionId, live)
   const ref = useMemo(() => {
-    if (!props.model) {
-      return
-    }
-    const [pid, ...rest] = props.model.split("/")
+    if (!props.model) return
+    const [providerID, ...rest] = props.model.split("/")
     return {
-      providerID: pid,
+      providerID,
       modelID: rest.join("/"),
     }
   }, [props.model])
+  const entry = useMemo(
+    () => props.models.find((item) => `${item.provider.id}/${item.id}` === props.model),
+    [props.model, props.models],
+  )
+  const canImage = imageModel(entry)
   const { submitting, submit } = usePromptSubmit({
     workspacePath: props.workspace.path,
     sessionId: chat.selectedSessionId,
@@ -68,21 +75,29 @@ export function MultiWorkspaceChatPanel(props: Props) {
     variant: props.variant ?? undefined,
     createSession: chat.createSession,
     selectSession: chat.selectSession,
-    onSubmitted: draft.clear,
+    onSubmitted: () => {
+      draft.clear()
+      files.clear()
+    },
   })
 
   useEffect(() => {
     props.onLoad?.(chat.sessionLoading && chat.sessions.length === 0)
   }, [chat.sessionLoading, chat.sessions.length, props])
 
-  const onSubmit = async (value: string) => {
+  const onSubmit = async (msg: PromptInputMessage) => {
     if (!props.agent || !ref) {
       toast.error("请先选择模式和模型")
       return
     }
 
+    if (msg.files.length > 0 && !canImage) {
+      toast.error("当前模型不支持图片输入.")
+      return
+    }
+
     try {
-      await submit(value)
+      await submit(msg)
     } catch (err) {
       console.error("Failed to submit prompt", err)
       toast.error("提交失败")
@@ -228,14 +243,17 @@ export function MultiWorkspaceChatPanel(props: Props) {
                 agent={props.agent}
                 agents={props.agents}
                 busy={chat.busy}
+                canImage={canImage}
                 compact
                 disabled={props.load}
+                files={files.files}
                 model={props.model}
                 models={props.models}
                 onAgent={props.onAgent}
                 onAbort={() => {
                   void onAbort()
                 }}
+                onFilesChange={files.setFiles}
                 onModel={props.onModel}
                 onSubmit={(value) => {
                   void onSubmit(value)

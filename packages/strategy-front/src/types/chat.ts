@@ -394,7 +394,27 @@ export interface ChatTextInput {
   text: string;
 }
 
-export type ChatInputPart = ChatTextInput;
+export interface ChatFileInput {
+  id?: string;
+  type: "file";
+  mime: string;
+  url: string;
+  filename?: string;
+}
+
+export interface ChatImageInput {
+  id: string;
+  filename: string;
+  mime: string;
+  url: string;
+}
+
+export interface PromptInputMessage {
+  text: string;
+  files: ChatImageInput[];
+}
+
+export type ChatInputPart = ChatTextInput | ChatFileInput;
 
 export interface ChatPromptBody {
   messageID?: string;

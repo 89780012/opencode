@@ -12,7 +12,9 @@ import { useChatQuestion } from "@/hooks/use-chat-question"
 import { useChatTodo } from "@/hooks/use-chat-todo"
 import { usePromptSubmit } from "@/hooks/use-prompt-submit"
 import { useSessionDraft } from "@/hooks/use-session-draft"
-import type { ChatMessageInfo, ChatStatus } from "@/types/chat"
+import { useSessionFiles } from "@/hooks/use-session-files"
+import { imageModel } from "@/lib/attachment"
+import type { ChatMessageInfo, ChatStatus, PromptInputMessage } from "@/types/chat"
 import type { ComposerModel } from "@/types/composer"
 import type { LocalWorkspace } from "@/types/workspace"
 
@@ -45,6 +47,7 @@ export function StrategyChatPanel(props: Props) {
   useChatEvents(props.workspace.path)
 
   const draft = useSessionDraft(props.workspace.path, props.selectedSessionId)
+  const files = useSessionFiles(props.workspace.path, props.selectedSessionId)
   const permission = useChatPermission(props.workspace.path, props.selectedSessionId)
   const question = useChatQuestion(props.workspace.path, props.selectedSessionId)
   const busy = !!props.selectedSessionId && props.status.type !== "idle"
@@ -58,6 +61,11 @@ export function StrategyChatPanel(props: Props) {
       modelID: rest.join("/"),
     }
   }, [props.model])
+  const entry = useMemo(
+    () => props.models.find((item) => `${item.provider.id}/${item.id}` === props.model),
+    [props.model, props.models],
+  )
+  const canImage = imageModel(entry)
   const { submitting, submit } = usePromptSubmit({
     workspacePath: props.workspace.path,
     sessionId: props.selectedSessionId,
@@ -66,20 +74,28 @@ export function StrategyChatPanel(props: Props) {
     variant: props.variant ?? undefined,
     createSession: props.onCreate,
     selectSession: props.onSelectSession,
-    onSubmitted: draft.clear,
+    onSubmitted: () => {
+      draft.clear()
+      files.clear()
+    },
   })
 
-  const onSubmit = async (value: string) => {
+  const onSubmit = async (msg: PromptInputMessage) => {
     if (!props.agent || !ref) {
-      toast.error("请先选择模式和模型")
+      toast.error("请先选择模式和模型.")
+      return
+    }
+
+    if (msg.files.length > 0 && !canImage) {
+      toast.error("当前模型不支持图片输入.")
       return
     }
 
     try {
-      await submit(value)
+      await submit(msg)
     } catch (err) {
       console.error("Failed to submit prompt", err)
-      toast.error("提交失败")
+      toast.error("提交失败.")
     }
   }
 
@@ -144,11 +160,14 @@ export function StrategyChatPanel(props: Props) {
               agent={props.agent}
               agents={props.agents}
               busy={busy}
+              canImage={canImage}
               disabled={props.load}
+              files={files.files}
               model={props.model}
               models={props.models}
               onAgent={props.onAgent}
               onAbort={props.onAbort}
+              onFilesChange={files.setFiles}
               onModel={props.onModel}
               onSubmit={(value) => {
                 void onSubmit(value)

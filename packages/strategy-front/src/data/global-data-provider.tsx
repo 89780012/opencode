@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react"
 import { agentApi, mcpApi, providerApi, skillApi, workspaceApi } from "@/api/modules"
+import { imageModel } from "@/lib/attachment"
 import { rankAgent } from "@/lib/chat-composer"
-import { latestModels, modelVisible, readModelVisibility } from "@/lib/model-catalog"
+import { latestModels, modelKey, modelVisible, readModelImage, readModelVisibility } from "@/lib/model-catalog"
 import type { GlobalAgentCatalog, RuntimeAgent } from "@/types/agent"
 import type { ComposerModel, ProviderCatalogState } from "@/types/composer"
 import type { McpDoc, McpMap } from "@/types/mcp"
@@ -70,6 +71,7 @@ type Ctx = State & {
   refresh: <K extends Key>(key: K) => Promise<Box<DataMap[K]>>
   refreshMany: (keys: Key[]) => Promise<void>
   invalidate: (key: Key) => void
+  syncProvider: () => void
   clearWorkspace: () => void
   selectWorkspace: (item: LocalWorkspace) => void
   workspace: State["workspace"] & {
@@ -253,6 +255,7 @@ function allow(item?: string, current?: string) {
 
 function buildProvider(providers: List, config: Config, auth: AuthMap): ProviderData {
   const user = readModelVisibility()
+  const image = readModelImage()
   const connected = new Set(providers.connected)
   const connectedModels = providers.all
     .filter((item) => connected.has(item.id))
@@ -261,6 +264,9 @@ function buildProvider(providers: List, config: Config, auth: AuthMap): Provider
         (model) =>
           ({
             ...model,
+            vision: image[modelKey({ providerID: provider.id, modelID: model.id })]
+              ? image[modelKey({ providerID: provider.id, modelID: model.id })] === "on"
+              : imageModel(model),
             provider,
           }) satisfies ComposerModel,
       ),
@@ -497,6 +503,23 @@ export function GlobalDataProvider(props: { children: ReactNode }) {
     dispatch({ type: "invalidate", key })
   }, [])
 
+  const syncProvider = useCallback(() => {
+    const prev = ref.current.provider
+    if (!prev.ready) return
+
+    dispatch({
+      type: "load_done",
+      key: "provider",
+      box: {
+        ...prev,
+        data: buildProvider(prev.data.providers, prev.data.config, prev.data.auth),
+        load: false,
+        stale: false,
+        stamp: Date.now(),
+      },
+    })
+  }, [])
+
   const selectWorkspace = useCallback((item: LocalWorkspace) => {
     setSelected(item.path)
   }, [])
@@ -544,6 +567,7 @@ export function GlobalDataProvider(props: { children: ReactNode }) {
       refresh,
       refreshMany,
       invalidate,
+      syncProvider,
       clearWorkspace,
       selectWorkspace,
       workspace: {
@@ -551,7 +575,7 @@ export function GlobalDataProvider(props: { children: ReactNode }) {
         selected: current,
       },
     }),
-    [clearWorkspace, current, ensure, invalidate, refresh, refreshMany, selectWorkspace, state],
+    [clearWorkspace, current, ensure, invalidate, refresh, refreshMany, selectWorkspace, state, syncProvider],
   )
 
   return <Ctx.Provider value={value}>{props.children}</Ctx.Provider>
@@ -621,6 +645,7 @@ export function useProviderList() {
       providers: data.provider.data.providers,
       reload: () => refresh("provider"),
       refresh: () => refresh("provider"),
+      sync: data.syncProvider,
       visibleModels: data.provider.data.visibleModels,
     }),
     [
@@ -631,6 +656,7 @@ export function useProviderList() {
       data.provider.data.visibleModels,
       data.provider.err,
       data.provider.load,
+      data.syncProvider,
       refresh,
     ],
   )

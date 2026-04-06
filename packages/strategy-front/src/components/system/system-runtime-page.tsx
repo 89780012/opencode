@@ -17,17 +17,6 @@ const empty: OpencodeState = {
   owned: false,
 }
 
-function stamp(value?: string) {
-  if (!value) {
-    return "-"
-  }
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return value
-  }
-  return date.toLocaleString()
-}
-
 function tone(state: OpencodeState) {
   if (state.status === "running" || state.status === "external") {
     return "border-emerald-200 bg-emerald-50 text-emerald-700"
