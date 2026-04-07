@@ -252,6 +252,7 @@ export function WorkflowNodeFrame(input: FrameProps) {
   const rf = useReactFlow<WorkflowFlowNode, WorkflowFlowEdge>()
   const skills = useSkillList()
   const data = input.props.data
+  const hasFields = data.fields.length > 0
   const ui = tone(data.tone)
   const Icon = input.icon
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
@@ -342,7 +343,7 @@ export function WorkflowNodeFrame(input: FrameProps) {
       </div>
 
       {input.top ? <div className="pt-3">{input.top}</div> : null}
-      <div className="space-y-3 pt-3">{data.fields.map((item, i) => field(item, i, skills.names, save))}</div>
+      {hasFields ? <div className="space-y-3 pt-3">{data.fields.map((item, i) => field(item, i, skills.names, save))}</div> : null}
       {input.foot ? <div className="pt-3">{input.foot}</div> : null}
 
       {menu && typeof document !== "undefined"

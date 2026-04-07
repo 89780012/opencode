@@ -136,58 +136,31 @@ func (s *Service) Start(wid string, input string) (StartResult, error) {
 		return StartResult{}, errors.New("workflow workspace_path is required")
 	}
 
-	if err := s.ensure(); err != nil {
-		return StartResult{}, err
-	}
-
-	sid, err := s.createSession(flow.WorkspacePath)
-	if err != nil {
-		return StartResult{}, err
-	}
-
 	run := Run{
 		ID:            id("run"),
 		WorkflowID:    flow.ID,
 		WorkspacePath: flow.WorkspacePath,
-		RootSessionID: sid,
 		Status:        RunRunning,
 		CurrentNodeID: node.ID,
 		Input:         strings.TrimSpace(input),
 		StartedAt:     time.Now().UnixMilli(),
 	}
 
-	anchor := s.anchor(flow.WorkspacePath, sid)
-	prompt := buildPrompt(flow, node, run.Input, "", "")
-	row := NodeRun{
-		ID:        id("node"),
-		RunID:     run.ID,
-		NodeID:    node.ID,
-		SessionID: sid,
-		Status:    NodeRunning,
-		Input:     prompt,
-		StartedAt: time.Now().UnixMilli(),
-		Anchor:    anchor,
-	}
-
 	if err := s.putRun(run); err != nil {
 		return StartResult{}, err
 	}
-	if err := s.putNodeRun(row); err != nil {
-		return StartResult{}, err
-	}
-	if err := s.sendPrompt(flow.WorkspacePath, sid, node, prompt); err != nil {
-		row.Status = NodeFailed
-		row.Error = err.Error()
-		row.EndedAt = time.Now().UnixMilli()
+	row, err := s.queue(flow, &run, node, 0, run.Input, "", "")
+	if err != nil {
 		run.Status = RunFailed
 		run.Error = err.Error()
-		run.EndedAt = row.EndedAt
-		_ = s.putNodeRun(row)
+		run.EndedAt = time.Now().UnixMilli()
 		_ = s.putRun(run)
 		return StartResult{}, err
 	}
 
-	s.kick(run.ID)
+	if run.Status == RunRunning {
+		s.kick(run.ID)
+	}
 	return StartResult{Run: run, NodeRun: row}, nil
 }
 
@@ -355,50 +328,6 @@ func (s *Service) exec(runID string) {
 					return
 				}
 
-				sid := run.RootSessionID
-				if nextNode.Session == Isolated {
-					s.mu.Unlock()
-					if err := s.ensure(); err != nil {
-						s.mu.Lock()
-						run, _ = s.run(runID)
-						run.Status = RunFailed
-						run.Error = err.Error()
-						run.EndedAt = time.Now().UnixMilli()
-						_ = s.putRun(run)
-						s.mu.Unlock()
-						return
-					}
-					iso, err := s.createSession(run.WorkspacePath)
-					s.mu.Lock()
-					if err != nil {
-						run, _ = s.run(runID)
-						run.Status = RunFailed
-						run.Error = err.Error()
-						run.EndedAt = time.Now().UnixMilli()
-						_ = s.putRun(run)
-						s.mu.Unlock()
-						return
-					}
-					sid = iso
-				}
-
-				anchor := s.anchor(run.WorkspacePath, sid)
-				prompt := buildPrompt(flow, nextNode, run.Input, row.Result.Text, feedback)
-				nextRow := NodeRun{
-					ID:        id("node"),
-					RunID:     run.ID,
-					NodeID:    nextNode.ID,
-					SessionID: sid,
-					Status:    NodeRunning,
-					Turn:      row.Turn + 1,
-					Input:     prompt,
-					StartedAt: time.Now().UnixMilli(),
-					Anchor:    anchor,
-				}
-
-				run.Status = RunRunning
-				run.CurrentNodeID = nextNode.ID
-				run.Error = ""
 				if nextNode.Kind == Build && (node.Kind == Review || node.Kind == Judge) && row.Result.Pass != nil && !*row.Result.Pass {
 					run.Loop++
 				}
@@ -410,30 +339,15 @@ func (s *Service) exec(runID string) {
 					s.mu.Unlock()
 					return
 				}
-				if err := s.putRun(run); err != nil {
-					s.mu.Unlock()
-					return
-				}
-				if err := s.putNodeRun(nextRow); err != nil {
-					s.mu.Unlock()
-					return
-				}
-				s.mu.Unlock()
-
-				if err := s.sendPrompt(run.WorkspacePath, sid, nextNode, prompt); err != nil {
-					s.mu.Lock()
-					nextRow.Status = NodeFailed
-					nextRow.Error = err.Error()
-					nextRow.EndedAt = time.Now().UnixMilli()
-					_ = s.putNodeRun(nextRow)
-					run, _ = s.run(runID)
+				if _, err := s.queue(flow, &run, nextNode, row.Turn+1, run.Input, row.Result.Text, feedback); err != nil {
 					run.Status = RunFailed
 					run.Error = err.Error()
-					run.EndedAt = nextRow.EndedAt
+					run.EndedAt = time.Now().UnixMilli()
 					_ = s.putRun(run)
 					s.mu.Unlock()
 					return
 				}
+				s.mu.Unlock()
 				continue
 			}
 		}
@@ -513,6 +427,133 @@ func (s *Service) lastNodeRun(runID string, nodeID string) (NodeRun, bool) {
 		}
 	}
 	return out, hit
+}
+
+func auto(kind Kind) bool {
+	return kind == Start || kind == End
+}
+
+func (s *Service) session(dir string, run *Run, node Node) (string, error) {
+	if node.Session == Shared && run.RootSessionID != "" {
+		return run.RootSessionID, nil
+	}
+	if err := s.ensure(); err != nil {
+		return "", err
+	}
+	sid, err := s.createSession(dir)
+	if err != nil {
+		return "", err
+	}
+	if node.Session == Shared {
+		run.RootSessionID = sid
+	}
+	return sid, nil
+}
+
+func (s *Service) queue(
+	flow Workflow,
+	run *Run,
+	node Node,
+	turn int,
+	input string,
+	upstream string,
+	feedback string,
+) (NodeRun, error) {
+	for {
+		now := time.Now().UnixMilli()
+		if auto(node.Kind) {
+			row := NodeRun{
+				ID:        id("node"),
+				RunID:     run.ID,
+				NodeID:    node.ID,
+				Status:    NodeDone,
+				Turn:      turn,
+				StartedAt: now,
+				EndedAt:   now,
+			}
+			if err := s.putNodeRun(row); err != nil {
+				return NodeRun{}, err
+			}
+
+			run.CurrentNodeID = node.ID
+			run.Error = ""
+			if node.Kind == End {
+				run.Status = RunDone
+				run.EndedAt = now
+				if err := s.putRun(*run); err != nil {
+					return NodeRun{}, err
+				}
+				return row, nil
+			}
+
+			nextID, nextFeedback := next(flow, node, row.Result)
+			if nextID == "" {
+				run.Status = RunDone
+				run.EndedAt = now
+				if err := s.putRun(*run); err != nil {
+					return NodeRun{}, err
+				}
+				return row, nil
+			}
+
+			nextNode, ok := pickNode(flow, nextID)
+			if !ok {
+				return NodeRun{}, errors.New("next workflow node not found")
+			}
+
+			run.Status = RunRunning
+			run.CurrentNodeID = nextNode.ID
+			if err := s.putRun(*run); err != nil {
+				return NodeRun{}, err
+			}
+
+			node = nextNode
+			turn++
+			upstream = row.Result.Text
+			feedback = nextFeedback
+			continue
+		}
+
+		sid, err := s.session(flow.WorkspacePath, run, node)
+		if err != nil {
+			return NodeRun{}, err
+		}
+		prompt := buildPrompt(flow, node, input, upstream, feedback)
+		row := NodeRun{
+			ID:        id("node"),
+			RunID:     run.ID,
+			NodeID:    node.ID,
+			SessionID: sid,
+			Status:    NodeRunning,
+			Turn:      turn,
+			Input:     prompt,
+			StartedAt: now,
+			Anchor:    s.anchor(flow.WorkspacePath, sid),
+		}
+
+		run.Status = RunRunning
+		run.CurrentNodeID = node.ID
+		run.Error = ""
+		run.EndedAt = 0
+		if err := s.putRun(*run); err != nil {
+			return NodeRun{}, err
+		}
+		if err := s.putNodeRun(row); err != nil {
+			return NodeRun{}, err
+		}
+		if err := s.sendPrompt(flow.WorkspacePath, sid, node, prompt); err != nil {
+			row.Status = NodeFailed
+			row.Error = err.Error()
+			row.EndedAt = time.Now().UnixMilli()
+			run.Status = RunFailed
+			run.Error = err.Error()
+			run.EndedAt = row.EndedAt
+			_ = s.putNodeRun(row)
+			_ = s.putRun(*run)
+			return NodeRun{}, err
+		}
+		return row, nil
+	}
 }
 
 func (s *Service) putRun(item Run) error {

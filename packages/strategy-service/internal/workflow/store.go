@@ -132,6 +132,11 @@ func cleanNodes(list []Node) []Node {
 		item.Session = mode(item.Session)
 		item.Kind = kind(item.Kind)
 		item.Skills = uniq(item.Skills)
+		if item.Kind == Start || item.Kind == End {
+			item.Agent = ""
+			item.Prompt = ""
+			item.Skills = nil
+		}
 		if item.TimeoutMS < 0 {
 			item.TimeoutMS = 0
 		}

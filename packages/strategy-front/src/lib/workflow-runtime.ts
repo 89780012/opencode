@@ -44,13 +44,20 @@ function name(node: WorkflowRuntimeNode) {
 }
 
 function agent(node: WorkflowFlowNode) {
-  if (node.data.kind === "start" || node.data.kind === "end" || node.data.kind === "judge") {
+  if (node.data.kind === "start" || node.data.kind === "end") {
+    return ""
+  }
+  if (node.data.kind === "judge") {
     return kindAgent(node.data.kind)
   }
   return node.data.title.trim() || kindAgent(node.data.kind)
 }
 
 function fields(node: WorkflowRuntimeNode) {
+  if (node.kind === "start" || node.kind === "end") {
+    return []
+  }
+
   return [
     {
       key: workflowField.session,
@@ -137,7 +144,11 @@ export function fromFlow(
   edges: WorkflowFlowEdge[],
 ): WorkflowRuntimeDetail {
   const nextNodes = nodes.map((node) => {
-    const title = node.data.title.trim() || kindAgent(node.data.kind)
+    const title =
+      node.data.title.trim() ||
+      (node.data.kind === "start" || node.data.kind === "end" || node.data.kind === "judge"
+        ? kindName(node.data.kind)
+        : kindAgent(node.data.kind))
     return {
       id: node.id,
       kind: node.data.kind,

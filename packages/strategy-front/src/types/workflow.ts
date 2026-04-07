@@ -286,6 +286,8 @@ function label(key: WorkflowFieldKey) {
 }
 
 function fields(kind: WorkflowKind, seed: WorkflowSeed) {
+  if (kind === "start" || kind === "end") return []
+
   const mode = seed.mode || kindMode(kind)
   return [
     {
@@ -311,7 +313,9 @@ function fields(kind: WorkflowKind, seed: WorkflowSeed) {
 }
 
 export function makeNode(kind: WorkflowKind, id: string, pos: XYPosition, seed: WorkflowSeed = {}): WorkflowFlowNode {
-  const title = seed.title || seed.agent || kindAgent(kind)
+  const title =
+    seed.title ||
+    (kind === "start" || kind === "end" || kind === "judge" ? kindName(kind) : seed.agent || kindAgent(kind))
 
   if (kind === "start") {
     return {
