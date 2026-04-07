@@ -15,11 +15,10 @@ import {
 import { Trash2 } from "lucide-react"
 import "@xyflow/react/dist/style.css"
 import { WorkflowMiniToolbar } from "@/components/workflow/workflow-mini-toolbar"
-import { WorkflowNode } from "@/components/workflow/workflow-node"
+import { workflowNodeTypes } from "@/components/workflow/workflow-node"
 import { makeNode } from "@/types/workflow"
-import type { WorkflowDetail, WorkflowFlowEdge, WorkflowFlowNode, WorkflowKind } from "@/types/workflow"
+import type { WorkflowDetail, WorkflowFlowEdge, WorkflowFlowNode, WorkflowKind, WorkflowSeed } from "@/types/workflow"
 
-const types = { workflow: WorkflowNode }
 const tone = (active = false) => ({
   stroke: "var(--primary)",
   strokeWidth: active ? 3 : 2.2,
@@ -39,14 +38,14 @@ export function WorkflowCanvas(props: {
   const [edges, setEdges, onEdges] = useEdgesState(props.item.edges)
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null)
 
-  const drop = (kind: WorkflowKind, x: number, y: number) => {
+  const drop = (kind: WorkflowKind, x: number, y: number, seed?: WorkflowSeed) => {
     if (!rf) return
     const pos = rf.screenToFlowPosition({ x, y })
     const id = `${kind}-${Date.now()}-${seq.current++}`
     const next = makeNode(kind, id, {
       x: pos.x - 110 + seq.current * 8,
       y: pos.y - 60 + seq.current * 8,
-    })
+    }, seed)
     setNodes((prev) => [...prev, next])
   }
 
@@ -95,7 +94,7 @@ export function WorkflowCanvas(props: {
       <ReactFlow<WorkflowFlowNode, WorkflowFlowEdge>
         nodes={nodes}
         edges={edges}
-        nodeTypes={types}
+        nodeTypes={workflowNodeTypes}
         fitView
         proOptions={{ hideAttribution: true }}
         defaultEdgeOptions={{
@@ -165,6 +164,16 @@ export function WorkflowCanvas(props: {
         }}
         onDrop={(event) => {
           event.preventDefault()
+          const raw = event.dataTransfer.getData("application/opencode-workflow-node")
+          if (raw) {
+            try {
+              const item = JSON.parse(raw) as WorkflowSeed & { kind?: WorkflowKind }
+              if (item.kind) {
+                drop(item.kind, event.clientX, event.clientY, item)
+                return
+              }
+            } catch {}
+          }
           const kind = event.dataTransfer.getData("application/opencode-workflow") as WorkflowKind
           if (!kind) return
           drop(kind, event.clientX, event.clientY)

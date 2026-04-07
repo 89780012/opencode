@@ -1,4 +1,4 @@
-import { makeNode } from "@/types/workflow"
+import { kindAgent, kindName, makeNode, workflowField } from "@/types/workflow"
 import type {
   WorkflowDetail,
   WorkflowFlowEdge,
@@ -11,33 +11,71 @@ import type {
 } from "@/types/workflow"
 
 function tone(kind: WorkflowRuntimeNode["kind"]) {
+  if (kind === "start") return "blue"
   if (kind === "plan") return "blue"
+  if (kind === "end") return "amber"
   if (kind === "build") return "amber"
   return "slate"
 }
 
 function desc(node: WorkflowRuntimeNode) {
   if (node.prompt.trim()) return node.prompt.trim()
+  if (node.kind === "start") return "整理输入并启动流程。"
   if (node.kind === "plan") return "输出实现计划。"
   if (node.kind === "build") return "在工作区中实现需求。"
+  if (node.kind === "judge") return "根据结果做分支判断。"
   if (node.kind === "review") return "审查当前工作区状态。"
+  if (node.kind === "end") return "汇总结果并结束流程。"
   return "等待人工决策。"
+}
+
+function name(node: WorkflowRuntimeNode) {
+  const title = node.title.trim()
+  if (!title) {
+    return node.agent.trim() || kindName(node.kind)
+  }
+  if (node.kind === "start" || node.kind === "end" || node.kind === "judge") {
+    return title
+  }
+  if (title === kindName(node.kind)) {
+    return node.agent.trim() || kindName(node.kind)
+  }
+  return title
+}
+
+function agent(node: WorkflowFlowNode) {
+  if (node.data.kind === "start" || node.data.kind === "end" || node.data.kind === "judge") {
+    return kindAgent(node.data.kind)
+  }
+  return node.data.title.trim() || kindAgent(node.data.kind)
 }
 
 function fields(node: WorkflowRuntimeNode) {
   return [
     {
+      key: workflowField.session,
       kind: "select" as const,
       label: "会话",
       value: node.session_mode,
-      options: ["shared", "isolated"],
+      options:
+        node.session_mode === "isolated"
+          ? [
+              { label: "独立会话", value: "isolated" },
+              { label: "共享会话", value: "shared" },
+            ]
+          : [
+              { label: "共享会话", value: "shared" },
+              { label: "独立会话", value: "isolated" },
+            ],
     },
     {
-      kind: "note" as const,
-      label: "智能体",
-      value: node.agent || "",
+      key: workflowField.skills,
+      kind: "multi" as const,
+      label: "技能",
+      value: node.skills || [],
     },
     {
+      key: workflowField.prompt,
       kind: "note" as const,
       label: "提示词",
       value: node.prompt || "",
@@ -52,7 +90,7 @@ export function runtimeItem(item: WorkflowRuntimeDetail): WorkflowItem {
     desc: item.workspace_path || "工作流",
     status: item.nodes.length > 0 ? "ready" : "draft",
     updated_at: item.updated_at,
-    tags: [...new Set(item.nodes.map((node) => node.kind))],
+    tags: [...new Set(item.nodes.map((node) => kindName(node.kind)))],
     count: item.nodes.length,
   }
 }
@@ -65,7 +103,7 @@ export function runtimeDetail(item: WorkflowRuntimeDetail): WorkflowDetail {
       data: {
         ...base.data,
         kind: node.kind,
-        title: node.title || base.data.title,
+        title: name(node),
         desc: desc(node),
         tone: tone(node.kind),
         fields: fields(node),
@@ -98,17 +136,20 @@ export function fromFlow(
   nodes: WorkflowFlowNode[],
   edges: WorkflowFlowEdge[],
 ): WorkflowRuntimeDetail {
-  const nextNodes = nodes.map((node) => ({
-    id: node.id,
-    kind: node.data.kind,
-    title: node.data.title,
-    agent: note(node.data.fields, "智能体"),
-    skills: [],
-    session_mode: mode(node.data.fields, node.data.kind),
-    prompt: note(node.data.fields, "提示词"),
-    timeout_ms: 0,
-    retry_limit: 0,
-  })) satisfies WorkflowRuntimeNode[]
+  const nextNodes = nodes.map((node) => {
+    const title = node.data.title.trim() || kindAgent(node.data.kind)
+    return {
+      id: node.id,
+      kind: node.data.kind,
+      title,
+      agent: agent(node),
+      skills: multi(node.data.fields, workflowField.skills),
+      session_mode: mode(node.data.fields, node.data.kind),
+      prompt: note(node.data.fields, workflowField.prompt),
+      timeout_ms: 0,
+      retry_limit: 0,
+    }
+  }) satisfies WorkflowRuntimeNode[]
 
   const nextEdges = edges.map((edge) => ({
     id: edge.id,
@@ -126,19 +167,25 @@ export function fromFlow(
   }
 }
 
-function note(fields: WorkflowFlowNode["data"]["fields"], label: string) {
-  const item = fields.find((field) => field.label === label && field.kind === "note")
+function note(fields: WorkflowFlowNode["data"]["fields"], key: string) {
+  const item = fields.find((field) => field.key === key && field.kind === "note")
   if (!item || item.kind !== "note") return ""
   return item.value.trim()
 }
 
-function select(fields: WorkflowFlowNode["data"]["fields"], label: string, fallback: string) {
-  const item = fields.find((field) => field.label === label && field.kind === "select")
+function select(fields: WorkflowFlowNode["data"]["fields"], key: string, fallback: string) {
+  const item = fields.find((field) => field.key === key && field.kind === "select")
   if (!item || item.kind !== "select") return fallback
   return item.value || fallback
 }
 
+function multi(fields: WorkflowFlowNode["data"]["fields"], key: string) {
+  const item = fields.find((field) => field.key === key && field.kind === "multi")
+  if (!item || item.kind !== "multi") return []
+  return item.value.map((row) => row.trim()).filter(Boolean)
+}
+
 function mode(fields: WorkflowFlowNode["data"]["fields"], kind: WorkflowRuntimeNode["kind"]): WorkflowSessionMode {
-  const value = select(fields, "会话", kind === "review" ? "isolated" : "shared")
+  const value = select(fields, workflowField.session, kind === "review" ? "isolated" : "shared")
   return value === "isolated" ? "isolated" : "shared"
 }

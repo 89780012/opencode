@@ -1,65 +1,211 @@
-import { useMemo, useState } from "react"
-import { ChevronDown, ChevronUp, ClipboardList, FileSearch, Hammer, PauseCircle, Search } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import {
+  ChevronDown,
+  ChevronUp,
+  ClipboardList,
+  FileSearch,
+  GitBranch,
+  Hammer,
+  PauseCircle,
+  Play,
+  Search,
+  Square,
+} from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { useGlobalData } from "@/data/global-data-provider"
 import { cn } from "@/lib/utils"
-import type { WorkflowKind } from "@/types/workflow"
+import { kindDesc, kindMode, kindPrompt, type WorkflowKind } from "@/types/workflow"
+import type { GlobalAgent, RuntimeAgent } from "@/types/agent"
 
-const cut = 28
-const init = ["Core", "Control"]
+const cut = 16
+const init = ["流程控制", "规划智能体", "执行智能体"]
 
-const workflowLibrary: {
+type Item = {
+  kind: WorkflowKind
   title: string
-  items: { kind: WorkflowKind; title: string; desc: string }[]
-}[] = [
-  {
-    title: "Core",
-    items: [
-      { kind: "plan", title: "Plan", desc: "Break the request into a concrete implementation plan." },
-      { kind: "build", title: "Build", desc: "Implement or revise code in the shared workspace." },
-      { kind: "review", title: "Review", desc: "Review current code and emit structured pass/fail feedback." },
-    ],
-  },
-  {
-    title: "Control",
-    items: [{ kind: "gate", title: "Gate", desc: "Pause for a manual decision before continuing." }],
-  },
-]
+  desc: string
+  agent?: string
+  prompt?: string
+  mode?: "shared" | "isolated"
+  search: string
+}
+
+type AgentRow = {
+  name: string
+  description?: string
+  hidden?: boolean
+  mode?: "subagent" | "primary" | "all"
+}
+
+function has(text: string, list: string[]) {
+  return list.some((item) => text.includes(item))
+}
+
+function infer(item: AgentRow): WorkflowKind {
+  const text = `${item.name} ${item.description || ""}`.toLowerCase()
+  if (has(text, ["plan"])) {
+    return "plan"
+  }
+  return "build"
+}
+
+function title(kind: WorkflowKind) {
+  if (kind === "plan") return "规划智能体"
+  if (kind === "build") return "执行智能体"
+  return "执行智能体"
+}
+
+function note(item: AgentRow, kind: WorkflowKind) {
+  const text = item.description?.trim()
+  if (text && /[\u4e00-\u9fff]/.test(text)) {
+    return text
+  }
+  if (kind === "plan") return `${item.name} 负责拆解需求并产出可执行计划。`
+  return `${item.name} 负责在工作区中执行实现或修改。`
+}
+
+function merge(run: RuntimeAgent[], cfg: GlobalAgent[]) {
+  const map = new Map<string, AgentRow>()
+
+  for (const item of cfg) {
+    map.set(item.name, {
+      name: item.name,
+      description: item.description,
+      hidden: item.hidden,
+      mode: item.mode,
+    })
+  }
+
+  for (const item of run) {
+    const prev = map.get(item.name)
+    map.set(item.name, {
+      name: item.name,
+      description: prev?.description || item.description,
+      hidden: prev?.hidden || item.hidden,
+      mode: prev?.mode === "subagent" ? prev.mode : item.mode,
+    })
+  }
+
+  return [...map.values()]
+    .filter((item) => !item.hidden && item.mode !== "subagent")
+    .sort((a, b) => a.name.localeCompare(b.name))
+}
+
+function build(list: AgentRow[]) {
+  const map = new Map<string, Item[]>()
+
+  map.set("流程控制", [
+    {
+      kind: "start",
+      title: "开始",
+      desc: "作为流程入口，整理输入与上下文后进入下一节点。",
+      agent: "operator",
+      prompt: kindPrompt("start"),
+      mode: kindMode("start"),
+      search: "开始 起点 启动 start",
+    },
+    {
+      kind: "end",
+      title: "结束",
+      desc: "汇总最终结果，作为流程终点结束执行。",
+      agent: "operator",
+      prompt: kindPrompt("end"),
+      mode: kindMode("end"),
+      search: "结束 终点 完成 end",
+    },
+    {
+      kind: "judge",
+      title: "通用判断",
+      desc: "做通用判断，并按 pass / fail 分支继续流转。",
+      agent: "reviewer",
+      prompt: kindPrompt("judge"),
+      mode: kindMode("judge"),
+      search: "判断 条件 分支 judge pass fail",
+    },
+  ])
+
+  for (const item of list) {
+    const kind = infer(item)
+    const key = title(kind)
+    const row = {
+      kind,
+      title: item.name,
+      desc: note(item, kind),
+      agent: item.name,
+      prompt: kindPrompt(kind),
+      mode: kindMode(kind),
+      search: `${item.name} ${item.description || ""} ${kindDesc(kind)}`,
+    } satisfies Item
+    map.set(key, [...(map.get(key) || []), row])
+  }
+
+  return ["流程控制", "规划智能体", "执行智能体"]
+    .map((item) => ({
+      title: item,
+      items: map.get(item) || [],
+    }))
+    .filter((item) => item.items.length > 0)
+}
 
 function icon(kind: WorkflowKind) {
+  if (kind === "start") return <Play className="size-4 text-primary" />
   if (kind === "plan") return <ClipboardList className="size-4 text-primary" />
   if (kind === "build") return <Hammer className="size-4 text-amber-500" />
+  if (kind === "judge") return <GitBranch className="size-4 text-slate-500" />
   if (kind === "review") return <FileSearch className="size-4 text-slate-500" />
+  if (kind === "end") return <Square className="size-4 text-amber-500" />
   return <PauseCircle className="size-4 text-slate-500" />
 }
 
 function gicon(kinds: WorkflowKind[]) {
+  if (kinds.includes("start")) {
+    return <Play className="size-3.5 text-muted-foreground" />
+  }
   if (kinds.includes("plan") || kinds.includes("build") || kinds.includes("review")) {
     return <ClipboardList className="size-3.5 text-muted-foreground" />
+  }
+  if (kinds.includes("judge")) {
+    return <GitBranch className="size-3.5 text-muted-foreground" />
+  }
+  if (kinds.includes("end")) {
+    return <Square className="size-3.5 text-muted-foreground" />
   }
   return <PauseCircle className="size-3.5 text-muted-foreground" />
 }
 
-function clip(text: string) {
-  if (text.length <= cut) return text
-  return `${text.slice(0, cut)}...`
+function clip(text: string, max = cut) {
+  if (text.length <= max) return text
+  return `${text.slice(0, max)}...`
 }
 
 export function WorkflowLibrary(props: { value: string; onValue: (value: string) => void }) {
+  const data = useGlobalData()
+  const ensure = data.ensure
+
+  useEffect(() => {
+    void ensure("agent")
+  }, [ensure])
+
+  const rows = useMemo(
+    () => merge(data.agent.data.run, data.agent.data.cfg.agents),
+    [data.agent.data.cfg.agents, data.agent.data.run],
+  )
+  const base = useMemo(() => build(rows), [rows])
   const list = useMemo(() => {
     const key = props.value.trim().toLowerCase()
-    return workflowLibrary
+    return base
       .map((group) => ({
         ...group,
         items: group.items.filter((item) => {
           if (!key) return true
-          return item.title.toLowerCase().includes(key) || item.desc.toLowerCase().includes(key)
+          return [item.title, item.desc, item.search].some((row) => row.toLowerCase().includes(key))
         }),
       }))
       .filter((group) => group.items.length > 0)
-  }, [props.value])
+  }, [base, props.value])
   const [open, setOpen] = useState<string[]>(init)
   const full = list.map((group) => group.title)
   const all = full.length > 0 && full.every((item) => open.includes(item))
@@ -73,7 +219,7 @@ export function WorkflowLibrary(props: { value: string; onValue: (value: string)
             <Input
               value={props.value}
               onChange={(event) => props.onValue(event.target.value)}
-              placeholder="Search nodes..."
+              placeholder="搜索节点或智能体..."
               className="h-8 rounded-md border-border/80 bg-background pl-9 text-[13px] shadow-none"
             />
           </div>
@@ -89,7 +235,7 @@ export function WorkflowLibrary(props: { value: string; onValue: (value: string)
               </button>
             </TooltipTrigger>
             <TooltipContent side="bottom" sideOffset={8}>
-              {all ? "Collapse all" : "Expand all"}
+              {all ? "全部收起" : "全部展开"}
             </TooltipContent>
           </Tooltip>
         </div>
@@ -97,6 +243,14 @@ export function WorkflowLibrary(props: { value: string; onValue: (value: string)
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="px-2 py-3">
+          {data.agent.err ? (
+            <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              {data.agent.err}
+            </div>
+          ) : null}
+          {data.agent.load ? (
+            <div className="mb-3 px-2 text-xs text-muted-foreground">正在加载可用智能体...</div>
+          ) : null}
           <Accordion type="multiple" value={open} onValueChange={setOpen} className="w-full">
             {list.map((group) => (
               <AccordionItem key={group.title} value={group.title} className="border-b-0">
@@ -120,15 +274,48 @@ export function WorkflowLibrary(props: { value: string; onValue: (value: string)
                         onDragStart={(event) => {
                           event.dataTransfer.effectAllowed = "copy"
                           event.dataTransfer.setData("application/opencode-workflow", item.kind)
+                          event.dataTransfer.setData(
+                            "application/opencode-workflow-node",
+                            JSON.stringify({
+                              kind: item.kind,
+                              title: item.title,
+                              desc: item.desc,
+                              agent: item.agent,
+                              prompt: item.prompt,
+                              mode: item.mode,
+                            }),
+                          )
                         }}
                       >
-                        <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">{icon(item.kind)}</div>
+                        <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
+                          {icon(item.kind)}
+                        </div>
                         <div className="min-w-0 flex-1">
-                          <div className="truncate text-[13px] font-medium text-foreground">{item.title}</div>
+                          {item.title.length > cut ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="truncate text-[13px] font-medium text-foreground">
+                                  {clip(item.title)}
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent
+                                side="right"
+                                align="start"
+                                sideOffset={8}
+                                className="max-w-56 px-2.5 py-1.5 leading-5"
+                              >
+                                {item.title}
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <div className="truncate text-[13px] font-medium text-foreground">{item.title}</div>
+                          )}
                           {item.desc.length > cut ? (
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <div className="mt-0.5 truncate text-[12px] text-muted-foreground">{clip(item.desc)}</div>
+                                <div className="mt-0.5 truncate text-[12px] text-muted-foreground">
+                                  {clip(item.desc)}
+                                </div>
                               </TooltipTrigger>
                               <TooltipContent
                                 side="right"
@@ -150,6 +337,12 @@ export function WorkflowLibrary(props: { value: string; onValue: (value: string)
               </AccordionItem>
             ))}
           </Accordion>
+
+          {list.length === 0 ? (
+            <div className="rounded-md border border-dashed border-border/70 px-3 py-4 text-sm text-muted-foreground">
+              没有匹配的智能体节点。
+            </div>
+          ) : null}
         </div>
       </ScrollArea>
     </aside>

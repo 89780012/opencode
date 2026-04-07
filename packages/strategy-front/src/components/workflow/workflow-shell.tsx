@@ -1,49 +1,22 @@
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { ArrowLeft, PanelLeftClose, PanelLeftOpen } from "lucide-react"
 import { Link } from "react-router-dom"
 import { toast } from "sonner"
 import { workflowApi } from "@/api/modules"
 import { WorkflowCanvas } from "@/components/workflow/workflow-canvas"
 import { WorkflowLibrary } from "@/components/workflow/workflow-library"
+import { WorkflowSidepanel } from "@/components/workflow/workflow-sidepanel"
 import { WorkflowTopbar } from "@/components/workflow/workflow-topbar"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { fromFlow, runtimeDetail } from "@/lib/workflow-runtime"
 import type {
   WorkflowDetail,
-  WorkflowEdgeCond,
   WorkflowFlowEdge,
   WorkflowFlowNode,
-  WorkflowNodeData,
   WorkflowNodeRun,
   WorkflowRun,
   WorkflowRuntimeDetail,
 } from "@/types/workflow"
-
-const fmt = new Intl.DateTimeFormat("zh-CN", {
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-})
-
-function stamp(value?: number) {
-  if (!value) return "-"
-  return fmt.format(new Date(value))
-}
-
-function readNote(fields: WorkflowNodeData["fields"], label: string) {
-  const item = fields.find((field) => field.kind === "note" && field.label === label)
-  if (!item || item.kind !== "note") return ""
-  return item.value
-}
-
-function readSelect(fields: WorkflowNodeData["fields"], label: string, fallback: string) {
-  const item = fields.find((field) => field.kind === "select" && field.label === label)
-  if (!item || item.kind !== "select") return fallback
-  return item.value || fallback
-}
 
 export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: () => Promise<void> | void }) {
   const [open, setOpen] = useState(true)
@@ -54,14 +27,10 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
   const [rows, setRows] = useState<WorkflowNodeRun[]>([])
   const [item, setItem] = useState(props.item)
   const [flow, setFlow] = useState<WorkflowDetail>(() => runtimeDetail(props.item))
-  const [pick, setPick] = useState<WorkflowFlowNode | null>(null)
-  const [edge, setEdge] = useState<WorkflowFlowEdge | null>(null)
 
   useEffect(() => {
     setItem(props.item)
     setFlow(runtimeDetail(props.item))
-    setPick(null)
-    setEdge(null)
   }, [props.item])
 
   const blocked = run?.status === "blocked"
@@ -89,37 +58,16 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
     return () => window.clearInterval(timer)
   }, [refreshRun, run?.id, run?.status])
 
-  const setNode = (id: string, map: (node: WorkflowFlowNode) => WorkflowFlowNode) => {
-    setFlow((prev) => ({
-      ...prev,
-      nodes: prev.nodes.map((node) => (node.id === id ? map(node) : node)),
-    }))
-  }
-
-  const setFields = (id: string, map: (fields: WorkflowNodeData["fields"]) => WorkflowNodeData["fields"]) => {
-    setNode(id, (node) => ({
-      ...node,
-      data: {
-        ...node.data,
-        fields: map(node.data.fields),
-      },
-    }))
-  }
-
-  const setEdgeRow = (id: string, map: (row: WorkflowFlowEdge) => WorkflowFlowEdge) => {
-    setFlow((prev) => ({
-      ...prev,
-      edges: prev.edges.map((row) => (row.id === id ? map(row) : row)),
-    }))
-  }
-
   const onCanvasChange = useCallback((nodes: WorkflowFlowNode[], edges: WorkflowFlowEdge[]) => {
-    setFlow((prev) => ({
-      ...prev,
-      count: nodes.length,
-      nodes,
-      edges,
-    }))
+    setFlow((prev) => {
+      if (prev.nodes === nodes && prev.edges === edges) return prev
+      return {
+        ...prev,
+        count: nodes.length,
+        nodes,
+        edges,
+      }
+    })
   }, [])
 
   const onSave = async () => {
@@ -189,40 +137,6 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
     }
   }
 
-  const syncPick = (id: string, value: string, label: string) => {
-    setPick((prev) =>
-      prev
-        ? {
-            ...prev,
-            data: {
-              ...prev.data,
-              fields: prev.data.fields.map((item) =>
-                item.kind === "note" && item.label === label ? { ...item, value } : item,
-              ),
-            },
-          }
-        : prev,
-    )
-    setFields(id, (fields) => fields.map((item) => (item.kind === "note" && item.label === label ? { ...item, value } : item)))
-  }
-
-  const syncPickMode = (id: string, value: string) => {
-    setPick((prev) =>
-      prev
-        ? {
-            ...prev,
-            data: {
-              ...prev.data,
-              fields: prev.data.fields.map((item) =>
-                item.kind === "select" && item.label === "会话" ? { ...item, value } : item,
-              ),
-            },
-          }
-        : prev,
-    )
-    setFields(id, (fields) => fields.map((item) => (item.kind === "select" && item.label === "会话" ? { ...item, value } : item)))
-  }
-
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
       <div className="border-b border-border/70 bg-sidebar px-5 py-1 backdrop-blur">
@@ -261,156 +175,17 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
 
           <div className="relative min-h-0 flex-1">
             <div className="h-full">
-              <WorkflowCanvas item={flow} onPick={setPick} onEdgePick={setEdge} onChange={onCanvasChange} />
+              <WorkflowCanvas item={flow} onPick={() => {}} onEdgePick={() => {}} onChange={onCanvasChange} />
             </div>
           </div>
 
-          <aside className="flex h-full w-[380px] shrink-0 flex-col border-l border-border/70 bg-sidebar">
-            <div className="border-b border-border/70 px-4 py-4">
-              <div className="text-sm font-medium text-foreground">运行输入</div>
-              <div className="mt-1 text-xs text-muted-foreground">工作流根会话共享的启动输入。</div>
-              <textarea
-                value={text}
-                onChange={(event: ChangeEvent<HTMLTextAreaElement>) => setText(event.target.value)}
-                placeholder="描述这次工作流要完成的目标..."
-                className="mt-3 min-h-28 w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-              />
-            </div>
-
-            <div className="border-b border-border/70 px-4 py-4">
-              <div className="text-sm font-medium text-foreground">运行状态</div>
-              <div className="mt-3 space-y-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">状态</span>
-                  <span className="font-medium text-foreground">{run?.status || "idle"}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">当前节点</span>
-                  <span className="max-w-40 truncate font-medium text-foreground">{run?.current_node_id || "-"}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">开始时间</span>
-                  <span className="font-medium text-foreground">{stamp(run?.started_at)}</span>
-                </div>
-                {run?.error ? <div className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">{run.error}</div> : null}
-                {current?.error ? (
-                  <div className="rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-                    当前节点：{current.error}
-                  </div>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="border-b border-border/70 px-4 py-4">
-              <div className="text-sm font-medium text-foreground">详情编辑</div>
-              {pick ? (
-                <div className="mt-3 space-y-3">
-                  <div className="space-y-1.5">
-                    <Label>节点标题</Label>
-                    <Input
-                      value={pick.data.title}
-                      onChange={(event) => {
-                        const value = event.target.value
-                        setPick((prev) => (prev ? { ...prev, data: { ...prev.data, title: value } } : prev))
-                        setNode(pick.id, (node) => ({ ...node, data: { ...node.data, title: value } }))
-                      }}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>智能体</Label>
-                    <Input value={readNote(pick.data.fields, "智能体")} onChange={(event) => syncPick(pick.id, event.target.value, "智能体")} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>会话模式</Label>
-                    <select
-                      value={readSelect(pick.data.fields, "会话", pick.data.kind === "review" ? "isolated" : "shared")}
-                      onChange={(event) => syncPickMode(pick.id, event.target.value)}
-                      className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                    >
-                      <option value="shared">shared</option>
-                      <option value="isolated">isolated</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>提示词</Label>
-                    <textarea
-                      value={readNote(pick.data.fields, "提示词")}
-                      onChange={(event) => syncPick(pick.id, event.target.value, "提示词")}
-                      className="min-h-24 w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    />
-                  </div>
-                </div>
-              ) : edge ? (
-                <div className="mt-3 space-y-3">
-                  <div className="space-y-1.5">
-                    <Label>连线标签</Label>
-                    <Input
-                      value={typeof edge.label === "string" ? edge.label : ""}
-                      onChange={(event) => {
-                        const value = event.target.value
-                        setEdge((prev) => (prev ? { ...prev, label: value } : prev))
-                        setEdgeRow(edge.id, (row) => ({ ...row, label: value }))
-                      }}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>触发条件</Label>
-                    <select
-                      value={
-                        edge.data?.cond === "pass" || edge.data?.cond === "fail" || edge.data?.cond === "always"
-                          ? edge.data.cond
-                          : "always"
-                      }
-                      onChange={(event) => {
-                        const value = event.target.value as WorkflowEdgeCond
-                        setEdge((prev) => (prev ? { ...prev, data: { ...prev.data, cond: value } } : prev))
-                        setEdgeRow(edge.id, (row) => ({ ...row, data: { ...row.data, cond: value } }))
-                      }}
-                      className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                    >
-                      <option value="always">always</option>
-                      <option value="pass">pass</option>
-                      <option value="fail">fail</option>
-                    </select>
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-3 rounded-md border border-dashed border-border/70 px-3 py-4 text-sm text-muted-foreground">
-                  选择一个节点或一条连线后，可在这里编辑详情。
-                </div>
-              )}
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-              <div className="mb-3 text-sm font-medium text-foreground">节点运行记录</div>
-              <div className="space-y-3">
-                {rows.length === 0 ? (
-                  <div className="rounded-md border border-dashed border-border/70 px-3 py-4 text-sm text-muted-foreground">
-                    还没有运行记录。
-                  </div>
-                ) : (
-                  rows.map((row) => (
-                    <section key={row.id} className="rounded-md border border-border/70 bg-background px-3 py-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="text-sm font-medium text-foreground">{row.node_id}</div>
-                        <div className="rounded-full border border-border/70 px-2 py-0.5 text-[11px] text-muted-foreground">
-                          {row.status}
-                        </div>
-                      </div>
-                      <div className="mt-2 text-xs text-muted-foreground">会话：{row.session_id}</div>
-                      {row.output ? <div className="mt-2 whitespace-pre-wrap text-xs leading-5 text-foreground">{row.output}</div> : null}
-                      {row.result.next_prompt ? (
-                        <div className="mt-2 rounded-md bg-muted px-2 py-2 text-xs leading-5 text-muted-foreground">
-                          回写提示词：{row.result.next_prompt}
-                        </div>
-                      ) : null}
-                      {row.error ? <div className="mt-2 text-xs text-destructive">{row.error}</div> : null}
-                    </section>
-                  ))
-                )}
-              </div>
-            </div>
-          </aside>
+          <WorkflowSidepanel
+            text={text}
+            run={run}
+            rows={rows}
+            current={current}
+            onText={setText}
+          />
         </div>
       </div>
     </div>

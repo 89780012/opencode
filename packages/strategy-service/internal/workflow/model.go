@@ -3,9 +3,12 @@ package workflow
 type Kind string
 
 const (
+	Start  Kind = "start"
 	Plan   Kind = "plan"
 	Build  Kind = "build"
+	Judge  Kind = "judge"
 	Review Kind = "review"
+	End    Kind = "end"
 	Gate   Kind = "gate"
 )
 

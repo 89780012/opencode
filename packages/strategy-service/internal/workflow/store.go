@@ -244,7 +244,7 @@ func uniq(list []string) []string {
 
 func kind(v Kind) Kind {
 	switch v {
-	case Plan, Build, Review, Gate:
+	case Start, Plan, Build, Judge, Review, End, Gate:
 		return v
 	default:
 		return Plan

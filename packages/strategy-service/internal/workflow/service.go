@@ -399,7 +399,7 @@ func (s *Service) exec(runID string) {
 				run.Status = RunRunning
 				run.CurrentNodeID = nextNode.ID
 				run.Error = ""
-				if nextNode.Kind == Build && node.Kind == Review && row.Result.Pass != nil && !*row.Result.Pass {
+				if nextNode.Kind == Build && (node.Kind == Review || node.Kind == Judge) && row.Result.Pass != nil && !*row.Result.Pass {
 					run.Loop++
 				}
 				if run.Loop > 3 {
@@ -581,7 +581,7 @@ func buildPrompt(flow Workflow, node Node, input string, upstream string, feedba
 	if node.Prompt != "" {
 		parts = append(parts, "Node instructions:\n"+node.Prompt)
 	}
-	if node.Kind == Review {
+	if node.Kind == Review || node.Kind == Judge {
 		parts = append(parts, `Output contract:
 Return JSON with keys pass, summary, issues, next_prompt.`)
 	}
@@ -593,7 +593,7 @@ Return JSON with keys pass, summary, issues, next_prompt.`)
 
 func next(flow Workflow, node Node, res Result) (string, string) {
 	check := Always
-	if node.Kind == Review {
+	if node.Kind == Review || node.Kind == Judge {
 		check = Pass
 		if res.Pass != nil && !*res.Pass {
 			check = Fail

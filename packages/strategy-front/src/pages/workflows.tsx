@@ -20,7 +20,7 @@ function blank(path: string): Omit<WorkflowRuntimeDetail, "id" | "updated_at"> {
       {
         id: "plan-1",
         kind: "plan",
-        title: "计划",
+        title: "planner",
         agent: "planner",
         skills: [],
         session_mode: "shared",
@@ -31,7 +31,7 @@ function blank(path: string): Omit<WorkflowRuntimeDetail, "id" | "updated_at"> {
       {
         id: "build-1",
         kind: "build",
-        title: "构建",
+        title: "coder",
         agent: "coder",
         skills: [],
         session_mode: "shared",
@@ -42,7 +42,7 @@ function blank(path: string): Omit<WorkflowRuntimeDetail, "id" | "updated_at"> {
       {
         id: "review-1",
         kind: "review",
-        title: "审查",
+        title: "reviewer",
         agent: "reviewer",
         skills: [],
         session_mode: "isolated",

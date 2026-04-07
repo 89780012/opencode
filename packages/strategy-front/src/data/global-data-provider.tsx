@@ -626,6 +626,50 @@ export function useAgentList(current?: string) {
   )
 }
 
+export function useSkillList(current?: string) {
+  const data = useGlobalData()
+  const ensure = data.ensure
+  const refresh = data.refresh
+
+  useEffect(() => {
+    void ensure("skill")
+  }, [ensure])
+
+  const list = useMemo(() => {
+    const map = new Map<string, { name: string; description: string }>()
+
+    for (const item of data.skill.data.cfg.skills) {
+      if (!allow(item.scope, current)) continue
+      map.set(item.name, {
+        name: item.name,
+        description: item.description || "",
+      })
+    }
+
+    for (const item of data.skill.data.run) {
+      if (!allow(item.scope, current)) continue
+      map.set(item.name, {
+        name: item.name,
+        description: map.get(item.name)?.description || item.description || "",
+      })
+    }
+
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name))
+  }, [current, data.skill.data.cfg.skills, data.skill.data.run])
+
+  return useMemo(
+    () => ({
+      err: data.skill.err,
+      list,
+      load: data.skill.load,
+      names: list.map((item) => item.name),
+      reload: () => refresh("skill"),
+      refresh: () => refresh("skill"),
+    }),
+    [data.skill.err, data.skill.load, list, refresh],
+  )
+}
+
 export function useProviderList() {
   const data = useGlobalData()
   const ensure = data.ensure

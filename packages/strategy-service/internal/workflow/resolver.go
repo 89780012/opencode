@@ -13,7 +13,7 @@ import (
 type messageList []messageRecord
 
 type messageRecord struct {
-	Info messageInfo `json:"info"`
+	Info  messageInfo   `json:"info"`
 	Parts []messagePart `json:"parts"`
 }
 
@@ -60,7 +60,7 @@ func (s *Service) resolve(dir string, sid string, row NodeRun, node Node) (Resul
 
 	text := strings.TrimSpace(strings.Join(out, "\n\n"))
 	res := Result{Text: text}
-	if node.Kind != Review || text == "" {
+	if (node.Kind != Review && node.Kind != Judge) || text == "" {
 		return res, nil
 	}
 
