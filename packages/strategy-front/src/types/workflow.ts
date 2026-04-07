@@ -1,6 +1,6 @@
 import type { Edge, Node, XYPosition } from "@xyflow/react"
 
-export type WorkflowKind = "placeholder" | "finance" | "source"
+export type WorkflowKind = "plan" | "build" | "review" | "gate"
 
 export type WorkflowTone = "slate" | "blue" | "amber"
 
@@ -55,13 +55,126 @@ export type WorkflowDetail = WorkflowItem & {
   edges: WorkflowFlowEdge[]
 }
 
-export type WorkflowSeed = {
-  key: string
-  kind: WorkflowKind
+export type WorkflowNodeKind = WorkflowKind
+
+export type WorkflowSessionMode = "shared" | "isolated"
+
+export type WorkflowEdgeCond = "always" | "pass" | "fail"
+
+export type WorkflowRunStatus = "pending" | "running" | "blocked" | "failed" | "done"
+
+export type WorkflowNodeRunStatus =
+  | "pending"
+  | "running"
+  | "blocked"
+  | "failed"
+  | "done"
+  | "timeout"
+
+export type WorkflowRuntimeNode = {
+  id: string
+  kind: WorkflowNodeKind
+  title: string
+  agent: string
+  skills: string[]
+  session_mode: WorkflowSessionMode
+  prompt: string
+  timeout_ms: number
+  retry_limit: number
+}
+
+export type WorkflowRuntimeEdge = {
+  id: string
+  from: string
+  to: string
+  cond: WorkflowEdgeCond
+  label: string
+}
+
+export type WorkflowRuntimeDetail = {
+  id: string
+  name: string
+  workspace_path: string
+  root_node_id: string
+  nodes: WorkflowRuntimeNode[]
+  edges: WorkflowRuntimeEdge[]
+  updated_at: number
+}
+
+export type WorkflowRuntimeList = {
+  items: WorkflowRuntimeDetail[]
+}
+
+export type WorkflowUpsertInput = {
+  id?: string
+  name: string
+  workspace_path: string
+  root_node_id: string
+  nodes: WorkflowRuntimeNode[]
+  edges: WorkflowRuntimeEdge[]
+}
+
+export type WorkflowRun = {
+  id: string
+  workflow_id: string
+  workspace_path: string
+  root_session_id: string
+  status: WorkflowRunStatus
+  current_node_id?: string
+  input: string
+  loop: number
+  started_at: number
+  ended_at?: number
+  error?: string
+}
+
+export type WorkflowRunList = {
+  items: WorkflowRun[]
+}
+
+export type WorkflowAnchor = {
+  started_at: number
+  last_message_id?: string
+}
+
+export type WorkflowNodeResult = {
+  text?: string
+  structured?: string
+  next_prompt?: string
+  pass?: boolean
+}
+
+export type WorkflowNodeRun = {
+  id: string
+  run_id: string
+  node_id: string
+  session_id: string
+  status: WorkflowNodeRunStatus
+  turn: number
+  input: string
+  output?: string
+  error?: string
+  started_at: number
+  ended_at?: number
+  anchor: WorkflowAnchor
+  result: WorkflowNodeResult
+}
+
+export type WorkflowNodeRunList = {
+  items: WorkflowNodeRun[]
+}
+
+export type WorkflowStartResult = {
+  run: WorkflowRun
+  node_run: WorkflowNodeRun
+}
+
+export type WorkflowContinueResult = {
+  run: WorkflowRun
 }
 
 export function makeNode(kind: WorkflowKind, id: string, pos: XYPosition): WorkflowFlowNode {
-  if (kind === "finance") {
+  if (kind === "plan") {
     return {
       id,
       type: "workflow",
@@ -69,38 +182,19 @@ export function makeNode(kind: WorkflowKind, id: string, pos: XYPosition): Workf
       position: pos,
       data: {
         kind,
-        title: "财务数据",
-        desc: "获取财务报表及字段数据",
+        title: "Plan",
+        desc: "Outline the implementation plan without changing code.",
         tone: "blue",
         fields: [
-          { kind: "select", label: "股票池", value: "全部A股", options: ["全部A股", "沪深300", "中证500"] },
-          { kind: "select", label: "报表类型", value: "所有报表", options: ["所有报表", "利润表", "资产负债表", "现金流量表"] },
-          { kind: "select", label: "报告期", value: "所有季度", options: ["所有季度", "年报", "中报", "一季报", "三季报"] },
-          { kind: "range", label: "年份区间", from: "2021", to: "2026" },
-          {
-            kind: "select",
-            label: "调整类型",
-            value: "TTM(滚动12个月)",
-            options: ["TTM(滚动12个月)", "原始值", "同比", "环比"],
-          },
-          {
-            kind: "checks",
-            label: "数据字段",
-            items: [
-              { label: "营业收入", checked: true },
-              { label: "营业成本" },
-              { label: "毛利润" },
-              { label: "营业利润" },
-              { label: "净利润", checked: true },
-              { label: "每股收益", checked: true },
-            ],
-          },
+          { kind: "select", label: "Session", value: "shared", options: ["shared", "isolated"] },
+          { kind: "note", label: "Agent", value: "planner" },
+          { kind: "note", label: "Prompt", value: "Write a concise implementation plan. Do not edit code." },
         ],
       },
     }
   }
 
-  if (kind === "source") {
+  if (kind === "build") {
     return {
       id,
       type: "workflow",
@@ -108,13 +202,37 @@ export function makeNode(kind: WorkflowKind, id: string, pos: XYPosition): Workf
       position: pos,
       data: {
         kind,
-        title: "日线数据",
-        desc: "获取历史日 K 线数据",
+        title: "Build",
+        desc: "Implement the requested behavior in the workspace.",
         tone: "amber",
         fields: [
-          { kind: "select", label: "数据源", value: "历史行情", options: ["历史行情", "前复权行情", "后复权行情"] },
-          { kind: "select", label: "频率", value: "1D", options: ["1D", "1W", "1M"] },
-          { kind: "note", label: "说明", value: "适合基础回测与区间指标计算" },
+          { kind: "select", label: "Session", value: "shared", options: ["shared", "isolated"] },
+          { kind: "note", label: "Agent", value: "coder" },
+          { kind: "note", label: "Prompt", value: "Implement the requested behavior in the workspace." },
+        ],
+      },
+    }
+  }
+
+  if (kind === "review") {
+    return {
+      id,
+      type: "workflow",
+      dragHandle: ".workflow-drag",
+      position: pos,
+      data: {
+        kind,
+        title: "Review",
+        desc: "Review current code and emit structured pass or fail feedback.",
+        tone: "slate",
+        fields: [
+          { kind: "select", label: "Session", value: "isolated", options: ["isolated", "shared"] },
+          { kind: "note", label: "Agent", value: "reviewer" },
+          {
+            kind: "note",
+            label: "Prompt",
+            value: 'Review the latest code and return JSON with "pass", "summary", and "next_prompt".',
+          },
         ],
       },
     }
@@ -127,10 +245,14 @@ export function makeNode(kind: WorkflowKind, id: string, pos: XYPosition): Workf
     position: pos,
     data: {
       kind,
-      title: "未实现组件",
-      desc: "这部分组件稍后再补完整逻辑",
+      title: "Gate",
+      desc: "Pause for a human decision before continuing.",
       tone: "slate",
-      fields: [{ kind: "note", label: "组件ID", value: "未知" }],
+      fields: [
+        { kind: "select", label: "Session", value: "shared", options: ["shared", "isolated"] },
+        { kind: "note", label: "Agent", value: "operator" },
+        { kind: "note", label: "Prompt", value: "Wait for a human decision before continuing." },
+      ],
     },
   }
 }

@@ -9,6 +9,7 @@ import (
 	"strategy-service/internal/oprun"
 	rt "strategy-service/internal/runtime"
 	"strategy-service/internal/smartx"
+	"strategy-service/internal/workflow"
 	"strategy-service/internal/workspace"
 )
 
@@ -19,6 +20,7 @@ type API struct {
 	cfg *cfg.Store
 	sx  *smartx.Service
 	log *logs.Hub
+	wf  *workflow.Service
 }
 
 type envelope struct {
@@ -56,6 +58,7 @@ func NewAPI(run *rt.Service, op *oprun.Manager, cfg *cfg.Store, sx *smartx.Servi
 		cfg: cfg,
 		sx:  sx,
 		log: logs.New(),
+		wf:  workflow.New(op),
 	}
 }
 
@@ -101,6 +104,19 @@ func (a *API) Register(r *gin.Engine) {
 	log := api.Group("/logs")
 	log.GET("/sources", a.logSources)
 	log.GET("/tail", a.logTail)
+
+	flow := api.Group("/workflow")
+	flow.GET("", a.workflowList)
+	flow.GET("/:id", a.workflowGet)
+	flow.POST("", a.workflowSave)
+	flow.PUT("/:id", a.workflowSave)
+	flow.POST("/:id/start", a.workflowStart)
+
+	run := api.Group("/workflow-runs")
+	run.GET("", a.workflowRuns)
+	run.GET("/:id", a.workflowRunGet)
+	run.GET("/:id/nodes", a.workflowRunNodes)
+	run.POST("/:id/continue", a.workflowContinue)
 
 	r.POST("/mcp", a.mcpPost)
 	r.GET("/mcp", a.mcpGet)

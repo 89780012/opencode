@@ -1,31 +1,45 @@
 import { useMemo, useState } from "react"
-import { ChevronDown, ChevronUp, Database, FileWarning, Search, WalletCards } from "lucide-react"
+import { ChevronDown, ChevronUp, ClipboardList, FileSearch, Hammer, PauseCircle, Search } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { workflowLibrary } from "@/data/workflow-demo"
 import { cn } from "@/lib/utils"
 import type { WorkflowKind } from "@/types/workflow"
 
-const cut = 16
-const init = ["数据源", "处理中"]
+const cut = 28
+const init = ["Core", "Control"]
+
+const workflowLibrary: {
+  title: string
+  items: { kind: WorkflowKind; title: string; desc: string }[]
+}[] = [
+  {
+    title: "Core",
+    items: [
+      { kind: "plan", title: "Plan", desc: "Break the request into a concrete implementation plan." },
+      { kind: "build", title: "Build", desc: "Implement or revise code in the shared workspace." },
+      { kind: "review", title: "Review", desc: "Review current code and emit structured pass/fail feedback." },
+    ],
+  },
+  {
+    title: "Control",
+    items: [{ kind: "gate", title: "Gate", desc: "Pause for a manual decision before continuing." }],
+  },
+]
 
 function icon(kind: WorkflowKind) {
-  if (kind === "finance") return <WalletCards className="size-4 text-primary" />
-  if (kind === "placeholder") return <FileWarning className="size-4 text-slate-500" />
-  return kind === "source" ? (
-    <Database className="size-4 text-amber-500" />
-  ) : (
-    <FileWarning className="size-4 text-slate-500" />
-  )
+  if (kind === "plan") return <ClipboardList className="size-4 text-primary" />
+  if (kind === "build") return <Hammer className="size-4 text-amber-500" />
+  if (kind === "review") return <FileSearch className="size-4 text-slate-500" />
+  return <PauseCircle className="size-4 text-slate-500" />
 }
 
 function gicon(kinds: WorkflowKind[]) {
-  if (kinds.includes("source") || kinds.includes("finance")) {
-    return <Database className="size-3.5 text-muted-foreground" />
+  if (kinds.includes("plan") || kinds.includes("build") || kinds.includes("review")) {
+    return <ClipboardList className="size-3.5 text-muted-foreground" />
   }
-  return <FileWarning className="size-3.5 text-muted-foreground" />
+  return <PauseCircle className="size-3.5 text-muted-foreground" />
 }
 
 function clip(text: string) {
@@ -59,7 +73,7 @@ export function WorkflowLibrary(props: { value: string; onValue: (value: string)
             <Input
               value={props.value}
               onChange={(event) => props.onValue(event.target.value)}
-              placeholder="搜索组件..."
+              placeholder="Search nodes..."
               className="h-8 rounded-md border-border/80 bg-background pl-9 text-[13px] shadow-none"
             />
           </div>
@@ -75,7 +89,7 @@ export function WorkflowLibrary(props: { value: string; onValue: (value: string)
               </button>
             </TooltipTrigger>
             <TooltipContent side="bottom" sideOffset={8}>
-              {all ? "全部收缩" : "全部展开"}
+              {all ? "Collapse all" : "Expand all"}
             </TooltipContent>
           </Tooltip>
         </div>
@@ -86,7 +100,7 @@ export function WorkflowLibrary(props: { value: string; onValue: (value: string)
           <Accordion type="multiple" value={open} onValueChange={setOpen} className="w-full">
             {list.map((group) => (
               <AccordionItem key={group.title} value={group.title} className="border-b-0">
-                <AccordionTrigger className="rounded-md px-2 py-2 text-[13px]text-foreground hover:bg-muted/40 hover:no-underline">
+                <AccordionTrigger className="rounded-md px-2 py-2 text-[13px] text-foreground hover:bg-muted/40 hover:no-underline">
                   <span className="flex items-center gap-2">
                     {gicon(group.items.map((item) => item.kind))}
                     <span>{group.title}</span>
@@ -108,17 +122,13 @@ export function WorkflowLibrary(props: { value: string; onValue: (value: string)
                           event.dataTransfer.setData("application/opencode-workflow", item.kind)
                         }}
                       >
-                        <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
-                          {icon(item.kind)}
-                        </div>
+                        <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">{icon(item.kind)}</div>
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-[13px] font-medium text-foreground">{item.title}</div>
                           {item.desc.length > cut ? (
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <div className="mt-0.5 truncate text-[12px] text-muted-foreground">
-                                  {clip(item.desc)}
-                                </div>
+                                <div className="mt-0.5 truncate text-[12px] text-muted-foreground">{clip(item.desc)}</div>
                               </TooltipTrigger>
                               <TooltipContent
                                 side="right"

@@ -1,0 +1,144 @@
+import { makeNode } from "@/types/workflow"
+import type {
+  WorkflowDetail,
+  WorkflowFlowEdge,
+  WorkflowFlowNode,
+  WorkflowItem,
+  WorkflowRuntimeDetail,
+  WorkflowRuntimeEdge,
+  WorkflowRuntimeNode,
+  WorkflowSessionMode,
+} from "@/types/workflow"
+
+function tone(kind: WorkflowRuntimeNode["kind"]) {
+  if (kind === "plan") return "blue"
+  if (kind === "build") return "amber"
+  return "slate"
+}
+
+function desc(node: WorkflowRuntimeNode) {
+  if (node.prompt.trim()) return node.prompt.trim()
+  if (node.kind === "plan") return "输出实现计划。"
+  if (node.kind === "build") return "在工作区中实现需求。"
+  if (node.kind === "review") return "审查当前工作区状态。"
+  return "等待人工决策。"
+}
+
+function fields(node: WorkflowRuntimeNode) {
+  return [
+    {
+      kind: "select" as const,
+      label: "会话",
+      value: node.session_mode,
+      options: ["shared", "isolated"],
+    },
+    {
+      kind: "note" as const,
+      label: "智能体",
+      value: node.agent || "",
+    },
+    {
+      kind: "note" as const,
+      label: "提示词",
+      value: node.prompt || "",
+    },
+  ]
+}
+
+export function runtimeItem(item: WorkflowRuntimeDetail): WorkflowItem {
+  return {
+    id: item.id,
+    name: item.name,
+    desc: item.workspace_path || "工作流",
+    status: item.nodes.length > 0 ? "ready" : "draft",
+    updated_at: item.updated_at,
+    tags: [...new Set(item.nodes.map((node) => node.kind))],
+    count: item.nodes.length,
+  }
+}
+
+export function runtimeDetail(item: WorkflowRuntimeDetail): WorkflowDetail {
+  const nodes = item.nodes.map((node, i) => {
+    const base = makeNode(node.kind, node.id, { x: 120 + i * 300, y: 180 + (i % 2) * 42 })
+    return {
+      ...base,
+      data: {
+        ...base.data,
+        kind: node.kind,
+        title: node.title || base.data.title,
+        desc: desc(node),
+        tone: tone(node.kind),
+        fields: fields(node),
+      },
+    } satisfies WorkflowFlowNode
+  })
+
+  const edges = item.edges.map(
+    (edge) =>
+      ({
+        id: edge.id,
+        source: edge.from,
+        target: edge.to,
+        label: edge.label || undefined,
+        data: {
+          cond: edge.cond,
+        },
+      }) satisfies WorkflowFlowEdge,
+  )
+
+  return {
+    ...runtimeItem(item),
+    nodes,
+    edges,
+  }
+}
+
+export function fromFlow(
+  item: WorkflowRuntimeDetail,
+  nodes: WorkflowFlowNode[],
+  edges: WorkflowFlowEdge[],
+): WorkflowRuntimeDetail {
+  const nextNodes = nodes.map((node) => ({
+    id: node.id,
+    kind: node.data.kind,
+    title: node.data.title,
+    agent: note(node.data.fields, "智能体"),
+    skills: [],
+    session_mode: mode(node.data.fields, node.data.kind),
+    prompt: note(node.data.fields, "提示词"),
+    timeout_ms: 0,
+    retry_limit: 0,
+  })) satisfies WorkflowRuntimeNode[]
+
+  const nextEdges = edges.map((edge) => ({
+    id: edge.id,
+    from: edge.source,
+    to: edge.target,
+    cond: edge.data?.cond === "pass" || edge.data?.cond === "fail" ? edge.data.cond : "always",
+    label: typeof edge.label === "string" ? edge.label : "",
+  })) satisfies WorkflowRuntimeEdge[]
+
+  return {
+    ...item,
+    root_node_id: nextNodes.some((node) => node.id === item.root_node_id) ? item.root_node_id : (nextNodes[0]?.id ?? ""),
+    nodes: nextNodes,
+    edges: nextEdges,
+  }
+}
+
+function note(fields: WorkflowFlowNode["data"]["fields"], label: string) {
+  const item = fields.find((field) => field.label === label && field.kind === "note")
+  if (!item || item.kind !== "note") return ""
+  return item.value.trim()
+}
+
+function select(fields: WorkflowFlowNode["data"]["fields"], label: string, fallback: string) {
+  const item = fields.find((field) => field.label === label && field.kind === "select")
+  if (!item || item.kind !== "select") return fallback
+  return item.value || fallback
+}
+
+function mode(fields: WorkflowFlowNode["data"]["fields"], kind: WorkflowRuntimeNode["kind"]): WorkflowSessionMode {
+  const value = select(fields, "会话", kind === "review" ? "isolated" : "shared")
+  return value === "isolated" ? "isolated" : "shared"
+}

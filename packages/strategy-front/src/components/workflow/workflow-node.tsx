@@ -1,6 +1,6 @@
 import { memo, useEffect, useState } from "react"
 import { createPortal } from "react-dom"
-import { Copy, Database, FileWarning, Trash2, WalletCards } from "lucide-react"
+import { ClipboardList, Copy, FileSearch, Hammer, PauseCircle, Trash2 } from "lucide-react"
 import { Handle, Position, useReactFlow, type NodeProps } from "@xyflow/react"
 import { cn } from "@/lib/utils"
 import type { WorkflowField, WorkflowFlowEdge, WorkflowFlowNode, WorkflowNodeData } from "@/types/workflow"
@@ -29,9 +29,10 @@ function tone(value: WorkflowNodeData["tone"]) {
 }
 
 function icon(kind: WorkflowNodeData["kind"]) {
-  if (kind === "finance") return WalletCards
-  if (kind === "source") return Database
-  return FileWarning
+  if (kind === "plan") return ClipboardList
+  if (kind === "build") return Hammer
+  if (kind === "review") return FileSearch
+  return PauseCircle
 }
 
 function field(item: WorkflowField, i: number, save: (i: number, next: WorkflowField) => void) {

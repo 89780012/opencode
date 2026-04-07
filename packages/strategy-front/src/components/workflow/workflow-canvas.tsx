@@ -6,8 +6,8 @@ import {
   BackgroundVariant,
   MiniMap,
   ReactFlow,
-  type Edge,
   type Connection,
+  type Edge,
   type ReactFlowInstance,
   useEdgesState,
   useNodesState,
@@ -29,8 +29,11 @@ const tone = (active = false) => ({
 export function WorkflowCanvas(props: {
   item: WorkflowDetail
   onPick: (node: WorkflowFlowNode | null) => void
+  onEdgePick?: (edge: WorkflowFlowEdge | null) => void
+  onChange?: (nodes: WorkflowFlowNode[], edges: WorkflowFlowEdge[]) => void
 }) {
   const seq = useRef(0)
+  const sync = useRef(false)
   const [rf, setRf] = useState<ReactFlowInstance<WorkflowFlowNode, WorkflowFlowEdge> | null>(null)
   const [nodes, setNodes, onNodes] = useNodesState(props.item.nodes)
   const [edges, setEdges, onEdges] = useEdgesState(props.item.edges)
@@ -48,10 +51,20 @@ export function WorkflowCanvas(props: {
   }
 
   useEffect(() => {
+    sync.current = true
     setNodes(props.item.nodes)
     setEdges(props.item.edges.map((item) => ({ ...item, selected: false, style: tone() })))
     props.onPick(null)
-  }, [props.item, props.onPick, setEdges, setNodes])
+    props.onEdgePick?.(null)
+  }, [props.item, props.onEdgePick, props.onPick, setEdges, setNodes])
+
+  useEffect(() => {
+    if (sync.current) {
+      sync.current = false
+      return
+    }
+    props.onChange?.(nodes, edges)
+  }, [edges, nodes, props.onChange])
 
   useEffect(() => {
     if (!menu) return
@@ -92,20 +105,35 @@ export function WorkflowCanvas(props: {
         onNodesChange={onNodes}
         onEdgesChange={onEdges}
         onConnect={(conn: Connection) =>
-          setEdges((prev) => addEdge({ ...conn, animated: false, selected: false, style: tone() }, prev))
+          setEdges((prev) =>
+            addEdge(
+              {
+                ...conn,
+                animated: false,
+                selected: false,
+                style: tone(),
+                data: { cond: "always" },
+              },
+              prev,
+            ),
+          )
         }
         onPaneClick={() => {
           props.onPick(null)
+          props.onEdgePick?.(null)
           setMenu(null)
           setEdges((prev) => prev.map((item) => ({ ...item, selected: false, style: tone() })))
         }}
         onNodeClick={(_, node) => {
           props.onPick(node as WorkflowFlowNode)
+          props.onEdgePick?.(null)
           setEdges((prev) => prev.map((item) => ({ ...item, selected: false, style: tone() })))
         }}
         onSelectionChange={({ nodes }) => props.onPick((nodes[0] as WorkflowFlowNode | undefined) ?? null)}
         onEdgeClick={(event, hit: Edge) => {
           event.stopPropagation()
+          props.onPick(null)
+          props.onEdgePick?.(hit as WorkflowFlowEdge)
           setMenu(null)
           setEdges((prev) =>
             prev.map((item) => {
@@ -117,6 +145,8 @@ export function WorkflowCanvas(props: {
         onEdgeContextMenu={(event, hit: Edge) => {
           event.preventDefault()
           event.stopPropagation()
+          props.onPick(null)
+          props.onEdgePick?.(hit as WorkflowFlowEdge)
           setEdges((prev) =>
             prev.map((item) => {
               const active = item.id === hit.id
@@ -172,6 +202,7 @@ export function WorkflowCanvas(props: {
                 className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-normal text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-500/10"
                 onClick={() => {
                   setEdges((prev) => prev.filter((edge) => edge.id !== menu.id))
+                  props.onEdgePick?.(null)
                   setMenu(null)
                 }}
               >
