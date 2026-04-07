@@ -7,6 +7,8 @@ const IndexPage = lazy(() => import("@/pages/index"))
 const StrategiesPage = lazy(() => import("@/pages/strategies"))
 const StrategyDetailPage = lazy(() => import("@/pages/strategy-detail"))
 const StrategyMultiPage = lazy(() => import("@/pages/strategy-multi"))
+const WorkflowsPage = lazy(() => import("@/pages/workflows"))
+const WorkflowDetailPage = lazy(() => import("@/pages/workflow-detail"))
 const SettingsPage = lazy(() => import("@/pages/settings"))
 const SettingsAppearancePage = lazy(() => import("@/pages/settings-appearance"))
 const SettingsRuntimePage = lazy(() => import("@/pages/settings-runtime"))
@@ -51,6 +53,19 @@ const router = createBrowserRouter([
           {
             path: ":strategyID",
             element: <StrategyDetailPage />,
+          },
+        ],
+      },
+      {
+        path: "workflows",
+        children: [
+          {
+            index: true,
+            element: <WorkflowsPage />,
+          },
+          {
+            path: ":workflowID",
+            element: <WorkflowDetailPage />,
           },
         ],
       },
@@ -114,6 +129,10 @@ const router = createBrowserRouter([
   },
   {
     path: "/providers/*",
+    element: <LegacyPage />,
+  },
+  {
+    path: "/workflows/*",
     element: <LegacyPage />,
   },
   {

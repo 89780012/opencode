@@ -1,6 +1,6 @@
 "use client"
 
-import { Bot, Command, MessageSquareText, PlugZap, ServerCog, Settings2, Sparkles } from "lucide-react"
+import { Bot, Command, GitBranchPlus, MessageSquareText, PlugZap, ServerCog, Settings2, Sparkles } from "lucide-react"
 import { NavLink, useLocation } from "react-router-dom"
 import { useSystem } from "@/components/system/system-provider"
 import {
@@ -23,6 +23,11 @@ const nav = [
     title: "策略",
     url: "/app/strategies",
     icon: MessageSquareText,
+  },
+  {
+    title: "工作流",
+    url: "/app/workflows",
+    icon: GitBranchPlus,
   },
   {
     title: "提供商",
@@ -144,7 +149,6 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
                 <div>通道: {label(row.channel)}</div>
                 <div>环境: {row.env === "production" ? "生产" : "开发"}</div>
                 {row.commit ? <div>Commit: {row.commit}</div> : null}
-                {/* <div>工作区: {row.dirty ? "dirty" : "clean"}</div> */}
                 {row.built_at ? <div>构建时间: {row.built_at}</div> : null}
               </TooltipContent>
             </Tooltip>
