@@ -66,7 +66,7 @@ function infer(item: AgentRow): WorkflowKind {
   return "build"
 }
 
-function title(kind: WorkflowKind) {
+function group(kind: WorkflowKind) {
   if (kind === "plan") return "规划智能体"
   if (kind === "review") return "检查智能体"
   return "执行智能体"
@@ -150,7 +150,7 @@ function build(list: AgentRow[]) {
 
   for (const item of list) {
     const kind = infer(item)
-    const key = title(kind)
+    const key = group(kind)
     const row = {
       kind,
       title: item.name,
@@ -314,9 +314,7 @@ export function WorkflowLibrary(props: { value: string; onValue: (value: string)
                           )
                         }}
                       >
-                        <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
-                          {icon(item.kind)}
-                        </div>
+                        <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">{icon(item.kind)}</div>
                         <div className="min-w-0 flex-1">
                           {item.title.length > cut ? (
                             <Tooltip>
@@ -363,7 +361,7 @@ export function WorkflowLibrary(props: { value: string; onValue: (value: string)
 
           {list.length === 0 ? (
             <div className="rounded-md border border-dashed border-border/70 px-3 py-4 text-sm text-muted-foreground">
-              没有匹配的智能体节点。
+              没有匹配的节点。
             </div>
           ) : null}
         </div>

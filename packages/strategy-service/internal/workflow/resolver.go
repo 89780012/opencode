@@ -31,6 +31,41 @@ type messagePart struct {
 	Text string `json:"text"`
 }
 
+func parse(kind Kind, text string) (Result, error) {
+	raw := strings.TrimSpace(text)
+	res := Result{
+		Raw:  raw,
+		Text: raw,
+	}
+	if kind != Review && kind != Judge {
+		return res, nil
+	}
+	if raw == "" {
+		return Result{}, errors.New(string(kind) + " output is empty")
+	}
+
+	var body struct {
+		Pass       *bool    `json:"pass"`
+		Summary    string   `json:"summary"`
+		NextPrompt string   `json:"next_prompt"`
+		Issues     []string `json:"issues"`
+	}
+	if err := json.Unmarshal([]byte(raw), &body); err != nil {
+		return Result{}, errors.New(string(kind) + " output must be valid JSON")
+	}
+	if body.Pass == nil {
+		return Result{}, errors.New(string(kind) + " output must include boolean pass")
+	}
+
+	res.Structured = raw
+	res.NextPrompt = strings.TrimSpace(body.NextPrompt)
+	res.Pass = body.Pass
+	if strings.TrimSpace(body.Summary) != "" {
+		res.Text = strings.TrimSpace(body.Summary)
+	}
+	return res, nil
+}
+
 func (s *Service) resolve(dir string, sid string, row NodeRun, node Node) (Result, error) {
 	list, err := s.messages(dir, sid)
 	if err != nil {
@@ -58,27 +93,7 @@ func (s *Service) resolve(dir string, sid string, row NodeRun, node Node) (Resul
 		}
 	}
 
-	text := strings.TrimSpace(strings.Join(out, "\n\n"))
-	res := Result{Text: text}
-	if (node.Kind != Review && node.Kind != Judge) || text == "" {
-		return res, nil
-	}
-
-	var body struct {
-		Pass       *bool  `json:"pass"`
-		Summary    string `json:"summary"`
-		NextPrompt string `json:"next_prompt"`
-	}
-	if err := json.Unmarshal([]byte(text), &body); err != nil {
-		return res, nil
-	}
-	res.Structured = text
-	res.NextPrompt = strings.TrimSpace(body.NextPrompt)
-	res.Pass = body.Pass
-	if strings.TrimSpace(body.Summary) != "" {
-		res.Text = strings.TrimSpace(body.Summary)
-	}
-	return res, nil
+	return parse(node.Kind, strings.TrimSpace(strings.Join(out, "\n\n")))
 }
 
 func (s *Service) completed(row NodeRun) (bool, error) {

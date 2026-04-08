@@ -114,6 +114,7 @@ type Anchor struct {
 }
 
 type Result struct {
+	Raw        string `json:"raw,omitempty"`
 	Text       string `json:"text,omitempty"`
 	Structured string `json:"structured,omitempty"`
 	NextPrompt string `json:"next_prompt,omitempty"`

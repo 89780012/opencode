@@ -24,7 +24,7 @@ function blank(path: string): Omit<WorkflowRuntimeDetail, "id" | "updated_at"> {
         agent: "planner",
         skills: [],
         session_mode: "shared",
-        prompt: "输出实现计划，不要修改代码。",
+        prompt: "输出实现计划，不要直接修改代码。",
         timeout_ms: 0,
         retry_limit: 0,
       },
@@ -35,7 +35,7 @@ function blank(path: string): Omit<WorkflowRuntimeDetail, "id" | "updated_at"> {
         agent: "coder",
         skills: [],
         session_mode: "shared",
-        prompt: "在当前工作区中实现需求。",
+        prompt: "在当前工作区中完成实现。",
         timeout_ms: 0,
         retry_limit: 0,
       },
@@ -123,7 +123,7 @@ export default function WorkflowsPage() {
             <div className="min-w-0">
               <div className="mt-3 text-3xl font-semibold tracking-tight text-foreground">工作流</div>
               <p className="mt-1.5 max-w-3xl text-sm leading-6 text-muted-foreground">
-                基于单工作区会话模型编排“计划、构建、审查”等节点。
+                基于单工作区会话模型编排规划、执行、检查和回环修复等节点。
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">

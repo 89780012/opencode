@@ -179,13 +179,7 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
             </div>
           </div>
 
-          <WorkflowSidepanel
-            text={text}
-            run={run}
-            rows={rows}
-            current={current}
-            onText={setText}
-          />
+          <WorkflowSidepanel text={text} run={run} rows={rows} current={current} onText={setText} />
         </div>
       </div>
     </div>

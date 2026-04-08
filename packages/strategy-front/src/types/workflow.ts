@@ -110,13 +110,7 @@ export type WorkflowEdgeCond = "always" | "pass" | "fail"
 
 export type WorkflowRunStatus = "pending" | "running" | "blocked" | "failed" | "done"
 
-export type WorkflowNodeRunStatus =
-  | "pending"
-  | "running"
-  | "blocked"
-  | "failed"
-  | "done"
-  | "timeout"
+export type WorkflowNodeRunStatus = "pending" | "running" | "blocked" | "failed" | "done" | "timeout"
 
 export type WorkflowRuntimeNode = {
   id: string
@@ -185,6 +179,7 @@ export type WorkflowAnchor = {
 }
 
 export type WorkflowNodeResult = {
+  raw?: string
   text?: string
   structured?: string
   next_prompt?: string

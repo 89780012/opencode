@@ -67,6 +67,9 @@ func (s *Service) Save(item Workflow) (Workflow, error) {
 	}
 	item.UpdatedAt = time.Now().UnixMilli()
 	item = cleanFlows([]Workflow{item})[0]
+	if err := validate(item); err != nil {
+		return Workflow{}, err
+	}
 
 	hit := false
 	next := make([]Workflow, 0, len(list)+1)
@@ -126,6 +129,9 @@ func (s *Service) Start(wid string, input string) (StartResult, error) {
 
 	flow, err := s.get(wid)
 	if err != nil {
+		return StartResult{}, err
+	}
+	if err := validate(flow); err != nil {
 		return StartResult{}, err
 	}
 	node, ok := pickNode(flow, flow.RootNodeID)
@@ -303,7 +309,7 @@ func (s *Service) exec(runID string) {
 				}
 				row.Status = NodeDone
 				row.Result = res
-				row.Output = res.Text
+				row.Output = res.Raw
 				row.Error = ""
 				row.EndedAt = time.Now().UnixMilli()
 				_ = s.putNodeRun(row)

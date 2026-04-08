@@ -11,22 +11,20 @@ import type {
 } from "@/types/workflow"
 
 function tone(kind: WorkflowRuntimeNode["kind"]) {
-  if (kind === "start") return "blue"
-  if (kind === "plan") return "blue"
-  if (kind === "end") return "amber"
-  if (kind === "build") return "amber"
+  if (kind === "start" || kind === "plan") return "blue"
+  if (kind === "end" || kind === "build") return "amber"
   return "slate"
 }
 
 function desc(node: WorkflowRuntimeNode) {
   if (node.prompt.trim()) return node.prompt.trim()
-  if (node.kind === "start") return "整理输入并启动流程。"
+  if (node.kind === "start") return "整理输入并启动工作流。"
   if (node.kind === "plan") return "输出实现计划。"
-  if (node.kind === "build") return "在工作区中实现需求。"
-  if (node.kind === "judge") return "根据结果做分支判断。"
-  if (node.kind === "review") return "审查当前工作区状态。"
-  if (node.kind === "end") return "汇总结果并结束流程。"
-  return "等待人工决策。"
+  if (node.kind === "build") return "在工作区中完成实现。"
+  if (node.kind === "judge") return "根据结果做路由判断。"
+  if (node.kind === "review") return "检查当前工作区状态。"
+  if (node.kind === "end") return "汇总结论并结束流程。"
+  return "等待人工确认后继续。"
 }
 
 function name(node: WorkflowRuntimeNode) {

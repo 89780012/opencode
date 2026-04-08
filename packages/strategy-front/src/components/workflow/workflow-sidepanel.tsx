@@ -79,7 +79,7 @@ export function WorkflowSidepanel(props: Props) {
           <div className="mb-3 space-y-1">
             <div className="text-sm font-medium text-foreground">工作流面板</div>
             <div className="text-xs leading-5 text-muted-foreground">
-              按任务分区查看内容，让右栏在窄宽度下也更顺手。
+              这里展示启动输入、运行状态和每个节点的执行记录。
             </div>
           </div>
 
@@ -98,7 +98,7 @@ export function WorkflowSidepanel(props: Props) {
             <div className="space-y-3">
               <section className="rounded-xl border border-border/70 bg-background/85 px-3 py-3 shadow-xs">
                 <div className="text-sm font-medium text-foreground">运行输入</div>
-                <div className="mt-1 text-xs leading-5 text-muted-foreground">工作流根会话共享的启动输入。</div>
+                <div className="mt-1 text-xs leading-5 text-muted-foreground">这里会作为工作流根输入发送给首个节点。</div>
                 <textarea
                   value={props.text}
                   onChange={(event: ChangeEvent<HTMLTextAreaElement>) => props.onText(event.target.value)}
@@ -126,7 +126,7 @@ export function WorkflowSidepanel(props: Props) {
                     <span className="text-right font-medium text-foreground">{stamp(props.run?.started_at)}</span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">运行记录</span>
+                    <span className="text-muted-foreground">节点记录</span>
                     <span className="text-right font-medium text-foreground">{props.rows.length}</span>
                   </div>
                   {props.run?.error ? (
@@ -136,7 +136,7 @@ export function WorkflowSidepanel(props: Props) {
                   ) : null}
                   {props.current?.error ? (
                     <div className="rounded-lg bg-amber-500/10 px-3 py-2 text-xs leading-5 text-amber-700 dark:text-amber-300">
-                      当前节点：{props.current.error}
+                      当前节点错误：{props.current.error}
                     </div>
                   ) : null}
                 </div>
@@ -148,17 +148,14 @@ export function WorkflowSidepanel(props: Props) {
         <TabsContent value="log" className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden">
           <div className="h-full overflow-y-auto p-3">
             {props.rows.length === 0 ? (
-              card("暂无运行记录", "执行工作流后，节点运行结果会按时间顺序展示在这里。")
+              card("暂无运行记录", "执行工作流后，节点结果会按时间顺序显示在这里。")
             ) : (
               <div className="space-y-3">
                 {props.rows.map((row) => {
                   const review = parseReview(row)
 
                   return (
-                    <section
-                      key={row.id}
-                      className="rounded-xl border border-border/70 bg-background/85 px-3 py-3 shadow-xs"
-                    >
+                    <section key={row.id} className="rounded-xl border border-border/70 bg-background/85 px-3 py-3 shadow-xs">
                       <div className="flex items-center justify-between gap-2">
                         <div className="min-w-0 truncate text-sm font-medium text-foreground">{row.node_id}</div>
                         <div className="rounded-full border border-border/70 px-2 py-0.5 text-[11px] text-muted-foreground">
@@ -167,13 +164,13 @@ export function WorkflowSidepanel(props: Props) {
                       </div>
 
                       <div className="mt-2 break-all text-[11px] leading-5 text-muted-foreground">
-                        会话：{row.session_id}
+                        会话：{row.session_id || "-"}
                       </div>
 
                       {review ? (
                         <div className="mt-3 space-y-2">
                           <div className="flex items-center justify-between rounded-lg border border-border/70 bg-muted/35 px-3 py-2">
-                            <span className="text-xs text-muted-foreground">审查结论</span>
+                            <span className="text-xs text-muted-foreground">检查结论</span>
                             <span
                               className={
                                 review.pass === true

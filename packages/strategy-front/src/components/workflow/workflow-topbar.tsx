@@ -16,7 +16,7 @@ export function WorkflowTopbar(props: {
         size="icon-sm"
         className="rounded-full text-muted-foreground hover:bg-primary/6 hover:text-foreground"
         onClick={props.onSave}
-        title="保存"
+        title="保存工作流"
       >
         <Save className="size-[18px] text-blue-600" strokeWidth={2.35} />
       </Button>
@@ -25,7 +25,7 @@ export function WorkflowTopbar(props: {
         size="icon-sm"
         className="rounded-full text-muted-foreground hover:bg-primary/6 hover:text-foreground"
         onClick={props.onRefresh}
-        title="刷新"
+        title="刷新工作流"
       >
         <RefreshCw className={`size-[18px] text-indigo-500 ${props.busy ? "animate-spin" : ""}`} strokeWidth={2.35} />
       </Button>
@@ -34,7 +34,7 @@ export function WorkflowTopbar(props: {
         size="icon-sm"
         className="rounded-full text-muted-foreground hover:bg-primary/6 hover:text-foreground"
         onClick={props.onRun}
-        title="运行"
+        title="运行工作流"
       >
         <Play className="size-[18px] text-emerald-600" strokeWidth={2.35} />
       </Button>
@@ -44,7 +44,7 @@ export function WorkflowTopbar(props: {
           size="icon-sm"
           className="rounded-full text-muted-foreground hover:bg-primary/6 hover:text-foreground"
           onClick={props.onContinue}
-          title="继续"
+          title="继续运行"
         >
           <CheckCheck className="size-[18px] text-amber-600" strokeWidth={2.35} />
         </Button>
