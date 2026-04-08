@@ -7,8 +7,10 @@ export function WorkflowEmpty() {
         <Boxes className="size-5" />
       </div>
       <div className="space-y-1">
-        <div className="text-base font-semibold">没有匹配到工作流</div>
-        <p className="text-sm text-muted-foreground">先用 demo 版本把页面骨架和编排体验搭起来，后续再接真实数据。</p>
+        <div className="text-base font-semibold">No workflows yet</div>
+        <p className="text-sm text-muted-foreground">
+          Create a workflow to connect planning, execution, checking, and repair loops inside one workspace.
+        </p>
       </div>
     </div>
   )

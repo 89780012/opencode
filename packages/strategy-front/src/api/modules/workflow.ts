@@ -3,6 +3,7 @@ import type {
   WorkflowContinueResult,
   WorkflowRun,
   WorkflowStartResult,
+  WorkflowSummary,
   WorkflowUpsertInput,
   WorkflowRuntimeDetail,
   WorkflowRuntimeList,
@@ -17,6 +18,10 @@ export const workflowApi = {
 
   get(id: string) {
     return request.get<WorkflowRuntimeDetail>(`/workflow/${encodeURIComponent(id)}`)
+  },
+
+  summary(id: string) {
+    return request.get<WorkflowSummary>(`/workflow/${encodeURIComponent(id)}/summary`)
   },
 
   save(body: WorkflowUpsertInput) {

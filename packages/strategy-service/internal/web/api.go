@@ -108,6 +108,7 @@ func (a *API) Register(r *gin.Engine) {
 	flow := api.Group("/workflow")
 	flow.GET("", a.workflowList)
 	flow.GET("/:id", a.workflowGet)
+	flow.GET("/:id/summary", a.workflowSummary)
 	flow.POST("", a.workflowSave)
 	flow.PUT("/:id", a.workflowSave)
 	flow.POST("/:id/start", a.workflowStart)

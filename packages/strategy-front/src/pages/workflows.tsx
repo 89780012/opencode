@@ -9,11 +9,11 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { useWorkspaceList } from "@/data/global-data-provider"
 import { runtimeItem } from "@/lib/workflow-runtime"
-import type { WorkflowItem, WorkflowRuntimeDetail } from "@/types/workflow"
+import type { WorkflowItem, WorkflowRun, WorkflowRuntimeDetail } from "@/types/workflow"
 
 function blank(path: string): Omit<WorkflowRuntimeDetail, "id" | "updated_at"> {
   return {
-    name: "新建工作流",
+    name: "New workflow",
     workspace_path: path,
     root_node_id: "plan-1",
     nodes: [
@@ -24,7 +24,7 @@ function blank(path: string): Omit<WorkflowRuntimeDetail, "id" | "updated_at"> {
         agent: "planner",
         skills: [],
         session_mode: "shared",
-        prompt: "输出实现计划，不要直接修改代码。",
+        prompt: "Produce a clear implementation plan before any code changes.",
         timeout_ms: 0,
         retry_limit: 0,
       },
@@ -35,7 +35,7 @@ function blank(path: string): Omit<WorkflowRuntimeDetail, "id" | "updated_at"> {
         agent: "coder",
         skills: [],
         session_mode: "shared",
-        prompt: "在当前工作区中完成实现。",
+        prompt: "Implement the requested change inside the current workspace and keep it verifiable.",
         timeout_ms: 0,
         retry_limit: 0,
       },
@@ -46,7 +46,7 @@ function blank(path: string): Omit<WorkflowRuntimeDetail, "id" | "updated_at"> {
         agent: "reviewer",
         skills: [],
         session_mode: "isolated",
-        prompt: '审查当前代码，并返回包含 "pass"、"summary"、"next_prompt" 的 JSON。',
+        prompt: 'Inspect the current code and return JSON with keys "pass", "summary", and "next_prompt".',
         timeout_ms: 0,
         retry_limit: 0,
       },
@@ -54,9 +54,31 @@ function blank(path: string): Omit<WorkflowRuntimeDetail, "id" | "updated_at"> {
     edges: [
       { id: "edge-1", from: "plan-1", to: "build-1", cond: "always", label: "" },
       { id: "edge-2", from: "build-1", to: "review-1", cond: "always", label: "" },
-      { id: "edge-3", from: "review-1", to: "build-1", cond: "fail", label: "重试" },
+      { id: "edge-3", from: "review-1", to: "build-1", cond: "fail", label: "Retry" },
     ],
   }
+}
+
+function merge(items: WorkflowRuntimeDetail[], runs: WorkflowRun[]) {
+  const map = new Map<string, WorkflowRun[]>()
+  for (const item of runs) {
+    map.set(item.workflow_id, [...(map.get(item.workflow_id) || []), item])
+  }
+
+  return items.map((item) => {
+    const base = runtimeItem(item)
+    const list = [...(map.get(item.id) || [])].sort((a, b) => b.started_at - a.started_at)
+    const cur = list[0]
+    return {
+      ...base,
+      run_status: cur?.status,
+      run_total: list.length,
+      run_at: cur?.started_at,
+      done_runs: list.filter((item) => item.status === "done").length,
+      failed_runs: list.filter((item) => item.status === "failed").length,
+      blocked_runs: list.filter((item) => item.status === "blocked").length,
+    } satisfies WorkflowItem
+  })
 }
 
 export default function WorkflowsPage() {
@@ -66,16 +88,18 @@ export default function WorkflowsPage() {
   const [load, setLoad] = useState(true)
   const [err, setErr] = useState("")
   const [items, setItems] = useState<WorkflowRuntimeDetail[]>([])
+  const [runs, setRuns] = useState<WorkflowRun[]>([])
 
   const refresh = async () => {
     setLoad(true)
     setErr("")
     try {
-      const data = await workflowApi.list()
-      setItems(data.items)
+      const [flows, runs] = await Promise.all([workflowApi.list(), workflowApi.runs()])
+      setItems(flows.items)
+      setRuns(runs.items)
     } catch (err) {
       console.error(err)
-      setErr("加载工作流失败")
+      setErr("Failed to load workflows")
     } finally {
       setLoad(false)
     }
@@ -87,22 +111,30 @@ export default function WorkflowsPage() {
 
   const list = useMemo(() => {
     const key = q.trim().toLowerCase()
-    return items
-      .map(runtimeItem)
-      .filter((item) => {
-        if (!key) return true
-        return (
-          item.name.toLowerCase().includes(key) ||
-          item.desc.toLowerCase().includes(key) ||
-          item.tags.some((tag) => tag.toLowerCase().includes(key))
-        )
-      })
-  }, [items, q])
+    return merge(items, runs).filter((item) => {
+      if (!key) return true
+      return (
+        item.name.toLowerCase().includes(key) ||
+        item.desc.toLowerCase().includes(key) ||
+        item.tags.some((tag) => tag.toLowerCase().includes(key))
+      )
+    })
+  }, [items, q, runs])
+
+  const stats = useMemo(
+    () => ({
+      running: runs.filter((item) => item.status === "running").length,
+      blocked: runs.filter((item) => item.status === "blocked").length,
+      failed: runs.filter((item) => item.status === "failed").length,
+      done: runs.filter((item) => item.status === "done").length,
+    }),
+    [runs],
+  )
 
   const onCreate = async () => {
     const path = workspaces.workspaces[0]?.path
     if (!path) {
-      toast.error("请先创建或导入工作区")
+      toast.error("Create or import a workspace first")
       return
     }
     try {
@@ -111,7 +143,7 @@ export default function WorkflowsPage() {
       nav(`/app/workflows/${data.id}`)
     } catch (err) {
       console.error(err)
-      toast.error("创建工作流失败")
+      toast.error("Failed to create workflow")
     }
   }
 
@@ -121,9 +153,10 @@ export default function WorkflowsPage() {
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-6 py-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="mt-3 text-3xl font-semibold tracking-tight text-foreground">工作流</div>
+              <div className="mt-3 text-3xl font-semibold tracking-tight text-foreground">Workflows</div>
               <p className="mt-1.5 max-w-3xl text-sm leading-6 text-muted-foreground">
-                基于单工作区会话模型编排规划、执行、检查和回环修复等节点。
+                Build single-workspace multi-agent workflows with planning, execution, checking, repair loops, and
+                resumable blocked steps.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -137,11 +170,11 @@ export default function WorkflowsPage() {
                 disabled={load}
               >
                 <RefreshCw className={`size-4 ${load ? "animate-spin" : ""}`} />
-                刷新
+                Refresh
               </Button>
               <Button size="sm" className="bg-slate-900 text-white hover:bg-slate-800" onClick={() => void onCreate()}>
                 <Plus className="size-4" />
-                新建工作流
+                New Workflow
               </Button>
             </div>
           </div>
@@ -152,7 +185,7 @@ export default function WorkflowsPage() {
               <Input
                 value={q}
                 onChange={(event) => setQ(event.target.value)}
-                placeholder="搜索工作流、标签或工作区..."
+                placeholder="Search workflows, tags, or workspace paths..."
                 className="h-9 rounded-xl border-slate-200 bg-background pl-10 shadow-sm"
               />
             </div>
@@ -169,20 +202,35 @@ export default function WorkflowsPage() {
                   <Network className="size-5" />
                 </div>
                 <div>
-                  <div className="text-sm text-foreground">单工作区工作流</div>
+                  <div className="text-sm text-foreground">Single-workspace workflow runtime</div>
                   <div className="text-xs text-muted-foreground">
-                    每个工作流都绑定一个工作区，并通过监听 opencode 会话状态推进节点。
+                    Each workflow targets one workspace and advances when opencode sessions reach idle, blocked, or
+                    failed states.
                   </div>
                 </div>
               </div>
-              <div className="rounded-full border border-border/70 bg-background/85 px-3 py-1 text-xs font-medium text-foreground">
-                {list.length} 个工作流
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="rounded-full border border-border/70 bg-background/85 px-3 py-1 text-xs font-medium text-foreground">
+                  {list.length} workflows
+                </div>
+                <div className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                  {stats.done} done
+                </div>
+                <div className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700">
+                  {stats.running} running
+                </div>
+                <div className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+                  {stats.blocked} blocked
+                </div>
+                <div className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-medium text-red-700">
+                  {stats.failed} failed
+                </div>
               </div>
             </CardContent>
           </Card>
 
           <WorkflowList
-            items={list as WorkflowItem[]}
+            items={list}
             err={err || null}
             onRetry={() => {
               void refresh()

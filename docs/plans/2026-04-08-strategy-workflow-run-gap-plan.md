@@ -399,6 +399,8 @@ Implemented in the current pass:
 - add a global workflow step cap as the final cycle safety net
 - add `keyed` session mode plus `session_key`
 - reuse named session lanes inside one workflow run
+- expose lane reuse, node retry progress, and current node execution config in the workflow side panel
+- handle `permission.asked` and `question.asked` directly from the workflow side panel
 
 ### Scope
 
@@ -510,6 +512,208 @@ This keeps product semantics clear:
 - retry policy is configured per node
 - one workflow run can maintain several persistent agent contexts inside one workspace
 
+## PR 4: Make Runs Inspectable And Resumable From The UI
+
+### Goal
+
+Make `/app/workflows/:id` usable as an actual run console instead of only a canvas editor.
+
+### Status Update
+
+Implemented in the current pass:
+
+- workflow detail page now auto-loads the latest run when opened
+- the right panel now shows workflow run history for the current workflow
+- users can switch between past runs and inspect each run's node logs
+- the run panel now exposes run elapsed time and current node elapsed time
+- node log cards now show start time, end time, and elapsed duration
+
+### Scope
+
+- restore the latest run after page refresh
+- expose recent runs in the detail page
+- make loop inspection easier by surfacing timings
+
+### Changes
+
+#### 1. Auto-load the latest run for a workflow
+
+Files:
+
+- `packages/strategy-front/src/components/workflow/workflow-shell.tsx`
+
+Required behavior:
+
+- when the workflow detail page opens
+- load `workflowApi.runs(workflowID)`
+- pick the most recent run if one exists
+- load its node run list automatically
+
+Impact:
+
+- a refresh no longer drops the user out of the runtime context
+
+#### 2. Add workflow run history to the side panel
+
+Files:
+
+- `packages/strategy-front/src/components/workflow/workflow-shell.tsx`
+- `packages/strategy-front/src/components/workflow/workflow-sidepanel.tsx`
+
+Required behavior:
+
+- show all runs for the current workflow in reverse chronological order
+- allow clicking a past run to inspect it
+- keep the selected run as the source of truth for the log tab
+
+Impact:
+
+- debugging repeated loops and prior failures becomes much easier
+
+#### 3. Surface elapsed time in run and node views
+
+Files:
+
+- `packages/strategy-front/src/components/workflow/workflow-sidepanel.tsx`
+
+Required behavior:
+
+- show run-level elapsed time
+- show current node elapsed time
+- show each node run's start time, end time, and elapsed time
+
+Impact:
+
+- long-running checks and repair loops are visible without needing backend logs
+
+### Acceptance
+
+- refreshing `/app/workflows/:id` restores the latest run when one exists
+- users can inspect past runs without leaving the workflow detail page
+- run duration and node duration are visible in the side panel
+
+## PR 5: Add Workflow Analytics Summary
+
+### Goal
+
+Give `/app/workflows/:id` a workflow-level health view that stays generic across custom node identities.
+
+### Status Update
+
+Implemented in the current pass:
+
+- backend now exposes a workflow summary endpoint
+- summary aggregates workflow runs and node runs for one workflow
+- summary keeps node analytics generic by `node_id`, not by hardcoded roles
+- workflow detail UI now exposes a `Stats` tab in the side panel
+
+### Scope
+
+- add workflow-level run counters
+- add per-node execution analytics
+- show analytics without assuming node names like writer or checker
+
+### Changes
+
+#### 1. Add a summary aggregation in `strategy-service`
+
+Files:
+
+- `packages/strategy-service/internal/workflow/model.go`
+- `packages/strategy-service/internal/workflow/summary.go`
+- `packages/strategy-service/internal/workflow/summary_test.go`
+
+Required behavior:
+
+- aggregate total runs, done runs, failed runs, blocked runs, running runs
+- aggregate average run duration and last run time
+- aggregate per-node totals, last status, average duration, pass/fail totals
+
+#### 2. Expose the summary via HTTP
+
+Files:
+
+- `packages/strategy-service/internal/web/api.go`
+- `packages/strategy-service/internal/web/workflow_api.go`
+
+Route:
+
+- `GET /api/workflow/:id/summary`
+
+#### 3. Surface analytics in the workflow detail UI
+
+Files:
+
+- `packages/strategy-front/src/types/workflow.ts`
+- `packages/strategy-front/src/api/modules/workflow.ts`
+- `packages/strategy-front/src/components/workflow/workflow-shell.tsx`
+- `packages/strategy-front/src/components/workflow/workflow-sidepanel.tsx`
+
+Required behavior:
+
+- load summary together with run history
+- show workflow health counters
+- show per-node analytics in a separate `Stats` tab
+
+### Acceptance
+
+- workflow detail page shows overall run health for the selected workflow
+- node analytics remain useful even when nodes are user-defined
+- average duration excludes unfinished runs
+
+## PR 6: Surface Run Health On The Workflow List Page
+
+### Goal
+
+Turn `/app/workflows` into a workflow dashboard instead of only a canvas entry page.
+
+### Status Update
+
+Implemented in the current pass:
+
+- workflow list page now loads workflow runs together with workflow definitions
+- each workflow card now shows latest run status
+- each workflow card now shows run totals and issue counts
+- workflow list page copy and empty state are now readable again
+
+### Scope
+
+- show latest workflow health before opening the detail page
+- reduce the need to click into every workflow to find failures
+
+### Changes
+
+#### 1. Load workflow runs on the list page
+
+Files:
+
+- `packages/strategy-front/src/pages/workflows.tsx`
+
+Required behavior:
+
+- fetch `workflowApi.list()` and `workflowApi.runs()` together
+- derive per-workflow latest status and total run counts in the page layer
+
+#### 2. Enrich workflow cards with runtime signals
+
+Files:
+
+- `packages/strategy-front/src/components/workflow/workflow-list-card.tsx`
+- `packages/strategy-front/src/components/workflow/workflow-list.tsx`
+- `packages/strategy-front/src/components/workflow/workflow-empty.tsx`
+- `packages/strategy-front/src/types/workflow.ts`
+
+Required behavior:
+
+- show last run status
+- show total runs, done runs, and issue totals
+- show last run time on the card footer
+
+### Acceptance
+
+- users can identify unhealthy workflows from `/app/workflows` at a glance
+- list page no longer requires opening every workflow to find the latest failure
+
 ## Recommended Order
 
 ### First
@@ -537,6 +741,33 @@ Reason:
 
 - this is where the workflow engine becomes truly generic
 - it is also the most structural change
+
+### Fourth
+
+Implement PR 4.
+
+Reason:
+
+- once the runtime is generic, the next bottleneck is observability
+- users need to inspect retries, loop length, and blocked states without backend digging
+
+### Fifth
+
+Implement PR 5.
+
+Reason:
+
+- after single-run observability, the next layer is workflow-level health
+- users need a generic way to compare custom nodes and identify hotspots over time
+
+### Sixth
+
+Implement PR 6.
+
+Reason:
+
+- once detail pages are observable, the list page should become a real dashboard
+- latest status and issue counts shorten the feedback loop for many workflows
 
 ## Recommended File Checklist
 

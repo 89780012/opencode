@@ -27,6 +27,16 @@ func (a *API) workflowGet(c *gin.Context) {
 	ok(c, data)
 }
 
+func (a *API) workflowSummary(c *gin.Context) {
+	data, err := a.wf.Summary(c.Param("id"))
+	if err != nil {
+		slog.Error("workflow summary failed", "id", c.Param("id"), "error", err)
+		bad(c, err)
+		return
+	}
+	ok(c, data)
+}
+
 func (a *API) workflowSave(c *gin.Context) {
 	body := struct {
 		ID            string `json:"id"`

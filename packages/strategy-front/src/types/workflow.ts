@@ -97,6 +97,12 @@ export type WorkflowItem = {
   updated_at: number
   tags: string[]
   count: number
+  run_status?: WorkflowRunStatus
+  run_total?: number
+  run_at?: number
+  done_runs?: number
+  failed_runs?: number
+  blocked_runs?: number
 }
 
 export type WorkflowDetail = WorkflowItem & {
@@ -180,6 +186,7 @@ export type WorkflowRun = {
   workflow_id: string
   workspace_path: string
   root_session_id: string
+  lanes?: Record<string, string>
   status: WorkflowRunStatus
   current_node_id?: string
   block_reason?: string
@@ -193,6 +200,36 @@ export type WorkflowRun = {
 
 export type WorkflowRunList = {
   items: WorkflowRun[]
+}
+
+export type WorkflowNodeSummary = {
+  node_id: string
+  kind: WorkflowNodeKind
+  title: string
+  total: number
+  done: number
+  failed: number
+  blocked: number
+  running: number
+  timeout: number
+  pass: number
+  fail: number
+  avg_ms: number
+  last_run_at?: number
+  last_status: WorkflowNodeRunStatus
+}
+
+export type WorkflowSummary = {
+  workflow_id: string
+  total_runs: number
+  done_runs: number
+  failed_runs: number
+  blocked_runs: number
+  running_runs: number
+  avg_run_ms: number
+  last_run_at?: number
+  total_node_runs: number
+  nodes: WorkflowNodeSummary[]
 }
 
 export type WorkflowAnchor = {

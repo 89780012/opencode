@@ -143,6 +143,36 @@ type NodeRunList struct {
 	Items []NodeRun `json:"items"`
 }
 
+type Summary struct {
+	WorkflowID    string        `json:"workflow_id"`
+	TotalRuns     int           `json:"total_runs"`
+	DoneRuns      int           `json:"done_runs"`
+	FailedRuns    int           `json:"failed_runs"`
+	BlockedRuns   int           `json:"blocked_runs"`
+	RunningRuns   int           `json:"running_runs"`
+	AvgRunMS      int64         `json:"avg_run_ms"`
+	LastRunAt     int64         `json:"last_run_at,omitempty"`
+	TotalNodeRuns int           `json:"total_node_runs"`
+	Nodes         []NodeSummary `json:"nodes"`
+}
+
+type NodeSummary struct {
+	NodeID     string     `json:"node_id"`
+	Kind       Kind       `json:"kind"`
+	Title      string     `json:"title"`
+	Total      int        `json:"total"`
+	Done       int        `json:"done"`
+	Failed     int        `json:"failed"`
+	Blocked    int        `json:"blocked"`
+	Running    int        `json:"running"`
+	Timeout    int        `json:"timeout"`
+	Pass       int        `json:"pass"`
+	Fail       int        `json:"fail"`
+	AvgMS      int64      `json:"avg_ms"`
+	LastRunAt  int64      `json:"last_run_at,omitempty"`
+	LastStatus NodeStatus `json:"last_status"`
+}
+
 type StartResult struct {
 	Run     Run     `json:"run"`
 	NodeRun NodeRun `json:"node_run"`
