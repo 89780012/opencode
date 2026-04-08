@@ -48,6 +48,8 @@ func (a *API) workflowSave(c *gin.Context) {
 			Kind            string   `json:"kind"`
 			Title           string   `json:"title"`
 			Agent           string   `json:"agent"`
+			X               float64  `json:"x"`
+			Y               float64  `json:"y"`
 			Skills          []string `json:"skills"`
 			SessionMode     string   `json:"session_mode"`
 			SessionKey      string   `json:"session_key"`
@@ -159,6 +161,8 @@ func convertFlow(body struct {
 		Kind            string   `json:"kind"`
 		Title           string   `json:"title"`
 		Agent           string   `json:"agent"`
+		X               float64  `json:"x"`
+		Y               float64  `json:"y"`
 		Skills          []string `json:"skills"`
 		SessionMode     string   `json:"session_mode"`
 		SessionKey      string   `json:"session_key"`
@@ -184,6 +188,8 @@ func convertFlow(body struct {
 			Kind:            workflow.Kind(item.Kind),
 			Title:           item.Title,
 			Agent:           item.Agent,
+			X:               item.X,
+			Y:               item.Y,
 			Skills:          item.Skills,
 			Session:         workflow.Mode(item.SessionMode),
 			SessionKey:      item.SessionKey,

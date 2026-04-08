@@ -141,6 +141,8 @@ export type WorkflowRuntimeNode = {
   kind: WorkflowNodeKind
   title: string
   agent: string
+  x?: number
+  y?: number
   skills: string[]
   session_mode: WorkflowSessionMode
   session_key?: string

@@ -101,6 +101,7 @@ export function WorkflowCanvas(props: {
         edges={edges}
         nodeTypes={workflowNodeTypes}
         fitView
+        fitViewOptions={{ maxZoom: 0.8, padding: 0.2 }}
         proOptions={{ hideAttribution: true }}
         defaultEdgeOptions={{
           style: tone(),

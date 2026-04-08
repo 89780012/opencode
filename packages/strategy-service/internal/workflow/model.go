@@ -64,6 +64,8 @@ type Node struct {
 	Kind            Kind     `json:"kind"`
 	Title           string   `json:"title"`
 	Agent           string   `json:"agent"`
+	X               float64  `json:"x,omitempty"`
+	Y               float64  `json:"y,omitempty"`
 	Skills          []string `json:"skills"`
 	Session         Mode     `json:"session_mode"`
 	SessionKey      string   `json:"session_key,omitempty"`

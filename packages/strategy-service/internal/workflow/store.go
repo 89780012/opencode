@@ -154,6 +154,12 @@ func cleanNodes(list []Node) []Node {
 		if item.RetryLimit < 0 {
 			item.RetryLimit = 0
 		}
+		if item.X != item.X {
+			item.X = 0
+		}
+		if item.Y != item.Y {
+			item.Y = 0
+		}
 		out = append(out, item)
 	}
 	return out

@@ -137,7 +137,6 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
     const data = item.id ? await workflowApi.update(item.id, next) : await workflowApi.save(next)
     setItem(data)
     setWorkspace(data.workspace_path || "")
-    setFlow(runtimeDetail(data))
     return data
   }
 
@@ -146,7 +145,6 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
     try {
       await persist()
       toast.success("工作流已保存")
-      await props.onRefresh?.()
     } catch (err) {
       console.error(err)
       toast.error("保存工作流失败")

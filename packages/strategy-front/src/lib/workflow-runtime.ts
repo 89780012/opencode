@@ -41,6 +41,19 @@ function agent(node: WorkflowFlowNode) {
   return node.data.title.trim() || kindAgent(node.data.kind)
 }
 
+function pos(node: WorkflowRuntimeNode, i: number) {
+  if (Number.isFinite(node.x) && Number.isFinite(node.y)) {
+    return {
+      x: node.x || 0,
+      y: node.y || 0,
+    }
+  }
+  return {
+    x: 120 + i * 300,
+    y: 180 + (i % 2) * 42,
+  }
+}
+
 function times(value: number) {
   const list = [
     { label: "默认（30 分钟）", value: "0" },
@@ -157,7 +170,7 @@ export function runtimeDetail(item: WorkflowRuntimeDetail): WorkflowDetail {
     const base = makeNode(
       node.kind,
       node.id,
-      { x: 120 + i * 300, y: 180 + (i % 2) * 42 },
+      pos(node, i),
       {
         timeout: node.timeout_ms,
         retry: node.retry_limit,
@@ -218,6 +231,8 @@ export function fromFlow(
       kind: node.data.kind,
       title: text,
       agent: agent(node),
+      x: node.position.x,
+      y: node.position.y,
       skills: multi(node.data.fields, workflowField.skills),
       session_mode: mode(node.data.fields, node.data.kind),
       session_key: textField(node.data.fields, workflowField.sessionKey),
