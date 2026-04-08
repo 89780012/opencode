@@ -79,33 +79,37 @@ type Edge struct {
 }
 
 type Run struct {
-	ID            string    `json:"id"`
-	WorkflowID    string    `json:"workflow_id"`
-	WorkspacePath string    `json:"workspace_path"`
-	RootSessionID string    `json:"root_session_id"`
-	Status        RunStatus `json:"status"`
-	CurrentNodeID string    `json:"current_node_id"`
-	Input         string    `json:"input"`
-	Loop          int       `json:"loop"`
-	StartedAt     int64     `json:"started_at"`
-	EndedAt       int64     `json:"ended_at,omitempty"`
-	Error         string    `json:"error,omitempty"`
+	ID             string    `json:"id"`
+	WorkflowID     string    `json:"workflow_id"`
+	WorkspacePath  string    `json:"workspace_path"`
+	RootSessionID  string    `json:"root_session_id"`
+	Status         RunStatus `json:"status"`
+	CurrentNodeID  string    `json:"current_node_id"`
+	BlockReason    string    `json:"block_reason,omitempty"`
+	BlockRequestID string    `json:"block_request_id,omitempty"`
+	Input          string    `json:"input"`
+	Loop           int       `json:"loop"`
+	StartedAt      int64     `json:"started_at"`
+	EndedAt        int64     `json:"ended_at,omitempty"`
+	Error          string    `json:"error,omitempty"`
 }
 
 type NodeRun struct {
-	ID        string     `json:"id"`
-	RunID     string     `json:"run_id"`
-	NodeID    string     `json:"node_id"`
-	SessionID string     `json:"session_id"`
-	Status    NodeStatus `json:"status"`
-	Turn      int        `json:"turn"`
-	Input     string     `json:"input"`
-	Output    string     `json:"output,omitempty"`
-	Error     string     `json:"error,omitempty"`
-	StartedAt int64      `json:"started_at"`
-	EndedAt   int64      `json:"ended_at,omitempty"`
-	Anchor    Anchor     `json:"anchor"`
-	Result    Result     `json:"result"`
+	ID             string     `json:"id"`
+	RunID          string     `json:"run_id"`
+	NodeID         string     `json:"node_id"`
+	SessionID      string     `json:"session_id"`
+	Status         NodeStatus `json:"status"`
+	Turn           int        `json:"turn"`
+	Input          string     `json:"input"`
+	Output         string     `json:"output,omitempty"`
+	BlockReason    string     `json:"block_reason,omitempty"`
+	BlockRequestID string     `json:"block_request_id,omitempty"`
+	Error          string     `json:"error,omitempty"`
+	StartedAt      int64      `json:"started_at"`
+	EndedAt        int64      `json:"ended_at,omitempty"`
+	Anchor         Anchor     `json:"anchor"`
+	Result         Result     `json:"result"`
 }
 
 type Anchor struct {

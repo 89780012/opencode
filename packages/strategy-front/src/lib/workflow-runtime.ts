@@ -29,32 +29,33 @@ function desc(node: WorkflowRuntimeNode) {
 
 function name(node: WorkflowRuntimeNode) {
   const title = node.title.trim()
-  if (!title) {
-    return node.agent.trim() || kindName(node.kind)
-  }
-  if (node.kind === "start" || node.kind === "end" || node.kind === "judge") {
-    return title
-  }
-  if (title === kindName(node.kind)) {
-    return node.agent.trim() || kindName(node.kind)
-  }
+  if (!title) return node.agent.trim() || kindName(node.kind)
+  if (node.kind === "start" || node.kind === "end" || node.kind === "judge") return title
+  if (title === kindName(node.kind)) return node.agent.trim() || kindName(node.kind)
   return title
 }
 
 function agent(node: WorkflowFlowNode) {
-  if (node.data.kind === "start" || node.data.kind === "end") {
-    return ""
-  }
-  if (node.data.kind === "judge") {
-    return kindAgent(node.data.kind)
-  }
+  if (node.data.kind === "start" || node.data.kind === "end") return ""
+  if (node.data.kind === "judge") return kindAgent(node.data.kind)
   return node.data.title.trim() || kindAgent(node.data.kind)
 }
 
+function times(value: number) {
+  const list = [
+    { label: "默认（30 分钟）", value: "0" },
+    { label: "5 分钟", value: "300000" },
+    { label: "15 分钟", value: "900000" },
+    { label: "30 分钟", value: "1800000" },
+    { label: "60 分钟", value: "3600000" },
+  ]
+  const raw = String(Math.max(0, Math.trunc(value || 0)))
+  if (list.some((item) => item.value === raw)) return list
+  return [{ label: `${raw} ms`, value: raw }, ...list]
+}
+
 function fields(node: WorkflowRuntimeNode) {
-  if (node.kind === "start" || node.kind === "end") {
-    return []
-  }
+  if (node.kind === "start" || node.kind === "end") return []
 
   return [
     {
@@ -72,6 +73,13 @@ function fields(node: WorkflowRuntimeNode) {
               { label: "共享会话", value: "shared" },
               { label: "独立会话", value: "isolated" },
             ],
+    },
+    {
+      key: workflowField.timeout,
+      kind: "select" as const,
+      label: "超时",
+      value: String(Math.max(0, Math.trunc(node.timeout_ms || 0))),
+      options: times(node.timeout_ms),
     },
     {
       key: workflowField.skills,
@@ -102,7 +110,7 @@ export function runtimeItem(item: WorkflowRuntimeDetail): WorkflowItem {
 
 export function runtimeDetail(item: WorkflowRuntimeDetail): WorkflowDetail {
   const nodes = item.nodes.map((node, i) => {
-    const base = makeNode(node.kind, node.id, { x: 120 + i * 300, y: 180 + (i % 2) * 42 })
+    const base = makeNode(node.kind, node.id, { x: 120 + i * 300, y: 180 + (i % 2) * 42 }, { timeout: node.timeout_ms })
     return {
       ...base,
       data: {
@@ -155,7 +163,7 @@ export function fromFlow(
       skills: multi(node.data.fields, workflowField.skills),
       session_mode: mode(node.data.fields, node.data.kind),
       prompt: note(node.data.fields, workflowField.prompt),
-      timeout_ms: 0,
+      timeout_ms: num(node.data.fields, workflowField.timeout),
       retry_limit: 0,
     }
   }) satisfies WorkflowRuntimeNode[]
@@ -194,7 +202,14 @@ function multi(fields: WorkflowFlowNode["data"]["fields"], key: string) {
   return item.value.map((row) => row.trim()).filter(Boolean)
 }
 
+function num(fields: WorkflowFlowNode["data"]["fields"], key: string) {
+  const value = select(fields, key, "0")
+  const num = Number.parseInt(value, 10)
+  if (!Number.isFinite(num) || num < 0) return 0
+  return num
+}
+
 function mode(fields: WorkflowFlowNode["data"]["fields"], kind: WorkflowRuntimeNode["kind"]): WorkflowSessionMode {
-  const value = select(fields, workflowField.session, kind === "review" ? "isolated" : "shared")
+  const value = select(fields, workflowField.session, kind === "review" || kind === "judge" ? "isolated" : "shared")
   return value === "isolated" ? "isolated" : "shared"
 }

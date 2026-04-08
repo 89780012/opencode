@@ -38,6 +38,12 @@ function passLabel(pass?: boolean) {
   return "未判定"
 }
 
+function blockLabel(value?: string) {
+  if (value === "permission") return "权限请求"
+  if (value === "question") return "问题确认"
+  return value || "-"
+}
+
 function parseReview(row: WorkflowNodeRun) {
   const text = row.result.structured?.trim()
   if (!text) return null
@@ -71,6 +77,15 @@ function card(title: string, body: string) {
   )
 }
 
+function info(label: string, value: string) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="max-w-40 truncate text-right font-medium text-foreground">{value || "-"}</span>
+    </div>
+  )
+}
+
 export function WorkflowSidepanel(props: Props) {
   return (
     <aside className="flex h-full w-[280px] shrink-0 flex-col border-l border-border/70 bg-sidebar/95 backdrop-blur">
@@ -79,7 +94,7 @@ export function WorkflowSidepanel(props: Props) {
           <div className="mb-3 space-y-1">
             <div className="text-sm font-medium text-foreground">工作流面板</div>
             <div className="text-xs leading-5 text-muted-foreground">
-              这里展示启动输入、运行状态和每个节点的执行记录。
+              这里展示启动输入、运行状态，以及每个节点的执行记录。
             </div>
           </div>
 
@@ -98,7 +113,9 @@ export function WorkflowSidepanel(props: Props) {
             <div className="space-y-3">
               <section className="rounded-xl border border-border/70 bg-background/85 px-3 py-3 shadow-xs">
                 <div className="text-sm font-medium text-foreground">运行输入</div>
-                <div className="mt-1 text-xs leading-5 text-muted-foreground">这里会作为工作流根输入发送给首个节点。</div>
+                <div className="mt-1 text-xs leading-5 text-muted-foreground">
+                  这里会作为工作流根输入，发送给第一个节点。
+                </div>
                 <textarea
                   value={props.text}
                   onChange={(event: ChangeEvent<HTMLTextAreaElement>) => props.onText(event.target.value)}
@@ -115,20 +132,9 @@ export function WorkflowSidepanel(props: Props) {
                   </div>
                 </div>
                 <div className="mt-3 space-y-2 text-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">当前节点</span>
-                    <span className="max-w-36 truncate text-right font-medium text-foreground">
-                      {props.run?.current_node_id || "-"}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">开始时间</span>
-                    <span className="text-right font-medium text-foreground">{stamp(props.run?.started_at)}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">节点记录</span>
-                    <span className="text-right font-medium text-foreground">{props.rows.length}</span>
-                  </div>
+                  {info("当前节点", props.run?.current_node_id || "-")}
+                  {info("开始时间", stamp(props.run?.started_at))}
+                  {info("节点记录", String(props.rows.length))}
                   {props.run?.error ? (
                     <div className="rounded-lg bg-destructive/10 px-3 py-2 text-xs leading-5 text-destructive">
                       {props.run.error}
@@ -141,6 +147,17 @@ export function WorkflowSidepanel(props: Props) {
                   ) : null}
                 </div>
               </section>
+
+              {props.run?.status === "blocked" ? (
+                <section className="rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-3 shadow-xs dark:border-amber-500/30 dark:bg-amber-500/10">
+                  <div className="text-sm font-medium text-foreground">阻塞详情</div>
+                  <div className="mt-3 space-y-2 text-sm">
+                    {info("阻塞类型", blockLabel(props.run.block_reason))}
+                    {info("请求 ID", props.run.block_request_id || "-")}
+                    {info("阻塞节点", props.current?.node_id || props.run.current_node_id || "-")}
+                  </div>
+                </section>
+              ) : null}
             </div>
           </div>
         </TabsContent>
@@ -166,6 +183,13 @@ export function WorkflowSidepanel(props: Props) {
                       <div className="mt-2 break-all text-[11px] leading-5 text-muted-foreground">
                         会话：{row.session_id || "-"}
                       </div>
+
+                      {row.status === "blocked" ? (
+                        <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                          <div>阻塞类型：{blockLabel(row.block_reason)}</div>
+                          <div>请求 ID：{row.block_request_id || "-"}</div>
+                        </div>
+                      ) : null}
 
                       {review ? (
                         <div className="mt-3 space-y-2">

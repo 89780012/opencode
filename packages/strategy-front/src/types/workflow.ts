@@ -8,6 +8,7 @@ export const workflowField = {
   prompt: "prompt",
   session: "session",
   skills: "skills",
+  timeout: "timeout",
 } as const
 
 export type WorkflowFieldKey = (typeof workflowField)[keyof typeof workflowField]
@@ -104,6 +105,7 @@ export type WorkflowSeed = {
   prompt?: string
   mode?: WorkflowSessionMode
   skills?: string[]
+  timeout?: number
 }
 
 export type WorkflowEdgeCond = "always" | "pass" | "fail"
@@ -162,6 +164,8 @@ export type WorkflowRun = {
   root_session_id: string
   status: WorkflowRunStatus
   current_node_id?: string
+  block_reason?: string
+  block_request_id?: string
   input: string
   loop: number
   started_at: number
@@ -195,6 +199,8 @@ export type WorkflowNodeRun = {
   turn: number
   input: string
   output?: string
+  block_reason?: string
+  block_request_id?: string
   error?: string
   started_at: number
   ended_at?: number
@@ -226,11 +232,11 @@ export function kindName(kind: WorkflowKind) {
 }
 
 export function kindDesc(kind: WorkflowKind) {
-  if (kind === "start") return "作为流程入口，整理上下文后进入下一步。"
+  if (kind === "start") return "作为流程入口，整理上下文后进入下一个节点。"
   if (kind === "plan") return "拆解需求并输出清晰的执行计划。"
   if (kind === "build") return "在工作区中实现需求或调整现有代码。"
-  if (kind === "judge") return "根据当前结果做路由判断，并按通过或未通过分支流转。"
-  if (kind === "review") return "审查当前结果并给出通过或不通过结论。"
+  if (kind === "judge") return "根据当前结果做路由判断，并按 pass 或 fail 走向不同分支。"
+  if (kind === "review") return "检查当前结果并给出通过或不通过结论。"
   if (kind === "end") return "汇总最终结果，作为流程终点结束执行。"
   return "暂停流程，等待人工确认后继续。"
 }
@@ -240,7 +246,7 @@ export function kindPrompt(kind: WorkflowKind) {
   if (kind === "plan") return "输出清晰的实现计划，不要直接修改代码。"
   if (kind === "build") return "在当前工作区中完成需求实现，并保持改动可验证。"
   if (kind === "judge") return '根据当前结果做路由判断，并返回包含 "pass"、"summary"、"next_prompt" 的 JSON。'
-  if (kind === "review") return '审查当前代码，并返回包含 "pass"、"summary"、"next_prompt" 的 JSON。'
+  if (kind === "review") return '检查当前代码，并返回包含 "pass"、"summary"、"next_prompt" 的 JSON。'
   if (kind === "end") return "总结最终结果并给出明确结论；如果没有后续节点，流程将在这里结束。"
   return "等待人工确认后再继续执行。"
 }
@@ -274,9 +280,23 @@ function options(kind: WorkflowKind) {
   ]
 }
 
+function times(value = 0) {
+  const list = [
+    { label: "默认（30 分钟）", value: "0" },
+    { label: "5 分钟", value: "300000" },
+    { label: "15 分钟", value: "900000" },
+    { label: "30 分钟", value: "1800000" },
+    { label: "60 分钟", value: "3600000" },
+  ]
+  const raw = String(Math.max(0, Math.trunc(value || 0)))
+  if (list.some((item) => item.value === raw)) return list
+  return [{ label: `${raw} ms`, value: raw }, ...list]
+}
+
 function label(key: WorkflowFieldKey) {
   if (key === workflowField.session) return "会话"
   if (key === workflowField.skills) return "技能"
+  if (key === workflowField.timeout) return "超时"
   return "提示词"
 }
 
@@ -291,6 +311,13 @@ function fields(kind: WorkflowKind, seed: WorkflowSeed) {
       label: label(workflowField.session),
       value: mode,
       options: options(kind),
+    },
+    {
+      key: workflowField.timeout,
+      kind: "select" as const,
+      label: label(workflowField.timeout),
+      value: String(Math.max(0, Math.trunc(seed.timeout || 0))),
+      options: times(seed.timeout),
     },
     {
       key: workflowField.skills,

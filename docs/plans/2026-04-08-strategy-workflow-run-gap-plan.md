@@ -263,6 +263,20 @@ Optional first-step validation:
 
 Make workflow execution controllable and observable at the node level.
 
+### Status Update
+
+Implemented in the current pass:
+
+- persist `block_reason` and `block_request_id` on both workflow run and node run
+- clear blocked metadata when a blocked run is resumed
+- show blocked reason, request id, and blocked node in `/app/workflows` side panel
+- make node `timeout_ms` editable in the workflow canvas and preserve it on save/start
+
+Still open inside PR 2:
+
+- node-level `model` and `variant`
+- explicit short-term runtime behavior for selected `skills`
+
 ### Scope
 
 - persist blocked request information
