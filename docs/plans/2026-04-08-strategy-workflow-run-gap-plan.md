@@ -390,6 +390,16 @@ For the first runnable version, prompt injection is enough if the UI needs visib
 
 Move from a hardcoded `plan-build-review` loop to a generic single-workspace multi-agent workflow engine.
 
+### Status Update
+
+Implemented in the current pass:
+
+- remove the hardcoded `review/judge -> build` loop counter
+- enforce `retry_limit` from repeated entry count per node
+- add a global workflow step cap as the final cycle safety net
+- add `keyed` session mode plus `session_key`
+- reuse named session lanes inside one workflow run
+
 ### Scope
 
 - remove hardcoded repair loop logic

@@ -84,3 +84,16 @@ func TestValidateRejectsHalfModelOverride(t *testing.T) {
 		t.Fatal("expected model override validation error")
 	}
 }
+
+func TestValidateRequiresKeyForKeyedSession(t *testing.T) {
+	err := validate(Workflow{
+		WorkspacePath: "x",
+		RootNodeID:    "n1",
+		Nodes: []Node{
+			{ID: "n1", Kind: Build, Session: Keyed},
+		},
+	})
+	if err == nil {
+		t.Fatal("expected keyed session validation error")
+	}
+}

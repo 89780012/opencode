@@ -7,8 +7,10 @@ export type WorkflowTone = "slate" | "blue" | "amber"
 export const workflowField = {
   prompt: "prompt",
   session: "session",
+  sessionKey: "session_key",
   skills: "skills",
   timeout: "timeout",
+  retry: "retry",
   model: "model",
   variant: "variant",
 } as const
@@ -104,7 +106,7 @@ export type WorkflowDetail = WorkflowItem & {
 
 export type WorkflowNodeKind = WorkflowKind
 
-export type WorkflowSessionMode = "shared" | "isolated"
+export type WorkflowSessionMode = "shared" | "isolated" | "keyed"
 
 export type WorkflowSeed = {
   title?: string
@@ -112,8 +114,10 @@ export type WorkflowSeed = {
   agent?: string
   prompt?: string
   mode?: WorkflowSessionMode
+  session_key?: string
   skills?: string[]
   timeout?: number
+  retry?: number
   model?: string
   variant?: string
 }
@@ -131,6 +135,7 @@ export type WorkflowRuntimeNode = {
   agent: string
   skills: string[]
   session_mode: WorkflowSessionMode
+  session_key?: string
   prompt: string
   timeout_ms: number
   retry_limit: number
@@ -279,18 +284,16 @@ export function kindAgent(kind: WorkflowKind) {
   return "operator"
 }
 
-function options(kind: WorkflowKind) {
-  if (kind === "review" || kind === "judge") {
-    return [
-      { label: "独立会话", value: "isolated" },
-      { label: "共享会话", value: "shared" },
-    ]
-  }
-
-  return [
+function sessions(kind: WorkflowKind) {
+  const list = [
     { label: "共享会话", value: "shared" },
+    { label: "命名会话", value: "keyed" },
     { label: "独立会话", value: "isolated" },
   ]
+  if (kind === "review" || kind === "judge") {
+    return [list[2], list[1], list[0]]
+  }
+  return list
 }
 
 function times(value = 0) {
@@ -306,10 +309,25 @@ function times(value = 0) {
   return [{ label: `${raw} ms`, value: raw }, ...list]
 }
 
+function retries(value = 0) {
+  const list = [
+    { label: "0 次重试", value: "0" },
+    { label: "1 次重试", value: "1" },
+    { label: "2 次重试", value: "2" },
+    { label: "3 次重试", value: "3" },
+    { label: "5 次重试", value: "5" },
+  ]
+  const raw = String(Math.max(0, Math.trunc(value || 0)))
+  if (list.some((item) => item.value === raw)) return list
+  return [{ label: `${raw} 次重试`, value: raw }, ...list]
+}
+
 function label(key: WorkflowFieldKey) {
   if (key === workflowField.session) return "会话"
+  if (key === workflowField.sessionKey) return "会话键"
   if (key === workflowField.skills) return "技能"
   if (key === workflowField.timeout) return "超时"
+  if (key === workflowField.retry) return "重试"
   if (key === workflowField.model) return "模型覆盖"
   if (key === workflowField.variant) return "变体"
   return "提示词"
@@ -325,7 +343,13 @@ function fields(kind: WorkflowKind, seed: WorkflowSeed) {
       kind: "select" as const,
       label: label(workflowField.session),
       value: mode,
-      options: options(kind),
+      options: sessions(kind),
+    },
+    {
+      key: workflowField.sessionKey,
+      kind: "text" as const,
+      label: label(workflowField.sessionKey),
+      value: seed.session_key || "",
     },
     {
       key: workflowField.timeout,
@@ -333,6 +357,13 @@ function fields(kind: WorkflowKind, seed: WorkflowSeed) {
       label: label(workflowField.timeout),
       value: String(Math.max(0, Math.trunc(seed.timeout || 0))),
       options: times(seed.timeout),
+    },
+    {
+      key: workflowField.retry,
+      kind: "select" as const,
+      label: label(workflowField.retry),
+      value: String(Math.max(0, Math.trunc(seed.retry || 0))),
+      options: retries(seed.retry),
     },
     {
       key: workflowField.skills,
@@ -366,113 +397,19 @@ export function makeNode(kind: WorkflowKind, id: string, pos: XYPosition, seed: 
     seed.title ||
     (kind === "start" || kind === "end" || kind === "judge" ? kindName(kind) : seed.agent || kindAgent(kind))
 
-  if (kind === "start") {
-    return {
-      id,
-      type: nodeType(kind),
-      dragHandle: ".workflow-drag",
-      position: pos,
-      data: {
-        kind,
-        title,
-        desc: seed.desc || kindDesc(kind),
-        tone: "blue",
-        fields: fields(kind, seed),
-      },
-    }
-  }
-
-  if (kind === "plan") {
-    return {
-      id,
-      type: nodeType(kind),
-      dragHandle: ".workflow-drag",
-      position: pos,
-      data: {
-        kind,
-        title,
-        desc: seed.desc || kindDesc(kind),
-        tone: "blue",
-        fields: fields(kind, seed),
-      },
-    }
-  }
-
-  if (kind === "build") {
-    return {
-      id,
-      type: nodeType(kind),
-      dragHandle: ".workflow-drag",
-      position: pos,
-      data: {
-        kind,
-        title,
-        desc: seed.desc || kindDesc(kind),
-        tone: "amber",
-        fields: fields(kind, seed),
-      },
-    }
-  }
-
-  if (kind === "judge") {
-    return {
-      id,
-      type: nodeType(kind),
-      dragHandle: ".workflow-drag",
-      position: pos,
-      data: {
-        kind,
-        title,
-        desc: seed.desc || kindDesc(kind),
-        tone: "slate",
-        fields: fields(kind, seed),
-      },
-    }
-  }
-
-  if (kind === "review") {
-    return {
-      id,
-      type: nodeType(kind),
-      dragHandle: ".workflow-drag",
-      position: pos,
-      data: {
-        kind,
-        title,
-        desc: seed.desc || kindDesc(kind),
-        tone: "slate",
-        fields: fields(kind, seed),
-      },
-    }
-  }
-
-  if (kind === "end") {
-    return {
-      id,
-      type: nodeType(kind),
-      dragHandle: ".workflow-drag",
-      position: pos,
-      data: {
-        kind,
-        title,
-        desc: seed.desc || kindDesc(kind),
-        tone: "amber",
-        fields: fields(kind, seed),
-      },
-    }
-  }
+  const data = {
+    kind,
+    title,
+    desc: seed.desc || kindDesc(kind),
+    tone: kind === "start" || kind === "plan" ? "blue" : kind === "build" || kind === "end" ? "amber" : "slate",
+    fields: fields(kind, seed),
+  } as const
 
   return {
     id,
     type: nodeType(kind),
     dragHandle: ".workflow-drag",
     position: pos,
-    data: {
-      kind,
-      title,
-      desc: seed.desc || kindDesc(kind),
-      tone: "slate",
-      fields: fields(kind, seed),
-    },
+    data,
   }
 }

@@ -17,6 +17,7 @@ type Mode string
 const (
 	Shared   Mode = "shared"
 	Isolated Mode = "isolated"
+	Keyed    Mode = "keyed"
 )
 
 type Cond string
@@ -65,6 +66,7 @@ type Node struct {
 	Agent           string   `json:"agent"`
 	Skills          []string `json:"skills"`
 	Session         Mode     `json:"session_mode"`
+	SessionKey      string   `json:"session_key,omitempty"`
 	Prompt          string   `json:"prompt"`
 	TimeoutMS       int64    `json:"timeout_ms"`
 	RetryLimit      int      `json:"retry_limit"`
@@ -82,19 +84,20 @@ type Edge struct {
 }
 
 type Run struct {
-	ID             string    `json:"id"`
-	WorkflowID     string    `json:"workflow_id"`
-	WorkspacePath  string    `json:"workspace_path"`
-	RootSessionID  string    `json:"root_session_id"`
-	Status         RunStatus `json:"status"`
-	CurrentNodeID  string    `json:"current_node_id"`
-	BlockReason    string    `json:"block_reason,omitempty"`
-	BlockRequestID string    `json:"block_request_id,omitempty"`
-	Input          string    `json:"input"`
-	Loop           int       `json:"loop"`
-	StartedAt      int64     `json:"started_at"`
-	EndedAt        int64     `json:"ended_at,omitempty"`
-	Error          string    `json:"error,omitempty"`
+	ID             string            `json:"id"`
+	WorkflowID     string            `json:"workflow_id"`
+	WorkspacePath  string            `json:"workspace_path"`
+	RootSessionID  string            `json:"root_session_id"`
+	Lanes          map[string]string `json:"lanes,omitempty"`
+	Status         RunStatus         `json:"status"`
+	CurrentNodeID  string            `json:"current_node_id"`
+	BlockReason    string            `json:"block_reason,omitempty"`
+	BlockRequestID string            `json:"block_request_id,omitempty"`
+	Input          string            `json:"input"`
+	Loop           int               `json:"loop"`
+	StartedAt      int64             `json:"started_at"`
+	EndedAt        int64             `json:"ended_at,omitempty"`
+	Error          string            `json:"error,omitempty"`
 }
 
 type NodeRun struct {

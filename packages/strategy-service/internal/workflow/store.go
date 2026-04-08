@@ -129,6 +129,7 @@ func cleanNodes(list []Node) []Node {
 		item.Title = text(item.Title)
 		item.Agent = text(item.Agent)
 		item.Prompt = strings.TrimSpace(strings.ReplaceAll(item.Prompt, "\r\n", "\n"))
+		item.SessionKey = text(item.SessionKey)
 		item.ModelProviderID = text(item.ModelProviderID)
 		item.ModelID = text(item.ModelID)
 		item.Variant = text(item.Variant)
@@ -139,9 +140,13 @@ func cleanNodes(list []Node) []Node {
 			item.Agent = ""
 			item.Prompt = ""
 			item.Skills = nil
+			item.SessionKey = ""
 			item.ModelProviderID = ""
 			item.ModelID = ""
 			item.Variant = ""
+		}
+		if item.Session != Keyed {
+			item.SessionKey = ""
 		}
 		if item.TimeoutMS < 0 {
 			item.TimeoutMS = 0
@@ -187,6 +192,7 @@ func cleanRuns(list []Run) []Run {
 		item.WorkflowID = text(item.WorkflowID)
 		item.WorkspacePath = text(item.WorkspacePath)
 		item.RootSessionID = text(item.RootSessionID)
+		item.Lanes = pairs(item.Lanes)
 		item.CurrentNodeID = text(item.CurrentNodeID)
 		item.BlockReason = text(item.BlockReason)
 		item.BlockRequestID = text(item.BlockRequestID)
@@ -268,11 +274,30 @@ func kind(v Kind) Kind {
 
 func mode(v Mode) Mode {
 	switch v {
-	case Shared, Isolated:
+	case Shared, Isolated, Keyed:
 		return v
 	default:
 		return Shared
 	}
+}
+
+func pairs(input map[string]string) map[string]string {
+	if len(input) == 0 {
+		return nil
+	}
+	out := map[string]string{}
+	for key, value := range input {
+		key = text(key)
+		value = text(value)
+		if key == "" || value == "" {
+			continue
+		}
+		out[key] = value
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func cond(v Cond) Cond {

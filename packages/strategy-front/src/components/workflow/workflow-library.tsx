@@ -17,7 +17,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useGlobalData } from "@/data/global-data-provider"
 import { cn } from "@/lib/utils"
-import { kindDesc, kindMode, kindPrompt, type WorkflowKind } from "@/types/workflow"
+import { kindDesc, kindMode, kindPrompt, type WorkflowKind, type WorkflowSessionMode } from "@/types/workflow"
 import type { GlobalAgent, RuntimeAgent, WorkflowAgentRole } from "@/types/agent"
 
 const cut = 16
@@ -29,7 +29,7 @@ type Item = {
   desc: string
   agent?: string
   prompt?: string
-  mode?: "shared" | "isolated"
+  mode?: WorkflowSessionMode
   search: string
 }
 

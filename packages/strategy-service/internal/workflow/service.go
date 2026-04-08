@@ -368,19 +368,6 @@ func (s *Service) exec(runID string) {
 					return
 				}
 
-				if nextNode.Kind == Build && (node.Kind == Review || node.Kind == Judge) && row.Result.Pass != nil && !*row.Result.Pass {
-					run.Loop++
-				}
-				if run.Loop > 3 {
-					run.Status = RunFailed
-					run.Error = "review loop limit reached"
-					run.BlockReason = ""
-					run.BlockRequestID = ""
-					run.EndedAt = time.Now().UnixMilli()
-					_ = s.putRun(run)
-					s.mu.Unlock()
-					return
-				}
 				if _, err := s.queue(flow, &run, nextNode, row.Turn+1, run.Input, row.Result.Text, feedback); err != nil {
 					run.Status = RunFailed
 					run.Error = err.Error()
@@ -473,6 +460,31 @@ func (s *Service) lastNodeRun(runID string, nodeID string) (NodeRun, bool) {
 	return out, hit
 }
 
+func (s *Service) rows(runID string) ([]NodeRun, error) {
+	list, err := s.store.loadNodeRuns()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]NodeRun, 0, len(list))
+	for _, item := range list {
+		if item.RunID == runID {
+			out = append(out, item)
+		}
+	}
+	return out, nil
+}
+
+func count(list []NodeRun, nodeID string) int {
+	out := 0
+	for _, item := range list {
+		if nodeID != "" && item.NodeID != nodeID {
+			continue
+		}
+		out++
+	}
+	return out
+}
+
 func auto(kind Kind) bool {
 	return kind == Start || kind == End
 }
@@ -480,6 +492,9 @@ func auto(kind Kind) bool {
 func (s *Service) session(dir string, run *Run, node Node) (string, error) {
 	if node.Session == Shared && run.RootSessionID != "" {
 		return run.RootSessionID, nil
+	}
+	if node.Session == Keyed && run.Lanes[node.SessionKey] != "" {
+		return run.Lanes[node.SessionKey], nil
 	}
 	if err := s.ensure(); err != nil {
 		return "", err
@@ -490,6 +505,12 @@ func (s *Service) session(dir string, run *Run, node Node) (string, error) {
 	}
 	if node.Session == Shared {
 		run.RootSessionID = sid
+	}
+	if node.Session == Keyed {
+		if run.Lanes == nil {
+			run.Lanes = map[string]string{}
+		}
+		run.Lanes[node.SessionKey] = sid
 	}
 	return sid, nil
 }
@@ -504,6 +525,20 @@ func (s *Service) queue(
 	feedback string,
 ) (NodeRun, error) {
 	for {
+		list, err := s.rows(run.ID)
+		if err != nil {
+			return NodeRun{}, err
+		}
+		if count(list, "") >= 64 {
+			return NodeRun{}, errors.New("workflow step limit reached")
+		}
+		if count(list, node.ID) > node.RetryLimit {
+			return NodeRun{}, errors.New("workflow node retry limit reached")
+		}
+		if count(list, node.ID) > 0 {
+			run.Loop++
+		}
+
 		now := time.Now().UnixMilli()
 		if auto(node.Kind) {
 			row := NodeRun{

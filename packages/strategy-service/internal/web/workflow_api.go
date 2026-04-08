@@ -40,6 +40,7 @@ func (a *API) workflowSave(c *gin.Context) {
 			Agent           string   `json:"agent"`
 			Skills          []string `json:"skills"`
 			SessionMode     string   `json:"session_mode"`
+			SessionKey      string   `json:"session_key"`
 			Prompt          string   `json:"prompt"`
 			TimeoutMS       int64    `json:"timeout_ms"`
 			RetryLimit      int      `json:"retry_limit"`
@@ -140,6 +141,7 @@ func convertFlow(body struct {
 		Agent           string   `json:"agent"`
 		Skills          []string `json:"skills"`
 		SessionMode     string   `json:"session_mode"`
+		SessionKey      string   `json:"session_key"`
 		Prompt          string   `json:"prompt"`
 		TimeoutMS       int64    `json:"timeout_ms"`
 		RetryLimit      int      `json:"retry_limit"`
@@ -164,6 +166,7 @@ func convertFlow(body struct {
 			Agent:           item.Agent,
 			Skills:          item.Skills,
 			Session:         workflow.Mode(item.SessionMode),
+			SessionKey:      item.SessionKey,
 			Prompt:          item.Prompt,
 			TimeoutMS:       item.TimeoutMS,
 			RetryLimit:      item.RetryLimit,

@@ -43,3 +43,17 @@ func TestBodyIncludesModelAndVariant(t *testing.T) {
 		t.Fatalf("expected variant override, got %#v", out["variant"])
 	}
 }
+
+func TestCountFiltersNode(t *testing.T) {
+	list := []NodeRun{
+		{NodeID: "a"},
+		{NodeID: "b"},
+		{NodeID: "a"},
+	}
+	if count(list, "") != 3 {
+		t.Fatalf("expected total count, got %d", count(list, ""))
+	}
+	if count(list, "a") != 2 {
+		t.Fatalf("expected node count, got %d", count(list, "a"))
+	}
+}

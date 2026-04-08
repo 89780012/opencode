@@ -54,6 +54,30 @@ function times(value: number) {
   return [{ label: `${raw} ms`, value: raw }, ...list]
 }
 
+function retries(value: number) {
+  const list = [
+    { label: "0 次重试", value: "0" },
+    { label: "1 次重试", value: "1" },
+    { label: "2 次重试", value: "2" },
+    { label: "3 次重试", value: "3" },
+    { label: "5 次重试", value: "5" },
+  ]
+  const raw = String(Math.max(0, Math.trunc(value || 0)))
+  if (list.some((item) => item.value === raw)) return list
+  return [{ label: `${raw} 次重试`, value: raw }, ...list]
+}
+
+function sessions(node: WorkflowRuntimeNode) {
+  const list = [
+    { label: "共享会话", value: "shared" },
+    { label: "命名会话", value: "keyed" },
+    { label: "独立会话", value: "isolated" },
+  ]
+  if (node.session_mode === "isolated") return [list[2], list[1], list[0]]
+  if (node.session_mode === "keyed") return [list[1], list[0], list[2]]
+  return list
+}
+
 function fields(node: WorkflowRuntimeNode) {
   if (node.kind === "start" || node.kind === "end") return []
 
@@ -63,16 +87,13 @@ function fields(node: WorkflowRuntimeNode) {
       kind: "select" as const,
       label: "会话",
       value: node.session_mode,
-      options:
-        node.session_mode === "isolated"
-          ? [
-              { label: "独立会话", value: "isolated" },
-              { label: "共享会话", value: "shared" },
-            ]
-          : [
-              { label: "共享会话", value: "shared" },
-              { label: "独立会话", value: "isolated" },
-            ],
+      options: sessions(node),
+    },
+    {
+      key: workflowField.sessionKey,
+      kind: "text" as const,
+      label: "会话键",
+      value: node.session_key || "",
     },
     {
       key: workflowField.timeout,
@@ -80,6 +101,13 @@ function fields(node: WorkflowRuntimeNode) {
       label: "超时",
       value: String(Math.max(0, Math.trunc(node.timeout_ms || 0))),
       options: times(node.timeout_ms),
+    },
+    {
+      key: workflowField.retry,
+      kind: "select" as const,
+      label: "重试",
+      value: String(Math.max(0, Math.trunc(node.retry_limit || 0))),
+      options: retries(node.retry_limit),
     },
     {
       key: workflowField.skills,
@@ -124,6 +152,8 @@ export function runtimeDetail(item: WorkflowRuntimeDetail): WorkflowDetail {
   const nodes = item.nodes.map((node, i) => {
     const base = makeNode(node.kind, node.id, { x: 120 + i * 300, y: 180 + (i % 2) * 42 }, {
       timeout: node.timeout_ms,
+      retry: node.retry_limit,
+      session_key: node.session_key,
       model: model(node),
       variant: node.variant,
     })
@@ -178,9 +208,10 @@ export function fromFlow(
       agent: agent(node),
       skills: multi(node.data.fields, workflowField.skills),
       session_mode: mode(node.data.fields, node.data.kind),
+      session_key: text(node.data.fields, workflowField.sessionKey),
       prompt: note(node.data.fields, workflowField.prompt),
       timeout_ms: num(node.data.fields, workflowField.timeout),
-      retry_limit: 0,
+      retry_limit: num(node.data.fields, workflowField.retry),
       ...ref(text(node.data.fields, workflowField.model)),
       variant: text(node.data.fields, workflowField.variant),
     }
@@ -251,5 +282,7 @@ function ref(value: string) {
 
 function mode(fields: WorkflowFlowNode["data"]["fields"], kind: WorkflowRuntimeNode["kind"]): WorkflowSessionMode {
   const value = select(fields, workflowField.session, kind === "review" || kind === "judge" ? "isolated" : "shared")
-  return value === "isolated" ? "isolated" : "shared"
+  if (value === "isolated") return "isolated"
+  if (value === "keyed") return "keyed"
+  return "shared"
 }

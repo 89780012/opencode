@@ -36,6 +36,9 @@ func validate(flow Workflow) error {
 	}
 
 	for _, item := range flow.Nodes {
+		if item.Session == Keyed && item.SessionKey == "" {
+			return errors.New("workflow keyed session requires session_key")
+		}
 		if (item.ModelProviderID == "") != (item.ModelID == "") {
 			return errors.New("workflow node model override requires both model_provider_id and model_id")
 		}
