@@ -46,15 +46,9 @@ function has(text: string, list: string[]) {
 }
 
 function infer(item: AgentRow): WorkflowKind {
-  if (item.workflow_role === "planner") {
-    return "plan"
-  }
-  if (item.workflow_role === "checker") {
-    return "review"
-  }
-  if (item.workflow_role === "executor") {
-    return "build"
-  }
+  if (item.workflow_role === "planner") return "plan"
+  if (item.workflow_role === "checker") return "review"
+  if (item.workflow_role === "executor") return "build"
 
   const text = `${item.name} ${item.description || ""}`.toLowerCase()
   if (has(text, ["checker", "check", "review", "verify", "lint", "test", "audit", "检查", "审查", "校验"])) {
@@ -74,16 +68,10 @@ function group(kind: WorkflowKind) {
 
 function note(item: AgentRow, kind: WorkflowKind) {
   const text = item.description?.trim()
-  if (text) {
-    return text
-  }
-  if (kind === "plan") {
-    return `${item.name} 负责拆解需求并产出清晰计划。`
-  }
-  if (kind === "review") {
-    return `${item.name} 负责检查结果并返回 pass/fail。`
-  }
-  return `${item.name} 负责在工作区中实现或修改内容。`
+  if (text) return text
+  if (kind === "plan") return `${item.name} 负责拆解需求并产出清晰计划。`
+  if (kind === "review") return `${item.name} 负责检查结果并返回 pass/fail。`
+  return `${item.name} 负责在工作区内实现或修改内容。`
 }
 
 function merge(run: RuntimeAgent[], cfg: GlobalAgent[]) {
@@ -122,7 +110,7 @@ function build(list: AgentRow[]) {
     {
       kind: "start",
       title: "开始",
-      desc: "作为流程入口，整理输入与上下文后进入下一个节点。",
+      desc: "作为流程入口，整理输入与上下文后进入下一节点。",
       agent: "operator",
       prompt: kindPrompt("start"),
       mode: kindMode("start"),
@@ -140,11 +128,11 @@ function build(list: AgentRow[]) {
     {
       kind: "judge",
       title: "路由判断",
-      desc: "内置流程路由节点，根据当前结果输出 pass/fail 并决定下一条分支。",
+      desc: "内置流程路由节点，根据当前结果输出 pass/fail 并决定下一分支。",
       agent: "reviewer",
       prompt: kindPrompt("judge"),
       mode: kindMode("judge"),
-      search: "路由判断 分支 路由 judge pass fail",
+      search: "路由判断 分支 judge pass fail",
     },
   ])
 
@@ -182,24 +170,12 @@ function icon(kind: WorkflowKind) {
 }
 
 function gicon(kinds: WorkflowKind[]) {
-  if (kinds.includes("start")) {
-    return <Play className="size-3.5 text-muted-foreground" />
-  }
-  if (kinds.includes("judge")) {
-    return <GitBranch className="size-3.5 text-muted-foreground" />
-  }
-  if (kinds.includes("review")) {
-    return <FileSearch className="size-3.5 text-muted-foreground" />
-  }
-  if (kinds.includes("plan")) {
-    return <ClipboardList className="size-3.5 text-muted-foreground" />
-  }
-  if (kinds.includes("build")) {
-    return <Hammer className="size-3.5 text-muted-foreground" />
-  }
-  if (kinds.includes("end")) {
-    return <Square className="size-3.5 text-muted-foreground" />
-  }
+  if (kinds.includes("start")) return <Play className="size-3.5 text-muted-foreground" />
+  if (kinds.includes("judge")) return <GitBranch className="size-3.5 text-muted-foreground" />
+  if (kinds.includes("review")) return <FileSearch className="size-3.5 text-muted-foreground" />
+  if (kinds.includes("plan")) return <ClipboardList className="size-3.5 text-muted-foreground" />
+  if (kinds.includes("build")) return <Hammer className="size-3.5 text-muted-foreground" />
+  if (kinds.includes("end")) return <Square className="size-3.5 text-muted-foreground" />
   return <PauseCircle className="size-3.5 text-muted-foreground" />
 }
 
@@ -275,9 +251,7 @@ export function WorkflowLibrary(props: { value: string; onValue: (value: string)
               {data.agent.err}
             </div>
           ) : null}
-          {data.agent.load ? (
-            <div className="mb-3 px-2 text-xs text-muted-foreground">正在加载可用智能体...</div>
-          ) : null}
+          {data.agent.load ? <div className="mb-3 px-2 text-xs text-muted-foreground">正在加载可用智能体...</div> : null}
           <Accordion type="multiple" value={open} onValueChange={setOpen} className="w-full">
             {list.map((group) => (
               <AccordionItem key={group.title} value={group.title} className="border-b-0">

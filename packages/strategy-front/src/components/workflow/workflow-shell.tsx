@@ -53,8 +53,11 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
 
   const sync = useCallback(
     async (runID?: string) => {
-      const [stats, data] = await Promise.all([workflowApi.summary(item.id), workflowApi.runs(item.id)])
-      const runs = sortRuns(data.items)
+      const [stats, data] = await Promise.all([
+        workflowApi.summary(item.id).catch(() => null),
+        workflowApi.runs(item.id).catch(() => ({ items: [] })),
+      ])
+      const runs = sortRuns(data.items || [])
       setSummary(stats)
       setRuns(runs)
 
@@ -67,7 +70,7 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
 
       const [run, rows] = await Promise.all([workflowApi.run(id), workflowApi.nodeRuns(id)])
       setRun(run)
-      setRows(sortRows(rows.items))
+      setRows(sortRows(rows.items || []))
     },
     [item.id],
   )
@@ -133,11 +136,11 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
       const data = item.id ? await workflowApi.update(item.id, next) : await workflowApi.save(next)
       setItem(data)
       setFlow(runtimeDetail(data))
-      toast.success("Workflow saved")
+      toast.success("工作流已保存")
       await props.onRefresh?.()
     } catch (err) {
       console.error(err)
-      toast.error("Failed to save workflow")
+      toast.error("保存工作流失败")
     } finally {
       setBusy(false)
     }
@@ -153,10 +156,10 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
       setRun(out.run)
       setRows([out.node_run])
       await sync(out.run.id)
-      toast.success("Workflow started")
+      toast.success("工作流已启动")
     } catch (err) {
       console.error(err)
-      toast.error("Failed to start workflow")
+      toast.error("启动工作流失败")
     } finally {
       setBusy(false)
     }
@@ -168,10 +171,10 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
     try {
       await workflowApi.continue(run.id)
       await sync(run.id)
-      toast.success("Workflow resumed")
+      toast.success("工作流已继续")
     } catch (err) {
       console.error(err)
-      toast.error("Failed to resume workflow")
+      toast.error("继续工作流失败")
     } finally {
       setBusy(false)
     }
@@ -192,10 +195,10 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
       await permissionApi.respond(permission.id, { reply })
       setPermission(null)
       await resume(run.id)
-      toast.success("Permission request handled")
+      toast.success("权限请求已处理")
     } catch (err) {
       console.error(err)
-      toast.error("Failed to handle permission request")
+      toast.error("处理权限请求失败")
     } finally {
       setSending(false)
     }
@@ -208,10 +211,10 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
       await questionApi.reply(question.id, answers)
       setQuestion(null)
       await resume(run.id)
-      toast.success("Question answered")
+      toast.success("问题已回复")
     } catch (err) {
       console.error(err)
-      toast.error("Failed to submit answer")
+      toast.error("提交问题回复失败")
     } finally {
       setSending(false)
     }
@@ -224,10 +227,10 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
       await questionApi.reject(question.id)
       setQuestion(null)
       await resume(run.id)
-      toast.success("Question rejected")
+      toast.success("问题已拒绝")
     } catch (err) {
       console.error(err)
-      toast.error("Failed to reject question")
+      toast.error("拒绝问题失败")
     } finally {
       setSending(false)
     }
@@ -241,10 +244,10 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
       setFlow(runtimeDetail(data))
       await sync(run?.id)
       await props.onRefresh?.()
-      toast.success("Workflow refreshed")
+      toast.success("工作流已刷新")
     } catch (err) {
       console.error(err)
-      toast.error("Failed to refresh workflow")
+      toast.error("刷新工作流失败")
     } finally {
       setBusy(false)
     }
@@ -276,7 +279,7 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
             />
             <Button variant="outline" size="sm" className="rounded-full" onClick={() => setOpen((prev) => !prev)}>
               {open ? <PanelLeftClose className="size-4" /> : <PanelLeftOpen className="size-4" />}
-              {open ? "Hide library" : "Show library"}
+              {open ? "隐藏节点库" : "显示节点库"}
             </Button>
           </div>
         </div>

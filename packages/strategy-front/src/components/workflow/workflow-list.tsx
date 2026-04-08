@@ -16,7 +16,7 @@ export function WorkflowList(props: {
         <p className="text-sm text-destructive">{props.err}</p>
         <Button variant="outline" size="sm" onClick={props.onRetry}>
           <RefreshCw className="size-4" />
-          Retry
+          重试
         </Button>
       </div>
     )

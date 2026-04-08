@@ -9,7 +9,7 @@ function JudgeView(props: NodeProps<WorkflowFlowNode>) {
     <WorkflowNodeFrame
       props={props}
       icon={GitBranch}
-      badge="Judge"
+      badge="判断"
       top={
         <div className="rounded-xl border border-slate-200 bg-slate-50/90 px-3 py-3">
           <div className="flex items-center justify-between gap-2 text-[11px] font-medium text-slate-700">
@@ -21,7 +21,7 @@ function JudgeView(props: NodeProps<WorkflowFlowNode>) {
               <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-rose-700">fail</span>
             </div>
           </div>
-          <div className="mt-2 text-[12px] leading-5 text-slate-700">适合做条件判断、质量阈值判断或自定义分支判断。</div>
+          <div className="mt-2 text-[12px] leading-5 text-slate-700">适合做条件判断、质量阈值判断，或任意自定义分支判断。</div>
         </div>
       }
       foot={

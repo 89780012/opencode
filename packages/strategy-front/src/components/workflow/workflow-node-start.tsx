@@ -9,7 +9,7 @@ function StartView(props: NodeProps<WorkflowFlowNode>) {
     <WorkflowNodeFrame
       props={props}
       icon={Play}
-      badge="Entry"
+      badge="入口"
       left={false}
       top={
         <div className="rounded-xl border border-primary/15 bg-[linear-gradient(135deg,rgba(59,130,246,0.14),rgba(255,255,255,0.96))] px-3 py-3">

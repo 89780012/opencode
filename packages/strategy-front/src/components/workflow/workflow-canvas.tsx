@@ -42,10 +42,15 @@ export function WorkflowCanvas(props: {
     if (!rf) return
     const pos = rf.screenToFlowPosition({ x, y })
     const id = `${kind}-${Date.now()}-${seq.current++}`
-    const next = makeNode(kind, id, {
-      x: pos.x - 110 + seq.current * 8,
-      y: pos.y - 60 + seq.current * 8,
-    }, seed)
+    const next = makeNode(
+      kind,
+      id,
+      {
+        x: pos.x - 110 + seq.current * 8,
+        y: pos.y - 60 + seq.current * 8,
+      },
+      seed,
+    )
     setNodes((prev) => [...prev, next])
   }
 

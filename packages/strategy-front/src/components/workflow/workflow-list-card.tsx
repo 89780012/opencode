@@ -16,11 +16,11 @@ function time(value?: number) {
 }
 
 function status(value?: WorkflowItem["run_status"]) {
-  if (value === "running") return "Running"
-  if (value === "blocked") return "Blocked"
-  if (value === "failed") return "Failed"
-  if (value === "done") return "Done"
-  return "Never run"
+  if (value === "running") return "运行中"
+  if (value === "blocked") return "已阻塞"
+  if (value === "failed") return "失败"
+  if (value === "done") return "完成"
+  return "未运行"
 }
 
 function tone(value?: WorkflowItem["run_status"]) {
@@ -36,7 +36,7 @@ export function WorkflowListCard(props: { item: WorkflowItem; onOpen: (id: strin
     <Card
       role="button"
       tabIndex={0}
-      className="group min-h-[232px] gap-0 cursor-pointer overflow-hidden rounded-md border py-0 text-left shadow-[0_18px_36px_-30px_rgba(15,23,42,0.35)] transition-all duration-200 hover:-translate-y-1 hover:border-primary/25 hover:shadow-[0_22px_42px_-28px_rgba(15,23,42,0.38)]"
+      className="group min-h-[232px] cursor-pointer gap-0 overflow-hidden rounded-md border py-0 text-left shadow-[0_18px_36px_-30px_rgba(15,23,42,0.35)] transition-all duration-200 hover:-translate-y-1 hover:border-primary/25 hover:shadow-[0_22px_42px_-28px_rgba(15,23,42,0.38)]"
       onClick={() => props.onOpen(props.item.id)}
       onKeyDown={(event) => {
         if (event.key !== "Enter" && event.key !== " ") return
@@ -52,9 +52,7 @@ export function WorkflowListCard(props: { item: WorkflowItem; onOpen: (id: strin
             </div>
             <div>
               <div className="text-[18px] tracking-tight text-foreground">{props.item.name}</div>
-              <div className="mt-1 text-xs text-muted-foreground">
-                {props.item.status === "ready" ? "Ready to run" : "Draft"}
-              </div>
+              <div className="mt-1 text-xs text-muted-foreground">{props.item.status === "ready" ? "可运行" : "草稿"}</div>
             </div>
           </div>
           <div className="flex size-8 items-center justify-center rounded-full border border-border/70 bg-background/90 text-muted-foreground transition-all group-hover:border-primary/30 group-hover:text-foreground">
@@ -66,9 +64,14 @@ export function WorkflowListCard(props: { item: WorkflowItem; onOpen: (id: strin
 
         <div className="mt-4 flex flex-wrap gap-2">
           <span className="inline-flex items-center rounded-full border border-primary/20 bg-primary/8 px-2.5 py-1 text-[11px] font-medium text-primary">
-            {props.item.count} nodes
+            {props.item.count} 个节点
           </span>
-          <span className={cn("inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium", tone(props.item.run_status))}>
+          <span
+            className={cn(
+              "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium",
+              tone(props.item.run_status),
+            )}
+          >
             {status(props.item.run_status)}
           </span>
           {props.item.tags.map((item) => (
@@ -86,15 +89,15 @@ export function WorkflowListCard(props: { item: WorkflowItem; onOpen: (id: strin
 
         <div className="mt-4 grid grid-cols-3 gap-2 text-center">
           <div className="rounded-lg border border-border/70 bg-background/85 px-2 py-2">
-            <div className="text-[10px] text-muted-foreground">Runs</div>
+            <div className="text-[10px] text-muted-foreground">运行次数</div>
             <div className="mt-1 text-sm font-medium text-foreground">{props.item.run_total || 0}</div>
           </div>
           <div className="rounded-lg border border-border/70 bg-background/85 px-2 py-2">
-            <div className="text-[10px] text-muted-foreground">Done</div>
+            <div className="text-[10px] text-muted-foreground">完成次数</div>
             <div className="mt-1 text-sm font-medium text-emerald-600">{props.item.done_runs || 0}</div>
           </div>
           <div className="rounded-lg border border-border/70 bg-background/85 px-2 py-2">
-            <div className="text-[10px] text-muted-foreground">Issues</div>
+            <div className="text-[10px] text-muted-foreground">问题数</div>
             <div className="mt-1 text-sm font-medium text-destructive">
               {(props.item.failed_runs || 0) + (props.item.blocked_runs || 0)}
             </div>
@@ -104,11 +107,11 @@ export function WorkflowListCard(props: { item: WorkflowItem; onOpen: (id: strin
         <div className="mt-auto flex items-center justify-between border-t border-border/70 pt-4">
           <div className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
             <Clock3 className="size-3.5" />
-            Updated {time(props.item.updated_at)}
+            最近更新 {time(props.item.updated_at)}
           </div>
           <div className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground">
             <Sparkles className="size-3.5 text-primary" />
-            Last run {time(props.item.run_at)}
+            最近运行 {time(props.item.run_at)}
           </div>
         </div>
       </div>

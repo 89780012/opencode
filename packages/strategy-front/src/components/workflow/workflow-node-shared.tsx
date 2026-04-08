@@ -73,12 +73,12 @@ function SkillField(props: {
     <div className="space-y-1.5">
       <div className="flex items-center justify-between gap-2">
         <div className={label}>{props.item.label}</div>
-        <div className="text-[11px] text-muted-foreground">{props.item.value.length} selected</div>
+        <div className="text-[11px] text-muted-foreground">已选 {props.item.value.length} 项</div>
       </div>
       <Input
         value={q}
         onChange={(event) => setQ(event.target.value)}
-        placeholder="搜索 skill"
+        placeholder="搜索技能"
         className="nodrag nopan h-8 border-border/70 text-[12px] shadow-none"
         onWheelCapture={(event) => event.stopPropagation()}
         onPointerDownCapture={stop}
@@ -101,7 +101,7 @@ function SkillField(props: {
               </span>
             ))
           ) : (
-            <span className="px-1 text-[11px] text-muted-foreground">未选择 skill</span>
+            <span className="px-1 text-[11px] text-muted-foreground">还没有选择技能</span>
           )}
         </div>
       </div>
@@ -139,7 +139,7 @@ function SkillField(props: {
             )
           })
         ) : (
-          <div className="px-1 py-2 text-[12px] text-muted-foreground">No matching skills</div>
+          <div className="px-1 py-2 text-[12px] text-muted-foreground">没有匹配的技能</div>
         )}
       </div>
     </div>

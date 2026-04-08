@@ -7,9 +7,9 @@ export function WorkflowEmpty() {
         <Boxes className="size-5" />
       </div>
       <div className="space-y-1">
-        <div className="text-base font-semibold">No workflows yet</div>
+        <div className="text-base font-semibold">还没有工作流</div>
         <p className="text-sm text-muted-foreground">
-          Create a workflow to connect planning, execution, checking, and repair loops inside one workspace.
+          新建一个工作流后，就可以在同一工作区内串起规划、执行、检查和修复回环。
         </p>
       </div>
     </div>

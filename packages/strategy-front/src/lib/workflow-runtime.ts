@@ -43,7 +43,7 @@ function agent(node: WorkflowFlowNode) {
 
 function times(value: number) {
   const list = [
-    { label: "默认（30 分钟）", value: "0" },
+    { label: "默认（0 分钟）", value: "0" },
     { label: "5 分钟", value: "300000" },
     { label: "15 分钟", value: "900000" },
     { label: "30 分钟", value: "1800000" },
@@ -150,13 +150,18 @@ export function runtimeItem(item: WorkflowRuntimeDetail): WorkflowItem {
 
 export function runtimeDetail(item: WorkflowRuntimeDetail): WorkflowDetail {
   const nodes = item.nodes.map((node, i) => {
-    const base = makeNode(node.kind, node.id, { x: 120 + i * 300, y: 180 + (i % 2) * 42 }, {
-      timeout: node.timeout_ms,
-      retry: node.retry_limit,
-      session_key: node.session_key,
-      model: model(node),
-      variant: node.variant,
-    })
+    const base = makeNode(
+      node.kind,
+      node.id,
+      { x: 120 + i * 300, y: 180 + (i % 2) * 42 },
+      {
+        timeout: node.timeout_ms,
+        retry: node.retry_limit,
+        session_key: node.session_key,
+        model: model(node),
+        variant: node.variant,
+      },
+    )
     return {
       ...base,
       data: {
@@ -259,9 +264,9 @@ function multi(fields: WorkflowFlowNode["data"]["fields"], key: string) {
 
 function num(fields: WorkflowFlowNode["data"]["fields"], key: string) {
   const value = select(fields, key, "0")
-  const num = Number.parseInt(value, 10)
-  if (!Number.isFinite(num) || num < 0) return 0
-  return num
+  const out = Number.parseInt(value, 10)
+  if (!Number.isFinite(out) || out < 0) return 0
+  return out
 }
 
 function model(node: WorkflowRuntimeNode) {

@@ -9,7 +9,7 @@ function EndView(props: NodeProps<WorkflowFlowNode>) {
     <WorkflowNodeFrame
       props={props}
       icon={Square}
-      badge="Finish"
+      badge="结束"
       right={false}
       top={
         <div className="rounded-xl border border-amber-200 bg-[linear-gradient(135deg,rgba(251,191,36,0.14),rgba(255,255,255,0.96))] px-3 py-3">

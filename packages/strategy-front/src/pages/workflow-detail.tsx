@@ -23,7 +23,7 @@ export default function WorkflowDetailPage() {
   }
 
   if (load) {
-    return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Loading workflow...</div>
+    return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">正在加载工作流...</div>
   }
 
   if (!item) {
