@@ -81,6 +81,16 @@ func (a *API) workflowSave(c *gin.Context) {
 	ok(c, data)
 }
 
+func (a *API) workflowDelete(c *gin.Context) {
+	id := c.Param("id")
+	if err := a.wf.Delete(id); err != nil {
+		slog.Error("workflow delete failed", "id", id, "error", err)
+		bad(c, err)
+		return
+	}
+	ok(c, nil)
+}
+
 func (a *API) workflowRuns(c *gin.Context) {
 	data, err := a.wf.Runs(c.Query("workflow_id"))
 	if err != nil {

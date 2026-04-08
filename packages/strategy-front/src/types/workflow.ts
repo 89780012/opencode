@@ -89,11 +89,13 @@ export type WorkflowFlowNode = Node<WorkflowNodeData, WorkflowNodeType>
 
 export type WorkflowFlowEdge = Edge
 
+export type WorkflowListStatus = "draft" | "config" | "ready"
+
 export type WorkflowItem = {
   id: string
   name: string
   desc: string
-  status: "draft" | "ready"
+  status: WorkflowListStatus
   updated_at: number
   tags: string[]
   count: number
@@ -288,21 +290,21 @@ export function kindName(kind: WorkflowKind) {
 
 export function kindDesc(kind: WorkflowKind) {
   if (kind === "start") return "作为流程入口，整理输入和上下文后进入下一步。"
-  if (kind === "plan") return "拆解需求并输出清晰的执行计划。"
-  if (kind === "build") return "在工作区中实现需求或修改现有代码。"
-  if (kind === "judge") return "根据当前结果做路由判断，并按 pass 或 fail 进入不同分支。"
-  if (kind === "review") return "检查当前结果并给出是否通过的结论。"
-  if (kind === "end") return "汇总最终结果，作为流程终点结束执行。"
-  return "暂停流程，等待人工确认后继续。"
+  if (kind === "plan") return "拆解目标，生成清晰的执行计划。"
+  if (kind === "build") return "在工作区中实现需求，或修改已有代码与文件。"
+  if (kind === "judge") return "输出 pass 或 fail，用来驱动后续分支。"
+  if (kind === "review") return "检查当前结果并给出 pass 或 fail。"
+  if (kind === "end") return "汇总结果并结束流程。"
+  return "等待人工确认后继续。"
 }
 
 export function kindPrompt(kind: WorkflowKind) {
-  if (kind === "start") return "读取用户目标和已有上下文，整理出本次工作流的执行起点，然后继续。"
-  if (kind === "plan") return "输出清晰的实现计划，不要直接修改代码。"
-  if (kind === "build") return "在当前工作区中完成需求实现，并保持改动可验证。"
-  if (kind === "judge") return '根据当前结果做路由判断，并返回包含 "pass"、"summary"、"next_prompt" 的 JSON。'
-  if (kind === "review") return '检查当前代码或结果，并返回包含 "pass"、"summary"、"next_prompt" 的 JSON。'
-  if (kind === "end") return "总结最终结果并给出明确结论；如果没有后续节点，流程将在这里结束。"
+  if (kind === "start") return "阅读用户目标和已有上下文，整理出本次工作流的起点。"
+  if (kind === "plan") return "先产出清晰的实施计划，不要直接开始修改代码。"
+  if (kind === "build") return "在当前工作区内完成目标，并让结果可验证。"
+  if (kind === "judge") return '根据当前结果做判断，并输出包含 "pass"、"summary"、"issues"、"next_prompt" 的 JSON。'
+  if (kind === "review") return '检查当前结果，并输出包含 "pass"、"summary"、"issues"、"next_prompt" 的 JSON。'
+  if (kind === "end") return "总结最终结果，并给出明确结论。"
   return "等待人工确认后再继续执行。"
 }
 
@@ -335,7 +337,7 @@ function sessions(kind: WorkflowKind) {
 
 function times(value = 0) {
   const list = [
-    { label: "默认（0 分钟）", value: "0" },
+    { label: "默认（30 分钟）", value: "0" },
     { label: "5 分钟", value: "300000" },
     { label: "15 分钟", value: "900000" },
     { label: "30 分钟", value: "1800000" },
@@ -348,15 +350,15 @@ function times(value = 0) {
 
 function retries(value = 0) {
   const list = [
-    { label: "0 次重试", value: "0" },
-    { label: "1 次重试", value: "1" },
-    { label: "2 次重试", value: "2" },
-    { label: "3 次重试", value: "3" },
-    { label: "5 次重试", value: "5" },
+    { label: "不重试", value: "0" },
+    { label: "重试 1 次", value: "1" },
+    { label: "重试 2 次", value: "2" },
+    { label: "重试 3 次", value: "3" },
+    { label: "重试 5 次", value: "5" },
   ]
   const raw = String(Math.max(0, Math.trunc(value || 0)))
   if (list.some((item) => item.value === raw)) return list
-  return [{ label: `${raw} 次重试`, value: raw }, ...list]
+  return [{ label: `重试 ${raw} 次`, value: raw }, ...list]
 }
 
 function label(key: WorkflowFieldKey) {

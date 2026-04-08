@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
-interface Props {
+type Props = {
   open: boolean
   busy?: boolean
   title: string

@@ -111,6 +111,7 @@ func (a *API) Register(r *gin.Engine) {
 	flow.GET("/:id/summary", a.workflowSummary)
 	flow.POST("", a.workflowSave)
 	flow.PUT("/:id", a.workflowSave)
+	flow.DELETE("/:id", a.workflowDelete)
 	flow.POST("/:id/start", a.workflowStart)
 
 	run := api.Group("/workflow-runs")

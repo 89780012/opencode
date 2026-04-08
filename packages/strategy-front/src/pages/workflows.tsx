@@ -3,59 +3,22 @@ import { Network, Plus, RefreshCw, Search } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 import { workflowApi } from "@/api/modules"
+import { DeleteConfirmDialog } from "@/components/shared/delete-confirm-dialog"
+import { WorkflowCreateDialog } from "@/components/workflow/workflow-create-dialog"
 import { WorkflowList } from "@/components/workflow/workflow-list"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { useWorkspaceList } from "@/data/global-data-provider"
 import { runtimeItem } from "@/lib/workflow-runtime"
 import type { WorkflowItem, WorkflowRun, WorkflowRuntimeDetail } from "@/types/workflow"
 
-function blank(path: string): Omit<WorkflowRuntimeDetail, "id" | "updated_at"> {
+function blank(name: string): Omit<WorkflowRuntimeDetail, "id" | "updated_at"> {
   return {
-    name: "新建工作流",
-    workspace_path: path,
-    root_node_id: "plan-1",
-    nodes: [
-      {
-        id: "plan-1",
-        kind: "plan",
-        title: "规划",
-        agent: "planner",
-        skills: [],
-        session_mode: "shared",
-        prompt: "先输出清晰的实现计划，再进入后续节点。",
-        timeout_ms: 0,
-        retry_limit: 0,
-      },
-      {
-        id: "build-1",
-        kind: "build",
-        title: "执行",
-        agent: "coder",
-        skills: [],
-        session_mode: "shared",
-        prompt: "在当前工作区内完成需求实现，并保持结果可验证。",
-        timeout_ms: 0,
-        retry_limit: 0,
-      },
-      {
-        id: "review-1",
-        kind: "review",
-        title: "检查",
-        agent: "reviewer",
-        skills: [],
-        session_mode: "isolated",
-        prompt: '检查当前结果，并返回包含 "pass"、"summary"、"next_prompt" 的 JSON。',
-        timeout_ms: 0,
-        retry_limit: 0,
-      },
-    ],
-    edges: [
-      { id: "edge-1", from: "plan-1", to: "build-1", cond: "always", label: "" },
-      { id: "edge-2", from: "build-1", to: "review-1", cond: "always", label: "" },
-      { id: "edge-3", from: "review-1", to: "build-1", cond: "fail", label: "重试" },
-    ],
+    name,
+    workspace_path: "",
+    root_node_id: "",
+    nodes: [],
+    edges: [],
   }
 }
 
@@ -83,20 +46,22 @@ function merge(items: WorkflowRuntimeDetail[], runs: WorkflowRun[]) {
 
 export default function WorkflowsPage() {
   const nav = useNavigate()
-  const workspaces = useWorkspaceList()
   const [q, setQ] = useState("")
   const [load, setLoad] = useState(true)
   const [err, setErr] = useState("")
   const [items, setItems] = useState<WorkflowRuntimeDetail[]>([])
   const [runs, setRuns] = useState<WorkflowRun[]>([])
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [drop, setDrop] = useState<WorkflowItem | null>(null)
 
   const refresh = async () => {
     setLoad(true)
     setErr("")
     try {
       const [flows, runs] = await Promise.all([workflowApi.list(), workflowApi.runs()])
-      setItems(flows.items)
-      setRuns(runs.items)
+      setItems(flows.items || [])
+      setRuns(runs.items || [])
     } catch (err) {
       console.error(err)
       setErr("加载工作流失败")
@@ -131,19 +96,34 @@ export default function WorkflowsPage() {
     [runs],
   )
 
-  const onCreate = async () => {
-    const path = workspaces.workspaces[0]?.path
-    if (!path) {
-      toast.error("请先创建或导入工作区")
-      return
-    }
+  const onCreate = async (name: string) => {
+    setBusy(true)
     try {
-      const data = await workflowApi.save(blank(path))
+      const data = await workflowApi.save(blank(name))
+      setOpen(false)
       await refresh()
       nav(`/app/workflows/${data.id}`)
     } catch (err) {
       console.error(err)
       toast.error("创建工作流失败")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const onDelete = async () => {
+    if (!drop) return
+    setBusy(true)
+    try {
+      await workflowApi.remove(drop.id)
+      setDrop(null)
+      await refresh()
+      toast.success("工作流已删除")
+    } catch (err) {
+      console.error(err)
+      toast.error("删除工作流失败")
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -155,7 +135,7 @@ export default function WorkflowsPage() {
             <div className="min-w-0">
               <div className="mt-3 text-3xl font-semibold tracking-tight text-foreground">工作流</div>
               <p className="mt-1.5 max-w-3xl text-sm leading-6 text-muted-foreground">
-                在单个工作区内编排规划、执行、检查、修复回环和可恢复的阻塞步骤，构建多智能体工作流。
+                在同一个代码工作区里编排多节点协作流程，把规划、执行、检查、修复回环串成可重复运行的自动化链路。
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -171,7 +151,7 @@ export default function WorkflowsPage() {
                 <RefreshCw className={`size-4 ${load ? "animate-spin" : ""}`} />
                 刷新
               </Button>
-              <Button size="sm" className="bg-slate-900 text-white hover:bg-slate-800" onClick={() => void onCreate()}>
+              <Button size="sm" className="bg-slate-900 text-white hover:bg-slate-800" onClick={() => setOpen(true)}>
                 <Plus className="size-4" />
                 新建工作流
               </Button>
@@ -201,9 +181,9 @@ export default function WorkflowsPage() {
                   <Network className="size-5" />
                 </div>
                 <div>
-                  <div className="text-sm text-foreground">单工作区工作流运行台</div>
+                  <div className="text-sm text-foreground">单工作区工作流控制台</div>
                   <div className="text-xs text-muted-foreground">
-                    每个工作流绑定一个工作区，并根据 opencode 会话推进到空闲、阻塞、失败等状态。
+                    新工作流先以空草稿创建，再在详情页单独配置工作区路径、节点图和运行输入。
                   </div>
                 </div>
               </div>
@@ -234,9 +214,24 @@ export default function WorkflowsPage() {
               void refresh()
             }}
             onOpen={(id) => nav(`/app/workflows/${id}`)}
+            onDelete={setDrop}
           />
         </div>
       </div>
+
+      <WorkflowCreateDialog open={open} busy={busy} onOpenChange={setOpen} onConfirm={(name) => void onCreate(name)} />
+
+      <DeleteConfirmDialog
+        open={!!drop}
+        busy={busy}
+        title="删除工作流"
+        name={drop?.name || ""}
+        desc="这会删除工作流本身，以及它对应的运行记录和节点运行记录。"
+        onOpenChange={(open) => {
+          if (!open) setDrop(null)
+        }}
+        onConfirm={() => void onDelete()}
+      />
     </div>
   )
 }

@@ -33,6 +33,7 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
   const [q, setQ] = useState("")
   const [busy, setBusy] = useState(false)
   const [text, setText] = useState("")
+  const [workspace, setWorkspace] = useState(props.item.workspace_path || "")
   const [run, setRun] = useState<WorkflowRun | null>(null)
   const [runs, setRuns] = useState<WorkflowRun[]>([])
   const [rows, setRows] = useState<WorkflowNodeRun[]>([])
@@ -45,11 +46,13 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
 
   useEffect(() => {
     setItem(props.item)
+    setWorkspace(props.item.workspace_path || "")
     setFlow(runtimeDetail(props.item))
   }, [props.item])
 
   const blocked = run?.status === "blocked"
   const current = useMemo(() => rows.find((row) => row.node_id === run?.current_node_id) ?? null, [rows, run])
+  const canRun = flow.nodes.length > 0 && !!workspace.trim()
 
   const sync = useCallback(
     async (runID?: string) => {
@@ -129,13 +132,19 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
     })
   }, [])
 
+  const persist = async () => {
+    const next = fromFlow(item, flow.nodes, flow.edges, workspace)
+    const data = item.id ? await workflowApi.update(item.id, next) : await workflowApi.save(next)
+    setItem(data)
+    setWorkspace(data.workspace_path || "")
+    setFlow(runtimeDetail(data))
+    return data
+  }
+
   const onSave = async () => {
     setBusy(true)
     try {
-      const next = fromFlow(item, flow.nodes, flow.edges)
-      const data = item.id ? await workflowApi.update(item.id, next) : await workflowApi.save(next)
-      setItem(data)
-      setFlow(runtimeDetail(data))
+      await persist()
       toast.success("工作流已保存")
       await props.onRefresh?.()
     } catch (err) {
@@ -147,11 +156,18 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
   }
 
   const onRun = async () => {
+    if (!workspace.trim()) {
+      toast.error("请先填写工作区路径")
+      return
+    }
+    if (flow.nodes.length === 0) {
+      toast.error("请先添加至少一个节点")
+      return
+    }
+
     setBusy(true)
     try {
-      const next = fromFlow(item, flow.nodes, flow.edges)
-      const data = item.id ? await workflowApi.update(item.id, next) : await workflowApi.save(next)
-      setItem(data)
+      const data = await persist()
       const out = await workflowApi.start(data.id, text.trim())
       setRun(out.run)
       setRows([out.node_run])
@@ -241,6 +257,7 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
     try {
       const data = await workflowApi.get(item.id)
       setItem(data)
+      setWorkspace(data.workspace_path || "")
       setFlow(runtimeDetail(data))
       await sync(run?.id)
       await props.onRefresh?.()
@@ -265,12 +282,13 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
             </Button>
             <div className="min-w-0">
               <div className="truncate text-sm font-medium text-foreground">{item.name}</div>
-              <div className="truncate text-xs text-muted-foreground">{item.workspace_path}</div>
+              <div className="truncate text-xs text-muted-foreground">{workspace.trim() || "未配置工作区路径"}</div>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <WorkflowTopbar
               busy={busy}
+              canRun={canRun}
               blocked={blocked}
               onSave={() => void onSave()}
               onRun={() => void onRun()}
@@ -296,6 +314,7 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
           </div>
 
           <WorkflowSidepanel
+            workspace={workspace}
             text={text}
             run={run}
             runs={runs}
@@ -310,6 +329,7 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
             onPermission={onPermission}
             onQuestion={onQuestion}
             onRejectQuestion={onRejectQuestion}
+            onWorkspace={setWorkspace}
             onText={setText}
           />
         </div>

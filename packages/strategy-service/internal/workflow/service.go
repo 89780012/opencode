@@ -67,7 +67,7 @@ func (s *Service) Save(item Workflow) (Workflow, error) {
 	}
 	item.UpdatedAt = time.Now().UnixMilli()
 	item = cleanFlows([]Workflow{item})[0]
-	if err := validate(item); err != nil {
+	if err := validateSave(item); err != nil {
 		return Workflow{}, err
 	}
 
@@ -88,6 +88,63 @@ func (s *Service) Save(item Workflow) (Workflow, error) {
 		return Workflow{}, err
 	}
 	return item, nil
+}
+
+func (s *Service) Delete(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	list, err := s.store.loadFlows()
+	if err != nil {
+		return err
+	}
+
+	hit := false
+	flows := make([]Workflow, 0, len(list))
+	for _, item := range list {
+		if item.ID == id {
+			hit = true
+			continue
+		}
+		flows = append(flows, item)
+	}
+	if !hit {
+		return errors.New("workflow not found")
+	}
+
+	runs, err := s.store.loadRuns()
+	if err != nil {
+		return err
+	}
+	keep := make([]Run, 0, len(runs))
+	ids := map[string]bool{}
+	for _, item := range runs {
+		if item.WorkflowID == id {
+			ids[item.ID] = true
+			continue
+		}
+		keep = append(keep, item)
+	}
+
+	rows, err := s.store.loadNodeRuns()
+	if err != nil {
+		return err
+	}
+	nodes := make([]NodeRun, 0, len(rows))
+	for _, item := range rows {
+		if ids[item.RunID] {
+			continue
+		}
+		nodes = append(nodes, item)
+	}
+
+	if err := s.store.saveFlows(flows); err != nil {
+		return err
+	}
+	if err := s.store.saveRuns(keep); err != nil {
+		return err
+	}
+	return s.store.saveNodeRuns(nodes)
 }
 
 func (s *Service) Runs(workflowID string) (RunList, error) {
@@ -131,15 +188,12 @@ func (s *Service) Start(wid string, input string) (StartResult, error) {
 	if err != nil {
 		return StartResult{}, err
 	}
-	if err := validate(flow); err != nil {
+	if err := validateStart(flow); err != nil {
 		return StartResult{}, err
 	}
 	node, ok := pickNode(flow, flow.RootNodeID)
 	if !ok {
 		return StartResult{}, errors.New("workflow root node not found")
-	}
-	if text(flow.WorkspacePath) == "" {
-		return StartResult{}, errors.New("workflow workspace_path is required")
 	}
 
 	run := Run{

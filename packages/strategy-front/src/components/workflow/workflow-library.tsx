@@ -69,9 +69,9 @@ function group(kind: WorkflowKind) {
 function note(item: AgentRow, kind: WorkflowKind) {
   const text = item.description?.trim()
   if (text) return text
-  if (kind === "plan") return `${item.name} 负责拆解需求并产出清晰计划。`
-  if (kind === "review") return `${item.name} 负责检查结果并返回 pass/fail。`
-  return `${item.name} 负责在工作区内实现或修改内容。`
+  if (kind === "plan") return `${item.name} 负责拆解目标并输出执行计划。`
+  if (kind === "review") return `${item.name} 负责检查结果，并返回 pass/fail。`
+  return `${item.name} 负责在工作区中实施修改或生成内容。`
 }
 
 function merge(run: RuntimeAgent[], cfg: GlobalAgent[]) {
@@ -128,11 +128,11 @@ function build(list: AgentRow[]) {
     {
       kind: "judge",
       title: "路由判断",
-      desc: "内置流程路由节点，根据当前结果输出 pass/fail 并决定下一分支。",
+      desc: "内置判断节点，根据当前结果输出 pass/fail 并决定下一条边。",
       agent: "reviewer",
       prompt: kindPrompt("judge"),
       mode: kindMode("judge"),
-      search: "路由判断 分支 judge pass fail",
+      search: "路由 判断 分支 judge pass fail",
     },
   ])
 

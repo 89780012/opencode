@@ -21,18 +21,18 @@ function desc(node: WorkflowRuntimeNode) {
   if (node.kind === "start") return "整理输入并启动工作流。"
   if (node.kind === "plan") return "输出实现计划。"
   if (node.kind === "build") return "在工作区中完成实现。"
-  if (node.kind === "judge") return "根据结果做路由判断。"
-  if (node.kind === "review") return "检查当前工作区状态。"
+  if (node.kind === "judge") return "根据结果做出路由判断。"
+  if (node.kind === "review") return "检查当前结果是否通过。"
   if (node.kind === "end") return "汇总结论并结束流程。"
   return "等待人工确认后继续。"
 }
 
-function name(node: WorkflowRuntimeNode) {
-  const title = node.title.trim()
-  if (!title) return node.agent.trim() || kindName(node.kind)
-  if (node.kind === "start" || node.kind === "end" || node.kind === "judge") return title
-  if (title === kindName(node.kind)) return node.agent.trim() || kindName(node.kind)
-  return title
+function title(node: WorkflowRuntimeNode) {
+  const text = node.title.trim()
+  if (!text) return node.agent.trim() || kindName(node.kind)
+  if (node.kind === "start" || node.kind === "end" || node.kind === "judge") return text
+  if (text === kindName(node.kind)) return node.agent.trim() || kindName(node.kind)
+  return text
 }
 
 function agent(node: WorkflowFlowNode) {
@@ -43,7 +43,7 @@ function agent(node: WorkflowFlowNode) {
 
 function times(value: number) {
   const list = [
-    { label: "默认（0 分钟）", value: "0" },
+    { label: "默认（30 分钟）", value: "0" },
     { label: "5 分钟", value: "300000" },
     { label: "15 分钟", value: "900000" },
     { label: "30 分钟", value: "1800000" },
@@ -56,15 +56,15 @@ function times(value: number) {
 
 function retries(value: number) {
   const list = [
-    { label: "0 次重试", value: "0" },
-    { label: "1 次重试", value: "1" },
-    { label: "2 次重试", value: "2" },
-    { label: "3 次重试", value: "3" },
-    { label: "5 次重试", value: "5" },
+    { label: "不重试", value: "0" },
+    { label: "重试 1 次", value: "1" },
+    { label: "重试 2 次", value: "2" },
+    { label: "重试 3 次", value: "3" },
+    { label: "重试 5 次", value: "5" },
   ]
   const raw = String(Math.max(0, Math.trunc(value || 0)))
   if (list.some((item) => item.value === raw)) return list
-  return [{ label: `${raw} 次重试`, value: raw }, ...list]
+  return [{ label: `重试 ${raw} 次`, value: raw }, ...list]
 }
 
 function sessions(node: WorkflowRuntimeNode) {
@@ -137,19 +137,23 @@ function fields(node: WorkflowRuntimeNode) {
 }
 
 export function runtimeItem(item: WorkflowRuntimeDetail): WorkflowItem {
+  const nodes = item.nodes || []
+  const ready = nodes.length > 0 && !!item.workspace_path.trim()
+  const status = nodes.length === 0 ? "draft" : ready ? "ready" : "config"
+
   return {
     id: item.id,
     name: item.name,
-    desc: item.workspace_path || "工作流",
-    status: item.nodes.length > 0 ? "ready" : "draft",
+    desc: item.workspace_path.trim() || "未配置工作区",
+    status,
     updated_at: item.updated_at,
-    tags: [...new Set(item.nodes.map((node) => kindName(node.kind)))],
-    count: item.nodes.length,
+    tags: [...new Set(nodes.map((node) => kindName(node.kind)))],
+    count: nodes.length,
   }
 }
 
 export function runtimeDetail(item: WorkflowRuntimeDetail): WorkflowDetail {
-  const nodes = item.nodes.map((node, i) => {
+  const nodes = (item.nodes || []).map((node, i) => {
     const base = makeNode(
       node.kind,
       node.id,
@@ -162,12 +166,13 @@ export function runtimeDetail(item: WorkflowRuntimeDetail): WorkflowDetail {
         variant: node.variant,
       },
     )
+
     return {
       ...base,
       data: {
         ...base.data,
         kind: node.kind,
-        title: name(node),
+        title: title(node),
         desc: desc(node),
         tone: tone(node.kind),
         fields: fields(node),
@@ -175,7 +180,7 @@ export function runtimeDetail(item: WorkflowRuntimeDetail): WorkflowDetail {
     } satisfies WorkflowFlowNode
   })
 
-  const edges = item.edges.map(
+  const edges = (item.edges || []).map(
     (edge) =>
       ({
         id: edge.id,
@@ -199,26 +204,28 @@ export function fromFlow(
   item: WorkflowRuntimeDetail,
   nodes: WorkflowFlowNode[],
   edges: WorkflowFlowEdge[],
+  workspace = item.workspace_path,
 ): WorkflowRuntimeDetail {
   const nextNodes = nodes.map((node) => {
-    const title =
+    const text =
       node.data.title.trim() ||
       (node.data.kind === "start" || node.data.kind === "end" || node.data.kind === "judge"
         ? kindName(node.data.kind)
         : kindAgent(node.data.kind))
+
     return {
       id: node.id,
       kind: node.data.kind,
-      title,
+      title: text,
       agent: agent(node),
       skills: multi(node.data.fields, workflowField.skills),
       session_mode: mode(node.data.fields, node.data.kind),
-      session_key: text(node.data.fields, workflowField.sessionKey),
+      session_key: textField(node.data.fields, workflowField.sessionKey),
       prompt: note(node.data.fields, workflowField.prompt),
       timeout_ms: num(node.data.fields, workflowField.timeout),
       retry_limit: num(node.data.fields, workflowField.retry),
-      ...ref(text(node.data.fields, workflowField.model)),
-      variant: text(node.data.fields, workflowField.variant),
+      ...ref(textField(node.data.fields, workflowField.model)),
+      variant: textField(node.data.fields, workflowField.variant),
     }
   }) satisfies WorkflowRuntimeNode[]
 
@@ -232,6 +239,7 @@ export function fromFlow(
 
   return {
     ...item,
+    workspace_path: workspace.trim(),
     root_node_id: nextNodes.some((node) => node.id === item.root_node_id) ? item.root_node_id : (nextNodes[0]?.id ?? ""),
     nodes: nextNodes,
     edges: nextEdges,
@@ -244,7 +252,7 @@ function note(fields: WorkflowFlowNode["data"]["fields"], key: string) {
   return item.value.trim()
 }
 
-function text(fields: WorkflowFlowNode["data"]["fields"], key: string) {
+function textField(fields: WorkflowFlowNode["data"]["fields"], key: string) {
   const item = fields.find((field) => field.key === key && field.kind === "text")
   if (!item || item.kind !== "text") return ""
   return item.value.trim()
@@ -263,10 +271,9 @@ function multi(fields: WorkflowFlowNode["data"]["fields"], key: string) {
 }
 
 function num(fields: WorkflowFlowNode["data"]["fields"], key: string) {
-  const value = select(fields, key, "0")
-  const out = Number.parseInt(value, 10)
-  if (!Number.isFinite(out) || out < 0) return 0
-  return out
+  const raw = Number.parseInt(select(fields, key, "0"), 10)
+  if (!Number.isFinite(raw) || raw < 0) return 0
+  return raw
 }
 
 function model(node: WorkflowRuntimeNode) {
@@ -276,12 +283,12 @@ function model(node: WorkflowRuntimeNode) {
 
 function ref(value: string) {
   if (!value) return {}
-  const [provider, ...rest] = value.split("/")
-  const model = rest.join("/").trim()
-  if (!provider?.trim() || !model) return {}
+  const [head, ...rest] = value.split("/")
+  const tail = rest.join("/").trim()
+  if (!head?.trim() || !tail) return {}
   return {
-    model_provider_id: provider.trim(),
-    model_id: model,
+    model_provider_id: head.trim(),
+    model_id: tail,
   }
 }
 

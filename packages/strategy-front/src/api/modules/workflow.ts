@@ -32,6 +32,10 @@ export const workflowApi = {
     return request.put<WorkflowRuntimeDetail, WorkflowUpsertInput>(`/workflow/${encodeURIComponent(id)}`, body)
   },
 
+  remove(id: string) {
+    return request.delete<void>(`/workflow/${encodeURIComponent(id)}`)
+  },
+
   start(id: string, input: string) {
     return request.post<WorkflowStartResult, { input: string }>(`/workflow/${encodeURIComponent(id)}/start`, {
       input,

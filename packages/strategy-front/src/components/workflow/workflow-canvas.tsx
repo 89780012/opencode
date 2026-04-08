@@ -12,7 +12,7 @@ import {
   useEdgesState,
   useNodesState,
 } from "@xyflow/react"
-import { Trash2 } from "lucide-react"
+import { Boxes, Trash2 } from "lucide-react"
 import "@xyflow/react/dist/style.css"
 import { WorkflowMiniToolbar } from "@/components/workflow/workflow-mini-toolbar"
 import { workflowNodeTypes } from "@/components/workflow/workflow-node"
@@ -200,7 +200,23 @@ export function WorkflowCanvas(props: {
           {...map}
         />
       </ReactFlow>
+
+      {nodes.length === 0 ? (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div className="max-w-sm rounded-3xl border border-dashed border-border/70 bg-background/92 px-6 py-5 text-center shadow-sm backdrop-blur">
+            <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <Boxes className="size-5" />
+            </div>
+            <div className="mt-3 text-base font-semibold text-foreground">这个工作流还没有节点</div>
+            <div className="mt-1 text-sm leading-6 text-muted-foreground">
+              从左侧节点库拖入第一个节点开始搭建。你可以先放一个开始节点，再接执行、检查或判断节点。
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <WorkflowMiniToolbar />
+
       {menu && typeof document !== "undefined"
         ? createPortal(
             <div

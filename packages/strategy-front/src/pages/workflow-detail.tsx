@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { Navigate, useParams } from "react-router-dom"
-import { WorkflowShell } from "@/components/workflow/workflow-shell"
 import { workflowApi } from "@/api/modules"
+import { WorkflowShell } from "@/components/workflow/workflow-shell"
 import type { WorkflowRuntimeDetail } from "@/types/workflow"
 
 export default function WorkflowDetailPage() {

@@ -8,9 +8,7 @@ export function WorkflowEmpty() {
       </div>
       <div className="space-y-1">
         <div className="text-base font-semibold">还没有工作流</div>
-        <p className="text-sm text-muted-foreground">
-          新建一个工作流后，就可以在同一工作区内串起规划、执行、检查和修复回环。
-        </p>
+        <p className="text-sm text-muted-foreground">新建一个空工作流后，就可以在详情页里配置节点、工作区和运行输入。</p>
       </div>
     </div>
   )

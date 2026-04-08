@@ -7,6 +7,7 @@ import type { WorkflowItem } from "@/types/workflow"
 export function WorkflowList(props: {
   items: WorkflowItem[]
   onOpen: (id: string) => void
+  onDelete: (item: WorkflowItem) => void
   err?: string | null
   onRetry?: () => void
 }) {
@@ -29,7 +30,7 @@ export function WorkflowList(props: {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {props.items.map((item) => (
-        <WorkflowListCard key={item.id} item={item} onOpen={props.onOpen} />
+        <WorkflowListCard key={item.id} item={item} onOpen={props.onOpen} onDelete={props.onDelete} />
       ))}
     </div>
   )

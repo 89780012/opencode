@@ -1,4 +1,5 @@
-import { ArrowUpRight, Clock3, Network, Sparkles } from "lucide-react"
+import { ArrowUpRight, Clock3, Network, Sparkles, Trash2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import type { WorkflowItem } from "@/types/workflow"
@@ -15,12 +16,18 @@ function time(value?: number) {
   return fmt.format(new Date(value))
 }
 
-function status(value?: WorkflowItem["run_status"]) {
+function run(value?: WorkflowItem["run_status"]) {
   if (value === "running") return "运行中"
   if (value === "blocked") return "已阻塞"
   if (value === "failed") return "失败"
   if (value === "done") return "完成"
   return "未运行"
+}
+
+function state(value: WorkflowItem["status"]) {
+  if (value === "ready") return "可运行"
+  if (value === "config") return "待配置"
+  return "草稿"
 }
 
 function tone(value?: WorkflowItem["run_status"]) {
@@ -31,7 +38,11 @@ function tone(value?: WorkflowItem["run_status"]) {
   return "border-border/70 bg-background/85 text-muted-foreground"
 }
 
-export function WorkflowListCard(props: { item: WorkflowItem; onOpen: (id: string) => void }) {
+export function WorkflowListCard(props: {
+  item: WorkflowItem
+  onOpen: (id: string) => void
+  onDelete: (item: WorkflowItem) => void
+}) {
   return (
     <Card
       role="button"
@@ -52,11 +63,24 @@ export function WorkflowListCard(props: { item: WorkflowItem; onOpen: (id: strin
             </div>
             <div>
               <div className="text-[18px] tracking-tight text-foreground">{props.item.name}</div>
-              <div className="mt-1 text-xs text-muted-foreground">{props.item.status === "ready" ? "可运行" : "草稿"}</div>
+              <div className="mt-1 text-xs text-muted-foreground">{state(props.item.status)}</div>
             </div>
           </div>
-          <div className="flex size-8 items-center justify-center rounded-full border border-border/70 bg-background/90 text-muted-foreground transition-all group-hover:border-primary/30 group-hover:text-foreground">
-            <ArrowUpRight className="size-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="rounded-full text-muted-foreground hover:text-destructive"
+              onClick={(event) => {
+                event.stopPropagation()
+                props.onDelete(props.item)
+              }}
+            >
+              <Trash2 className="size-4" />
+            </Button>
+            <div className="flex size-8 items-center justify-center rounded-full border border-border/70 bg-background/90 text-muted-foreground transition-all group-hover:border-primary/30 group-hover:text-foreground">
+              <ArrowUpRight className="size-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+            </div>
           </div>
         </div>
 
@@ -72,7 +96,7 @@ export function WorkflowListCard(props: { item: WorkflowItem; onOpen: (id: strin
               tone(props.item.run_status),
             )}
           >
-            {status(props.item.run_status)}
+            {run(props.item.run_status)}
           </span>
           {props.item.tags.map((item) => (
             <span
@@ -97,7 +121,7 @@ export function WorkflowListCard(props: { item: WorkflowItem; onOpen: (id: strin
             <div className="mt-1 text-sm font-medium text-emerald-600">{props.item.done_runs || 0}</div>
           </div>
           <div className="rounded-lg border border-border/70 bg-background/85 px-2 py-2">
-            <div className="text-[10px] text-muted-foreground">问题数</div>
+            <div className="text-[10px] text-muted-foreground">问题次数</div>
             <div className="mt-1 text-sm font-medium text-destructive">
               {(props.item.failed_runs || 0) + (props.item.blocked_runs || 0)}
             </div>

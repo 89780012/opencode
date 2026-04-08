@@ -1,6 +1,7 @@
 import { type ChangeEvent } from "react"
 import { PermissionPanel } from "@/components/chat/permission-panel"
 import { QuestionPanel } from "@/components/chat/question-panel"
+import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { ChatQuestionAnswer, ChatQuestionRequest, PermissionRequest } from "@/types/chat"
 import type { WorkflowNodeRun, WorkflowRun, WorkflowRuntimeNode, WorkflowSummary } from "@/types/workflow"
@@ -13,6 +14,7 @@ const fmt = new Intl.DateTimeFormat("zh-CN", {
 })
 
 type Props = {
+  workspace: string
   text: string
   run: WorkflowRun | null
   runs: WorkflowRun[]
@@ -27,6 +29,7 @@ type Props = {
   onPermission: (reply: "once" | "always" | "reject") => void
   onQuestion: (answers: ChatQuestionAnswer[]) => void
   onRejectQuestion: () => void
+  onWorkspace: (value: string) => void
   onText: (value: string) => void
 }
 
@@ -35,17 +38,17 @@ function stamp(value?: number) {
   return fmt.format(new Date(value))
 }
 
-function cost(from?: number, to?: number) {
-  if (!from) return "-"
-  return span(Math.max(0, (to || Date.now()) - from))
-}
-
 function span(ms?: number) {
   if (!ms || ms <= 0) return "-"
   if (ms < 1000) return `${ms}ms`
   if (ms < 60_000) return `${Math.round((ms / 1000) * 10) / 10}s`
   if (ms < 3_600_000) return `${Math.round((ms / 60_000) * 10) / 10}m`
   return `${Math.round((ms / 3_600_000) * 10) / 10}h`
+}
+
+function cost(from?: number, to?: number) {
+  if (!from) return "-"
+  return span(Math.max(0, (to || Date.now()) - from))
 }
 
 function runLabel(status?: WorkflowRun["status"] | WorkflowNodeRun["status"]) {
@@ -78,7 +81,7 @@ function sessionLabel(mode?: WorkflowRuntimeNode["session_mode"], key?: string) 
 }
 
 function parseReview(row: WorkflowNodeRun) {
-  const text = row.result.structured?.trim()
+  const text = row.result?.structured?.trim()
   if (!text) return null
 
   try {
@@ -89,9 +92,9 @@ function parseReview(row: WorkflowNodeRun) {
       issues?: string[]
     }
     return {
-      pass: typeof data.pass === "boolean" ? data.pass : row.result.pass,
-      summary: typeof data.summary === "string" ? data.summary.trim() : row.result.text?.trim(),
-      next_prompt: typeof data.next_prompt === "string" ? data.next_prompt.trim() : row.result.next_prompt?.trim(),
+      pass: typeof data.pass === "boolean" ? data.pass : row.result?.pass,
+      summary: typeof data.summary === "string" ? data.summary.trim() : row.result?.text?.trim(),
+      next_prompt: typeof data.next_prompt === "string" ? data.next_prompt.trim() : row.result?.next_prompt?.trim(),
       issues: Array.isArray(data.issues)
         ? data.issues.filter((item): item is string => typeof item === "string" && !!item.trim())
         : [],
@@ -133,7 +136,7 @@ function attempts(rows: WorkflowNodeRun[], nodeID: string, rowID?: string) {
 function lanes(run: WorkflowRun | null, nodes: WorkflowRuntimeNode[]) {
   if (!run) return []
 
-  const out = []
+  const out: Array<{ label: string; session: string; nodes: WorkflowRuntimeNode[] }> = []
   if (run.root_session_id) {
     out.push({
       label: "共享",
@@ -167,7 +170,7 @@ export function WorkflowSidepanel(props: Props) {
           <div className="mb-3 space-y-1">
             <div className="text-sm font-medium text-foreground">工作流面板</div>
             <div className="text-xs leading-5 text-muted-foreground">
-              这里可以查看当前运行、切换历史记录、处理阻塞请求，并追踪每个节点的循环执行情况。
+              这里可以配置工作区路径、运行输入，查看历史运行，并追踪每一个节点的执行状态。
             </div>
           </div>
 
@@ -190,6 +193,19 @@ export function WorkflowSidepanel(props: Props) {
         <TabsContent value="run" className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden">
           <div className="h-full overflow-y-auto p-3">
             <div className="space-y-3">
+              <section className="rounded-xl border border-border/70 bg-background/85 px-3 py-3 shadow-xs">
+                <div className="text-sm font-medium text-foreground">工作区路径</div>
+                <div className="mt-1 text-xs leading-5 text-muted-foreground">
+                  这里填写真正要运行的代码目录。工作流保存时允许为空，但启动运行前必须配置。
+                </div>
+                <Input
+                  value={props.workspace}
+                  onChange={(event) => props.onWorkspace(event.target.value)}
+                  placeholder="例如：F:\\code\\my-project"
+                  className="mt-3"
+                />
+              </section>
+
               <section className="rounded-xl border border-border/70 bg-background/85 px-3 py-3 shadow-xs">
                 <div className="text-sm font-medium text-foreground">运行输入</div>
                 <div className="mt-1 text-xs leading-5 text-muted-foreground">

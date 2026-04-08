@@ -3,11 +3,18 @@ package workflow
 import "errors"
 
 func validate(flow Workflow) error {
-	if flow.WorkspacePath == "" {
-		return errors.New("workflow workspace_path is required")
-	}
+	return validateStart(flow)
+}
+
+func validateSave(flow Workflow) error {
 	if len(flow.Nodes) == 0 {
-		return errors.New("workflow requires at least one node")
+		if flow.RootNodeID != "" {
+			return errors.New("workflow root node must be empty when no nodes exist")
+		}
+		if len(flow.Edges) > 0 {
+			return errors.New("workflow edges require nodes")
+		}
+		return nil
 	}
 	if flow.RootNodeID == "" {
 		return errors.New("workflow root node not found")
@@ -47,5 +54,18 @@ func validate(flow Workflow) error {
 		}
 	}
 
+	return nil
+}
+
+func validateStart(flow Workflow) error {
+	if err := validateSave(flow); err != nil {
+		return err
+	}
+	if flow.WorkspacePath == "" {
+		return errors.New("workflow workspace_path is required")
+	}
+	if len(flow.Nodes) == 0 {
+		return errors.New("workflow requires at least one node")
+	}
 	return nil
 }

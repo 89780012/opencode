@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button"
 
 export function WorkflowTopbar(props: {
   busy?: boolean
+  canRun?: boolean
   onSave: () => void
   onRun: () => void
   onRefresh: () => void
@@ -17,6 +18,7 @@ export function WorkflowTopbar(props: {
         className="rounded-full text-muted-foreground hover:bg-primary/6 hover:text-foreground"
         onClick={props.onSave}
         title="保存工作流"
+        disabled={props.busy}
       >
         <Save className="size-[18px] text-blue-600" strokeWidth={2.35} />
       </Button>
@@ -26,6 +28,7 @@ export function WorkflowTopbar(props: {
         className="rounded-full text-muted-foreground hover:bg-primary/6 hover:text-foreground"
         onClick={props.onRefresh}
         title="刷新工作流"
+        disabled={props.busy}
       >
         <RefreshCw className={`size-[18px] text-indigo-500 ${props.busy ? "animate-spin" : ""}`} strokeWidth={2.35} />
       </Button>
@@ -35,6 +38,7 @@ export function WorkflowTopbar(props: {
         className="rounded-full text-muted-foreground hover:bg-primary/6 hover:text-foreground"
         onClick={props.onRun}
         title="运行工作流"
+        disabled={props.busy || !props.canRun}
       >
         <Play className="size-[18px] text-emerald-600" strokeWidth={2.35} />
       </Button>
@@ -45,6 +49,7 @@ export function WorkflowTopbar(props: {
           className="rounded-full text-muted-foreground hover:bg-primary/6 hover:text-foreground"
           onClick={props.onContinue}
           title="继续运行"
+          disabled={props.busy}
         >
           <CheckCheck className="size-[18px] text-amber-600" strokeWidth={2.35} />
         </Button>
