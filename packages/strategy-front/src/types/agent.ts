@@ -1,5 +1,7 @@
 import type { ChatModelRef } from "@/types/chat";
 
+export type WorkflowAgentRole = "planner" | "executor" | "checker";
+
 export interface RuntimeAgent {
   name: string;
   description?: string;
@@ -11,6 +13,7 @@ export interface RuntimeAgent {
   variant?: string;
   color?: string;
   steps?: number;
+  workflow_role?: WorkflowAgentRole;
   options: Record<string, unknown>;
 }
 
@@ -23,6 +26,7 @@ export interface GlobalAgent {
   color?: string;
   hidden?: boolean;
   steps?: number;
+  workflow_role?: WorkflowAgentRole;
   path: string;
   content: string;
   updated_at: string;

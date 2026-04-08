@@ -224,7 +224,7 @@ export function kindName(kind: WorkflowKind) {
   if (kind === "start") return "开始"
   if (kind === "plan") return "规划"
   if (kind === "build") return "执行"
-  if (kind === "judge") return "判断"
+  if (kind === "judge") return "路由"
   if (kind === "review") return "审查"
   if (kind === "end") return "结束"
   return "人工确认"
@@ -234,7 +234,7 @@ export function kindDesc(kind: WorkflowKind) {
   if (kind === "start") return "作为流程入口，整理上下文后进入下一步。"
   if (kind === "plan") return "拆解需求并输出清晰的执行计划。"
   if (kind === "build") return "在工作区中实现需求或调整现有代码。"
-  if (kind === "judge") return "根据结果做通用判断，并按通过或未通过分支流转。"
+  if (kind === "judge") return "根据当前结果做路由判断，并按通过或未通过分支流转。"
   if (kind === "review") return "审查当前结果并给出通过或不通过结论。"
   if (kind === "end") return "汇总最终结果，作为流程终点结束执行。"
   return "暂停流程，等待人工确认后继续。"
@@ -244,7 +244,7 @@ export function kindPrompt(kind: WorkflowKind) {
   if (kind === "start") return "读取用户目标和已有上下文，整理出本次工作流的执行起点，然后继续。"
   if (kind === "plan") return "输出清晰的实现计划，不要直接修改代码。"
   if (kind === "build") return "在当前工作区中完成需求实现，并保持改动可验证。"
-  if (kind === "judge") return '根据当前结果做判断，并返回包含 "pass"、"summary"、"next_prompt" 的 JSON。'
+  if (kind === "judge") return '根据当前结果做路由判断，并返回包含 "pass"、"summary"、"next_prompt" 的 JSON。'
   if (kind === "review") return '审查当前代码，并返回包含 "pass"、"summary"、"next_prompt" 的 JSON。'
   if (kind === "end") return "总结最终结果并给出明确结论；如果没有后续节点，流程将在这里结束。"
   return "等待人工确认后再继续执行。"
