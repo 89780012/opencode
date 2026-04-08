@@ -88,6 +88,18 @@ function fields(node: WorkflowRuntimeNode) {
       value: node.skills || [],
     },
     {
+      key: workflowField.model,
+      kind: "text" as const,
+      label: "模型覆盖",
+      value: model(node),
+    },
+    {
+      key: workflowField.variant,
+      kind: "text" as const,
+      label: "变体",
+      value: node.variant || "",
+    },
+    {
       key: workflowField.prompt,
       kind: "note" as const,
       label: "提示词",
@@ -110,7 +122,11 @@ export function runtimeItem(item: WorkflowRuntimeDetail): WorkflowItem {
 
 export function runtimeDetail(item: WorkflowRuntimeDetail): WorkflowDetail {
   const nodes = item.nodes.map((node, i) => {
-    const base = makeNode(node.kind, node.id, { x: 120 + i * 300, y: 180 + (i % 2) * 42 }, { timeout: node.timeout_ms })
+    const base = makeNode(node.kind, node.id, { x: 120 + i * 300, y: 180 + (i % 2) * 42 }, {
+      timeout: node.timeout_ms,
+      model: model(node),
+      variant: node.variant,
+    })
     return {
       ...base,
       data: {
@@ -165,6 +181,8 @@ export function fromFlow(
       prompt: note(node.data.fields, workflowField.prompt),
       timeout_ms: num(node.data.fields, workflowField.timeout),
       retry_limit: 0,
+      ...ref(text(node.data.fields, workflowField.model)),
+      variant: text(node.data.fields, workflowField.variant),
     }
   }) satisfies WorkflowRuntimeNode[]
 
@@ -190,6 +208,12 @@ function note(fields: WorkflowFlowNode["data"]["fields"], key: string) {
   return item.value.trim()
 }
 
+function text(fields: WorkflowFlowNode["data"]["fields"], key: string) {
+  const item = fields.find((field) => field.key === key && field.kind === "text")
+  if (!item || item.kind !== "text") return ""
+  return item.value.trim()
+}
+
 function select(fields: WorkflowFlowNode["data"]["fields"], key: string, fallback: string) {
   const item = fields.find((field) => field.key === key && field.kind === "select")
   if (!item || item.kind !== "select") return fallback
@@ -207,6 +231,22 @@ function num(fields: WorkflowFlowNode["data"]["fields"], key: string) {
   const num = Number.parseInt(value, 10)
   if (!Number.isFinite(num) || num < 0) return 0
   return num
+}
+
+function model(node: WorkflowRuntimeNode) {
+  if (!node.model_provider_id || !node.model_id) return ""
+  return `${node.model_provider_id}/${node.model_id}`
+}
+
+function ref(value: string) {
+  if (!value) return {}
+  const [provider, ...rest] = value.split("/")
+  const model = rest.join("/").trim()
+  if (!provider?.trim() || !model) return {}
+  return {
+    model_provider_id: provider.trim(),
+    model_id: model,
+  }
 }
 
 function mode(fields: WorkflowFlowNode["data"]["fields"], kind: WorkflowRuntimeNode["kind"]): WorkflowSessionMode {

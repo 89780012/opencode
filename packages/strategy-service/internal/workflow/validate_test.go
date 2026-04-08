@@ -71,3 +71,16 @@ func TestValidateAcceptsBasicWorkflow(t *testing.T) {
 		t.Fatalf("expected workflow to validate, got %v", err)
 	}
 }
+
+func TestValidateRejectsHalfModelOverride(t *testing.T) {
+	err := validate(Workflow{
+		WorkspacePath: "x",
+		RootNodeID:    "n1",
+		Nodes: []Node{
+			{ID: "n1", Kind: Build, ModelProviderID: "openai"},
+		},
+	})
+	if err == nil {
+		t.Fatal("expected model override validation error")
+	}
+}

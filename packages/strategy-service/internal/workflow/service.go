@@ -673,6 +673,9 @@ func buildPrompt(flow Workflow, node Node, input string, upstream string, feedba
 		parts = append(parts, "Review feedback:\n"+feedback)
 	}
 	parts = append(parts, "Workflow node:\n"+node.Title)
+	if len(node.Skills) > 0 {
+		parts = append(parts, "Requested skills:\n- "+strings.Join(node.Skills, "\n- "))
+	}
 	if node.Prompt != "" {
 		parts = append(parts, "Node instructions:\n"+node.Prompt)
 	}
@@ -684,6 +687,28 @@ Return JSON with keys pass, summary, issues, next_prompt.`)
 		parts = append(parts, "Workflow:\n"+flow.Name)
 	}
 	return strings.TrimSpace(strings.Join(parts, "\n\n"))
+}
+
+func body(node Node, prompt string) map[string]any {
+	out := map[string]any{
+		"agent": node.Agent,
+		"parts": []map[string]any{
+			{
+				"type": "text",
+				"text": prompt,
+			},
+		},
+	}
+	if node.ModelProviderID != "" && node.ModelID != "" {
+		out["model"] = map[string]string{
+			"providerID": node.ModelProviderID,
+			"modelID":    node.ModelID,
+		}
+	}
+	if node.Variant != "" {
+		out["variant"] = node.Variant
+	}
+	return out
 }
 
 func next(flow Workflow, node Node, res Result) (string, string) {
@@ -760,16 +785,7 @@ func (s *Service) sendPrompt(dir string, sid string, node Node, prompt string) e
 	q.Set("directory", dir)
 	u.RawQuery = q.Encode()
 
-	body := map[string]any{
-		"agent": node.Agent,
-		"parts": []map[string]any{
-			{
-				"type": "text",
-				"text": prompt,
-			},
-		},
-	}
-	buf, err := json.Marshal(body)
+	buf, err := json.Marshal(body(node, prompt))
 	if err != nil {
 		return err
 	}

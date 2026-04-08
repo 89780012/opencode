@@ -59,15 +59,18 @@ type Workflow struct {
 }
 
 type Node struct {
-	ID         string   `json:"id"`
-	Kind       Kind     `json:"kind"`
-	Title      string   `json:"title"`
-	Agent      string   `json:"agent"`
-	Skills     []string `json:"skills"`
-	Session    Mode     `json:"session_mode"`
-	Prompt     string   `json:"prompt"`
-	TimeoutMS  int64    `json:"timeout_ms"`
-	RetryLimit int      `json:"retry_limit"`
+	ID              string   `json:"id"`
+	Kind            Kind     `json:"kind"`
+	Title           string   `json:"title"`
+	Agent           string   `json:"agent"`
+	Skills          []string `json:"skills"`
+	Session         Mode     `json:"session_mode"`
+	Prompt          string   `json:"prompt"`
+	TimeoutMS       int64    `json:"timeout_ms"`
+	RetryLimit      int      `json:"retry_limit"`
+	ModelProviderID string   `json:"model_provider_id,omitempty"`
+	ModelID         string   `json:"model_id,omitempty"`
+	Variant         string   `json:"variant,omitempty"`
 }
 
 type Edge struct {

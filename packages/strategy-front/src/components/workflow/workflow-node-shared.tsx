@@ -147,6 +147,21 @@ function SkillField(props: {
 }
 
 function field(item: WorkflowField, i: number, names: string[], save: (i: number, next: WorkflowField) => void) {
+  if (item.kind === "text") {
+    return (
+      <div key={i} className="space-y-1.5">
+        <div className={label}>{item.label}</div>
+        <Input
+          value={item.value}
+          onChange={(event) => save(i, { ...item, value: event.target.value })}
+          onPointerDownCapture={stop}
+          onClick={stop}
+          className="nodrag nopan h-9 border-border/70 text-[13px] shadow-none"
+        />
+      </div>
+    )
+  }
+
   if (item.kind === "select") {
     return (
       <div key={i} className="space-y-1.5">

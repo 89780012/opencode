@@ -34,15 +34,18 @@ func (a *API) workflowSave(c *gin.Context) {
 		WorkspacePath string `json:"workspace_path"`
 		RootNodeID    string `json:"root_node_id"`
 		Nodes         []struct {
-			ID          string   `json:"id"`
-			Kind        string   `json:"kind"`
-			Title       string   `json:"title"`
-			Agent       string   `json:"agent"`
-			Skills      []string `json:"skills"`
-			SessionMode string   `json:"session_mode"`
-			Prompt      string   `json:"prompt"`
-			TimeoutMS   int64    `json:"timeout_ms"`
-			RetryLimit  int      `json:"retry_limit"`
+			ID              string   `json:"id"`
+			Kind            string   `json:"kind"`
+			Title           string   `json:"title"`
+			Agent           string   `json:"agent"`
+			Skills          []string `json:"skills"`
+			SessionMode     string   `json:"session_mode"`
+			Prompt          string   `json:"prompt"`
+			TimeoutMS       int64    `json:"timeout_ms"`
+			RetryLimit      int      `json:"retry_limit"`
+			ModelProviderID string   `json:"model_provider_id"`
+			ModelID         string   `json:"model_id"`
+			Variant         string   `json:"variant"`
 		} `json:"nodes"`
 		Edges []struct {
 			ID    string `json:"id"`
@@ -131,15 +134,18 @@ func convertFlow(body struct {
 	WorkspacePath string `json:"workspace_path"`
 	RootNodeID    string `json:"root_node_id"`
 	Nodes         []struct {
-		ID          string   `json:"id"`
-		Kind        string   `json:"kind"`
-		Title       string   `json:"title"`
-		Agent       string   `json:"agent"`
-		Skills      []string `json:"skills"`
-		SessionMode string   `json:"session_mode"`
-		Prompt      string   `json:"prompt"`
-		TimeoutMS   int64    `json:"timeout_ms"`
-		RetryLimit  int      `json:"retry_limit"`
+		ID              string   `json:"id"`
+		Kind            string   `json:"kind"`
+		Title           string   `json:"title"`
+		Agent           string   `json:"agent"`
+		Skills          []string `json:"skills"`
+		SessionMode     string   `json:"session_mode"`
+		Prompt          string   `json:"prompt"`
+		TimeoutMS       int64    `json:"timeout_ms"`
+		RetryLimit      int      `json:"retry_limit"`
+		ModelProviderID string   `json:"model_provider_id"`
+		ModelID         string   `json:"model_id"`
+		Variant         string   `json:"variant"`
 	} `json:"nodes"`
 	Edges []struct {
 		ID    string `json:"id"`
@@ -152,15 +158,18 @@ func convertFlow(body struct {
 	nodes := make([]workflow.Node, 0, len(body.Nodes))
 	for _, item := range body.Nodes {
 		nodes = append(nodes, workflow.Node{
-			ID:         item.ID,
-			Kind:       workflow.Kind(item.Kind),
-			Title:      item.Title,
-			Agent:      item.Agent,
-			Skills:     item.Skills,
-			Session:    workflow.Mode(item.SessionMode),
-			Prompt:     item.Prompt,
-			TimeoutMS:  item.TimeoutMS,
-			RetryLimit: item.RetryLimit,
+			ID:              item.ID,
+			Kind:            workflow.Kind(item.Kind),
+			Title:           item.Title,
+			Agent:           item.Agent,
+			Skills:          item.Skills,
+			Session:         workflow.Mode(item.SessionMode),
+			Prompt:          item.Prompt,
+			TimeoutMS:       item.TimeoutMS,
+			RetryLimit:      item.RetryLimit,
+			ModelProviderID: item.ModelProviderID,
+			ModelID:         item.ModelID,
+			Variant:         item.Variant,
 		})
 	}
 

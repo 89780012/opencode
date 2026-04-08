@@ -36,6 +36,9 @@ func validate(flow Workflow) error {
 	}
 
 	for _, item := range flow.Nodes {
+		if (item.ModelProviderID == "") != (item.ModelID == "") {
+			return errors.New("workflow node model override requires both model_provider_id and model_id")
+		}
 		if (item.Kind == Review || item.Kind == Judge) && outs[item.ID] == 0 {
 			return errors.New("review and judge nodes require at least one outgoing edge")
 		}

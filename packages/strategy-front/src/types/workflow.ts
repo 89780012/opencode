@@ -9,11 +9,19 @@ export const workflowField = {
   session: "session",
   skills: "skills",
   timeout: "timeout",
+  model: "model",
+  variant: "variant",
 } as const
 
 export type WorkflowFieldKey = (typeof workflowField)[keyof typeof workflowField]
 
 export type WorkflowField =
+  | {
+      key: WorkflowFieldKey
+      kind: "text"
+      label: string
+      value: string
+    }
   | {
       key: WorkflowFieldKey
       kind: "select"
@@ -106,6 +114,8 @@ export type WorkflowSeed = {
   mode?: WorkflowSessionMode
   skills?: string[]
   timeout?: number
+  model?: string
+  variant?: string
 }
 
 export type WorkflowEdgeCond = "always" | "pass" | "fail"
@@ -124,6 +134,9 @@ export type WorkflowRuntimeNode = {
   prompt: string
   timeout_ms: number
   retry_limit: number
+  model_provider_id?: string
+  model_id?: string
+  variant?: string
 }
 
 export type WorkflowRuntimeEdge = {
@@ -297,6 +310,8 @@ function label(key: WorkflowFieldKey) {
   if (key === workflowField.session) return "会话"
   if (key === workflowField.skills) return "技能"
   if (key === workflowField.timeout) return "超时"
+  if (key === workflowField.model) return "模型覆盖"
+  if (key === workflowField.variant) return "变体"
   return "提示词"
 }
 
@@ -324,6 +339,18 @@ function fields(kind: WorkflowKind, seed: WorkflowSeed) {
       kind: "multi" as const,
       label: label(workflowField.skills),
       value: seed.skills || [],
+    },
+    {
+      key: workflowField.model,
+      kind: "text" as const,
+      label: label(workflowField.model),
+      value: seed.model || "",
+    },
+    {
+      key: workflowField.variant,
+      kind: "text" as const,
+      label: label(workflowField.variant),
+      value: seed.variant || "",
     },
     {
       key: workflowField.prompt,

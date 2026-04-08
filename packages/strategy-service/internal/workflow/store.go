@@ -129,6 +129,9 @@ func cleanNodes(list []Node) []Node {
 		item.Title = text(item.Title)
 		item.Agent = text(item.Agent)
 		item.Prompt = strings.TrimSpace(strings.ReplaceAll(item.Prompt, "\r\n", "\n"))
+		item.ModelProviderID = text(item.ModelProviderID)
+		item.ModelID = text(item.ModelID)
+		item.Variant = text(item.Variant)
 		item.Session = mode(item.Session)
 		item.Kind = kind(item.Kind)
 		item.Skills = uniq(item.Skills)
@@ -136,6 +139,9 @@ func cleanNodes(list []Node) []Node {
 			item.Agent = ""
 			item.Prompt = ""
 			item.Skills = nil
+			item.ModelProviderID = ""
+			item.ModelID = ""
+			item.Variant = ""
 		}
 		if item.TimeoutMS < 0 {
 			item.TimeoutMS = 0
@@ -182,6 +188,8 @@ func cleanRuns(list []Run) []Run {
 		item.WorkspacePath = text(item.WorkspacePath)
 		item.RootSessionID = text(item.RootSessionID)
 		item.CurrentNodeID = text(item.CurrentNodeID)
+		item.BlockReason = text(item.BlockReason)
+		item.BlockRequestID = text(item.BlockRequestID)
 		item.Input = strings.TrimSpace(strings.ReplaceAll(item.Input, "\r\n", "\n"))
 		item.Error = text(item.Error)
 		item.Status = runStatus(item.Status)
@@ -213,6 +221,8 @@ func cleanNodeRuns(list []NodeRun) []NodeRun {
 		item.SessionID = text(item.SessionID)
 		item.Input = strings.TrimSpace(strings.ReplaceAll(item.Input, "\r\n", "\n"))
 		item.Output = strings.TrimSpace(strings.ReplaceAll(item.Output, "\r\n", "\n"))
+		item.BlockReason = text(item.BlockReason)
+		item.BlockRequestID = text(item.BlockRequestID)
 		item.Error = text(item.Error)
 		item.Status = nodeStatus(item.Status)
 		out = append(out, item)

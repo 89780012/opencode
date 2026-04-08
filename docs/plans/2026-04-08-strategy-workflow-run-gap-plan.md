@@ -271,11 +271,8 @@ Implemented in the current pass:
 - clear blocked metadata when a blocked run is resumed
 - show blocked reason, request id, and blocked node in `/app/workflows` side panel
 - make node `timeout_ms` editable in the workflow canvas and preserve it on save/start
-
-Still open inside PR 2:
-
-- node-level `model` and `variant`
-- explicit short-term runtime behavior for selected `skills`
+- add node-level `model` and `variant` overrides
+- give selected `skills` an explicit short-term runtime behavior by injecting them into the node prompt
 
 ### Scope
 
