@@ -25,6 +25,12 @@ const tone = (active = false) => ({
   filter: active ? "drop-shadow(0 0 6px color-mix(in oklab, var(--primary) 35%, transparent))" : undefined,
 })
 
+function label(edge: WorkflowFlowEdge) {
+  if (typeof edge.label === "string" && edge.label.trim()) return edge.label.trim()
+  if (edge.data?.cond === "pass" || edge.data?.cond === "fail") return edge.data.cond
+  return undefined
+}
+
 export function WorkflowCanvas(props: {
   item: WorkflowDetail
   onPick: (node: WorkflowFlowNode | null) => void
@@ -56,11 +62,30 @@ export function WorkflowCanvas(props: {
 
   useEffect(() => {
     sync.current = true
-    setNodes(props.item.nodes)
-    setEdges(props.item.edges.map((item) => ({ ...item, selected: false, style: tone() })))
-    props.onPick(null)
-    props.onEdgePick?.(null)
-  }, [props.item, props.onEdgePick, props.onPick, setEdges, setNodes])
+    setNodes((prev) =>
+      props.item.nodes.map((item) => ({
+        ...item,
+        selected: prev.some((row) => row.id === item.id && row.selected),
+      })),
+    )
+    setEdges((prev) =>
+      props.item.edges.map((item) => {
+        const active = prev.some((row) => row.id === item.id && row.selected)
+        return {
+          ...item,
+          label: label(item),
+          selected: active,
+          style: tone(active),
+        }
+      }),
+    )
+  }, [props.item, setEdges, setNodes])
+
+  useEffect(() => {
+    if (!menu) return
+    if (props.item.edges.some((item) => item.id === menu.id)) return
+    setMenu(null)
+  }, [menu, props.item.edges])
 
   useEffect(() => {
     if (sync.current) {
@@ -115,6 +140,7 @@ export function WorkflowCanvas(props: {
               {
                 ...conn,
                 animated: false,
+                label: undefined,
                 selected: false,
                 style: tone(),
                 data: { cond: "always" },

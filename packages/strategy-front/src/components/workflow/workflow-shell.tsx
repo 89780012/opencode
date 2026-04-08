@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { fromFlow, runtimeDetail } from "@/lib/workflow-runtime"
 import type {
   WorkflowDetail,
+  WorkflowEdgeCond,
   WorkflowFlowEdge,
   WorkflowFlowNode,
   WorkflowNodeRun,
@@ -43,16 +44,25 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
   const [sending, setSending] = useState(false)
   const [item, setItem] = useState(props.item)
   const [flow, setFlow] = useState<WorkflowDetail>(() => runtimeDetail(props.item))
+  const [edgeID, setEdgeID] = useState("")
 
   useEffect(() => {
     setItem(props.item)
     setWorkspace(props.item.workspace_path || "")
     setFlow(runtimeDetail(props.item))
+    setEdgeID("")
   }, [props.item])
 
   const blocked = run?.status === "blocked"
   const current = useMemo(() => rows.find((row) => row.node_id === run?.current_node_id) ?? null, [rows, run])
   const canRun = flow.nodes.length > 0 && !!workspace.trim()
+  const edge = useMemo(() => flow.edges.find((item) => item.id === edgeID) ?? null, [edgeID, flow.edges])
+
+  useEffect(() => {
+    if (!edgeID) return
+    if (flow.edges.some((item) => item.id === edgeID)) return
+    setEdgeID("")
+  }, [edgeID, flow.edges])
 
   const sync = useCallback(
     async (runID?: string) => {
@@ -131,6 +141,30 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
       }
     })
   }, [])
+
+  const onEdgeCond = useCallback((cond: WorkflowEdgeCond) => {
+    setFlow((prev) => ({
+      ...prev,
+      edges: prev.edges.map((item) =>
+        item.id === edgeID
+          ? {
+              ...item,
+              data: {
+                ...item.data,
+                cond,
+              },
+            }
+          : item,
+      ),
+    }))
+  }, [edgeID])
+
+  const onEdgeLabel = useCallback((label: string) => {
+    setFlow((prev) => ({
+      ...prev,
+      edges: prev.edges.map((item) => (item.id === edgeID ? { ...item, label } : item)),
+    }))
+  }, [edgeID])
 
   const persist = async () => {
     const next = fromFlow(item, flow.nodes, flow.edges, workspace)
@@ -307,11 +341,17 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
 
           <div className="relative min-h-0 flex-1">
             <div className="h-full">
-              <WorkflowCanvas item={flow} onPick={() => {}} onEdgePick={() => {}} onChange={onCanvasChange} />
+              <WorkflowCanvas
+                item={flow}
+                onPick={() => {}}
+                onEdgePick={(edge) => setEdgeID(edge?.id || "")}
+                onChange={onCanvasChange}
+              />
             </div>
           </div>
 
           <WorkflowSidepanel
+            edge={edge}
             workspace={workspace}
             text={text}
             run={run}
@@ -329,6 +369,8 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
             onRejectQuestion={onRejectQuestion}
             onWorkspace={setWorkspace}
             onText={setText}
+            onEdgeCond={onEdgeCond}
+            onEdgeLabel={onEdgeLabel}
           />
         </div>
       </div>

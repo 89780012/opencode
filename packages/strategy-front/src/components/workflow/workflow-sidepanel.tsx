@@ -2,9 +2,17 @@ import { type ChangeEvent } from "react"
 import { PermissionPanel } from "@/components/chat/permission-panel"
 import { QuestionPanel } from "@/components/chat/question-panel"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { ChatQuestionAnswer, ChatQuestionRequest, PermissionRequest } from "@/types/chat"
-import type { WorkflowNodeRun, WorkflowRun, WorkflowRuntimeNode, WorkflowSummary } from "@/types/workflow"
+import type {
+  WorkflowEdgeCond,
+  WorkflowFlowEdge,
+  WorkflowNodeRun,
+  WorkflowRun,
+  WorkflowRuntimeNode,
+  WorkflowSummary,
+} from "@/types/workflow"
 
 const fmt = new Intl.DateTimeFormat("zh-CN", {
   month: "2-digit",
@@ -16,6 +24,7 @@ const fmt = new Intl.DateTimeFormat("zh-CN", {
 type Props = {
   workspace: string
   text: string
+  edge: WorkflowFlowEdge | null
   run: WorkflowRun | null
   runs: WorkflowRun[]
   summary: WorkflowSummary | null
@@ -31,6 +40,8 @@ type Props = {
   onRejectQuestion: () => void
   onWorkspace: (value: string) => void
   onText: (value: string) => void
+  onEdgeCond: (value: WorkflowEdgeCond) => void
+  onEdgeLabel: (value: string) => void
 }
 
 function stamp(value?: number) {
@@ -71,6 +82,12 @@ function blockLabel(value?: string) {
   if (value === "permission") return "权限请求"
   if (value === "question") return "问题确认"
   return value || "-"
+}
+
+function edgeLabel(value?: WorkflowEdgeCond) {
+  if (value === "pass") return "通过"
+  if (value === "fail") return "失败"
+  return "始终"
 }
 
 function sessionLabel(mode?: WorkflowRuntimeNode["session_mode"], key?: string) {
@@ -218,6 +235,52 @@ export function WorkflowSidepanel(props: Props) {
                   className="mt-3 min-h-28 w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 />
               </section>
+
+              {props.edge ? (
+                <section className="rounded-xl border border-border/70 bg-background/85 px-3 py-3 shadow-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-sm font-medium text-foreground">连线配置</div>
+                    <div className="rounded-full border border-border/70 bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground">
+                      {props.edge.source} → {props.edge.target}
+                    </div>
+                  </div>
+                  <div className="mt-1 text-xs leading-5 text-muted-foreground">
+                    检查或判断节点通常通过 `pass` / `fail` 走不同分支；普通顺序流转一般使用 `always`。
+                  </div>
+
+                  <div className="mt-3 space-y-3">
+                    <div className="space-y-2">
+                      <div className="text-xs font-medium text-foreground">条件</div>
+                      <Select
+                        value={
+                          props.edge.data?.cond === "pass" || props.edge.data?.cond === "fail"
+                            ? props.edge.data.cond
+                            : "always"
+                        }
+                        onValueChange={(value) => props.onEdgeCond(value as WorkflowEdgeCond)}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="选择条件" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="always">{edgeLabel("always")}</SelectItem>
+                          <SelectItem value="pass">{edgeLabel("pass")}</SelectItem>
+                          <SelectItem value="fail">{edgeLabel("fail")}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-xs font-medium text-foreground">标签</div>
+                      <Input
+                        value={typeof props.edge.label === "string" ? props.edge.label : ""}
+                        onChange={(event) => props.onEdgeLabel(event.target.value)}
+                        placeholder="可选，留空时自动显示条件"
+                      />
+                    </div>
+                  </div>
+                </section>
+              ) : null}
 
               <section className="rounded-xl border border-border/70 bg-background/85 px-3 py-3 shadow-xs">
                 <div className="flex items-center justify-between gap-2">
