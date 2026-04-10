@@ -45,7 +45,7 @@ function useWide() {
 
 function Panel(props: { workspace: LocalWorkspace; onLoad: (value: boolean) => void }) {
   const { loading } = useChatSessions(props.workspace.path)
-  const composer = useStrategyComposer(props.workspace.path)
+  const composer = useStrategyComposer(props.workspace.path, props.workspace.type)
 
   return (
     <div className="relative h-full min-h-0">

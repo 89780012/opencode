@@ -23,7 +23,7 @@ export default function StrategyDetailPage() {
   const { loading, refresh, select, workspaces } = useWorkspaceList()
   const workspace = useMemo(() => workspaces.find((item) => item.path === path) ?? null, [path, workspaces])
   const kind = workspace?.type ?? "other"
-  const composer = useStrategyComposer(kind, kind)
+  const composer = useStrategyComposer(path, kind)
   const chat = useStrategySession(path)
   const [open, setOpen] = useState(false)
   const [file, setFile] = useState<string | null>(null)

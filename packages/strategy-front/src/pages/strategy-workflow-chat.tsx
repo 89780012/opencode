@@ -29,7 +29,7 @@ export default function StrategyWorkflowChatPage() {
   const { loading, refresh, select, workspaces } = useWorkspaceList()
   const workspace = useMemo(() => workspaces.find((item) => item.path === path) ?? null, [path, workspaces])
   const kind = workspace?.type ?? "other"
-  const composer = useStrategyComposer(kind, kind)
+  const composer = useStrategyComposer(path, kind)
   const chat = useStrategyWorkflowChat(path)
   const agent = composer.agents.includes("plan") ? "plan" : (composer.agent ?? composer.agents[0])
   const [open, setOpen] = useState(false)
@@ -61,7 +61,9 @@ export default function StrategyWorkflowChatPage() {
   }, [chat, refresh])
 
   if (loading && !workspace) {
-    return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Loading strategy...</div>
+    return (
+      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Loading strategy...</div>
+    )
   }
 
   if (!workspace) {
@@ -89,7 +91,9 @@ export default function StrategyWorkflowChatPage() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
         <div className="text-base font-semibold">Workspace directory is missing</div>
-        <div className="text-sm text-muted-foreground">The strategy exists in metadata, but the local directory no longer exists.</div>
+        <div className="text-sm text-muted-foreground">
+          The strategy exists in metadata, but the local directory no longer exists.
+        </div>
         <div className="flex gap-2">
           <Button variant="outline" asChild>
             <Link to="/app/strategies">
@@ -172,7 +176,11 @@ export default function StrategyWorkflowChatPage() {
             />
           </ResizablePanel>
           <ResizableHandle withHandle className="pointer" />
-          <ResizablePanel defaultSize={38} minSize={360} className="min-h-0 min-w-0 border-l border-black/6 dark:border-white/8">
+          <ResizablePanel
+            defaultSize={38}
+            minSize={360}
+            className="min-h-0 min-w-0 border-l border-black/6 dark:border-white/8"
+          >
             <WorkspaceDetailPane
               open={open}
               tab={tab}
