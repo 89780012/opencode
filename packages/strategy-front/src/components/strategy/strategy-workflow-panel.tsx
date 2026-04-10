@@ -1,12 +1,9 @@
 import { toast } from "sonner"
 import { ChatMessageList } from "@/components/chat-message-list"
 import { ChatEmptyState } from "@/components/chat/chat-empty-state"
-import { PermissionPanel } from "@/components/chat/permission-panel"
 import { PromptBar } from "@/components/chat/prompt-bar"
-import { QuestionPanel } from "@/components/chat/question-panel"
 import { TodoPanel } from "@/components/chat/todo-panel"
-import { useChatPermission } from "@/hooks/use-chat-permission"
-import { useChatQuestion } from "@/hooks/use-chat-question"
+import { WaitPanel } from "@/components/workflow/wait-panel"
 import { useChatTodo } from "@/hooks/use-chat-todo"
 import { useSessionDraft } from "@/hooks/use-session-draft"
 import { useSessionFiles } from "@/hooks/use-session-files"
@@ -31,11 +28,9 @@ interface Props {
 export function StrategyWorkflowPanel(props: Props) {
   const draft = useSessionDraft(props.workspace.path, props.chat.selectedSessionId)
   const files = useSessionFiles(props.workspace.path, props.chat.selectedSessionId)
-  const permission = useChatPermission(props.workspace.path, props.chat.selectedSessionId)
-  const question = useChatQuestion(props.workspace.path, props.chat.selectedSessionId)
   const live = !!props.chat.selectedSessionId && props.chat.status.type !== "idle"
-  const todo = useChatTodo(props.workspace.path, props.chat.selectedSessionId, live || !!permission.req || !!question.req)
-  const blocked = !!permission.req || !!question.req
+  const todo = useChatTodo(props.workspace.path, props.chat.selectedSessionId, live || !!props.chat.openWait)
+  const waiting = !!props.chat.openWait
   const bound = !!props.chat.state?.workflow_id && !!props.chat.flow
 
   const submit = async () => {
@@ -98,29 +93,13 @@ export function StrategyWorkflowPanel(props: Props) {
 
       <div className="shrink-0 px-2 pb-2 pt-1">
         <div className="mx-auto flex max-w-[780px] flex-col gap-2">
-          {permission.req ? (
-            <PermissionPanel
-              key={permission.req.id}
-              req={permission.req}
-              sending={permission.sending}
-              onReject={() => {
-                void permission.allow("reject")
-              }}
-              onAllow={(value) => {
-                void permission.allow(value)
-              }}
-            />
-          ) : null}
-          {question.req ? (
-            <QuestionPanel
-              key={question.req.id}
-              req={question.req}
-              sending={question.sending}
-              onReject={() => {
-                void question.reject()
-              }}
-              onReply={(answers) => {
-                void question.reply(answers)
+          {props.chat.openWait ? (
+            <WaitPanel
+              key={props.chat.openWait.id}
+              wait={props.chat.openWait}
+              sending={props.chat.replying}
+              onReply={(payload) => {
+                void props.chat.reply(props.chat.openWait!.id, payload)
               }}
             />
           ) : null}
@@ -131,7 +110,7 @@ export function StrategyWorkflowPanel(props: Props) {
               agents={props.agent ? [props.agent] : []}
               busy={false}
               canImage={false}
-              disabled={props.load || blocked || !bound}
+              disabled={props.load || waiting || !bound}
               files={files.files}
               model={props.model}
               models={props.models}
@@ -144,7 +123,7 @@ export function StrategyWorkflowPanel(props: Props) {
               }}
               onValueChange={draft.setText}
               onVariant={props.onVariant}
-              submitting={props.chat.sending || props.chat.sessionLoading || props.chat.creating}
+              submitting={props.chat.sending || props.chat.replying || props.chat.sessionLoading || props.chat.creating}
               value={draft.text}
               variant={props.variant}
               variants={props.variants}

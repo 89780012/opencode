@@ -99,7 +99,7 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
 
   useEffect(() => {
     if (!run?.id) return
-    if (run.status !== "running" && run.status !== "blocked") return
+    if (run.status !== "running" && run.status !== "waiting") return
 
     const timer = window.setInterval(() => {
       void sync(run.id)

@@ -212,8 +212,6 @@ func cleanRuns(list []Run) []Run {
 		item.ModelID = text(item.ModelID)
 		item.Variant = text(item.Variant)
 		item.CurrentNodeID = text(item.CurrentNodeID)
-		item.BlockReason = text(item.BlockReason)
-		item.BlockRequestID = text(item.BlockRequestID)
 		item.Input = strings.TrimSpace(strings.ReplaceAll(item.Input, "\r\n", "\n"))
 		item.Error = text(item.Error)
 		if item.ModelProviderID == "" || item.ModelID == "" {
@@ -250,8 +248,6 @@ func cleanNodeRuns(list []NodeRun) []NodeRun {
 		item.SessionID = text(item.SessionID)
 		item.Input = strings.TrimSpace(strings.ReplaceAll(item.Input, "\r\n", "\n"))
 		item.Output = strings.TrimSpace(strings.ReplaceAll(item.Output, "\r\n", "\n"))
-		item.BlockReason = text(item.BlockReason)
-		item.BlockRequestID = text(item.BlockRequestID)
 		item.Error = text(item.Error)
 		item.Status = nodeStatus(item.Status)
 		out = append(out, item)
@@ -335,7 +331,7 @@ func cond(v Cond) Cond {
 
 func runStatus(v RunStatus) RunStatus {
 	switch v {
-	case RunRunning, RunBlocked, RunFailed, RunDone, RunInterrupted:
+	case RunQueued, RunRunning, RunWaiting, RunFailed, RunDone, RunInterrupted, RunCancelled:
 		return v
 	default:
 		return RunPending
@@ -344,7 +340,7 @@ func runStatus(v RunStatus) RunStatus {
 
 func nodeStatus(v NodeStatus) NodeStatus {
 	switch v {
-	case NodeRunning, NodeBlocked, NodeFailed, NodeDone, NodeTimeout, NodeInterrupted:
+	case NodeQueued, NodeRunning, NodeWaiting, NodeFailed, NodeDone, NodeTimeout, NodeInterrupted, NodeCancelled:
 		return v
 	default:
 		return NodePending
@@ -353,7 +349,7 @@ func nodeStatus(v NodeStatus) NodeStatus {
 
 func workspaceStatus(v WorkspaceStatus) WorkspaceStatus {
 	switch v {
-	case WorkspaceRunning, WorkspaceBlocked, WorkspaceDone, WorkspaceFailed, WorkspaceInterrupted:
+	case WorkspaceRunning, WorkspaceWaiting, WorkspaceDone, WorkspaceFailed, WorkspaceInterrupted:
 		return v
 	default:
 		return WorkspaceIdle

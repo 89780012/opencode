@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
@@ -121,6 +122,46 @@ func (a *API) workflowRunNodes(c *gin.Context) {
 	ok(c, data)
 }
 
+func (a *API) workflowRunSteps(c *gin.Context) {
+	data, err := a.wf.Steps(c.Param("id"))
+	if err != nil {
+		slog.Error("workflow step list failed", "id", c.Param("id"), "error", err)
+		bad(c, err)
+		return
+	}
+	ok(c, data)
+}
+
+func (a *API) workflowRunWaits(c *gin.Context) {
+	data, err := a.wf.Waits(c.Param("id"))
+	if err != nil {
+		slog.Error("workflow wait list failed", "id", c.Param("id"), "error", err)
+		bad(c, err)
+		return
+	}
+	ok(c, data)
+}
+
+func (a *API) workflowRunReply(c *gin.Context) {
+	body := struct {
+		WaitID         string          `json:"wait_id"`
+		Payload        json.RawMessage `json:"payload"`
+		IdempotencyKey string          `json:"idempotency_key"`
+	}{}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		bad(c, err)
+		return
+	}
+
+	data, err := a.wf.Reply(c.Param("id"), body.WaitID, body.Payload, body.IdempotencyKey)
+	if err != nil {
+		slog.Error("workflow reply failed", "id", c.Param("id"), "error", err)
+		bad(c, err)
+		return
+	}
+	ok(c, data)
+}
+
 func (a *API) workflowStart(c *gin.Context) {
 	body := struct {
 		WorkspacePath string `json:"workspace_path"`
@@ -134,16 +175,6 @@ func (a *API) workflowStart(c *gin.Context) {
 	data, err := a.wf.Start(c.Param("id"), body.WorkspacePath, body.Input)
 	if err != nil {
 		slog.Error("workflow start failed", "id", c.Param("id"), "error", err)
-		bad(c, err)
-		return
-	}
-	ok(c, data)
-}
-
-func (a *API) workflowContinue(c *gin.Context) {
-	data, err := a.wf.Continue(c.Param("id"))
-	if err != nil {
-		slog.Error("workflow continue failed", "id", c.Param("id"), "error", err)
 		bad(c, err)
 		return
 	}

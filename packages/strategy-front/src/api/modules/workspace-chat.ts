@@ -1,7 +1,6 @@
 import { request } from "@/api/client"
 import type {
   WorkspaceBindInput,
-  WorkspaceContinueInput,
   WorkspaceDispatchInput,
   WorkspaceInterruptInput,
   WorkspaceSnapshot,
@@ -22,10 +21,6 @@ export const workspaceChatApi = {
 
   dispatch(body: WorkspaceDispatchInput) {
     return request.post<WorkspaceSnapshot, WorkspaceDispatchInput>("/workspace/chat-state/dispatch", body)
-  },
-
-  continue(body: WorkspaceContinueInput) {
-    return request.post<WorkspaceSnapshot, WorkspaceContinueInput>("/workspace/chat-state/continue", body)
   },
 
   interrupt(body: WorkspaceInterruptInput) {

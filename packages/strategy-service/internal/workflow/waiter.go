@@ -16,15 +16,17 @@ type waitKind string
 const (
 	waitDone    waitKind = "done"
 	waitFailed  waitKind = "failed"
-	waitBlocked waitKind = "blocked"
+	waitWaiting waitKind = "waiting"
 	waitTimeout waitKind = "timeout"
 )
 
 type waitResult struct {
 	Kind      waitKind
-	Reason    string
+	WaitKind  string
+	Mode      WaitMode
 	Error     string
 	RequestID string
+	Schema    json.RawMessage
 }
 
 type event struct {
@@ -107,7 +109,7 @@ func (s *Service) waitSession(dir string, sid string, row NodeRun, timeout time.
 				SessionID string `json:"sessionID"`
 			}
 			if json.Unmarshal(evt.Properties, &body) == nil && body.SessionID == sid {
-				return waitResult{Kind: waitBlocked, Reason: "permission", RequestID: body.ID}
+				return waitResult{Kind: waitWaiting, WaitKind: "permission", Mode: WaitApproval, RequestID: body.ID, Schema: evt.Properties}
 			}
 		case "question.asked":
 			var body struct {
@@ -115,7 +117,7 @@ func (s *Service) waitSession(dir string, sid string, row NodeRun, timeout time.
 				SessionID string `json:"sessionID"`
 			}
 			if json.Unmarshal(evt.Properties, &body) == nil && body.SessionID == sid {
-				return waitResult{Kind: waitBlocked, Reason: "question", RequestID: body.ID}
+				return waitResult{Kind: waitWaiting, WaitKind: "question", Mode: WaitForm, RequestID: body.ID, Schema: evt.Properties}
 			}
 		}
 	}

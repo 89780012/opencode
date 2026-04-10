@@ -56,26 +56,39 @@ function cost(from?: number, to?: number) {
 }
 
 function runLabel(status?: WorkflowRun["status"] | WorkflowNodeRun["status"]) {
-  if (status === "pending") return "等待中"
-  if (status === "running") return "运行中"
-  if (status === "blocked") return "已阻塞"
-  if (status === "failed") return "失败"
-  if (status === "done") return "完成"
-  if (status === "timeout") return "超时"
-  if (status === "interrupted") return "已中断"
-  return "空闲"
+  if (status === "pending" || status === "queued") return "Queued"
+  if (status === "running") return "Running"
+  if (status === "waiting") return "Waiting"
+  if (status === "failed") return "Failed"
+  if (status === "done") return "Done"
+  if (status === "timeout") return "Timeout"
+  if (status === "interrupted") return "Interrupted"
+  if (status === "cancelled") return "Cancelled"
+  return "Idle"
 }
 
 function passLabel(pass?: boolean) {
-  if (pass === true) return "通过"
-  if (pass === false) return "未通过"
-  return "未判定"
+  if (pass === true) return "Pass"
+  if (pass === false) return "Fail"
+  return "-"
 }
 
-function blockLabel(value?: string) {
-  if (value === "permission") return "权限请求"
-  if (value === "question") return "问题确认"
-  return value || "-"
+function card(title: string, body: string) {
+  return (
+    <div className="rounded-xl border border-dashed border-border/70 bg-background/60 px-3 py-4 text-sm text-muted-foreground">
+      <div className="text-sm font-medium text-foreground">{title}</div>
+      <div className="mt-2 leading-6">{body}</div>
+    </div>
+  )
+}
+
+function info(label: string, value: string) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="max-w-44 truncate text-right font-medium text-foreground">{value || "-"}</span>
+    </div>
+  )
 }
 
 function nodeName(nodes: WorkflowFlowNode[], id?: string) {
@@ -101,10 +114,20 @@ function timeoutOf(nodes: WorkflowFlowNode[], id?: string) {
   return value
 }
 
+function attempts(rows: WorkflowNodeRun[], nodeID: string, rowID?: string) {
+  let total = 0
+  let cur = 0
+  rows.forEach((row) => {
+    if (row.node_id !== nodeID) return
+    total++
+    if (row.id === rowID) cur = total
+  })
+  return { cur: cur || total, total }
+}
+
 function parseNode(row: WorkflowNodeRun) {
   const text = row.result?.structured?.trim()
   if (!text) return null
-
   try {
     const data = JSON.parse(text) as {
       route?: string
@@ -121,51 +144,16 @@ function parseNode(row: WorkflowNodeRun) {
       pass: typeof data.pass === "boolean" ? data.pass : row.result?.pass,
       summary: typeof data.summary === "string" ? data.summary.trim() : row.result?.text?.trim(),
       handoff: typeof data.handoff === "string" ? data.handoff.trim() : row.result?.handoff?.trim(),
-      issues: Array.isArray(data.issues)
-        ? data.issues.filter((item): item is string => typeof item === "string" && !!item.trim())
-        : (row.result?.issues || []),
-      steps: Array.isArray(data.steps)
-        ? data.steps.filter((item): item is string => typeof item === "string" && !!item.trim())
-        : (row.result?.steps || []),
+      issues: Array.isArray(data.issues) ? data.issues.filter((item): item is string => typeof item === "string" && !!item.trim()) : (row.result?.issues || []),
+      steps: Array.isArray(data.steps) ? data.steps.filter((item): item is string => typeof item === "string" && !!item.trim()) : (row.result?.steps || []),
       deliverables: Array.isArray(data.deliverables)
         ? data.deliverables.filter((item): item is string => typeof item === "string" && !!item.trim())
         : (row.result?.deliverables || []),
-      risks: Array.isArray(data.risks)
-        ? data.risks.filter((item): item is string => typeof item === "string" && !!item.trim())
-        : (row.result?.risks || []),
+      risks: Array.isArray(data.risks) ? data.risks.filter((item): item is string => typeof item === "string" && !!item.trim()) : (row.result?.risks || []),
     }
   } catch {
     return null
   }
-}
-
-function card(title: string, body: string) {
-  return (
-    <div className="rounded-xl border border-dashed border-border/70 bg-background/60 px-3 py-4 text-sm text-muted-foreground">
-      <div className="text-sm font-medium text-foreground">{title}</div>
-      <div className="mt-2 leading-6">{body}</div>
-    </div>
-  )
-}
-
-function info(label: string, value: string) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="max-w-44 truncate text-right font-medium text-foreground">{value || "-"}</span>
-    </div>
-  )
-}
-
-function attempts(rows: WorkflowNodeRun[], nodeID: string, rowID?: string) {
-  let total = 0
-  let cur = 0
-  for (const row of rows) {
-    if (row.node_id !== nodeID) continue
-    total++
-    if (row.id === rowID) cur = total
-  }
-  return { cur: cur || total, total }
 }
 
 function EdgePanel(props: {
@@ -181,25 +169,18 @@ function EdgePanel(props: {
   return (
     <section className="rounded-xl border border-border/70 bg-background/85 px-3 py-3 shadow-xs">
       <div className="flex items-center justify-between gap-2">
-        <div className="text-sm font-medium text-foreground">连线属性</div>
+        <div className="text-sm font-medium text-foreground">Edge</div>
         <div className="rounded-full border border-border/70 bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground">
-          {props.edge.source} {"->"} {props.edge.target}
+          {props.edge.source} {">"} {props.edge.target}
         </div>
-      </div>
-
-      <div className="mt-2 text-xs leading-5 text-muted-foreground">
-        路由节点只能选择 `plan / execute / check`；检查节点只能选择 `pass / fail`；其他节点只允许 `always`。
       </div>
 
       <div className="mt-3 space-y-3">
         <div className="space-y-2">
-          <div className="text-xs font-medium text-foreground">条件</div>
-          <Select
-            value={value}
-            onValueChange={(value) => props.onEdgeCond(value as WorkflowEdgeCond)}
-          >
+          <div className="text-xs font-medium text-foreground">Condition</div>
+          <Select value={value} onValueChange={(row) => props.onEdgeCond(row as WorkflowEdgeCond)}>
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="选择条件" />
+              <SelectValue placeholder="Select a condition" />
             </SelectTrigger>
             <SelectContent>
               {opts.map((item) => (
@@ -212,11 +193,11 @@ function EdgePanel(props: {
         </div>
 
         <div className="space-y-2">
-          <div className="text-xs font-medium text-foreground">标签</div>
+          <div className="text-xs font-medium text-foreground">Label</div>
           <Input
             value={typeof props.edge.label === "string" ? props.edge.label : ""}
             onChange={(event) => props.onEdgeLabel(event.target.value)}
-            placeholder="可选，留空时自动显示条件"
+            placeholder="Optional edge label"
           />
         </div>
       </div>
@@ -246,18 +227,18 @@ export function WorkflowSidepanel(props: Props) {
       <Tabs value={tab} onValueChange={setTab} className="flex h-full min-h-0 flex-col gap-0">
         <div className="border-b border-border/70 px-3 py-3">
           <div className="mb-3 space-y-1">
-            <div className="text-sm font-medium text-foreground">右侧面板</div>
+            <div className="text-sm font-medium text-foreground">Side Panel</div>
             <div className="text-xs leading-5 text-muted-foreground">
-              工作流面板用于查看运行和统计；属性面板用于编辑当前选中的节点或连线。
+              Review runtime history on the workflow tab and edit nodes or edges on the attrs tab.
             </div>
           </div>
 
           <TabsList className="grid h-10 w-full grid-cols-2 rounded-xl bg-muted/70 p-1">
             <TabsTrigger value="workflow" className="h-full rounded-lg text-sm">
-              工作流面板
+              Workflow
             </TabsTrigger>
             <TabsTrigger value="attrs" className="h-full rounded-lg text-sm">
-              属性面板
+              Attrs
             </TabsTrigger>
           </TabsList>
         </div>
@@ -267,16 +248,16 @@ export function WorkflowSidepanel(props: Props) {
             <div className="border-b border-border/70 px-3 py-3">
               <TabsList className="grid h-10 w-full grid-cols-4 rounded-xl bg-muted/70 p-1">
                 <TabsTrigger value="run" className="h-full rounded-lg text-sm">
-                  概览
+                  Run
                 </TabsTrigger>
                 <TabsTrigger value="runs" className="h-full rounded-lg text-sm">
-                  历史
+                  History
                 </TabsTrigger>
                 <TabsTrigger value="stats" className="h-full rounded-lg text-sm">
-                  统计
+                  Stats
                 </TabsTrigger>
                 <TabsTrigger value="log" className="h-full rounded-lg text-sm">
-                  日志
+                  Log
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -287,51 +268,36 @@ export function WorkflowSidepanel(props: Props) {
                   {props.run ? (
                     <section className="rounded-xl border border-border/70 bg-background/85 px-3 py-3 shadow-xs">
                       <div className="flex items-center justify-between gap-2">
-                        <div className="text-sm font-medium text-foreground">当前运行</div>
+                        <div className="text-sm font-medium text-foreground">Current Run</div>
                         <div className="rounded-full border border-border/70 bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground">
                           {runLabel(props.run.status)}
                         </div>
                       </div>
                       <div className="mt-3 space-y-2 text-sm">
-                        {info("运行 ID", props.run.id)}
-                        {info("工作区", props.run.workspace_path || "-")}
-                        {info("共享会话", props.run.session_id || "-")}
-                        {info("当前节点", nodeName(nodes, props.run.current_node_id))}
-                        {info("开始时间", stamp(props.run.started_at))}
-                        {info("结束时间", stamp(props.run.ended_at))}
-                        {info("运行耗时", cost(props.run.started_at, props.run.ended_at))}
-                        {props.run.error ? (
-                          <div className="rounded-lg bg-destructive/10 px-3 py-2 text-xs leading-5 text-destructive">
-                            {props.run.error}
-                          </div>
-                        ) : null}
+                        {info("Run ID", props.run.id)}
+                        {info("Workspace", props.run.workspace_path || "-")}
+                        {info("Session", props.run.session_id || "-")}
+                        {info("Node", nodeName(nodes, props.run.current_node_id))}
+                        {info("Started", stamp(props.run.started_at))}
+                        {info("Ended", stamp(props.run.ended_at))}
+                        {info("Duration", cost(props.run.started_at, props.run.ended_at))}
+                        {props.run.error ? <div className="rounded-lg bg-destructive/10 px-3 py-2 text-xs leading-5 text-destructive">{props.run.error}</div> : null}
                       </div>
                     </section>
                   ) : (
-                    card("还没有运行记录", "模板本身只负责描述流程。等它被某个策略绑定并触发后，这里会展示运行信息。")
+                    card("No run selected", "The workflow template has not produced runtime data yet.")
                   )}
 
                   {live && props.current ? (
                     <section className="rounded-xl border border-border/70 bg-background/85 px-3 py-3 shadow-xs">
-                      <div className="text-sm font-medium text-foreground">当前节点</div>
+                      <div className="text-sm font-medium text-foreground">Current Step</div>
                       <div className="mt-3 space-y-2 text-sm">
-                        {info("节点名称", live.data.title || live.data.kind)}
-                        {info("节点类型", live.data.kind)}
-                        {info("会话 ID", props.current.session_id || "-")}
-                        {info("尝试次数", `${Math.max(tries.cur, 1)}/${retry(nodes, live.id) + 1}`)}
-                        {info("超时", timeoutOf(nodes, live.id) > 0 ? `${Math.round(timeoutOf(nodes, live.id) / 1000)} 秒` : "默认")}
-                        {info("节点耗时", cost(props.current.started_at, props.current.ended_at))}
-                      </div>
-                    </section>
-                  ) : null}
-
-                  {props.run?.status === "blocked" ? (
-                    <section className="rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-3 shadow-xs dark:border-amber-500/30 dark:bg-amber-500/10">
-                      <div className="text-sm font-medium text-foreground">阻塞详情</div>
-                      <div className="mt-3 space-y-2 text-sm">
-                        {info("阻塞原因", blockLabel(props.run.block_reason))}
-                        {info("请求 ID", props.run.block_request_id || "-")}
-                        {info("阻塞节点", nodeName(nodes, props.current?.node_id || props.run.current_node_id))}
+                        {info("Title", live.data.title || live.data.kind)}
+                        {info("Kind", live.data.kind)}
+                        {info("Session", props.current.session_id || "-")}
+                        {info("Attempt", `${Math.max(tries.cur, 1)}/${retry(nodes, live.id) + 1}`)}
+                        {info("Timeout", timeoutOf(nodes, live.id) > 0 ? `${Math.round(timeoutOf(nodes, live.id) / 1000)}s` : "Default")}
+                        {info("Duration", cost(props.current.started_at, props.current.ended_at))}
                       </div>
                     </section>
                   ) : null}
@@ -342,7 +308,7 @@ export function WorkflowSidepanel(props: Props) {
             <TabsContent value="runs" className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden">
               <div className="h-full overflow-y-auto p-3">
                 {runs.length === 0 ? (
-                  card("还没有运行历史", "当固定工作流在策略聊天页里被触发后，这里会按时间顺序展示每一轮运行。")
+                  card("No history", "Runtime history will appear here after the workflow runs.")
                 ) : (
                   <div className="space-y-3">
                     {runs.map((item) => {
@@ -353,9 +319,7 @@ export function WorkflowSidepanel(props: Props) {
                           type="button"
                           onClick={() => props.onPickRun(item.id)}
                           className={`w-full rounded-xl border px-3 py-3 text-left shadow-xs transition-colors ${
-                            active
-                              ? "border-primary/40 bg-primary/5"
-                              : "border-border/70 bg-background/85 hover:border-primary/30 hover:bg-accent/40"
+                            active ? "border-primary/40 bg-primary/5" : "border-border/70 bg-background/85 hover:border-primary/30 hover:bg-accent/40"
                           }`}
                         >
                           <div className="flex items-center justify-between gap-2">
@@ -365,11 +329,11 @@ export function WorkflowSidepanel(props: Props) {
                             </div>
                           </div>
                           <div className="mt-2 space-y-1 text-[11px] leading-5 text-muted-foreground">
-                            <div>工作区：{item.workspace_path || "-"}</div>
-                            <div>开始：{stamp(item.started_at)}</div>
-                            <div>结束：{stamp(item.ended_at)}</div>
-                            <div>耗时：{cost(item.started_at, item.ended_at)}</div>
-                            <div>当前节点：{nodeName(nodes, item.current_node_id)}</div>
+                            <div>Workspace: {item.workspace_path || "-"}</div>
+                            <div>Started: {stamp(item.started_at)}</div>
+                            <div>Ended: {stamp(item.ended_at)}</div>
+                            <div>Duration: {cost(item.started_at, item.ended_at)}</div>
+                            <div>Node: {nodeName(nodes, item.current_node_id)}</div>
                           </div>
                           {item.error ? <div className="mt-2 text-xs leading-5 text-destructive">{item.error}</div> : null}
                         </button>
@@ -383,48 +347,48 @@ export function WorkflowSidepanel(props: Props) {
             <TabsContent value="stats" className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden">
               <div className="h-full overflow-y-auto p-3">
                 {!props.summary ? (
-                  card("还没有统计信息", "模板被实际运行后，这里会展示整体健康度和各节点统计。")
+                  card("No stats", "Workflow summary data will appear here after runs are recorded.")
                 ) : (
                   <div className="space-y-3">
                     <section className="rounded-xl border border-border/70 bg-background/85 px-3 py-3 shadow-xs">
-                      <div className="text-sm font-medium text-foreground">工作流统计</div>
+                      <div className="text-sm font-medium text-foreground">Workflow Summary</div>
                       <div className="mt-3 grid grid-cols-2 gap-2">
                         <div className="rounded-lg border border-border/70 px-3 py-2">
-                          <div className="text-[11px] text-muted-foreground">运行次数</div>
+                          <div className="text-[11px] text-muted-foreground">Runs</div>
                           <div className="mt-1 text-lg font-medium text-foreground">{props.summary.total_runs}</div>
                         </div>
                         <div className="rounded-lg border border-border/70 px-3 py-2">
-                          <div className="text-[11px] text-muted-foreground">节点执行次数</div>
+                          <div className="text-[11px] text-muted-foreground">Node Runs</div>
                           <div className="mt-1 text-lg font-medium text-foreground">{props.summary.total_node_runs}</div>
                         </div>
                         <div className="rounded-lg border border-border/70 px-3 py-2">
-                          <div className="text-[11px] text-muted-foreground">完成</div>
+                          <div className="text-[11px] text-muted-foreground">Done</div>
                           <div className="mt-1 text-lg font-medium text-emerald-600">{props.summary.done_runs}</div>
                         </div>
                         <div className="rounded-lg border border-border/70 px-3 py-2">
-                          <div className="text-[11px] text-muted-foreground">失败</div>
+                          <div className="text-[11px] text-muted-foreground">Failed</div>
                           <div className="mt-1 text-lg font-medium text-destructive">{props.summary.failed_runs}</div>
                         </div>
                         <div className="rounded-lg border border-border/70 px-3 py-2">
-                          <div className="text-[11px] text-muted-foreground">阻塞</div>
-                          <div className="mt-1 text-lg font-medium text-amber-600">{props.summary.blocked_runs}</div>
+                          <div className="text-[11px] text-muted-foreground">Waiting</div>
+                          <div className="mt-1 text-lg font-medium text-amber-600">{props.summary.waiting_runs}</div>
                         </div>
                         <div className="rounded-lg border border-border/70 px-3 py-2">
-                          <div className="text-[11px] text-muted-foreground">运行中</div>
+                          <div className="text-[11px] text-muted-foreground">Running</div>
                           <div className="mt-1 text-lg font-medium text-sky-600">{props.summary.running_runs}</div>
                         </div>
                       </div>
                       <div className="mt-3 space-y-2 text-sm">
-                        {info("平均运行耗时", span(props.summary.avg_run_ms))}
-                        {info("最近一次运行", stamp(props.summary.last_run_at))}
+                        {info("Avg Duration", span(props.summary.avg_run_ms))}
+                        {info("Last Run", stamp(props.summary.last_run_at))}
                       </div>
                     </section>
 
                     {stats.length === 0 ? (
-                      card("还没有节点统计", "执行工作流后，这里会累计每个节点的执行次数、结果和耗时。")
+                      card("No node stats", "Per-node summary data will appear here after runs are recorded.")
                     ) : (
                       <section className="rounded-xl border border-border/70 bg-background/85 px-3 py-3 shadow-xs">
-                        <div className="text-sm font-medium text-foreground">节点统计</div>
+                        <div className="text-sm font-medium text-foreground">Node Summary</div>
                         <div className="mt-3 space-y-3">
                           {stats.map((item) => (
                             <div key={item.node_id} className="rounded-lg border border-border/70 px-3 py-3">
@@ -439,27 +403,23 @@ export function WorkflowSidepanel(props: Props) {
                               </div>
                               <div className="mt-3 grid grid-cols-3 gap-2 text-center">
                                 <div className="rounded-md bg-muted/40 px-2 py-2">
-                                  <div className="text-[10px] text-muted-foreground">总次数</div>
+                                  <div className="text-[10px] text-muted-foreground">Total</div>
                                   <div className="mt-1 text-sm font-medium text-foreground">{item.total}</div>
                                 </div>
                                 <div className="rounded-md bg-muted/40 px-2 py-2">
-                                  <div className="text-[10px] text-muted-foreground">完成</div>
+                                  <div className="text-[10px] text-muted-foreground">Done</div>
                                   <div className="mt-1 text-sm font-medium text-emerald-600">{item.done}</div>
                                 </div>
                                 <div className="rounded-md bg-muted/40 px-2 py-2">
-                                  <div className="text-[10px] text-muted-foreground">失败</div>
+                                  <div className="text-[10px] text-muted-foreground">Failed</div>
                                   <div className="mt-1 text-sm font-medium text-destructive">{item.failed + item.timeout}</div>
                                 </div>
                               </div>
                               <div className="mt-3 space-y-1 text-[11px] leading-5 text-muted-foreground">
-                                <div>平均耗时：{span(item.avg_ms)}</div>
-                                <div>最近执行：{stamp(item.last_run_at)}</div>
-                                <div>
-                                  阻塞：{item.blocked} | 运行中：{item.running} | 超时：{item.timeout}
-                                </div>
-                                <div>
-                                  通过：{item.pass} | 未通过：{item.fail}
-                                </div>
+                                <div>Avg Duration: {span(item.avg_ms)}</div>
+                                <div>Last Run: {stamp(item.last_run_at)}</div>
+                                <div>Waiting: {item.waiting} | Running: {item.running} | Timeout: {item.timeout}</div>
+                                <div>Pass: {item.pass} | Fail: {item.fail}</div>
                               </div>
                             </div>
                           ))}
@@ -474,7 +434,7 @@ export function WorkflowSidepanel(props: Props) {
             <TabsContent value="log" className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden">
               <div className="h-full overflow-y-auto p-3">
                 {rows.length === 0 ? (
-                  card("还没有节点日志", "工作流真正运行后，每次节点执行都会按时间顺序显示在这里。")
+                  card("No log", "Node execution history will appear here after the workflow runs.")
                 ) : (
                   <div className="space-y-3">
                     {rows.map((row) => {
@@ -485,36 +445,25 @@ export function WorkflowSidepanel(props: Props) {
                       return (
                         <section key={row.id} className="rounded-xl border border-border/70 bg-background/85 px-3 py-3 shadow-xs">
                           <div className="flex items-center justify-between gap-2">
-                            <div className="min-w-0 truncate text-sm font-medium text-foreground">
-                              {nodeName(nodes, row.node_id)}
-                            </div>
+                            <div className="min-w-0 truncate text-sm font-medium text-foreground">{nodeName(nodes, row.node_id)}</div>
                             <div className="rounded-full border border-border/70 px-2 py-0.5 text-[11px] text-muted-foreground">
                               {runLabel(row.status)}
                             </div>
                           </div>
 
                           <div className="mt-2 space-y-1 text-[11px] leading-5 text-muted-foreground">
-                            <div>节点 ID：{row.node_id}</div>
-                            <div>会话：{row.session_id || "-"}</div>
-                            <div>
-                              尝试：{step.cur} / {retry(nodes, cfg?.id) + 1}
-                            </div>
-                            <div>开始：{stamp(row.started_at)}</div>
-                            <div>结束：{stamp(row.ended_at)}</div>
-                            <div>耗时：{cost(row.started_at, row.ended_at)}</div>
+                            <div>Node ID: {row.node_id}</div>
+                            <div>Session: {row.session_id || "-"}</div>
+                            <div>Attempt: {step.cur} / {retry(nodes, cfg?.id) + 1}</div>
+                            <div>Started: {stamp(row.started_at)}</div>
+                            <div>Ended: {stamp(row.ended_at)}</div>
+                            <div>Duration: {cost(row.started_at, row.ended_at)}</div>
                           </div>
-
-                          {row.status === "blocked" ? (
-                            <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-                              <div>阻塞原因：{blockLabel(row.block_reason)}</div>
-                              <div>请求 ID：{row.block_request_id || "-"}</div>
-                            </div>
-                          ) : null}
 
                           {review ? (
                             <div className="mt-3 space-y-2">
                               <div className="flex items-center justify-between rounded-lg border border-border/70 bg-muted/35 px-3 py-2">
-                                <span className="text-xs text-muted-foreground">检查结论</span>
+                                <span className="text-xs text-muted-foreground">Check</span>
                                 <span
                                   className={
                                     review.pass === true
@@ -530,34 +479,21 @@ export function WorkflowSidepanel(props: Props) {
 
                               {review.summary ? (
                                 <div className="rounded-lg border border-border/70 px-3 py-2">
-                                  <div className="text-xs text-muted-foreground">摘要</div>
+                                  <div className="text-xs text-muted-foreground">Summary</div>
                                   <div className="mt-1 whitespace-pre-wrap text-xs leading-5 text-foreground">{review.summary}</div>
-                                </div>
-                              ) : null}
-
-                              {review.issues.length > 0 ? (
-                                <div className="rounded-lg border border-border/70 px-3 py-2">
-                                  <div className="text-xs text-muted-foreground">问题</div>
-                                  <div className="mt-1 space-y-1">
-                                    {review.issues.map((item, i) => (
-                                      <div key={`${row.id}-issue-${i}`} className="text-xs leading-5 text-foreground">
-                                        {i + 1}. {item}
-                                      </div>
-                                    ))}
-                                  </div>
                                 </div>
                               ) : null}
 
                               {review.route ? (
                                 <div className="rounded-lg border border-border/70 px-3 py-2">
-                                  <div className="text-xs text-muted-foreground">路由结果</div>
+                                  <div className="text-xs text-muted-foreground">Route</div>
                                   <div className="mt-1 whitespace-pre-wrap text-xs leading-5 text-foreground">{review.route}</div>
                                 </div>
                               ) : null}
 
                               {review.steps.length > 0 ? (
                                 <div className="rounded-lg border border-border/70 px-3 py-2">
-                                  <div className="text-xs text-muted-foreground">规划步骤</div>
+                                  <div className="text-xs text-muted-foreground">Steps</div>
                                   <div className="mt-1 space-y-1">
                                     {review.steps.map((item, i) => (
                                       <div key={`${row.id}-step-${i}`} className="text-xs leading-5 text-foreground">
@@ -568,9 +504,22 @@ export function WorkflowSidepanel(props: Props) {
                                 </div>
                               ) : null}
 
+                              {review.issues.length > 0 ? (
+                                <div className="rounded-lg border border-border/70 px-3 py-2">
+                                  <div className="text-xs text-muted-foreground">Issues</div>
+                                  <div className="mt-1 space-y-1">
+                                    {review.issues.map((item, i) => (
+                                      <div key={`${row.id}-issue-${i}`} className="text-xs leading-5 text-foreground">
+                                        {i + 1}. {item}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : null}
+
                               {review.deliverables.length > 0 ? (
                                 <div className="rounded-lg border border-border/70 px-3 py-2">
-                                  <div className="text-xs text-muted-foreground">交付物</div>
+                                  <div className="text-xs text-muted-foreground">Deliverables</div>
                                   <div className="mt-1 space-y-1">
                                     {review.deliverables.map((item, i) => (
                                       <div key={`${row.id}-deliverable-${i}`} className="text-xs leading-5 text-foreground">
@@ -583,7 +532,7 @@ export function WorkflowSidepanel(props: Props) {
 
                               {review.risks.length > 0 ? (
                                 <div className="rounded-lg border border-border/70 px-3 py-2">
-                                  <div className="text-xs text-muted-foreground">风险</div>
+                                  <div className="text-xs text-muted-foreground">Risks</div>
                                   <div className="mt-1 space-y-1">
                                     {review.risks.map((item, i) => (
                                       <div key={`${row.id}-risk-${i}`} className="text-xs leading-5 text-foreground">
@@ -596,19 +545,17 @@ export function WorkflowSidepanel(props: Props) {
 
                               {review.handoff ? (
                                 <div className="rounded-lg bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
-                                  交接提示：{review.handoff}
+                                  Handoff: {review.handoff}
                                 </div>
                               ) : null}
                             </div>
                           ) : null}
 
-                          {row.output && !review ? (
-                            <div className="mt-2 whitespace-pre-wrap text-xs leading-5 text-foreground">{row.output}</div>
-                          ) : null}
+                          {row.output && !review ? <div className="mt-2 whitespace-pre-wrap text-xs leading-5 text-foreground">{row.output}</div> : null}
 
                           {row.output && review ? (
                             <details className="mt-2 rounded-lg border border-dashed border-border/70 px-3 py-2">
-                              <summary className="cursor-pointer text-xs text-muted-foreground">查看原始输出</summary>
+                              <summary className="cursor-pointer text-xs text-muted-foreground">Raw output</summary>
                               <div className="mt-2 whitespace-pre-wrap text-xs leading-5 text-foreground">{row.output}</div>
                             </details>
                           ) : null}
@@ -632,9 +579,7 @@ export function WorkflowSidepanel(props: Props) {
                 <WorkflowNodePanel node={props.node} onTitle={props.onNodeTitle} onFields={props.onNodeFields} />
               </div>
             ) : null}
-            {!props.edge && !props.node ? (
-              card("未选择对象", "点击节点后可以编辑节点属性；点击连线后可以编辑连线条件和标签。")
-            ) : null}
+            {!props.edge && !props.node ? card("Nothing selected", "Select a node or edge to edit its attributes.") : null}
           </div>
         </TabsContent>
       </Tabs>

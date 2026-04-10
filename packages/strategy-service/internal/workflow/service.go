@@ -301,58 +301,6 @@ func (s *Service) DispatchWorkspace(path string, input string) (WorkspaceSnapsho
 	}, nil
 }
 
-func (s *Service) ContinueWorkspace(path string) (WorkspaceSnapshot, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	item, _, err := s.workspaceState(path)
-	if err != nil {
-		return WorkspaceSnapshot{}, err
-	}
-	if item.RunID == "" {
-		return WorkspaceSnapshot{}, errors.New("workspace run is not set")
-	}
-	run, err := s.run(item.RunID)
-	if err != nil {
-		return WorkspaceSnapshot{}, err
-	}
-	if run.Status != RunBlocked {
-		return WorkspaceSnapshot{}, errors.New("workflow run is not resumable")
-	}
-	run.Status = RunRunning
-	run.Error = ""
-	run.BlockReason = ""
-	run.BlockRequestID = ""
-	if err := s.putRun(run); err != nil {
-		return WorkspaceSnapshot{}, err
-	}
-	row, ok := s.lastNodeRun(run.ID, run.CurrentNodeID)
-	if ok && row.Status == NodeBlocked {
-		row.Status = NodeRunning
-		row.Error = ""
-		row.BlockReason = ""
-		row.BlockRequestID = ""
-		if err := s.putNodeRun(row); err != nil {
-			return WorkspaceSnapshot{}, err
-		}
-	}
-	s.kick(run.ID)
-	item.RunID = run.ID
-	item.Status = workspaceStatusOf(run.Status)
-	item.UpdatedAt = time.Now().UnixMilli()
-	if err := s.putWorkspaceState(item); err != nil {
-		return WorkspaceSnapshot{}, err
-	}
-	runPtr, err := s.syncState(&item)
-	if err != nil {
-		return WorkspaceSnapshot{}, err
-	}
-	return WorkspaceSnapshot{
-		State: item,
-		Run:   runPtr,
-	}, nil
-}
-
 func (s *Service) InterruptWorkspace(path string) (WorkspaceSnapshot, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -427,40 +375,6 @@ func (s *Service) start(wid string, path string, input string, sid string) (Star
 	return StartResult{Run: run, NodeRun: row}, nil
 }
 
-func (s *Service) Continue(id string) (ContinueResult, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	run, err := s.run(id)
-	if err != nil {
-		return ContinueResult{}, err
-	}
-	if run.Status != RunBlocked && run.Status != RunRunning {
-		return ContinueResult{}, errors.New("workflow run is not resumable")
-	}
-	if run.Status == RunBlocked {
-		run.Status = RunRunning
-		run.Error = ""
-		run.BlockReason = ""
-		run.BlockRequestID = ""
-		if err := s.putRun(run); err != nil {
-			return ContinueResult{}, err
-		}
-		row, ok := s.lastNodeRun(run.ID, run.CurrentNodeID)
-		if ok && row.Status == NodeBlocked {
-			row.Status = NodeRunning
-			row.Error = ""
-			row.BlockReason = ""
-			row.BlockRequestID = ""
-			if err := s.putNodeRun(row); err != nil {
-				return ContinueResult{}, err
-			}
-		}
-	}
-	s.kick(run.ID)
-	return ContinueResult{Run: run}, nil
-}
-
 func (s *Service) kick(runID string) {
 	if s.live[runID] {
 		return
@@ -517,7 +431,7 @@ func (s *Service) exec(runID string) {
 		}
 		s.mu.Unlock()
 
-		if row.Status == NodeRunning || row.Status == NodeBlocked {
+		if row.Status == NodeRunning || row.Status == NodeWaiting {
 			wait := s.waitSession(run.WorkspacePath, row.SessionID, row, timeout(node))
 			s.mu.Lock()
 			run, err = s.run(runID)
@@ -535,30 +449,35 @@ func (s *Service) exec(runID string) {
 				return
 			}
 			switch wait.Kind {
-			case waitBlocked:
-				row.Status = NodeBlocked
-				row.Error = wait.Reason
-				row.BlockReason = wait.Reason
-				row.BlockRequestID = wait.RequestID
+			case waitWaiting:
+				item, openErr := s.openWait(run, row, wait)
+				if openErr != nil {
+					row.Status = NodeFailed
+					row.Error = openErr.Error()
+					row.EndedAt = time.Now().UnixMilli()
+					_ = s.putNodeRun(row)
+					run.Status = RunFailed
+					run.Error = openErr.Error()
+					run.EndedAt = row.EndedAt
+					_ = s.putRun(run)
+					s.mu.Unlock()
+					return
+				}
+				row.Status = NodeWaiting
+				row.Error = wait.WaitKind
 				_ = s.putNodeRun(row)
-				run.Status = RunBlocked
-				run.Error = wait.Reason
-				run.BlockReason = wait.Reason
-				run.BlockRequestID = wait.RequestID
+				run.Status = RunWaiting
+				run.Error = item.ID
 				_ = s.putRun(run)
 				s.mu.Unlock()
 				return
 			case waitFailed:
 				row.Status = NodeFailed
 				row.Error = wait.Error
-				row.BlockReason = ""
-				row.BlockRequestID = ""
 				row.EndedAt = time.Now().UnixMilli()
 				_ = s.putNodeRun(row)
 				run.Status = RunFailed
 				run.Error = wait.Error
-				run.BlockReason = ""
-				run.BlockRequestID = ""
 				run.EndedAt = row.EndedAt
 				_ = s.putRun(run)
 				s.mu.Unlock()
@@ -566,14 +485,10 @@ func (s *Service) exec(runID string) {
 			case waitTimeout:
 				row.Status = NodeTimeout
 				row.Error = "node timed out"
-				row.BlockReason = ""
-				row.BlockRequestID = ""
 				row.EndedAt = time.Now().UnixMilli()
 				_ = s.putNodeRun(row)
 				run.Status = RunFailed
 				run.Error = row.Error
-				run.BlockReason = ""
-				run.BlockRequestID = ""
 				run.EndedAt = row.EndedAt
 				_ = s.putRun(run)
 				s.mu.Unlock()
@@ -584,8 +499,6 @@ func (s *Service) exec(runID string) {
 					if retryable(err) {
 						row.Status = NodeFailed
 						row.Error = err.Error()
-						row.BlockReason = ""
-						row.BlockRequestID = ""
 						row.EndedAt = time.Now().UnixMilli()
 						_ = s.putNodeRun(row)
 						if _, retryErr := s.queue(flow, &run, node, row.Turn+1, run.Input, "", retryPrompt(node, err)); retryErr == nil {
@@ -595,14 +508,10 @@ func (s *Service) exec(runID string) {
 					}
 					row.Status = NodeFailed
 					row.Error = err.Error()
-					row.BlockReason = ""
-					row.BlockRequestID = ""
 					row.EndedAt = time.Now().UnixMilli()
 					_ = s.putNodeRun(row)
 					run.Status = RunFailed
 					run.Error = err.Error()
-					run.BlockReason = ""
-					run.BlockRequestID = ""
 					run.EndedAt = row.EndedAt
 					_ = s.putRun(run)
 					s.mu.Unlock()
@@ -612,8 +521,6 @@ func (s *Service) exec(runID string) {
 				row.Result = res
 				row.Output = res.Raw
 				row.Error = ""
-				row.BlockReason = ""
-				row.BlockRequestID = ""
 				row.EndedAt = time.Now().UnixMilli()
 				_ = s.putNodeRun(row)
 
@@ -622,8 +529,6 @@ func (s *Service) exec(runID string) {
 					run.Status = RunDone
 					run.EndedAt = time.Now().UnixMilli()
 					run.Error = ""
-					run.BlockReason = ""
-					run.BlockRequestID = ""
 					_ = s.putRun(run)
 					s.mu.Unlock()
 					return
@@ -633,8 +538,6 @@ func (s *Service) exec(runID string) {
 				if !ok {
 					run.Status = RunFailed
 					run.Error = "next workflow node not found"
-					run.BlockReason = ""
-					run.BlockRequestID = ""
 					run.EndedAt = time.Now().UnixMilli()
 					_ = s.putRun(run)
 					s.mu.Unlock()
@@ -644,8 +547,6 @@ func (s *Service) exec(runID string) {
 				if _, err := s.queue(flow, &run, nextNode, row.Turn+1, run.Input, row.Result.Text, feedback); err != nil {
 					run.Status = RunFailed
 					run.Error = err.Error()
-					run.BlockReason = ""
-					run.BlockRequestID = ""
 					run.EndedAt = time.Now().UnixMilli()
 					_ = s.putRun(run)
 					s.mu.Unlock()
@@ -789,8 +690,8 @@ func workspaceStatusOf(status RunStatus) WorkspaceStatus {
 	if status == RunRunning {
 		return WorkspaceRunning
 	}
-	if status == RunBlocked {
-		return WorkspaceBlocked
+	if status == RunWaiting {
+		return WorkspaceWaiting
 	}
 	if status == RunDone {
 		return WorkspaceDone
@@ -877,7 +778,7 @@ func (s *Service) interruptRun(id string) error {
 	if err != nil {
 		return err
 	}
-	if run.Status != RunRunning && run.Status != RunBlocked {
+	if run.Status != RunRunning && run.Status != RunWaiting {
 		return nil
 	}
 	if run.Status == RunRunning && run.WorkspacePath != "" && run.SessionID != "" {
@@ -887,8 +788,6 @@ func (s *Service) interruptRun(id string) error {
 	}
 	run.Status = RunInterrupted
 	run.Error = ""
-	run.BlockReason = ""
-	run.BlockRequestID = ""
 	run.EndedAt = time.Now().UnixMilli()
 	if err := s.putRun(run); err != nil {
 		return err
@@ -897,13 +796,11 @@ func (s *Service) interruptRun(id string) error {
 	if !ok {
 		return nil
 	}
-	if row.Status != NodeRunning && row.Status != NodeBlocked {
+	if row.Status != NodeRunning && row.Status != NodeWaiting {
 		return nil
 	}
 	row.Status = NodeInterrupted
 	row.Error = ""
-	row.BlockReason = ""
-	row.BlockRequestID = ""
 	row.EndedAt = run.EndedAt
 	return s.putNodeRun(row)
 }
@@ -949,8 +846,6 @@ func (s *Service) queue(
 
 			run.CurrentNodeID = node.ID
 			run.Error = ""
-			run.BlockReason = ""
-			run.BlockRequestID = ""
 			if node.Kind == End {
 				run.Status = RunDone
 				run.EndedAt = now
@@ -977,8 +872,6 @@ func (s *Service) queue(
 
 			run.Status = RunRunning
 			run.CurrentNodeID = nextNode.ID
-			run.BlockReason = ""
-			run.BlockRequestID = ""
 			if err := s.putRun(*run); err != nil {
 				return NodeRun{}, err
 			}
@@ -1010,8 +903,6 @@ func (s *Service) queue(
 		run.Status = RunRunning
 		run.CurrentNodeID = node.ID
 		run.Error = ""
-		run.BlockReason = ""
-		run.BlockRequestID = ""
 		run.EndedAt = 0
 		if err := s.putRun(*run); err != nil {
 			return NodeRun{}, err
@@ -1022,13 +913,9 @@ func (s *Service) queue(
 		if err := s.sendPrompt(run.WorkspacePath, sid, node, *run, prompt); err != nil {
 			row.Status = NodeFailed
 			row.Error = err.Error()
-			row.BlockReason = ""
-			row.BlockRequestID = ""
 			row.EndedAt = time.Now().UnixMilli()
 			run.Status = RunFailed
 			run.Error = err.Error()
-			run.BlockReason = ""
-			run.BlockRequestID = ""
 			run.EndedAt = row.EndedAt
 			_ = s.putNodeRun(row)
 			_ = s.putRun(*run)

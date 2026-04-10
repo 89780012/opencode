@@ -1,6 +1,6 @@
 import type { WorkflowRun } from "@/types/workflow"
 
-export type WorkspaceStatus = "idle" | "running" | "blocked" | "done" | "failed" | "interrupted"
+export type WorkspaceStatus = "idle" | "running" | "waiting" | "done" | "failed" | "interrupted"
 
 export type WorkspaceState = {
   workspace_path: string
@@ -30,10 +30,6 @@ export type WorkspaceBindInput = {
 export type WorkspaceDispatchInput = {
   workspace_path: string
   input: string
-}
-
-export type WorkspaceContinueInput = {
-  workspace_path: string
 }
 
 export type WorkspaceInterruptInput = {

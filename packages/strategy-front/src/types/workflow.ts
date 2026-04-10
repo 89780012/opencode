@@ -112,7 +112,7 @@ export type WorkflowItem = {
   run_at?: number
   done_runs?: number
   failed_runs?: number
-  blocked_runs?: number
+  waiting_runs?: number
 }
 
 export type WorkflowDetail = WorkflowItem & {
@@ -137,9 +137,9 @@ export type WorkflowSeed = {
 
 export type WorkflowEdgeCond = "always" | "plan" | "execute" | "check" | "pass" | "fail"
 
-export type WorkflowRunStatus = "pending" | "running" | "blocked" | "failed" | "done" | "interrupted"
+export type WorkflowRunStatus = "pending" | "queued" | "running" | "waiting" | "failed" | "done" | "interrupted" | "cancelled"
 
-export type WorkflowNodeRunStatus = "pending" | "running" | "blocked" | "failed" | "done" | "timeout" | "interrupted"
+export type WorkflowNodeRunStatus = "pending" | "queued" | "running" | "waiting" | "failed" | "done" | "timeout" | "interrupted" | "cancelled"
 
 export type WorkflowRuntimeNode = {
   id: string
@@ -197,8 +197,6 @@ export type WorkflowRun = {
   variant?: string
   status: WorkflowRunStatus
   current_node_id?: string
-  block_reason?: string
-  block_request_id?: string
   input: string
   loop: number
   started_at: number
@@ -217,7 +215,7 @@ export type WorkflowNodeSummary = {
   total: number
   done: number
   failed: number
-  blocked: number
+  waiting: number
   running: number
   timeout: number
   pass: number
@@ -232,7 +230,7 @@ export type WorkflowSummary = {
   total_runs: number
   done_runs: number
   failed_runs: number
-  blocked_runs: number
+  waiting_runs: number
   running_runs: number
   avg_run_ms: number
   last_run_at?: number
@@ -267,8 +265,6 @@ export type WorkflowNodeRun = {
   turn: number
   input: string
   output?: string
-  block_reason?: string
-  block_request_id?: string
   error?: string
   started_at: number
   ended_at?: number
@@ -285,8 +281,44 @@ export type WorkflowStartResult = {
   node_run: WorkflowNodeRun
 }
 
-export type WorkflowContinueResult = {
-  run: WorkflowRun
+export type WorkflowWaitMode = "text" | "form" | "approval" | "confirm"
+
+export type WorkflowWaitStatus = "open" | "answered" | "rejected" | "expired" | "cancelled" | "consumed"
+
+export type WorkflowWait = {
+  id: string
+  run_id: string
+  step_id: string
+  session_id?: string
+  kind: string
+  mode: WorkflowWaitMode
+  title: string
+  prompt: string
+  schema?: unknown
+  required: boolean
+  status: WorkflowWaitStatus
+  source: string
+  source_request_id?: string
+  resume_hint?: string
+  expires_at?: number
+  created_at: number
+  answered_at?: number
+  consumed_at?: number
+}
+
+export type WorkflowWaitList = {
+  items: WorkflowWait[]
+}
+
+export type WorkflowReply = {
+  id: string
+  wait_id: string
+  run_id: string
+  step_id: string
+  actor: string
+  payload?: unknown
+  idempotency_key: string
+  created_at: number
 }
 
 export function kindName(kind: WorkflowKind) {

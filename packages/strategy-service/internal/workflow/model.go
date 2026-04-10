@@ -1,5 +1,7 @@
 package workflow
 
+import "encoding/json"
+
 type Kind string
 
 const (
@@ -26,23 +28,78 @@ type RunStatus string
 
 const (
 	RunPending     RunStatus = "pending"
+	RunQueued      RunStatus = "queued"
 	RunRunning     RunStatus = "running"
-	RunBlocked     RunStatus = "blocked"
+	RunWaiting     RunStatus = "waiting"
 	RunFailed      RunStatus = "failed"
 	RunDone        RunStatus = "done"
 	RunInterrupted RunStatus = "interrupted"
+	RunCancelled   RunStatus = "cancelled"
 )
 
 type NodeStatus string
 
 const (
 	NodePending     NodeStatus = "pending"
+	NodeQueued      NodeStatus = "queued"
 	NodeRunning     NodeStatus = "running"
-	NodeBlocked     NodeStatus = "blocked"
+	NodeWaiting     NodeStatus = "waiting"
 	NodeFailed      NodeStatus = "failed"
 	NodeDone        NodeStatus = "done"
 	NodeTimeout     NodeStatus = "timeout"
 	NodeInterrupted NodeStatus = "interrupted"
+	NodeCancelled   NodeStatus = "cancelled"
+)
+
+type WaitStatus string
+
+const (
+	WaitOpen      WaitStatus = "open"
+	WaitAnswered  WaitStatus = "answered"
+	WaitRejected  WaitStatus = "rejected"
+	WaitExpired   WaitStatus = "expired"
+	WaitCancelled WaitStatus = "cancelled"
+	WaitConsumed  WaitStatus = "consumed"
+)
+
+type WaitMode string
+
+const (
+	WaitText     WaitMode = "text"
+	WaitForm     WaitMode = "form"
+	WaitApproval WaitMode = "approval"
+	WaitConfirm  WaitMode = "confirm"
+)
+
+type WaitSource string
+
+const (
+	WaitModel   WaitSource = "model"
+	WaitRuntime WaitSource = "runtime"
+	WaitSystem  WaitSource = "system"
+)
+
+type ReplyActor string
+
+const (
+	ReplyUser     ReplyActor = "user"
+	ReplySystem   ReplyActor = "system"
+	ReplyOperator ReplyActor = "operator"
+)
+
+type TimelineKind string
+
+const (
+	TimelineRunStarted   TimelineKind = "run.started"
+	TimelineStepStarted  TimelineKind = "step.started"
+	TimelineWaitOpened   TimelineKind = "wait.opened"
+	TimelineReply        TimelineKind = "reply.received"
+	TimelineWaitConsumed TimelineKind = "wait.consumed"
+	TimelineStepDone     TimelineKind = "step.completed"
+	TimelineStepFailed   TimelineKind = "step.failed"
+	TimelineRunDone      TimelineKind = "run.completed"
+	TimelineRunFailed    TimelineKind = "run.failed"
+	TimelineRunCancelled TimelineKind = "run.cancelled"
 )
 
 type Workflow struct {
@@ -89,8 +146,6 @@ type Run struct {
 	Variant         string    `json:"variant,omitempty"`
 	Status          RunStatus `json:"status"`
 	CurrentNodeID   string    `json:"current_node_id"`
-	BlockReason     string    `json:"block_reason,omitempty"`
-	BlockRequestID  string    `json:"block_request_id,omitempty"`
 	Input           string    `json:"input"`
 	Loop            int       `json:"loop"`
 	StartedAt       int64     `json:"started_at"`
@@ -99,21 +154,79 @@ type Run struct {
 }
 
 type NodeRun struct {
-	ID             string     `json:"id"`
-	RunID          string     `json:"run_id"`
-	NodeID         string     `json:"node_id"`
-	SessionID      string     `json:"session_id"`
-	Status         NodeStatus `json:"status"`
-	Turn           int        `json:"turn"`
-	Input          string     `json:"input"`
-	Output         string     `json:"output,omitempty"`
-	BlockReason    string     `json:"block_reason,omitempty"`
-	BlockRequestID string     `json:"block_request_id,omitempty"`
-	Error          string     `json:"error,omitempty"`
-	StartedAt      int64      `json:"started_at"`
-	EndedAt        int64      `json:"ended_at,omitempty"`
-	Anchor         Anchor     `json:"anchor"`
-	Result         Result     `json:"result"`
+	ID        string     `json:"id"`
+	RunID     string     `json:"run_id"`
+	NodeID    string     `json:"node_id"`
+	SessionID string     `json:"session_id"`
+	Status    NodeStatus `json:"status"`
+	Turn      int        `json:"turn"`
+	Input     string     `json:"input"`
+	Output    string     `json:"output,omitempty"`
+	Error     string     `json:"error,omitempty"`
+	StartedAt int64      `json:"started_at"`
+	EndedAt   int64      `json:"ended_at,omitempty"`
+	Anchor    Anchor     `json:"anchor"`
+	Result    Result     `json:"result"`
+}
+
+type Step struct {
+	ID        string     `json:"id"`
+	RunID     string     `json:"run_id"`
+	NodeID    string     `json:"node_id"`
+	SessionID string     `json:"session_id,omitempty"`
+	Status    NodeStatus `json:"status"`
+	Turn      int        `json:"turn"`
+	Input     string     `json:"input"`
+	Output    string     `json:"output,omitempty"`
+	Error     string     `json:"error,omitempty"`
+	StartedAt int64      `json:"started_at"`
+	EndedAt   int64      `json:"ended_at,omitempty"`
+	Anchor    Anchor     `json:"anchor"`
+	Result    Result     `json:"result"`
+	WaitID    string     `json:"wait_id,omitempty"`
+}
+
+type Wait struct {
+	ID              string          `json:"id"`
+	RunID           string          `json:"run_id"`
+	StepID          string          `json:"step_id"`
+	SessionID       string          `json:"session_id,omitempty"`
+	Kind            string          `json:"kind"`
+	Mode            WaitMode        `json:"mode"`
+	Title           string          `json:"title"`
+	Prompt          string          `json:"prompt"`
+	Schema          json.RawMessage `json:"schema,omitempty"`
+	Required        bool            `json:"required"`
+	Status          WaitStatus      `json:"status"`
+	Source          WaitSource      `json:"source"`
+	SourceRequestID string          `json:"source_request_id,omitempty"`
+	ResumeHint      string          `json:"resume_hint,omitempty"`
+	ExpiresAt       int64           `json:"expires_at,omitempty"`
+	CreatedAt       int64           `json:"created_at"`
+	AnsweredAt      int64           `json:"answered_at,omitempty"`
+	ConsumedAt      int64           `json:"consumed_at,omitempty"`
+}
+
+type Reply struct {
+	ID             string          `json:"id"`
+	WaitID         string          `json:"wait_id"`
+	RunID          string          `json:"run_id"`
+	StepID         string          `json:"step_id"`
+	Actor          ReplyActor      `json:"actor"`
+	Payload        json.RawMessage `json:"payload,omitempty"`
+	IdempotencyKey string          `json:"idempotency_key"`
+	CreatedAt      int64           `json:"created_at"`
+}
+
+type Timeline struct {
+	ID        string          `json:"id"`
+	RunID     string          `json:"run_id"`
+	StepID    string          `json:"step_id,omitempty"`
+	WaitID    string          `json:"wait_id,omitempty"`
+	ReplyID   string          `json:"reply_id,omitempty"`
+	Kind      TimelineKind    `json:"kind"`
+	Data      json.RawMessage `json:"data,omitempty"`
+	CreatedAt int64           `json:"created_at"`
 }
 
 type Anchor struct {
@@ -146,12 +259,24 @@ type NodeRunList struct {
 	Items []NodeRun `json:"items"`
 }
 
+type StepList struct {
+	Items []Step `json:"items"`
+}
+
+type WaitList struct {
+	Items []Wait `json:"items"`
+}
+
+type ReplyList struct {
+	Items []Reply `json:"items"`
+}
+
 type Summary struct {
 	WorkflowID    string        `json:"workflow_id"`
 	TotalRuns     int           `json:"total_runs"`
 	DoneRuns      int           `json:"done_runs"`
 	FailedRuns    int           `json:"failed_runs"`
-	BlockedRuns   int           `json:"blocked_runs"`
+	WaitingRuns   int           `json:"waiting_runs"`
 	RunningRuns   int           `json:"running_runs"`
 	AvgRunMS      int64         `json:"avg_run_ms"`
 	LastRunAt     int64         `json:"last_run_at,omitempty"`
@@ -166,7 +291,7 @@ type NodeSummary struct {
 	Total      int        `json:"total"`
 	Done       int        `json:"done"`
 	Failed     int        `json:"failed"`
-	Blocked    int        `json:"blocked"`
+	Waiting    int        `json:"waiting"`
 	Running    int        `json:"running"`
 	Timeout    int        `json:"timeout"`
 	Pass       int        `json:"pass"`
@@ -181,16 +306,12 @@ type StartResult struct {
 	NodeRun NodeRun `json:"node_run"`
 }
 
-type ContinueResult struct {
-	Run Run `json:"run"`
-}
-
 type WorkspaceStatus string
 
 const (
 	WorkspaceIdle        WorkspaceStatus = "idle"
 	WorkspaceRunning     WorkspaceStatus = "running"
-	WorkspaceBlocked     WorkspaceStatus = "blocked"
+	WorkspaceWaiting     WorkspaceStatus = "waiting"
 	WorkspaceDone        WorkspaceStatus = "done"
 	WorkspaceFailed      WorkspaceStatus = "failed"
 	WorkspaceInterrupted WorkspaceStatus = "interrupted"

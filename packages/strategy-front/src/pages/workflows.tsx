@@ -30,7 +30,7 @@ function merge(items: WorkflowRuntimeDetail[], runs: WorkflowRun[]) {
       run_at: cur?.started_at,
       done_runs: list.filter((item) => item.status === "done").length,
       failed_runs: list.filter((item) => item.status === "failed").length,
-      blocked_runs: list.filter((item) => item.status === "blocked").length,
+      waiting_runs: list.filter((item) => item.status === "waiting").length,
     } satisfies WorkflowItem
   })
 }
@@ -80,7 +80,7 @@ export default function WorkflowsPage() {
   const stats = useMemo(
     () => ({
       running: runs.filter((item) => item.status === "running").length,
-      blocked: runs.filter((item) => item.status === "blocked").length,
+      waiting: runs.filter((item) => item.status === "waiting").length,
       failed: runs.filter((item) => item.status === "failed").length,
       done: runs.filter((item) => item.status === "done").length,
     }),
@@ -190,7 +190,7 @@ export default function WorkflowsPage() {
                   {stats.running} 个运行中
                 </div>
                 <div className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
-                  {stats.blocked} 个阻塞
+                  {stats.waiting} 个等待
                 </div>
                 <div className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-medium text-red-700">
                   {stats.failed} 个失败

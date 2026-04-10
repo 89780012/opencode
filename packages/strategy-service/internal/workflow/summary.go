@@ -71,8 +71,8 @@ func summary(flow Workflow, runs []Run, rows []NodeRun) (Summary, error) {
 			out.DoneRuns++
 		case RunFailed:
 			out.FailedRuns++
-		case RunBlocked:
-			out.BlockedRuns++
+		case RunWaiting:
+			out.WaitingRuns++
 		case RunRunning:
 			out.RunningRuns++
 		}
@@ -113,8 +113,8 @@ func summary(flow Workflow, runs []Run, rows []NodeRun) (Summary, error) {
 			sum.Done++
 		case NodeFailed:
 			sum.Failed++
-		case NodeBlocked:
-			sum.Blocked++
+		case NodeWaiting:
+			sum.Waiting++
 		case NodeRunning:
 			sum.Running++
 		case NodeTimeout:

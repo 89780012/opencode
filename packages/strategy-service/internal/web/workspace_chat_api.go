@@ -58,24 +58,6 @@ func (a *API) workspaceChatDispatch(c *gin.Context) {
 	ok(c, data)
 }
 
-func (a *API) workspaceChatContinue(c *gin.Context) {
-	body := struct {
-		WorkspacePath string `json:"workspace_path"`
-	}{}
-	if err := c.ShouldBindJSON(&body); err != nil {
-		bad(c, err)
-		return
-	}
-
-	data, err := a.wf.ContinueWorkspace(body.WorkspacePath)
-	if err != nil {
-		slog.Error("workspace chat continue failed", "workspace_path", body.WorkspacePath, "error", err)
-		bad(c, err)
-		return
-	}
-	ok(c, data)
-}
-
 func (a *API) workspaceChatInterrupt(c *gin.Context) {
 	body := struct {
 		WorkspacePath string `json:"workspace_path"`

@@ -89,7 +89,6 @@ func (a *API) Register(r *gin.Engine) {
 	ws.GET("/chat-state", a.workspaceChatState)
 	ws.POST("/chat-state/bind", a.workspaceChatBind)
 	ws.POST("/chat-state/dispatch", a.workspaceChatDispatch)
-	ws.POST("/chat-state/continue", a.workspaceChatContinue)
 	ws.POST("/chat-state/interrupt", a.workspaceChatInterrupt)
 
 	sys := api.Group("/system")
@@ -123,7 +122,9 @@ func (a *API) Register(r *gin.Engine) {
 	run.GET("", a.workflowRuns)
 	run.GET("/:id", a.workflowRunGet)
 	run.GET("/:id/nodes", a.workflowRunNodes)
-	run.POST("/:id/continue", a.workflowContinue)
+	run.GET("/:id/steps", a.workflowRunSteps)
+	run.GET("/:id/waits", a.workflowRunWaits)
+	run.POST("/:id/replies", a.workflowRunReply)
 
 	r.POST("/mcp", a.mcpPost)
 	r.GET("/mcp", a.mcpGet)

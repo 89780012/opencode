@@ -4,7 +4,7 @@ import { useChatEvents } from "@/hooks/use-chat-events"
 import { useChatSessionDetail } from "@/hooks/use-chat-session-detail"
 import { useChatSessions } from "@/hooks/use-chat-sessions"
 import type { PromptInputMessage } from "@/types/chat"
-import type { WorkflowNodeRun, WorkflowRuntimeDetail } from "@/types/workflow"
+import type { WorkflowNodeRun, WorkflowRuntimeDetail, WorkflowWait } from "@/types/workflow"
 import type { WorkspaceSnapshot, WorkspaceStatus } from "@/types/workspace-chat"
 
 function note(err: unknown, fallback: string) {
@@ -39,10 +39,11 @@ export function useStrategyWorkflowChat(path?: string | null) {
   const [box, setBox] = useState<WorkspaceSnapshot | null>(null)
   const [flow, setFlow] = useState<WorkflowRuntimeDetail | null>(null)
   const [rows, setRows] = useState<WorkflowNodeRun[]>([])
+  const [waits, setWaits] = useState<WorkflowWait[]>([])
   const [load, setLoad] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [send, setSend] = useState(false)
-  const [hold, setHold] = useState(false)
+  const [replying, setReplying] = useState(false)
   const [stop, setStop] = useState(false)
 
   const sid = box?.state.session_id ?? null
@@ -67,8 +68,14 @@ export function useStrategyWorkflowChat(path?: string | null) {
               setRows(item.items)
             }),
           )
+          jobs.push(
+            workflowApi.waits(next.run.id).then((item) => {
+              setWaits(item.items)
+            }),
+          )
         } else {
           setRows([])
+          setWaits([])
         }
 
         if (next.state.workflow_id) {
@@ -105,7 +112,7 @@ export function useStrategyWorkflowChat(path?: string | null) {
   }, [box?.state.session_id, chat])
 
   useEffect(() => {
-    if (state !== "running" && state !== "blocked") return
+    if (state !== "running" && state !== "waiting") return
     const timer = window.setInterval(() => {
       void pull(true)
     }, 3000)
@@ -138,19 +145,24 @@ export function useStrategyWorkflowChat(path?: string | null) {
     [chat, path, pull],
   )
 
-  const cont = useCallback(async () => {
-    if (!path) return
-    setHold(true)
-    try {
-      const next = await workspaceChatApi.continue({
-        workspace_path: path,
-      })
-      setBox(next)
-      await pull(true)
-    } finally {
-      setHold(false)
-    }
-  }, [path, pull])
+  const reply = useCallback(
+    async (waitID: string, payload?: unknown) => {
+      const runID = box?.run?.id
+      if (!runID) return
+      setReplying(true)
+      try {
+        await workflowApi.reply(runID, {
+          wait_id: waitID,
+          payload,
+          idempotency_key: `${Date.now()}`,
+        })
+        await pull(true)
+      } finally {
+        setReplying(false)
+      }
+    },
+    [box?.run?.id, pull],
+  )
 
   const interrupt = useCallback(async () => {
     if (!path) return
@@ -206,6 +218,8 @@ export function useStrategyWorkflowChat(path?: string | null) {
     [save],
   )
 
+  const openWait = useMemo(() => waits.find((item) => item.status === "open") ?? null, [waits])
+
   return useMemo(
     () => ({
       sessions: chat.sessions,
@@ -222,14 +236,16 @@ export function useStrategyWorkflowChat(path?: string | null) {
       run: box?.run ?? null,
       flow,
       rows,
+      waits,
+      openWait,
       phase: state,
       load,
       err,
       sending: send,
-      continuing: hold,
+      replying,
       interrupting: stop,
       submit,
-      continue: cont,
+      reply,
       interrupt,
       setModel,
       setVariant,
@@ -241,17 +257,18 @@ export function useStrategyWorkflowChat(path?: string | null) {
       chat.creating,
       chat.loading,
       chat.sessions,
-      cont,
       detail.eventErr,
       detail.loading,
       detail.messages,
       detail.status,
       err,
       flow,
-      hold,
       load,
       mid,
+      openWait,
       pull,
+      reply,
+      replying,
       rows,
       setModel,
       setVariant,
@@ -261,6 +278,7 @@ export function useStrategyWorkflowChat(path?: string | null) {
       stop,
       submit,
       variant,
+      waits,
     ],
   )
 }

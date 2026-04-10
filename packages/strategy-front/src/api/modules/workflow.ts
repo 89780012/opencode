@@ -1,6 +1,6 @@
 import { request } from "@/api/client"
 import type {
-  WorkflowContinueResult,
+  WorkflowReply,
   WorkflowRun,
   WorkflowStartResult,
   WorkflowSummary,
@@ -9,6 +9,7 @@ import type {
   WorkflowRuntimeList,
   WorkflowRunList,
   WorkflowNodeRunList,
+  WorkflowWaitList,
 } from "@/types/workflow"
 
 export const workflowApi = {
@@ -60,7 +61,14 @@ export const workflowApi = {
     return request.get<WorkflowNodeRunList>(`/workflow-runs/${encodeURIComponent(id)}/nodes`)
   },
 
-  continue(id: string) {
-    return request.post<WorkflowContinueResult>(`/workflow-runs/${encodeURIComponent(id)}/continue`)
+  waits(id: string) {
+    return request.get<WorkflowWaitList>(`/workflow-runs/${encodeURIComponent(id)}/waits`)
+  },
+
+  reply(id: string, body: { wait_id: string; payload?: unknown; idempotency_key: string }) {
+    return request.post<WorkflowReply, { wait_id: string; payload?: unknown; idempotency_key: string }>(
+      `/workflow-runs/${encodeURIComponent(id)}/replies`,
+      body,
+    )
   },
 }
