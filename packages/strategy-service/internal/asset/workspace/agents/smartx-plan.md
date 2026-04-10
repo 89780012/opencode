@@ -34,10 +34,10 @@ permission:
 - 完成规划后，必须主动调用 `smartx-workflow`
 - 调用时使用 `kind="plan"`
 - `summary` 写本轮规划结论
-- `plan` 写有序步骤
+- `steps` 写有序步骤
 - `deliverables` 写预期产物
 - `risks` 写关键风险或约束
-- `next_prompt` 给下一个节点最小但足够的执行提示
+- `handoff` 给下一个节点最小但足够的执行提示
 - 不要用纯文本直接输出 JSON 来代替工具调用
 
 最终回复：

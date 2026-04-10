@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { WorkflowNodePanel } from "@/components/workflow/workflow-node-panel"
+import { edgeCond, edgeOptions } from "@/lib/workflow-runtime"
 import type {
   WorkflowEdgeCond,
   WorkflowField,
@@ -10,7 +11,6 @@ import type {
   WorkflowFlowNode,
   WorkflowNodeRun,
   WorkflowRun,
-  WorkflowRuntimeNode,
   WorkflowSummary,
 } from "@/types/workflow"
 
@@ -29,7 +29,7 @@ type Props = {
   summary: WorkflowSummary | null
   rows: WorkflowNodeRun[]
   current: WorkflowNodeRun | null
-  nodes: WorkflowRuntimeNode[]
+  nodes: WorkflowFlowNode[]
   onPickRun: (id: string) => void
   onEdgeCond: (value: WorkflowEdgeCond) => void
   onEdgeLabel: (value: string) => void
@@ -78,38 +78,61 @@ function blockLabel(value?: string) {
   return value || "-"
 }
 
-function edgeLabel(value?: WorkflowEdgeCond) {
-  if (value === "plan") return "进入规划"
-  if (value === "build") return "进入执行"
-  if (value === "checker") return "进入检查"
-  if (value === "pass") return "通过"
-  if (value === "fail") return "失败"
-  return "始终"
-}
-
-function nodeName(nodes: WorkflowRuntimeNode[], id?: string) {
+function nodeName(nodes: WorkflowFlowNode[], id?: string) {
   if (!id) return "-"
-  return nodes.find((item) => item.id === id)?.title || id
+  return nodes.find((item) => item.id === id)?.data.title || id
 }
 
-function parseReview(row: WorkflowNodeRun) {
+function retry(nodes: WorkflowFlowNode[], id?: string) {
+  const node = nodes.find((item) => item.id === id)
+  const row = node?.data.fields.find((item) => item.key === "retry" && item.kind === "select")
+  if (!row || row.kind !== "select") return 2
+  const value = Number.parseInt(row.value || "2", 10)
+  if (!Number.isFinite(value) || value < 0) return 2
+  return value
+}
+
+function timeoutOf(nodes: WorkflowFlowNode[], id?: string) {
+  const node = nodes.find((item) => item.id === id)
+  const row = node?.data.fields.find((item) => item.key === "timeout" && item.kind === "select")
+  if (!row || row.kind !== "select") return 0
+  const value = Number.parseInt(row.value || "0", 10)
+  if (!Number.isFinite(value) || value < 0) return 0
+  return value
+}
+
+function parseNode(row: WorkflowNodeRun) {
   const text = row.result?.structured?.trim()
   if (!text) return null
 
   try {
     const data = JSON.parse(text) as {
+      route?: string
       pass?: boolean
       summary?: string
-      next_prompt?: string
+      handoff?: string
       issues?: string[]
+      steps?: string[]
+      deliverables?: string[]
+      risks?: string[]
     }
     return {
+      route: typeof data.route === "string" ? data.route.trim() : row.result?.route?.trim(),
       pass: typeof data.pass === "boolean" ? data.pass : row.result?.pass,
       summary: typeof data.summary === "string" ? data.summary.trim() : row.result?.text?.trim(),
-      next_prompt: typeof data.next_prompt === "string" ? data.next_prompt.trim() : row.result?.next_prompt?.trim(),
+      handoff: typeof data.handoff === "string" ? data.handoff.trim() : row.result?.handoff?.trim(),
       issues: Array.isArray(data.issues)
         ? data.issues.filter((item): item is string => typeof item === "string" && !!item.trim())
-        : [],
+        : (row.result?.issues || []),
+      steps: Array.isArray(data.steps)
+        ? data.steps.filter((item): item is string => typeof item === "string" && !!item.trim())
+        : (row.result?.steps || []),
+      deliverables: Array.isArray(data.deliverables)
+        ? data.deliverables.filter((item): item is string => typeof item === "string" && !!item.trim())
+        : (row.result?.deliverables || []),
+      risks: Array.isArray(data.risks)
+        ? data.risks.filter((item): item is string => typeof item === "string" && !!item.trim())
+        : (row.result?.risks || []),
     }
   } catch {
     return null
@@ -147,9 +170,14 @@ function attempts(rows: WorkflowNodeRun[], nodeID: string, rowID?: string) {
 
 function EdgePanel(props: {
   edge: WorkflowFlowEdge
+  nodes: WorkflowFlowNode[]
   onEdgeCond: (value: WorkflowEdgeCond) => void
   onEdgeLabel: (value: string) => void
 }) {
+  const kind = props.nodes.find((item) => item.id === props.edge.source)?.data.kind
+  const opts = edgeOptions(kind)
+  const value = edgeCond(kind, typeof props.edge.data?.cond === "string" ? props.edge.data.cond : undefined)
+
   return (
     <section className="rounded-xl border border-border/70 bg-background/85 px-3 py-3 shadow-xs">
       <div className="flex items-center justify-between gap-2">
@@ -160,35 +188,25 @@ function EdgePanel(props: {
       </div>
 
       <div className="mt-2 text-xs leading-5 text-muted-foreground">
-        `intent` 节点通常使用 `plan` / `build` / `checker` 分支；检查类节点通常使用 `pass` / `fail`；
-        普通顺序边使用 `always`。
+        路由节点只能选择 `plan / execute / check`；检查节点只能选择 `pass / fail`；其他节点只允许 `always`。
       </div>
 
       <div className="mt-3 space-y-3">
         <div className="space-y-2">
           <div className="text-xs font-medium text-foreground">条件</div>
           <Select
-            value={
-              props.edge.data?.cond === "plan" ||
-              props.edge.data?.cond === "build" ||
-              props.edge.data?.cond === "checker" ||
-              props.edge.data?.cond === "pass" ||
-              props.edge.data?.cond === "fail"
-                ? props.edge.data.cond
-                : "always"
-            }
+            value={value}
             onValueChange={(value) => props.onEdgeCond(value as WorkflowEdgeCond)}
           >
             <SelectTrigger className="w-full">
               <SelectValue placeholder="选择条件" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="always">{edgeLabel("always")}</SelectItem>
-              <SelectItem value="plan">{edgeLabel("plan")}</SelectItem>
-              <SelectItem value="build">{edgeLabel("build")}</SelectItem>
-              <SelectItem value="checker">{edgeLabel("checker")}</SelectItem>
-              <SelectItem value="pass">{edgeLabel("pass")}</SelectItem>
-              <SelectItem value="fail">{edgeLabel("fail")}</SelectItem>
+              {opts.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -297,11 +315,11 @@ export function WorkflowSidepanel(props: Props) {
                     <section className="rounded-xl border border-border/70 bg-background/85 px-3 py-3 shadow-xs">
                       <div className="text-sm font-medium text-foreground">当前节点</div>
                       <div className="mt-3 space-y-2 text-sm">
-                        {info("节点名称", live.title || live.agent || live.kind)}
-                        {info("节点类型", live.kind)}
+                        {info("节点名称", live.data.title || live.data.kind)}
+                        {info("节点类型", live.data.kind)}
                         {info("会话 ID", props.current.session_id || "-")}
-                        {info("尝试次数", `${Math.max(tries.cur, 1)}/${live.retry_limit + 1}`)}
-                        {info("超时", live.timeout_ms > 0 ? `${Math.round(live.timeout_ms / 1000)} 秒` : "默认")}
+                        {info("尝试次数", `${Math.max(tries.cur, 1)}/${retry(nodes, live.id) + 1}`)}
+                        {info("超时", timeoutOf(nodes, live.id) > 0 ? `${Math.round(timeoutOf(nodes, live.id) / 1000)} 秒` : "默认")}
                         {info("节点耗时", cost(props.current.started_at, props.current.ended_at))}
                       </div>
                     </section>
@@ -460,7 +478,7 @@ export function WorkflowSidepanel(props: Props) {
                 ) : (
                   <div className="space-y-3">
                     {rows.map((row) => {
-                      const review = parseReview(row)
+                      const review = parseNode(row)
                       const cfg = nodes.find((item) => item.id === row.node_id)
                       const step = attempts(rows, row.node_id, row.id)
 
@@ -479,7 +497,7 @@ export function WorkflowSidepanel(props: Props) {
                             <div>节点 ID：{row.node_id}</div>
                             <div>会话：{row.session_id || "-"}</div>
                             <div>
-                              尝试：{step.cur} / {cfg ? cfg.retry_limit + 1 : 1}
+                              尝试：{step.cur} / {retry(nodes, cfg?.id) + 1}
                             </div>
                             <div>开始：{stamp(row.started_at)}</div>
                             <div>结束：{stamp(row.ended_at)}</div>
@@ -530,9 +548,55 @@ export function WorkflowSidepanel(props: Props) {
                                 </div>
                               ) : null}
 
-                              {review.next_prompt ? (
+                              {review.route ? (
+                                <div className="rounded-lg border border-border/70 px-3 py-2">
+                                  <div className="text-xs text-muted-foreground">路由结果</div>
+                                  <div className="mt-1 whitespace-pre-wrap text-xs leading-5 text-foreground">{review.route}</div>
+                                </div>
+                              ) : null}
+
+                              {review.steps.length > 0 ? (
+                                <div className="rounded-lg border border-border/70 px-3 py-2">
+                                  <div className="text-xs text-muted-foreground">规划步骤</div>
+                                  <div className="mt-1 space-y-1">
+                                    {review.steps.map((item, i) => (
+                                      <div key={`${row.id}-step-${i}`} className="text-xs leading-5 text-foreground">
+                                        {i + 1}. {item}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : null}
+
+                              {review.deliverables.length > 0 ? (
+                                <div className="rounded-lg border border-border/70 px-3 py-2">
+                                  <div className="text-xs text-muted-foreground">交付物</div>
+                                  <div className="mt-1 space-y-1">
+                                    {review.deliverables.map((item, i) => (
+                                      <div key={`${row.id}-deliverable-${i}`} className="text-xs leading-5 text-foreground">
+                                        {i + 1}. {item}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : null}
+
+                              {review.risks.length > 0 ? (
+                                <div className="rounded-lg border border-border/70 px-3 py-2">
+                                  <div className="text-xs text-muted-foreground">风险</div>
+                                  <div className="mt-1 space-y-1">
+                                    {review.risks.map((item, i) => (
+                                      <div key={`${row.id}-risk-${i}`} className="text-xs leading-5 text-foreground">
+                                        {i + 1}. {item}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : null}
+
+                              {review.handoff ? (
                                 <div className="rounded-lg bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
-                                  回写提示：{review.next_prompt}
+                                  交接提示：{review.handoff}
                                 </div>
                               ) : null}
                             </div>
@@ -562,7 +626,7 @@ export function WorkflowSidepanel(props: Props) {
 
         <TabsContent value="attrs" className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden">
           <div className="h-full overflow-y-auto p-3">
-            {props.edge ? <EdgePanel edge={props.edge} onEdgeCond={props.onEdgeCond} onEdgeLabel={props.onEdgeLabel} /> : null}
+            {props.edge ? <EdgePanel edge={props.edge} nodes={props.nodes} onEdgeCond={props.onEdgeCond} onEdgeLabel={props.onEdgeLabel} /> : null}
             {props.node ? (
               <div className={props.edge ? "mt-3" : ""}>
                 <WorkflowNodePanel node={props.node} onTitle={props.onNodeTitle} onFields={props.onNodeFields} />

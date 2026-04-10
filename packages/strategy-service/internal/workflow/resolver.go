@@ -61,13 +61,15 @@ func parseTool(kind Kind, raw json.RawMessage) (Result, error) {
 	}
 
 	var body struct {
-		Kind       string   `json:"kind"`
-		Summary    string   `json:"summary"`
-		NextPrompt string   `json:"next_prompt"`
-		Intent     string   `json:"intent"`
-		Pass       *bool    `json:"pass"`
-		Issues     []string `json:"issues"`
-		Plan       []string `json:"plan"`
+		Kind         string   `json:"kind"`
+		Summary      string   `json:"summary"`
+		Handoff      string   `json:"handoff"`
+		Route        string   `json:"route"`
+		Pass         *bool    `json:"pass"`
+		Issues       []string `json:"issues"`
+		Steps        []string `json:"steps"`
+		Deliverables []string `json:"deliverables"`
+		Risks        []string `json:"risks"`
 	}
 	if err := json.Unmarshal(raw, &body); err != nil {
 		return Result{}, contractError{msg: "tool input must be valid JSON"}
@@ -79,29 +81,36 @@ func parseTool(kind Kind, raw json.RawMessage) (Result, error) {
 	}
 
 	res := Result{
-		Raw:        string(raw),
-		Text:       strings.TrimSpace(body.Summary),
-		Structured: string(raw),
-		NextPrompt: strings.TrimSpace(body.NextPrompt),
+		Raw:          string(raw),
+		Text:         strings.TrimSpace(body.Summary),
+		Structured:   string(raw),
+		Handoff:      strings.TrimSpace(body.Handoff),
+		Route:        strings.TrimSpace(body.Route),
+		Issues:       cleanList(body.Issues),
+		Steps:        cleanList(body.Steps),
+		Deliverables: cleanList(body.Deliverables),
+		Risks:        cleanList(body.Risks),
 	}
-	if res.Text == "" && len(body.Plan) > 0 {
-		res.Text = strings.Join(body.Plan, "\n")
+	if res.Text == "" && len(res.Steps) > 0 {
+		res.Text = strings.Join(res.Steps, "\n")
 	}
-	if res.Text == "" && len(body.Issues) > 0 {
-		res.Text = strings.Join(body.Issues, "\n")
+	if res.Text == "" && len(res.Issues) > 0 {
+		res.Text = strings.Join(res.Issues, "\n")
 	}
 
-	if kind == Intent {
-		body.Intent = strings.TrimSpace(body.Intent)
-		if body.Intent != string(PlanTo) && body.Intent != string(BuildTo) && body.Intent != string(CheckTo) {
-			return Result{}, contractError{msg: `intent tool input must include intent = "plan" | "build" | "checker"`}
+	if kind == Router {
+		if res.Route != string(PlanTo) && res.Route != string(ExecuteTo) && res.Route != string(CheckTo) {
+			return Result{}, contractError{msg: `router tool input must include route = "plan" | "execute" | "check"`}
 		}
-		res.Intent = body.Intent
 	}
 
-	if kind == Review || kind == Judge {
+	if kind == Plan && len(res.Steps) == 0 {
+		return Result{}, contractError{msg: "plan tool input must include steps"}
+	}
+
+	if kind == Check {
 		if body.Pass == nil {
-			return Result{}, contractError{msg: string(kind) + " tool input must include boolean pass"}
+			return Result{}, contractError{msg: "check tool input must include boolean pass"}
 		}
 		res.Pass = body.Pass
 	}
@@ -110,6 +119,18 @@ func parseTool(kind Kind, raw json.RawMessage) (Result, error) {
 		return Result{}, contractError{msg: string(kind) + " tool input must include summary or structured items"}
 	}
 	return res, nil
+}
+
+func cleanList(list []string) []string {
+	out := make([]string, 0, len(list))
+	for _, item := range list {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out
 }
 
 func (s *Service) resolve(dir string, sid string, row NodeRun, node Node) (Result, error) {

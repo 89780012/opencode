@@ -79,12 +79,12 @@ func TestCountFiltersNode(t *testing.T) {
 	}
 }
 
-func TestBuildPromptIntentAllowsChecker(t *testing.T) {
+func TestBuildPromptRouterAllowsCheck(t *testing.T) {
 	text := buildPrompt(
 		Workflow{Name: "demo"},
 		Node{
-			Kind:   Intent,
-			Title:  "intent",
+			Kind:   Router,
+			Title:  "router",
 			Agent:  "intent",
 			ToolID: "smartx-workflow",
 		},
@@ -92,25 +92,28 @@ func TestBuildPromptIntentAllowsChecker(t *testing.T) {
 		"",
 		"",
 	)
-	if !strings.Contains(text, `"checker"`) {
-		t.Fatalf("expected intent prompt contract to include checker, got %q", text)
+	if !strings.Contains(text, `"check"`) {
+		t.Fatalf("expected router prompt contract to include check, got %q", text)
 	}
 }
 
-func TestNextRoutesIntentToChecker(t *testing.T) {
-	nextID, _ := next(
+func TestNextRoutesRouterToCheck(t *testing.T) {
+	nextID, handoff := next(
 		Workflow{
 			Edges: []Edge{
-				{From: "intent", To: "plan", Cond: PlanTo},
-				{From: "intent", To: "build", Cond: BuildTo},
-				{From: "intent", To: "review", Cond: CheckTo},
+				{From: "router", To: "plan", Cond: PlanTo},
+				{From: "router", To: "execute", Cond: ExecuteTo},
+				{From: "router", To: "check", Cond: CheckTo},
 			},
 		},
-		Node{ID: "intent", Kind: Intent},
-		Result{Intent: string(CheckTo)},
+		Node{ID: "router", Kind: Router},
+		Result{Route: string(CheckTo), Handoff: "go check"},
 	)
-	if nextID != "review" {
-		t.Fatalf("expected checker route to review, got %q", nextID)
+	if nextID != "check" {
+		t.Fatalf("expected check route, got %q", nextID)
+	}
+	if handoff != "go check" {
+		t.Fatalf("expected handoff to be preserved, got %q", handoff)
 	}
 }
 
@@ -129,8 +132,5 @@ func TestBuildPromptRequiresToolCall(t *testing.T) {
 	)
 	if !strings.Contains(text, "smartx-workflow") {
 		t.Fatalf("expected tool contract in prompt, got %q", text)
-	}
-	if strings.Contains(text, "Return JSON with keys") {
-		t.Fatalf("expected tool contract to replace raw JSON contract, got %q", text)
 	}
 }

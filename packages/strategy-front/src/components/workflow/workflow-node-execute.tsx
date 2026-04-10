@@ -4,7 +4,7 @@ import type { NodeProps } from "@xyflow/react"
 import type { WorkflowFlowNode } from "@/types/workflow"
 import { WorkflowNodeFrame } from "./workflow-node-shared"
 
-function BuildView(props: NodeProps<WorkflowFlowNode>) {
+function ExecuteView(props: NodeProps<WorkflowFlowNode>) {
   return (
     <WorkflowNodeFrame
       props={props}
@@ -16,11 +16,11 @@ function BuildView(props: NodeProps<WorkflowFlowNode>) {
             <span className="rounded-full border border-amber-200 bg-white px-2 py-0.5">实现</span>
             <span className="rounded-full border border-amber-200 bg-white px-2 py-0.5">验证</span>
           </div>
-          <div className="mt-2 text-[12px] leading-5 text-amber-950/75">负责真实改动与结果验证，是工作流中的执行位。</div>
+          <div className="mt-2 text-[12px] leading-5 text-amber-950/75">在工作区里真实执行任务、完成改动，并把结果交给下游检查节点。</div>
         </div>
       }
     />
   )
 }
 
-export const WorkflowBuildNode = memo(BuildView)
+export const WorkflowExecuteNode = memo(ExecuteView)

@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { Input } from "@/components/ui/input"
-import { useSkillList } from "@/data/global-data-provider"
-import { workflowField, type WorkflowField, type WorkflowFlowNode } from "@/types/workflow"
+import { useGlobalData, useSkillList } from "@/data/global-data-provider"
+import { kindRole, workflowField, type WorkflowField, type WorkflowFlowNode } from "@/types/workflow"
 
 type Props = {
   node: WorkflowFlowNode | null
@@ -33,9 +33,31 @@ function save(list: WorkflowField[], idx: number, next: WorkflowField) {
 }
 
 export function WorkflowNodePanel(props: Props) {
+  const data = useGlobalData()
   const skills = useSkillList()
   const [q, setQ] = useState("")
   const node = props.node
+
+  const role = node ? kindRole(node.data.kind) : undefined
+  const agents = [
+    ...data.agent.data.cfg.agents
+      .filter((item) => item.mode !== "subagent" && !item.hidden && (!role || item.workflow_role === role))
+      .map((item) => ({ label: item.name, value: item.name })),
+    ...data.agent.data.run
+      .filter((item) => item.mode !== "subagent" && !item.hidden && (!role || item.workflow_role === role))
+      .map((item) => ({ label: item.name, value: item.name })),
+  ]
+
+  const opts = (item: WorkflowField) => {
+    if (item.kind !== "select") {
+      return []
+    }
+    if (item.key === workflowField.agent) {
+      const cur = item.value ? [{ label: item.value, value: item.value }] : []
+      return [...new Map([...agents, ...cur].map((row) => [row.value, row])).values()]
+    }
+    return item.options ?? [item.value]
+  }
 
   if (!node) {
     return (
@@ -86,7 +108,7 @@ export function WorkflowNodePanel(props: Props) {
                     onChange={(event) => props.onFields(save(node.data.fields, idx, { ...item, value: event.target.value }))}
                     className="h-9 w-full rounded-md border border-border/70 bg-background px-3 text-[13px] text-foreground outline-none focus:border-primary/40"
                   >
-                    {(item.options ?? [item.value]).map((opt) => (
+                    {opts(item).map((opt: string | { label: string; value: string }) => (
                       <option key={typeof opt === "string" ? opt : opt.value} value={typeof opt === "string" ? opt : opt.value}>
                         {typeof opt === "string" ? opt : opt.label}
                       </option>

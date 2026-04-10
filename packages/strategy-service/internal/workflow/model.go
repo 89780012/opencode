@@ -3,25 +3,23 @@ package workflow
 type Kind string
 
 const (
-	Start  Kind = "start"
-	Intent Kind = "intent"
-	Plan   Kind = "plan"
-	Build  Kind = "build"
-	Judge  Kind = "judge"
-	Review Kind = "review"
-	End    Kind = "end"
-	Gate   Kind = "gate"
+	Start   Kind = "start"
+	Router  Kind = "router"
+	Plan    Kind = "plan"
+	Execute Kind = "execute"
+	Check   Kind = "check"
+	End     Kind = "end"
 )
 
 type Cond string
 
 const (
-	Always  Cond = "always"
-	PlanTo  Cond = "plan"
-	BuildTo Cond = "build"
-	CheckTo Cond = "checker"
-	Pass    Cond = "pass"
-	Fail    Cond = "fail"
+	Always    Cond = "always"
+	PlanTo    Cond = "plan"
+	ExecuteTo Cond = "execute"
+	CheckTo   Cond = "check"
+	Pass      Cond = "pass"
+	Fail      Cond = "fail"
 )
 
 type RunStatus string
@@ -124,12 +122,16 @@ type Anchor struct {
 }
 
 type Result struct {
-	Raw        string `json:"raw,omitempty"`
-	Text       string `json:"text,omitempty"`
-	Structured string `json:"structured,omitempty"`
-	NextPrompt string `json:"next_prompt,omitempty"`
-	Pass       *bool  `json:"pass,omitempty"`
-	Intent     string `json:"intent,omitempty"`
+	Raw          string   `json:"raw,omitempty"`
+	Text         string   `json:"text,omitempty"`
+	Structured   string   `json:"structured,omitempty"`
+	Handoff      string   `json:"handoff,omitempty"`
+	Pass         *bool    `json:"pass,omitempty"`
+	Route        string   `json:"route,omitempty"`
+	Issues       []string `json:"issues,omitempty"`
+	Steps        []string `json:"steps,omitempty"`
+	Deliverables []string `json:"deliverables,omitempty"`
+	Risks        []string `json:"risks,omitempty"`
 }
 
 type List struct {

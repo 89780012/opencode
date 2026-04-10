@@ -317,16 +317,16 @@ func uniq(list []string) []string {
 
 func kind(v Kind) Kind {
 	switch v {
-	case Start, Intent, Plan, Build, Judge, Review, End, Gate:
+	case Start, Router, Plan, Execute, Check, End:
 		return v
 	default:
-		return Plan
+		return Execute
 	}
 }
 
 func cond(v Cond) Cond {
 	switch v {
-	case PlanTo, BuildTo, Pass, Fail:
+	case PlanTo, ExecuteTo, CheckTo, Pass, Fail:
 		return v
 	default:
 		return Always

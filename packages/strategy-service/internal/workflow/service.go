@@ -1098,7 +1098,7 @@ func buildPrompt(flow Workflow, node Node, input string, upstream string, feedba
 		parts = append(parts, "Upstream summary:\n"+upstream)
 	}
 	if feedback != "" {
-		parts = append(parts, "Review feedback:\n"+feedback)
+		parts = append(parts, "Workflow feedback:\n"+feedback)
 	}
 	parts = append(parts, "Workflow node:\n"+node.Title)
 	if len(node.Skills) > 0 {
@@ -1121,20 +1121,17 @@ func toolPrompt(node Node) string {
 		"Do not paste raw JSON in assistant text.",
 		`Set "kind" to "` + string(node.Kind) + `" and fill the fields required for this node.`,
 	}
-	if node.Kind == Intent {
-		head = append(head, `For intent nodes, provide summary, next_prompt, and intent = "plan" | "build" | "checker".`)
+	if node.Kind == Router {
+		head = append(head, `For router nodes, provide summary, route = "plan" | "execute" | "check", and handoff.`)
 	}
 	if node.Kind == Plan {
-		head = append(head, "For plan nodes, provide summary, plan, deliverables, risks, and next_prompt.")
+		head = append(head, "For plan nodes, provide summary, steps, deliverables, risks, and handoff.")
 	}
-	if node.Kind == Review || node.Kind == Judge {
-		head = append(head, "For review or judge nodes, provide summary, pass, issues, and next_prompt.")
+	if node.Kind == Check {
+		head = append(head, "For check nodes, provide summary, pass, issues, and handoff.")
 	}
-	if node.Kind == Build {
-		head = append(head, "For build nodes, provide at least summary and next_prompt when a structured handoff is needed.")
-	}
-	if node.Kind == Gate {
-		head = append(head, "For gate nodes, provide summary and next_prompt for the next manual or automated step.")
+	if node.Kind == Execute {
+		head = append(head, "For execute nodes, provide at least summary and optional handoff.")
 	}
 	return strings.Join(head, "\n")
 }
@@ -1182,16 +1179,16 @@ func body(node Node, run Run, prompt string) map[string]any {
 
 func next(flow Workflow, node Node, res Result) (string, string) {
 	check := Always
-	if node.Kind == Intent {
+	if node.Kind == Router {
 		check = PlanTo
-		if res.Intent == string(BuildTo) {
-			check = BuildTo
+		if res.Route == string(ExecuteTo) {
+			check = ExecuteTo
 		}
-		if res.Intent == string(CheckTo) {
+		if res.Route == string(CheckTo) {
 			check = CheckTo
 		}
 	}
-	if node.Kind == Review || node.Kind == Judge {
+	if node.Kind == Check {
 		check = Pass
 		if res.Pass != nil && !*res.Pass {
 			check = Fail
@@ -1203,15 +1200,15 @@ func next(flow Workflow, node Node, res Result) (string, string) {
 			continue
 		}
 		if item.Cond == check {
-			return item.To, res.NextPrompt
+			return item.To, res.Handoff
 		}
 	}
 	for _, item := range flow.Edges {
 		if item.From == node.ID && item.Cond == Always {
-			return item.To, res.NextPrompt
+			return item.To, res.Handoff
 		}
 	}
-	return "", res.NextPrompt
+	return "", res.Handoff
 }
 
 func timeout(node Node) time.Duration {

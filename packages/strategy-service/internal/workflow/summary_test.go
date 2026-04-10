@@ -9,8 +9,8 @@ func TestSummaryAggregatesRunsAndNodes(t *testing.T) {
 		Workflow{
 			ID: "wf_1",
 			Nodes: []Node{
-				{ID: "writer", Kind: Build, Title: "writer"},
-				{ID: "check", Kind: Review, Title: "check"},
+				{ID: "execute", Kind: Execute, Title: "execute"},
+				{ID: "check", Kind: Check, Title: "check"},
 			},
 		},
 		[]Run{
@@ -19,11 +19,11 @@ func TestSummaryAggregatesRunsAndNodes(t *testing.T) {
 			{ID: "run_3", WorkflowID: "wf_x", Status: RunDone, StartedAt: 7000, EndedAt: 8000},
 		},
 		[]NodeRun{
-			{RunID: "run_1", NodeID: "writer", Status: NodeDone, StartedAt: 1000, EndedAt: 2000},
+			{RunID: "run_1", NodeID: "execute", Status: NodeDone, StartedAt: 1000, EndedAt: 2000},
 			{RunID: "run_1", NodeID: "check", Status: NodeDone, StartedAt: 2100, EndedAt: 2600, Result: Result{Pass: &pass}},
-			{RunID: "run_2", NodeID: "writer", Status: NodeDone, StartedAt: 6000, EndedAt: 7200},
+			{RunID: "run_2", NodeID: "execute", Status: NodeDone, StartedAt: 6000, EndedAt: 7200},
 			{RunID: "run_2", NodeID: "check", Status: NodeFailed, StartedAt: 7300, EndedAt: 7800, Result: Result{Pass: &fail}},
-			{RunID: "run_3", NodeID: "writer", Status: NodeDone, StartedAt: 7000, EndedAt: 7600},
+			{RunID: "run_3", NodeID: "execute", Status: NodeDone, StartedAt: 7000, EndedAt: 7600},
 		},
 	)
 	if err != nil {

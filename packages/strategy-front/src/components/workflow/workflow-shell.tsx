@@ -263,7 +263,7 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
             summary={summary}
             rows={rows}
             current={current}
-            nodes={item.nodes}
+            nodes={flow.nodes}
             onPickRun={(id) => void sync(id)}
             onEdgeCond={onEdgeCond}
             onEdgeLabel={onEdgeLabel}

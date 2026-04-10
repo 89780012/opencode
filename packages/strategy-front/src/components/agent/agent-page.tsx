@@ -434,7 +434,7 @@ export function AgentPage() {
               <Input
                 value={name}
                 onChange={(event) => rename(event.target.value)}
-                placeholder="例如：review"
+                placeholder="例如：task-router"
                 disabled={dlg.mode === "edit"}
               />
               <div className="text-muted-foreground text-xs leading-5">

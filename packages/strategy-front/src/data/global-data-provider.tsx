@@ -227,13 +227,16 @@ function role(value?: unknown): WorkflowAgentRole | undefined {
     return
   }
   const text = value.trim().toLowerCase()
+  if (text === "router" || text === "route") {
+    return "router"
+  }
   if (text === "planner" || text === "plan") {
     return "planner"
   }
-  if (text === "executor" || text === "build") {
+  if (text === "executor" || text === "execute") {
     return "executor"
   }
-  if (text === "checker" || text === "review" || text === "check") {
+  if (text === "checker" || text === "check") {
     return "checker"
   }
 }
@@ -257,7 +260,7 @@ function frontmatter(content?: string, key?: string) {
 
 function agentRole(name: string, cfg: GlobalAgentCatalog) {
   const item = cfg.agents.find((row) => row.name === name)
-  return role(item?.workflow_role) || role(frontmatter(item?.content, "workflow_role")) || role(frontmatter(item?.content, "workflow_kind"))
+  return role(item?.workflow_role) || role(frontmatter(item?.content, "workflow_role"))
 }
 
 function agentScope(name: string, cfg: GlobalAgentCatalog) {
@@ -338,8 +341,7 @@ async function loadAgent(): Promise<Out<AgentData>> {
             ...item,
             workflow_role:
               role(item.workflow_role) ||
-              role(frontmatter(item.content, "workflow_role")) ||
-              role(frontmatter(item.content, "workflow_kind")),
+              role(frontmatter(item.content, "workflow_role")),
           })),
         }
       : emptyAgent.cfg
@@ -354,7 +356,6 @@ async function loadAgent(): Promise<Out<AgentData>> {
               workflow_role:
                 role(item.workflow_role) ||
                 role(item.options?.workflow_role) ||
-                role(item.options?.workflow_kind) ||
                 agentRole(item.name, doc),
             }))
           : [],

@@ -175,7 +175,7 @@ export default function WorkflowsPage() {
                 <div>
                   <div className="text-sm text-foreground">固定工作流控制台</div>
                   <div className="text-xs text-muted-foreground">
-                    新工作流会默认生成一套可直接调整的骨架，包含意图识别、规划、执行、检查和结果判断节点。
+                    新工作流会默认生成一套可直接调整的骨架，包含开始、路由、规划、执行、检查和结束节点。
                   </div>
                 </div>
               </div>

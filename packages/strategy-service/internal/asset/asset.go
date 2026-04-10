@@ -32,7 +32,7 @@ func EnsureBuiltins() error {
 
 	// 将workspace下的agents 和 skills copy到用户配置中
 	for _, item := range []string{"agents", "skills"} {
-		err = sync(filepath.Join(root, item), "workspace/"+item)
+		err = sync(filepath.Join(root, item), "workspace/"+item, true)
 		if err != nil {
 			return err
 		}
@@ -46,7 +46,7 @@ func EnsureWorkspace(dir string) error {
 	if dir == "" {
 		return nil
 	}
-	return sync(filepath.Join(dir, ".opencode"), "workspace/.opencode")
+	return sync(filepath.Join(dir, ".opencode"), "workspace/.opencode", false)
 }
 
 // EnsureMCP writes the strategy-service remote MCP entry into the user's global opencode config.
@@ -91,7 +91,7 @@ func EnsureMCP(url string) error {
 
 // SeedWorkspace copies the builtin workspace template into a new workspace.
 func SeedWorkspace(dir string, item Template) error {
-	err := sync(dir, item.Root)
+	err := sync(dir, item.Root, false)
 	if err != nil {
 		return err
 	}
@@ -120,7 +120,7 @@ func configRoot() (string, error) {
 	return dir, nil
 }
 
-func sync(base string, root string) error {
+func sync(base string, root string, force bool) error {
 	return fs.WalkDir(raw, root, func(src string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -137,7 +137,7 @@ func sync(base string, root string) error {
 		}
 
 		_, err = os.Stat(dst)
-		if err == nil {
+		if err == nil && !force {
 			return nil
 		}
 		if !os.IsNotExist(err) {

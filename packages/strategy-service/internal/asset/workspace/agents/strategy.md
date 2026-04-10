@@ -3,6 +3,7 @@ name: strategy
 description: SmartX 主工作区代理
 mode: primary
 temperature: 0.1
+workflow_role: executor
 tools:
   write: true
   edit: true
@@ -40,10 +41,10 @@ permission:
 
 工具约定：
 - 完成 node 侧工作后，调用 `smartx-workflow`
-- 使用 `kind: "build"`
+- 使用 `kind: "execute"`
 - 始终发送：
   - `summary`
-  - `next_prompt`
+  - `handoff`
 - 在有帮助时补充简洁的结构化上下文，例如体现在 `summary` 里的实现备注
 - 不要在助手文本中粘贴原始 JSON
 - 工具调用本身就是工作流输出

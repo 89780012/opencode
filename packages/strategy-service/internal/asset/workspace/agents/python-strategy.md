@@ -4,6 +4,7 @@ description: Python 工作区代理
 scope: python
 mode: primary
 temperature: 0.1
+workflow_role: executor
 tools:
   write: true
   edit: true
@@ -33,9 +34,9 @@ permission:
 
 工具约定：
 - 完成 node 侧工作后，调用 `smartx-workflow`
-- 使用 `kind: "build"`
+- 使用 `kind: "execute"`
 - 始终发送：
   - `summary`
-  - `next_prompt`
+  - `handoff`
 - 不要在助手文本中粘贴原始 JSON
 - 工具调用本身就是工作流输出

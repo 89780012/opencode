@@ -3,6 +3,7 @@ name: checker
 description: 工作流审查代理
 mode: all
 temperature: 0.1
+workflow_role: checker
 tools:
   write: false
   edit: false
@@ -36,12 +37,12 @@ permission:
 
 工具约定：
 - 完成时必须调用 `smartx-workflow`
-- 使用 `kind: "review"`
+- 使用 `kind: "check"`
 - 始终发送：
   - `summary`
   - `pass`
   - `issues`
-  - `next_prompt`
+  - `handoff`
 - `pass` 必须是 `true` 或 `false`
 - `issues` 里只能包含真实的阻塞性问题
 - 不要在助手文本中粘贴原始 JSON
