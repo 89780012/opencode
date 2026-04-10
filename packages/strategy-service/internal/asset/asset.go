@@ -11,7 +11,7 @@ import (
 
 // raw stores the staged frontend bundle and builtin workspace assets.
 //
-//go:embed frontend/** workspace/**
+//go:embed frontend/** all:workspace/**
 var raw embed.FS
 
 // Site returns the embedded frontend bundle when a staged build is available.
@@ -39,6 +39,14 @@ func EnsureBuiltins() error {
 	}
 
 	return nil
+}
+
+func EnsureWorkspace(dir string) error {
+	dir = strings.TrimSpace(dir)
+	if dir == "" {
+		return nil
+	}
+	return sync(filepath.Join(dir, ".opencode"), "workspace/.opencode")
 }
 
 // EnsureMCP writes the strategy-service remote MCP entry into the user's global opencode config.
@@ -95,6 +103,7 @@ func SeedWorkspace(dir string, item Template) error {
 
 	return WriteMeta(dir, item, filepath.Base(dir))
 }
+
 // 创建opencode目录
 func configRoot() (string, error) {
 	home, err := os.UserHomeDir()

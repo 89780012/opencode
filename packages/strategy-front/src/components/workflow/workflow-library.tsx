@@ -17,7 +17,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useGlobalData } from "@/data/global-data-provider"
 import { cn } from "@/lib/utils"
-import { kindDesc, kindMode, kindPrompt, type WorkflowKind, type WorkflowSessionMode } from "@/types/workflow"
+import { kindDesc, kindPrompt, type WorkflowKind } from "@/types/workflow"
 import type { GlobalAgent, RuntimeAgent, WorkflowAgentRole } from "@/types/agent"
 
 const cut = 16
@@ -29,7 +29,6 @@ type Item = {
   desc: string
   agent?: string
   prompt?: string
-  mode?: WorkflowSessionMode
   search: string
 }
 
@@ -46,6 +45,7 @@ function has(text: string, list: string[]) {
 }
 
 function infer(item: AgentRow): WorkflowKind {
+  if (item.name === "intent") return "intent"
   if (item.workflow_role === "planner") return "plan"
   if (item.workflow_role === "checker") return "review"
   if (item.workflow_role === "executor") return "build"
@@ -56,6 +56,9 @@ function infer(item: AgentRow): WorkflowKind {
   }
   if (has(text, ["planner", "plan", "design", "规划", "计划"])) {
     return "plan"
+  }
+  if (has(text, ["intent", "意图识别", "路由"])) {
+    return "intent"
   }
   return "build"
 }
@@ -69,9 +72,10 @@ function group(kind: WorkflowKind) {
 function note(item: AgentRow, kind: WorkflowKind) {
   const text = item.description?.trim()
   if (text) return text
+  if (kind === "intent") return `${item.name} 负责根据当前消息判断应先规划、执行还是检查。`
   if (kind === "plan") return `${item.name} 负责拆解目标并输出执行计划。`
   if (kind === "review") return `${item.name} 负责检查结果，并返回 pass/fail。`
-  return `${item.name} 负责在工作区中实施修改或生成内容。`
+  return `${item.name} 负责在工作区中实施修改、执行任务或产出内容。`
 }
 
 function merge(run: RuntimeAgent[], cfg: GlobalAgent[]) {
@@ -113,7 +117,6 @@ function build(list: AgentRow[]) {
       desc: "作为流程入口，整理输入与上下文后进入下一节点。",
       agent: "operator",
       prompt: kindPrompt("start"),
-      mode: kindMode("start"),
       search: "开始 起点 启动 start",
     },
     {
@@ -122,7 +125,6 @@ function build(list: AgentRow[]) {
       desc: "汇总最终结果，作为流程终点结束执行。",
       agent: "operator",
       prompt: kindPrompt("end"),
-      mode: kindMode("end"),
       search: "结束 终点 完成 end",
     },
     {
@@ -131,7 +133,6 @@ function build(list: AgentRow[]) {
       desc: "内置判断节点，根据当前结果输出 pass/fail 并决定下一条边。",
       agent: "reviewer",
       prompt: kindPrompt("judge"),
-      mode: kindMode("judge"),
       search: "路由 判断 分支 judge pass fail",
     },
   ])
@@ -145,7 +146,6 @@ function build(list: AgentRow[]) {
       desc: note(item, kind),
       agent: item.name,
       prompt: kindPrompt(kind),
-      mode: kindMode(kind),
       search: `${item.name} ${item.description || ""} ${kindDesc(kind)}`,
     } satisfies Item
     map.set(key, [...(map.get(key) || []), row])
@@ -161,6 +161,7 @@ function build(list: AgentRow[]) {
 
 function icon(kind: WorkflowKind) {
   if (kind === "start") return <Play className="size-4 text-primary" />
+  if (kind === "intent") return <Search className="size-4 text-primary" />
   if (kind === "plan") return <ClipboardList className="size-4 text-primary" />
   if (kind === "build") return <Hammer className="size-4 text-amber-500" />
   if (kind === "judge") return <GitBranch className="size-4 text-slate-500" />
@@ -171,6 +172,7 @@ function icon(kind: WorkflowKind) {
 
 function gicon(kinds: WorkflowKind[]) {
   if (kinds.includes("start")) return <Play className="size-3.5 text-muted-foreground" />
+  if (kinds.includes("intent")) return <Search className="size-3.5 text-muted-foreground" />
   if (kinds.includes("judge")) return <GitBranch className="size-3.5 text-muted-foreground" />
   if (kinds.includes("review")) return <FileSearch className="size-3.5 text-muted-foreground" />
   if (kinds.includes("plan")) return <ClipboardList className="size-3.5 text-muted-foreground" />
@@ -283,7 +285,6 @@ export function WorkflowLibrary(props: { value: string; onValue: (value: string)
                               desc: item.desc,
                               agent: item.agent,
                               prompt: item.prompt,
-                              mode: item.mode,
                             }),
                           )
                         }}

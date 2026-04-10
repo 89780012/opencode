@@ -21,12 +21,12 @@ function run(value?: WorkflowItem["run_status"]) {
   if (value === "blocked") return "已阻塞"
   if (value === "failed") return "失败"
   if (value === "done") return "完成"
+  if (value === "interrupted") return "已中断"
   return "未运行"
 }
 
 function state(value: WorkflowItem["status"]) {
-  if (value === "ready") return "可运行"
-  if (value === "config") return "待配置"
+  if (value === "ready") return "可使用"
   return "草稿"
 }
 
@@ -35,6 +35,7 @@ function tone(value?: WorkflowItem["run_status"]) {
   if (value === "blocked") return "border-amber-200 bg-amber-50 text-amber-700"
   if (value === "failed") return "border-red-200 bg-red-50 text-red-700"
   if (value === "done") return "border-emerald-200 bg-emerald-50 text-emerald-700"
+  if (value === "interrupted") return "border-slate-300 bg-slate-100 text-slate-700"
   return "border-border/70 bg-background/85 text-muted-foreground"
 }
 
@@ -121,7 +122,7 @@ export function WorkflowListCard(props: {
             <div className="mt-1 text-sm font-medium text-emerald-600">{props.item.done_runs || 0}</div>
           </div>
           <div className="rounded-lg border border-border/70 bg-background/85 px-2 py-2">
-            <div className="text-[10px] text-muted-foreground">问题次数</div>
+            <div className="text-[10px] text-muted-foreground">异常次数</div>
             <div className="mt-1 text-sm font-medium text-destructive">
               {(props.item.failed_runs || 0) + (props.item.blocked_runs || 0)}
             </div>

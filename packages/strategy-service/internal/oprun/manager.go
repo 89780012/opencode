@@ -102,17 +102,11 @@ func (m *Manager) Ensure(ctx context.Context) error {
 
 	if err := m.health(ctx); err == nil {
 		m.mu.RLock()
-		owned := m.cmd != nil || m.state.Owned
+		cmd := m.cmd
 		m.mu.RUnlock()
-		if owned {
+		if cmd != nil {
 			m.log.Debug("opencode already running (owned)")
 			m.live()
-			return nil
-		}
-
-		if item, ok := m.owner(); ok {
-			m.log.Info("opencode ownership restored", "pid", item.PID)
-			m.attach(item)
 			return nil
 		}
 
@@ -172,37 +166,10 @@ func (m *Manager) Stop(context.Context) error {
 	m.log.Info("stopping opencode")
 	m.mu.Lock()
 	cmd := m.cmd
-	owned := m.state.Owned
-	pid := m.state.PID
 
 	if cmd == nil {
 		m.mu.Unlock()
-		if owned && pid > 0 {
-			m.log.Info("killing restored opencode process", "pid", pid)
-			if err := proc.KillPID(pid); err != nil {
-				m.log.Error("failed to kill restored opencode process", "error", err)
-				return err
-			}
-			dropOwner()
-			m.mu.Lock()
-			m.lastErr = nil
-			m.state.Running = false
-			m.state.Ready = false
-			m.state.Owned = false
-			m.state.PID = 0
-			if m.state.Enabled {
-				m.state.Status = "stopped"
-			} else {
-				m.state.Status = "disabled"
-			}
-			m.state.Message = ""
-			m.state.StartedAt = nil
-			m.mu.Unlock()
-			m.log.Info("opencode stopped (restored process)")
-			return nil
-		}
-
-		if !owned && m.healthy() {
+		if m.healthy() {
 			m.log.Info("opencode is external, cannot stop")
 			return errExternal
 		}
@@ -210,8 +177,6 @@ func (m *Manager) Stop(context.Context) error {
 		m.lastErr = nil
 		m.state.Running = false
 		m.state.Ready = false
-		m.state.Owned = false
-		m.state.PID = 0
 		if m.state.Enabled {
 			m.state.Status = "stopped"
 		} else {
@@ -250,7 +215,6 @@ func (m *Manager) begin() (chan struct{}, bool) {
 	m.state.Status = "starting"
 	m.state.Ready = false
 	m.state.Running = true
-	m.state.Owned = true
 	m.state.Message = ""
 	m.state.StartedAt = nil
 	return ch, true
@@ -314,21 +278,8 @@ func (m *Manager) spawn() error {
 
 	m.mu.Lock()
 	m.cmd = cmd
-	m.state.PID = cmd.Process.Pid
 	m.state.StartedAt = &now
 	m.mu.Unlock()
-
-	err = writeOwner(owner{
-		PID:       cmd.Process.Pid,
-		Bin:       m.cfg.Bin,
-		Host:      m.cfg.Host,
-		Port:      m.cfg.Port,
-		Cwd:       m.cfg.Cwd,
-		StartedAt: &now,
-	})
-	if err != nil {
-		m.log.Warn("opencode owner write failed", "error", err)
-	}
 
 	m.log.Info("opencode process started", "pid", cmd.Process.Pid)
 
@@ -384,6 +335,7 @@ func (m *Manager) down(ctx context.Context) error {
 	}
 }
 
+// 存活状态
 func (m *Manager) live() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -392,10 +344,10 @@ func (m *Manager) live() {
 	m.state.Status = "running"
 	m.state.Ready = true
 	m.state.Running = true
-	m.state.Owned = true
 	m.state.Message = ""
 }
 
+// 标识为外部状态
 func (m *Manager) external() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -404,25 +356,8 @@ func (m *Manager) external() {
 	m.state.Status = "external"
 	m.state.Ready = true
 	m.state.Running = true
-	m.state.Owned = false
-	m.state.PID = 0
 	m.state.Message = ""
 	m.state.StartedAt = nil
-	m.cmd = nil
-}
-
-func (m *Manager) attach(item owner) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.lastErr = nil
-	m.state.Status = "running"
-	m.state.Ready = true
-	m.state.Running = true
-	m.state.Owned = true
-	m.state.PID = item.PID
-	m.state.Message = ""
-	m.state.StartedAt = item.StartedAt
 	m.cmd = nil
 }
 
@@ -434,10 +369,6 @@ func (m *Manager) fail(msg string, err error) {
 	m.state.Status = "failed"
 	m.state.Ready = false
 	m.state.Running = m.cmd != nil
-	m.state.Owned = m.cmd != nil
-	if m.cmd == nil {
-		m.state.PID = 0
-	}
 	m.state.Message = msg
 	if err != nil {
 		_ = logs.Append(logs.OpencodeKind, err.Error())
@@ -483,13 +414,9 @@ func (m *Manager) close(cmd *exec.Cmd, status string, msg string, err error) {
 		m.stop = false
 	}
 
-	dropOwner()
-
 	m.cmd = nil
-	m.state.PID = 0
 	m.state.Ready = false
 	m.state.Running = false
-	m.state.Owned = false
 	m.state.Status = status
 	m.state.Message = msg
 	m.lastErr = err
@@ -514,8 +441,9 @@ func (m *Manager) scan(in io.ReadCloser) {
 	}
 }
 
+// 表示url服务起来了，查询path接口返回正常
 func (m *Manager) health(ctx context.Context) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, m.url.String()+"/path", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, m.url.String()+"/global/health", nil)
 	if err != nil {
 		return err
 	}

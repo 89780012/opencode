@@ -39,20 +39,18 @@ func (a *API) workflowSummary(c *gin.Context) {
 
 func (a *API) workflowSave(c *gin.Context) {
 	body := struct {
-		ID            string `json:"id"`
-		Name          string `json:"name"`
-		WorkspacePath string `json:"workspace_path"`
-		RootNodeID    string `json:"root_node_id"`
-		Nodes         []struct {
+		ID         string `json:"id"`
+		Name       string `json:"name"`
+		RootNodeID string `json:"root_node_id"`
+		Nodes      []struct {
 			ID              string   `json:"id"`
 			Kind            string   `json:"kind"`
 			Title           string   `json:"title"`
 			Agent           string   `json:"agent"`
+			ToolID          string   `json:"tool_id"`
 			X               float64  `json:"x"`
 			Y               float64  `json:"y"`
 			Skills          []string `json:"skills"`
-			SessionMode     string   `json:"session_mode"`
-			SessionKey      string   `json:"session_key"`
 			Prompt          string   `json:"prompt"`
 			TimeoutMS       int64    `json:"timeout_ms"`
 			RetryLimit      int      `json:"retry_limit"`
@@ -125,14 +123,15 @@ func (a *API) workflowRunNodes(c *gin.Context) {
 
 func (a *API) workflowStart(c *gin.Context) {
 	body := struct {
-		Input string `json:"input"`
+		WorkspacePath string `json:"workspace_path"`
+		Input         string `json:"input"`
 	}{}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		bad(c, err)
 		return
 	}
 
-	data, err := a.wf.Start(c.Param("id"), body.Input)
+	data, err := a.wf.Start(c.Param("id"), body.WorkspacePath, body.Input)
 	if err != nil {
 		slog.Error("workflow start failed", "id", c.Param("id"), "error", err)
 		bad(c, err)
@@ -152,20 +151,18 @@ func (a *API) workflowContinue(c *gin.Context) {
 }
 
 func convertFlow(body struct {
-	ID            string `json:"id"`
-	Name          string `json:"name"`
-	WorkspacePath string `json:"workspace_path"`
-	RootNodeID    string `json:"root_node_id"`
-	Nodes         []struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	RootNodeID string `json:"root_node_id"`
+	Nodes      []struct {
 		ID              string   `json:"id"`
 		Kind            string   `json:"kind"`
 		Title           string   `json:"title"`
 		Agent           string   `json:"agent"`
+		ToolID          string   `json:"tool_id"`
 		X               float64  `json:"x"`
 		Y               float64  `json:"y"`
 		Skills          []string `json:"skills"`
-		SessionMode     string   `json:"session_mode"`
-		SessionKey      string   `json:"session_key"`
 		Prompt          string   `json:"prompt"`
 		TimeoutMS       int64    `json:"timeout_ms"`
 		RetryLimit      int      `json:"retry_limit"`
@@ -188,11 +185,10 @@ func convertFlow(body struct {
 			Kind:            workflow.Kind(item.Kind),
 			Title:           item.Title,
 			Agent:           item.Agent,
+			ToolID:          item.ToolID,
 			X:               item.X,
 			Y:               item.Y,
 			Skills:          item.Skills,
-			Session:         workflow.Mode(item.SessionMode),
-			SessionKey:      item.SessionKey,
 			Prompt:          item.Prompt,
 			TimeoutMS:       item.TimeoutMS,
 			RetryLimit:      item.RetryLimit,
@@ -214,11 +210,10 @@ func convertFlow(body struct {
 	}
 
 	return workflow.Workflow{
-		ID:            body.ID,
-		Name:          body.Name,
-		WorkspacePath: body.WorkspacePath,
-		RootNodeID:    body.RootNodeID,
-		Nodes:         nodes,
-		Edges:         edges,
+		ID:         body.ID,
+		Name:       body.Name,
+		RootNodeID: body.RootNodeID,
+		Nodes:      nodes,
+		Edges:      edges,
 	}
 }

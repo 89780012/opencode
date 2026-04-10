@@ -2,6 +2,7 @@ import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { FolderInput, LayoutGrid, Plus, RefreshCw, Search, X } from "lucide-react"
 import { toast } from "sonner"
+import { workspaceChatApi } from "@/api/modules"
 import { workspaceApi } from "@/api/modules/workspace"
 import { DeleteConfirmDialog } from "@/components/shared/delete-confirm-dialog"
 import { StrategyImportDialog } from "@/components/strategy/strategy-import-dialog"
@@ -50,16 +51,29 @@ export default function StrategiesPage() {
     nav(`/app/strategies/${encodeStrategyPath(item.path)}`)
   }
 
+  const onWorkflow = async (item: LocalWorkspace) => {
+    try {
+      const box = await workspaceChatApi.getState(item.path)
+      if (!box.state.workflow_id) {
+        toast.error("当前策略还没有绑定工作流")
+        return
+      }
+      nav(`/app/strategies/${encodeStrategyPath(item.path)}/workflow-chat`)
+    } catch (err) {
+      toast.error(note(err, "加载固定工作流状态失败"))
+    }
+  }
+
   const toggle = (item: LocalWorkspace) => {
     if (item.missing) {
-      toast.error("目录缺失的策略不能进入多屏开发")
+      toast.error("目录缺失的工作区不能在多屏模式中打开")
       return
     }
 
     setSelected((prev) => {
       if (prev.includes(item.path)) return prev.filter((path) => path !== item.path)
       if (prev.length >= 3) {
-        toast.error("多屏开发最多选择 3 个策略")
+        toast.error("最多只能选择 3 个策略")
         return prev
       }
       return [...prev, item.path]
@@ -72,7 +86,7 @@ export default function StrategiesPage() {
       return
     }
     if (selected.length < 2) {
-      toast.error("请至少选择 2 个策略进入多屏开发")
+      toast.error("至少选择 2 个策略后才能进入多屏模式")
       return
     }
     nav(`/app/strategies/multi?${encodeStrategyQuery(selected)}`)
@@ -100,9 +114,9 @@ export default function StrategiesPage() {
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-6 py-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="mt-3 text-3xl font-semibold tracking-tight text-foreground">我的策略</div>
+              <div className="mt-3 text-3xl font-semibold tracking-tight text-foreground">策略</div>
               <p className="mt-1.5 max-w-3xl text-sm leading-6 text-muted-foreground">
-                这里展示注册表中的全部策略工作区。支持 SmartX、Python、JS 和其他类型，也支持导入任意目录并做逻辑移除。
+                浏览所有已登记的策略工作区。你可以创建、导入、移除，或进入工作流对话。
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -142,7 +156,7 @@ export default function StrategiesPage() {
               <Input
                 value={q}
                 onChange={(event) => setQ(event.target.value)}
-                placeholder="搜索策略名称、关键词、类型或来源..."
+                placeholder="按名称、关键词、类型或来源搜索..."
                 className="h-9 rounded-xl border-slate-200 bg-background pl-10 shadow-sm dark:border-[#4f7769] dark:bg-[#1a1f1e] dark:text-[#e3ece7] dark:shadow-none"
               />
             </div>
@@ -153,23 +167,23 @@ export default function StrategiesPage() {
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-6 py-4">
           <div className="flex items-center justify-between gap-3">
-            <div className="text-sm font-medium text-foreground">共 {list.length} 个策略</div>
+            <div className="text-sm font-medium text-foreground">{list.length} 个策略</div>
             <div className="text-xs text-muted-foreground dark:text-slate-400">
-              删除只会从 JSON 注册表里移除，不会删除本地文件夹。
+              从列表移除不会删除本地目录。
             </div>
           </div>
           {selecting ? (
             <Card className="sticky top-0 z-10 gap-0 rounded-2xl border-primary/20 bg-background/95 py-0 shadow-sm backdrop-blur">
               <CardContent className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                 <div className="space-y-1">
-                  <div className="text-sm font-medium text-foreground">多屏开发选择中</div>
+                  <div className="text-sm font-medium text-foreground">多屏选择</div>
                   <div className="text-xs text-muted-foreground">
-                    选择 2 到 3 个策略工作区后进入多屏开发。默认点击卡片仍是单屏开发，只有当前模式下才会变成选择。
+                    选择 2 到 3 个策略后进入多屏工作区。当前点击卡片会切换选择状态，而不是直接打开。
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="rounded-full border bg-muted/40 px-3 py-1 text-xs font-medium text-foreground">
-                    已选 {selected.length}/3
+                    已选择 {selected.length}/3
                   </div>
                   <Button
                     variant="outline"
@@ -185,7 +199,7 @@ export default function StrategiesPage() {
                   </Button>
                   <Button size="sm" className="h-8" onClick={openMulti} disabled={selected.length < 2}>
                     <LayoutGrid className="size-4" />
-                    进入多屏开发
+                    进入多屏模式
                   </Button>
                 </div>
               </CardContent>
@@ -194,7 +208,7 @@ export default function StrategiesPage() {
             <div className="flex justify-end">
               <Button variant="outline" size="sm" className="h-8" onClick={openMulti}>
                 <LayoutGrid className="size-4" />
-                多屏开发
+                多屏模式
               </Button>
             </div>
           )}
@@ -205,6 +219,7 @@ export default function StrategiesPage() {
             onRetry={() => void refresh()}
             onSelect={onSelect}
             onDelete={setItem}
+            onWorkflow={onWorkflow}
             selecting={selecting}
             selected={selected}
             onToggle={toggle}
@@ -227,7 +242,7 @@ export default function StrategiesPage() {
         busy={busy}
         title="从列表移除策略"
         name={item?.name ?? ""}
-        desc="移除后只会删除策略注册表中的记录，不会删除本地目录。之后仍可再次导入。"
+        desc="这只会移除登记记录，本地目录不会被删除，之后仍可再次导入。"
         onOpenChange={(value) => {
           if (!value) setItem(null)
         }}

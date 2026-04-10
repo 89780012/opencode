@@ -10,17 +10,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { runtimeItem } from "@/lib/workflow-runtime"
+import { starter } from "@/lib/workflow-template"
 import type { WorkflowItem, WorkflowRun, WorkflowRuntimeDetail } from "@/types/workflow"
-
-function blank(name: string): Omit<WorkflowRuntimeDetail, "id" | "updated_at"> {
-  return {
-    name,
-    workspace_path: "",
-    root_node_id: "",
-    nodes: [],
-    edges: [],
-  }
-}
 
 function merge(items: WorkflowRuntimeDetail[], runs: WorkflowRun[]) {
   const map = new Map<string, WorkflowRun[]>()
@@ -59,9 +50,9 @@ export default function WorkflowsPage() {
     setLoad(true)
     setErr("")
     try {
-      const [flows, runs] = await Promise.all([workflowApi.list(), workflowApi.runs()])
+      const [flows, rows] = await Promise.all([workflowApi.list(), workflowApi.runs()])
       setItems(flows.items || [])
-      setRuns(runs.items || [])
+      setRuns(rows.items || [])
     } catch (err) {
       console.error(err)
       setErr("加载工作流失败")
@@ -99,10 +90,11 @@ export default function WorkflowsPage() {
   const onCreate = async (name: string) => {
     setBusy(true)
     try {
-      const data = await workflowApi.save(blank(name))
+      const data = await workflowApi.save(starter(name))
       setOpen(false)
       await refresh()
       nav(`/app/workflows/${data.id}`)
+      toast.success("已创建默认工作流骨架")
     } catch (err) {
       console.error(err)
       toast.error("创建工作流失败")
@@ -135,7 +127,7 @@ export default function WorkflowsPage() {
             <div className="min-w-0">
               <div className="mt-3 text-3xl font-semibold tracking-tight text-foreground">工作流</div>
               <p className="mt-1.5 max-w-3xl text-sm leading-6 text-muted-foreground">
-                在同一个代码工作区里编排多节点协作流程，把规划、执行、检查、修复回环串成可重复运行的自动化链路。
+                在同一个代码工作区里编排多节点协作流程，把规划、执行、检查、回写串成可重复运行的固定链路。
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -164,7 +156,7 @@ export default function WorkflowsPage() {
               <Input
                 value={q}
                 onChange={(event) => setQ(event.target.value)}
-                placeholder="搜索工作流、标签或工作区路径..."
+                placeholder="搜索工作流名称、标签或节点类型..."
                 className="h-9 rounded-xl border-slate-200 bg-background pl-10 shadow-sm"
               />
             </div>
@@ -181,9 +173,9 @@ export default function WorkflowsPage() {
                   <Network className="size-5" />
                 </div>
                 <div>
-                  <div className="text-sm text-foreground">单工作区工作流控制台</div>
+                  <div className="text-sm text-foreground">固定工作流控制台</div>
                   <div className="text-xs text-muted-foreground">
-                    新工作流先以空草稿创建，再在详情页单独配置工作区路径、节点图和运行输入。
+                    新工作流会默认生成一套可直接调整的骨架，包含意图识别、规划、执行、检查和结果判断节点。
                   </div>
                 </div>
               </div>

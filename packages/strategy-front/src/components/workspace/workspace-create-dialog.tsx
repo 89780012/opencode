@@ -1,8 +1,8 @@
-import { useMemo, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { ChevronRight, Code2, Cpu, FileText, RefreshCw, Target } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
-import { chatApi, workspaceApi } from "@/api/modules"
+import { chatApi, workspaceApi, workflowApi, workspaceChatApi } from "@/api/modules"
 import { AutoResizeTextarea } from "@/components/ui/AutoResizeTextarea"
 import { Button } from "@/components/ui/button"
 import {
@@ -22,6 +22,7 @@ import { useProjectComposer } from "@/hooks/use-project-composer"
 import { resolveComposer } from "@/lib/chat-composer"
 import { buildStrategyPrompt, buildTemplatePrompt, createGuide, type StrategyType } from "@/lib/strategy-guide"
 import { encodeStrategyPath } from "@/lib/strategy-path"
+import type { WorkflowRuntimeDetail } from "@/types/workflow"
 
 interface Props {
   open: boolean
@@ -96,6 +97,16 @@ function text(list: string[]) {
   return list.length > 0 ? list.join(" / ") : "-"
 }
 
+function ref(value: string) {
+  const [pid, ...rest] = value.split("/")
+  const mid = rest.join("/").trim()
+  if (!pid?.trim() || !mid) return
+  return {
+    model_provider_id: pid.trim(),
+    model_id: mid,
+  }
+}
+
 function Chip(props: { active: boolean; text: string; onClick: () => void }) {
   return (
     <button
@@ -152,6 +163,7 @@ function Dot(props: { active: boolean; done: boolean; text: string; step: number
 export function WorkspaceCreateDialog(props: Props) {
   const nav = useNavigate()
   const { refresh, select } = useWorkspaceList()
+  const [mode, setMode] = useState<"plain" | "workflow">("plain")
   const [kind, setKind] = useState<StrategyType>("smartx")
   const ags = useAgentList(kind)
   const catalog = useProviderList()
@@ -168,12 +180,17 @@ export function WorkspaceCreateDialog(props: Props) {
   const [brief, setBrief] = useState("")
   const [prompt, setPrompt] = useState("")
   const [busy, setBusy] = useState(false)
+  const [flows, setFlows] = useState<WorkflowRuntimeDetail[]>([])
+  const [fid, setFid] = useState("")
+  const [fload, setFload] = useState(false)
   const model = composer.model ? `${composer.model.providerID}/${composer.model.modelID}` : ""
   const card = cards[kind]
   const full = name.trim() ? `${name.trim()}-${tailname.trim()}` : ""
   const rich = kind !== "other"
+  const pick = useMemo(() => flows.find((item) => item.id === fid) ?? null, [fid, flows])
 
   const reset = () => {
+    setMode("plain")
     setStep(0)
     setPanel("market")
     setKind("smartx")
@@ -182,7 +199,26 @@ export function WorkspaceCreateDialog(props: Props) {
     setGuide(createGuide())
     setBrief("")
     setPrompt("")
+    setFid("")
   }
+
+  const pullFlows = async () => {
+    setFload(true)
+    try {
+      const data = await workflowApi.list()
+      setFlows(data.items || [])
+    } catch (err) {
+      console.error("Failed to load workflows", err)
+      toast.error("加载工作流列表失败")
+    } finally {
+      setFload(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!props.open || mode !== "workflow") return
+    void pullFlows()
+  }, [mode, props.open])
 
   const setAgent = (value: string) => {
     if (!ags.ags.some((item) => item.name === value)) return
@@ -212,6 +248,10 @@ export function WorkspaceCreateDialog(props: Props) {
       toast.error("请输入策略名称")
       return
     }
+    if (step === 1 && mode === "workflow" && !fid) {
+      toast.error("请选择工作流")
+      return
+    }
     if (step === 1) setPrompt(buildPrompt())
     setStep((prev) => Math.min(prev + 1, steps.length - 1))
   }
@@ -221,19 +261,42 @@ export function WorkspaceCreateDialog(props: Props) {
       toast.error("请输入策略名称")
       return
     }
-    if (!composer.agent || !composer.model) {
+    if (mode === "workflow" && !pick) {
+      toast.error("请选择工作流")
+      return
+    }
+    if (mode === "plain" && (!composer.agent || !composer.model)) {
       toast.error("当前没有可用的模型或模式，无法自动发起引导会话")
       return
     }
     setBusy(true)
     try {
+      const pickModel = ref(model)
       const data = await workspaceApi.createWorkspace(full, kind, card.template)
       await refresh()
       select(data.workspace)
+      if (mode === "workflow" && pick) {
+        await workspaceChatApi.bind({
+          workspace_path: data.workspace.path,
+          workflow_id: pick.id,
+          ...pickModel,
+          variant: pickModel ? (composer.variant ?? undefined) : undefined,
+        })
+        await workspaceChatApi.dispatch({
+          workspace_path: data.workspace.path,
+          input: prompt || buildPrompt(),
+        })
+        props.onDone?.()
+        props.onOpenChange(false)
+        reset()
+        toast.success(`策略已创建并绑定工作流：${data.workspace.name}`)
+        nav(`/app/strategies/${encodeStrategyPath(data.workspace.path)}/workflow-chat`)
+        return
+      }
       const session = await chatApi.createSession(data.workspace.path)
       await chatApi.sendPrompt(data.workspace.path, session.id, {
-        agent: composer.agent.name,
-        model: composer.model,
+        agent: composer.agent!.name,
+        model: composer.model!,
         variant: composer.variant,
         parts: [{ type: "text", text: prompt || buildPrompt() }],
       })
@@ -262,7 +325,7 @@ export function WorkspaceCreateDialog(props: Props) {
         <div className="border-b border-slate-200/70 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.14),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(249,250,251,0.94))] px-5 py-4 dark:border-[#202725] dark:bg-[radial-gradient(circle_at_top_left,rgba(122,165,144,0.2),transparent_32%),linear-gradient(180deg,rgba(17,22,21,0.98),rgba(15,20,19,0.95))]">
           <DialogHeader className="mb-3 gap-1 text-left">
             <div className="text-[11px] font-medium uppercase tracking-[0.24em] text-emerald-700/80 dark:text-[#8eb7a5]">
-              Strategy Lab
+              策略实验室
             </div>
             <DialogTitle className="text-[22px] font-semibold tracking-[0.01em] text-slate-900 dark:text-[#eef5f1]">
               新建策略
@@ -284,6 +347,31 @@ export function WorkspaceCreateDialog(props: Props) {
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           {step === 0 ? (
             <div className="space-y-4">
+              <Block title="创建方式" hint="普通创建会自动发起引导会话，工作流创建会绑定固定工作流">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <button
+                    type="button"
+                    className={`rounded-md border px-4 py-4 text-left transition-all ${mode === "plain" ? "border-emerald-300 bg-emerald-50/70 ring-1 ring-emerald-100 dark:border-[#4d6f62] dark:bg-[#15201c]" : "border-slate-200/80 bg-white/90 hover:border-emerald-200 hover:bg-emerald-50/50 dark:border-[#26302c] dark:bg-[#141918]"}`}
+                    onClick={() => setMode("plain")}
+                  >
+                    <div className="text-sm font-semibold text-slate-900 dark:text-[#eef5f1]">普通创建</div>
+                    <div className="mt-2 text-xs leading-5 text-slate-600 dark:text-[#93a39c]">
+                      创建后进入普通策略对话，由首轮消息引导生成方案与代码。
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    className={`rounded-md border px-4 py-4 text-left transition-all ${mode === "workflow" ? "border-emerald-300 bg-emerald-50/70 ring-1 ring-emerald-100 dark:border-[#4d6f62] dark:bg-[#15201c]" : "border-slate-200/80 bg-white/90 hover:border-emerald-200 hover:bg-emerald-50/50 dark:border-[#26302c] dark:bg-[#141918]"}`}
+                    onClick={() => setMode("workflow")}
+                  >
+                    <div className="text-sm font-semibold text-slate-900 dark:text-[#eef5f1]">工作流创建</div>
+                    <div className="mt-2 text-xs leading-5 text-slate-600 dark:text-[#93a39c]">
+                      创建后绑定一个固定工作流，并进入工作流对话页按既定步骤执行。
+                    </div>
+                  </button>
+                </div>
+              </Block>
+
               <Block title="策略名称" hint="用于工作区目录和默认会话标题">
                 <Label htmlFor="workspace-name">策略名称</Label>
                 <div className="mt-2 grid gap-2 md:grid-cols-[minmax(0,1fr)_180px_auto]">
@@ -348,7 +436,73 @@ export function WorkspaceCreateDialog(props: Props) {
           ) : null}
 
           {step === 1 ? (
-            rich ? (
+            mode === "workflow" ? (
+              <div className="space-y-4">
+                <Block title="选择工作流" hint="创建后会复制所选工作流，并绑定到这个新策略">
+                  <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                    <div className="min-w-0 space-y-2">
+                      <Label>工作流</Label>
+                      <Select value={fid} onValueChange={setFid}>
+                        <SelectTrigger className="h-10 w-full rounded-md border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2d3733]">
+                          <SelectValue
+                            placeholder={fload ? "加载中..." : flows.length === 0 ? "暂无可选工作流" : "请选择工作流"}
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {flows.map((item) => (
+                            <SelectItem key={item.id} value={item.id}>
+                              {item.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="min-w-0 space-y-2">
+                      <Label>Default model</Label>
+                      <Select value={model} onValueChange={setModel}>
+                        <SelectTrigger className="h-10 w-full rounded-md border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2d3733]">
+                          <SelectValue placeholder="Select default model" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {catalog.visibleModels.map((item) => {
+                            const value = `${item.provider.id}/${item.id}`
+                            return (
+                              <SelectItem key={value} value={value}>
+                                {value}
+                              </SelectItem>
+                            )
+                          })}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="mt-7 h-10 rounded-md border-slate-200/80 bg-white/90 px-3 shadow-none dark:border-[#2c3532] dark:bg-[#151918]"
+                      onClick={() => {
+                        void pullFlows()
+                      }}
+                      disabled={fload}
+                    >
+                      <RefreshCw className={`size-4 ${fload ? "animate-spin" : ""}`} />
+                    </Button>
+                  </div>
+                  <div className="mt-3 text-xs leading-6 text-slate-500 dark:text-[#809088]">
+                    这里会读取现有工作流模板列表。选中后，系统会把当前引导结果作为该工作流的首轮输入，在固定聊天页里执行。
+                  </div>
+                </Block>
+
+                <Block title="绑定说明" hint="绑定后，这个策略会优先从固定工作流入口运行">
+                  <div className="space-y-2 text-sm text-slate-600 dark:text-[#93a39c]">
+                    <div>策略模板：{card.title}</div>
+                    <div>工作区目录：{card.root}</div>
+                    <div>已选工作流：{pick?.name || "-"}</div>
+                    <div>默认模型：{model || "-"}</div>
+                    <div>节点数量：{pick?.nodes.length || 0}</div>
+                  </div>
+                </Block>
+              </div>
+            ) : rich ? (
               <Tabs value={panel} onValueChange={setPanel} className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-slate-200/70 bg-white/80 px-4 py-3 dark:border-[#26302c] dark:bg-[#141918]">
                   <div>
@@ -668,47 +822,57 @@ export function WorkspaceCreateDialog(props: Props) {
             <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
               <div className="space-y-4">
                 <Block title="当前创建配置">
-                  <div className="mb-4 grid gap-3">
-                    <div className="space-y-2">
-                      <Label>使用模式</Label>
-                      <Select value={composer.agent?.name} onValueChange={setAgent}>
-                        <SelectTrigger className="h-10 w-full rounded-md border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2d3733]">
-                          <SelectValue placeholder="选择模式" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {ags.ags.map((item) => (
-                            <SelectItem key={item.name} value={item.name}>
-                              {item.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>使用模型</Label>
-                      <Select value={model} onValueChange={setModel}>
-                        <SelectTrigger className="h-10 w-full rounded-md border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2d3733]">
-                          <SelectValue placeholder="选择模型" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {catalog.visibleModels.map((item) => {
-                            const value = `${item.provider.id}/${item.id}`
-                            return (
-                              <SelectItem key={value} value={value}>
-                                {value}
+                  {mode === "plain" ? (
+                    <div className="mb-4 grid gap-3">
+                      <div className="space-y-2">
+                        <Label>使用模式</Label>
+                        <Select value={composer.agent?.name} onValueChange={setAgent}>
+                          <SelectTrigger className="h-10 w-full rounded-md border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2d3733]">
+                            <SelectValue placeholder="选择模式" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {ags.ags.map((item) => (
+                              <SelectItem key={item.name} value={item.name}>
+                                {item.name}
                               </SelectItem>
-                            )
-                          })}
-                        </SelectContent>
-                      </Select>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>使用模型</Label>
+                        <Select value={model} onValueChange={setModel}>
+                          <SelectTrigger className="h-10 w-full rounded-md border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2d3733]">
+                            <SelectValue placeholder="选择模型" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {catalog.visibleModels.map((item) => {
+                              const value = `${item.provider.id}/${item.id}`
+                              return (
+                                <SelectItem key={value} value={value}>
+                                  {value}
+                                </SelectItem>
+                              )
+                            })}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                  </div>
+                  ) : null}
                   <div className="space-y-2 text-sm text-slate-600 dark:text-[#9aaba4]">
+                    <div>创建方式：{mode === "workflow" ? "工作流创建" : "普通创建"}</div>
                     <div>类型：{card.title}</div>
                     <div>模板：{card.template}</div>
                     <div>名称：{full || "-"}</div>
                     <div>目录：{card.root}</div>
-                    {rich ? (
+                    {mode === "workflow" ? (
+                      <>
+                        <div>工作流：{pick?.name || "-"}</div>
+                        <div>默认模型：{model || "-"}</div>
+                        <div>节点数：{pick?.nodes.length || 0}</div>
+                      </>
+                    ) : null}
+                    {mode === "plain" && rich ? (
                       <>
                         <div>市场：{guide.market}</div>
                         <div>标的池：{guide.pool}</div>
@@ -720,7 +884,26 @@ export function WorkspaceCreateDialog(props: Props) {
                   </div>
                 </Block>
               </div>
-              {rich ? (
+              {mode === "workflow" ? (
+                <div className="space-y-4">
+                  <Block title="创建后动作" hint="不会发送普通引导消息，而是直接进入固定工作流聊天">
+                    <div className="text-sm leading-6 text-slate-600 dark:text-[#93a39c]">
+                      创建完成后，会把当前策略工作区绑定到所选工作流，并立即以这份引导结果发起第一轮工作流执行。
+                      后续你在聊天窗口中的每条自然语言消息，都会在同一个共享会话里触发一轮新的工作流运行。
+                    </div>
+                  </Block>
+                  <Block title="首轮工作流输入" hint="这段内容会直接作为工作流第一轮输入提交">
+                    <div className="rounded-md bg-white/92 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]">
+                      <AutoResizeTextarea
+                        value={prompt}
+                        onChange={setPrompt}
+                        height={320}
+                        placeholder="这里会使用引导式配置生成首轮工作流输入。"
+                      />
+                    </div>
+                  </Block>
+                </div>
+              ) : rich ? (
                 <Block title="首条引导消息" hint="创建后会自动发送到首个会话">
                   <div className="rounded-md bg-white/92 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]">
                     <AutoResizeTextarea
@@ -768,7 +951,7 @@ export function WorkspaceCreateDialog(props: Props) {
               onClick={() => void create()}
               disabled={busy}
             >
-              {busy ? "创建中..." : "创建并进入策略页"}
+              {busy ? "创建中..." : mode === "workflow" ? "创建并进入工作流页" : "创建并进入策略页"}
             </Button>
           )}
         </DialogFooter>

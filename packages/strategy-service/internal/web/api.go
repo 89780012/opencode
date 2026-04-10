@@ -86,6 +86,11 @@ func (a *API) Register(r *gin.Engine) {
 	ws.GET("/files", a.workspaceFiles)
 	ws.GET("/file-content", a.workspaceFileGet)
 	ws.PUT("/file-content", a.workspaceFilePut)
+	ws.GET("/chat-state", a.workspaceChatState)
+	ws.POST("/chat-state/bind", a.workspaceChatBind)
+	ws.POST("/chat-state/dispatch", a.workspaceChatDispatch)
+	ws.POST("/chat-state/continue", a.workspaceChatContinue)
+	ws.POST("/chat-state/interrupt", a.workspaceChatInterrupt)
 
 	sys := api.Group("/system")
 	sys.GET("/startup", a.startup)

@@ -4,8 +4,11 @@ import {
   addEdge,
   Background,
   BackgroundVariant,
+  ConnectionLineType,
+  MarkerType,
   MiniMap,
   ReactFlow,
+  reconnectEdge,
   type Connection,
   type Edge,
   type ReactFlowInstance,
@@ -19,16 +22,58 @@ import { workflowNodeTypes } from "@/components/workflow/workflow-node"
 import { makeNode } from "@/types/workflow"
 import type { WorkflowDetail, WorkflowFlowEdge, WorkflowFlowNode, WorkflowKind, WorkflowSeed } from "@/types/workflow"
 
+const grid: [number, number] = [24, 24]
+
 const tone = (active = false) => ({
-  stroke: "var(--primary)",
+  stroke: active ? "#2563eb" : "#1d84ff",
   strokeWidth: active ? 3 : 2.2,
-  filter: active ? "drop-shadow(0 0 6px color-mix(in oklab, var(--primary) 35%, transparent))" : undefined,
+  filter: active ? "drop-shadow(0 0 7px rgba(37,99,235,0.24))" : "drop-shadow(0 0 4px rgba(29,132,255,0.1))",
 })
+
+function edgeStyle(edge: WorkflowFlowEdge, active = false) {
+  return {
+    ...edge,
+    type: "smoothstep" as const,
+    animated: false,
+    selected: active,
+    style: tone(active),
+    interactionWidth: 32,
+    markerEnd: {
+      type: MarkerType.ArrowClosed,
+      width: 18,
+      height: 18,
+      color: active ? "#2563eb" : "#1d84ff",
+    },
+    labelStyle: {
+      fill: "#0f172a",
+      fontSize: 11,
+      fontWeight: 600,
+    },
+    labelBgStyle: {
+      fill: "rgba(255,255,255,0.94)",
+      fillOpacity: 1,
+      stroke: active ? "rgba(37,99,235,0.32)" : "rgba(148,163,184,0.3)",
+      strokeWidth: 1,
+    },
+    labelBgPadding: [7, 3] as [number, number],
+    labelBgBorderRadius: 999,
+  } satisfies WorkflowFlowEdge
+}
 
 function label(edge: WorkflowFlowEdge) {
   if (typeof edge.label === "string" && edge.label.trim()) return edge.label.trim()
   if (edge.data?.cond === "pass" || edge.data?.cond === "fail") return edge.data.cond
   return undefined
+}
+
+function decorate(edge: WorkflowFlowEdge, active = false) {
+  return edgeStyle(
+    {
+      ...edge,
+      label: label(edge),
+    },
+    active,
+  )
 }
 
 export function WorkflowCanvas(props: {
@@ -71,12 +116,7 @@ export function WorkflowCanvas(props: {
     setEdges((prev) =>
       props.item.edges.map((item) => {
         const active = prev.some((row) => row.id === item.id && row.selected)
-        return {
-          ...item,
-          label: label(item),
-          selected: active,
-          style: tone(active),
-        }
+        return decorate(item, active)
       }),
     )
   }, [props.item, setEdges, setNodes])
@@ -126,10 +166,43 @@ export function WorkflowCanvas(props: {
         edges={edges}
         nodeTypes={workflowNodeTypes}
         fitView
+        snapToGrid
+        snapGrid={grid}
         fitViewOptions={{ maxZoom: 0.8, padding: 0.2 }}
         proOptions={{ hideAttribution: true }}
+        connectionLineType={ConnectionLineType.SmoothStep}
+        connectionLineStyle={{
+          stroke: "#2563eb",
+          strokeWidth: 2.2,
+          strokeDasharray: "6 6",
+        }}
+        connectionRadius={26}
+        selectNodesOnDrag={false}
+        elevateEdgesOnSelect
+        edgesReconnectable
         defaultEdgeOptions={{
+          type: "smoothstep",
           style: tone(),
+          interactionWidth: 32,
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            width: 18,
+            height: 18,
+            color: "#1d84ff",
+          },
+          labelStyle: {
+            fill: "#0f172a",
+            fontSize: 11,
+            fontWeight: 600,
+          },
+          labelBgStyle: {
+            fill: "rgba(255,255,255,0.94)",
+            fillOpacity: 1,
+            stroke: "rgba(148,163,184,0.3)",
+            strokeWidth: 1,
+          },
+          labelBgPadding: [7, 3],
+          labelBgBorderRadius: 999,
         }}
         onInit={setRf}
         onNodesChange={onNodes}
@@ -141,24 +214,29 @@ export function WorkflowCanvas(props: {
                 ...conn,
                 animated: false,
                 label: undefined,
-                selected: false,
-                style: tone(),
                 data: { cond: "always" },
               },
               prev,
-            ),
+            ).map((item) => decorate(item))
+          )
+        }
+        onReconnect={(old, conn) =>
+          setEdges((prev) =>
+            reconnectEdge(old, conn, prev, {
+              shouldReplaceId: false,
+            }).map((item) => decorate(item, item.id === old.id && !!old.selected)),
           )
         }
         onPaneClick={() => {
           props.onPick(null)
           props.onEdgePick?.(null)
           setMenu(null)
-          setEdges((prev) => prev.map((item) => ({ ...item, selected: false, style: tone() })))
+          setEdges((prev) => prev.map((item) => decorate(item)))
         }}
         onNodeClick={(_, node) => {
           props.onPick(node as WorkflowFlowNode)
           props.onEdgePick?.(null)
-          setEdges((prev) => prev.map((item) => ({ ...item, selected: false, style: tone() })))
+          setEdges((prev) => prev.map((item) => decorate(item)))
         }}
         onSelectionChange={({ nodes }) => props.onPick((nodes[0] as WorkflowFlowNode | undefined) ?? null)}
         onEdgeClick={(event, hit: Edge) => {
@@ -166,24 +244,14 @@ export function WorkflowCanvas(props: {
           props.onPick(null)
           props.onEdgePick?.(hit as WorkflowFlowEdge)
           setMenu(null)
-          setEdges((prev) =>
-            prev.map((item) => {
-              const active = item.id === hit.id
-              return { ...item, selected: active, style: tone(active) }
-            }),
-          )
+          setEdges((prev) => prev.map((item) => decorate(item, item.id === hit.id)))
         }}
         onEdgeContextMenu={(event, hit: Edge) => {
           event.preventDefault()
           event.stopPropagation()
           props.onPick(null)
           props.onEdgePick?.(hit as WorkflowFlowEdge)
-          setEdges((prev) =>
-            prev.map((item) => {
-              const active = item.id === hit.id
-              return { ...item, selected: active, style: tone(active) }
-            }),
-          )
+          setEdges((prev) => prev.map((item) => decorate(item, item.id === hit.id)))
           setMenu({
             id: hit.id,
             x: event.clientX,
@@ -211,7 +279,7 @@ export function WorkflowCanvas(props: {
           drop(kind, event.clientX, event.clientY)
         }}
       >
-        <Background variant={BackgroundVariant.Dots} gap={22} size={1.55} color="rgba(51, 65, 85, 0.44)" />
+        <Background variant={BackgroundVariant.Dots} gap={24} size={1.55} color="rgba(51, 65, 85, 0.44)" />
         <MiniMap
           position="bottom-right"
           pannable
@@ -241,6 +309,10 @@ export function WorkflowCanvas(props: {
           </div>
         </div>
       ) : null}
+
+      <div className="pointer-events-none absolute bottom-5 right-[220px] z-20 rounded-full border border-border/70 bg-white/92 px-3 py-1.5 text-[11px] text-muted-foreground shadow-sm backdrop-blur dark:bg-[#111417]/92">
+        拖拽蓝点即可连线，选中连线后可直接拖动端点重连。
+      </div>
 
       <WorkflowMiniToolbar />
 

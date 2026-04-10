@@ -25,6 +25,7 @@ interface Props {
   err?: string
   loading?: boolean
   onOpenDiff?: (file: string) => void
+  hideWorkflowInternals?: boolean
 }
 
 function errorText(err?: ChatError) {
@@ -272,13 +273,55 @@ function renderPart(part: ChatPart, role: ChatMessageInfo["role"], onOpenDiff?: 
   }
 }
 
+function workflowInput(info: ChatMessageInfo, parts: ChatPart[]) {
+  if (info.role !== "user") return false
+  const text = parts
+    .filter((part): part is Extract<ChatPart, { type: "text" }> => part.type === "text")
+    .map((part) => part.text)
+    .join("\n")
+    .trim()
+  if (!text) return false
+  if (!text.startsWith("User objective:")) return false
+  if (!text.includes("Workflow node:") && !text.includes("Node instructions:") && !text.includes("Workflow:")) return false
+
+  const head = "User objective:\n"
+  const body = text.slice(head.length)
+  const tags = [
+    "\n\nUpstream summary:\n",
+    "\n\nReview feedback:\n",
+    "\n\nWorkflow node:\n",
+    "\n\nRequested skills:\n",
+    "\n\nNode instructions:\n",
+    "\n\nStructured output contract:\n",
+    "\n\nWorkflow:\n",
+  ]
+  const cut = tags
+    .map((item) => body.indexOf(item))
+    .filter((item) => item >= 0)
+    .sort((a, b) => a - b)[0]
+  const input = (cut === undefined ? body : body.slice(0, cut)).trim()
+  return input || false
+}
+
 const ChatMessageItem = memo(function ChatMessageItem(props: {
   info: ChatMessageInfo
   onOpenDiff?: (file: string) => void
+  hideWorkflowInternals?: boolean
 }) {
   const parts = useAppSelector((state) => state.chatSession.parts[props.info.id] ?? empty)
   const body = parts.length > 0 ? parts : empty
   const err = props.info.role === "assistant" ? errorText(props.info.error) : undefined
+  const input = props.hideWorkflowInternals ? workflowInput(props.info, body) : false
+
+  if (typeof input === "string") {
+    return (
+      <Message from={props.info.role}>
+        <MessageContent>
+          <div className="whitespace-pre-wrap break-words">{input}</div>
+        </MessageContent>
+      </Message>
+    )
+  }
 
   if (body.length === 0 && !err) {
     return null
@@ -303,7 +346,12 @@ export const ChatMessageList = memo(function ChatMessageList(props: Props) {
     <Conversation className="custom-scrollbar-2 h-full min-w-0 flex-1">
       <ConversationContent className="mx-auto min-w-0 w-full max-w-[776px]">
         {props.messages.map((info) => (
-          <ChatMessageItem key={info.id} info={info} onOpenDiff={props.onOpenDiff} />
+          <ChatMessageItem
+            key={info.id}
+            info={info}
+            onOpenDiff={props.onOpenDiff}
+            hideWorkflowInternals={props.hideWorkflowInternals}
+          />
         ))}
         {props.err ? (
           <Message from="assistant">

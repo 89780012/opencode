@@ -1,14 +1,13 @@
 import type { Edge, Node, XYPosition } from "@xyflow/react"
 
-export type WorkflowKind = "start" | "plan" | "build" | "judge" | "review" | "end" | "gate"
+export type WorkflowKind = "start" | "intent" | "plan" | "build" | "judge" | "review" | "end" | "gate"
 
 export type WorkflowTone = "slate" | "blue" | "amber"
 
 export const workflowField = {
   prompt: "prompt",
-  session: "session",
-  sessionKey: "session_key",
   skills: "skills",
+  tool: "tool",
   timeout: "timeout",
   retry: "retry",
   model: "model",
@@ -68,6 +67,7 @@ export type WorkflowNodeData = {
 
 export type WorkflowNodeType =
   | "workflow-start"
+  | "workflow-intent"
   | "workflow-plan"
   | "workflow-build"
   | "workflow-judge"
@@ -77,6 +77,7 @@ export type WorkflowNodeType =
 
 export function nodeType(kind: WorkflowKind): WorkflowNodeType {
   if (kind === "start") return "workflow-start"
+  if (kind === "intent") return "workflow-intent"
   if (kind === "plan") return "workflow-plan"
   if (kind === "build") return "workflow-build"
   if (kind === "judge") return "workflow-judge"
@@ -89,7 +90,7 @@ export type WorkflowFlowNode = Node<WorkflowNodeData, WorkflowNodeType>
 
 export type WorkflowFlowEdge = Edge
 
-export type WorkflowListStatus = "draft" | "config" | "ready"
+export type WorkflowListStatus = "draft" | "ready"
 
 export type WorkflowItem = {
   id: string
@@ -114,15 +115,12 @@ export type WorkflowDetail = WorkflowItem & {
 
 export type WorkflowNodeKind = WorkflowKind
 
-export type WorkflowSessionMode = "shared" | "isolated" | "keyed"
-
 export type WorkflowSeed = {
   title?: string
   desc?: string
   agent?: string
+  tool?: string
   prompt?: string
-  mode?: WorkflowSessionMode
-  session_key?: string
   skills?: string[]
   timeout?: number
   retry?: number
@@ -130,22 +128,21 @@ export type WorkflowSeed = {
   variant?: string
 }
 
-export type WorkflowEdgeCond = "always" | "pass" | "fail"
+export type WorkflowEdgeCond = "always" | "plan" | "build" | "checker" | "pass" | "fail"
 
-export type WorkflowRunStatus = "pending" | "running" | "blocked" | "failed" | "done"
+export type WorkflowRunStatus = "pending" | "running" | "blocked" | "failed" | "done" | "interrupted"
 
-export type WorkflowNodeRunStatus = "pending" | "running" | "blocked" | "failed" | "done" | "timeout"
+export type WorkflowNodeRunStatus = "pending" | "running" | "blocked" | "failed" | "done" | "timeout" | "interrupted"
 
 export type WorkflowRuntimeNode = {
   id: string
   kind: WorkflowNodeKind
   title: string
   agent: string
+  tool_id?: string
   x?: number
   y?: number
   skills: string[]
-  session_mode: WorkflowSessionMode
-  session_key?: string
   prompt: string
   timeout_ms: number
   retry_limit: number
@@ -165,7 +162,6 @@ export type WorkflowRuntimeEdge = {
 export type WorkflowRuntimeDetail = {
   id: string
   name: string
-  workspace_path: string
   root_node_id: string
   nodes: WorkflowRuntimeNode[]
   edges: WorkflowRuntimeEdge[]
@@ -179,7 +175,6 @@ export type WorkflowRuntimeList = {
 export type WorkflowUpsertInput = {
   id?: string
   name: string
-  workspace_path: string
   root_node_id: string
   nodes: WorkflowRuntimeNode[]
   edges: WorkflowRuntimeEdge[]
@@ -189,8 +184,10 @@ export type WorkflowRun = {
   id: string
   workflow_id: string
   workspace_path: string
-  root_session_id: string
-  lanes?: Record<string, string>
+  session_id: string
+  model_provider_id?: string
+  model_id?: string
+  variant?: string
   status: WorkflowRunStatus
   current_node_id?: string
   block_reason?: string
@@ -247,6 +244,7 @@ export type WorkflowNodeResult = {
   structured?: string
   next_prompt?: string
   pass?: boolean
+  intent?: string
 }
 
 export type WorkflowNodeRun = {
@@ -281,153 +279,145 @@ export type WorkflowContinueResult = {
 }
 
 export function kindName(kind: WorkflowKind) {
-  if (kind === "start") return "开始"
-  if (kind === "plan") return "规划"
-  if (kind === "build") return "执行"
-  if (kind === "judge") return "判断"
-  if (kind === "review") return "检查"
-  if (kind === "end") return "结束"
-  return "人工确认"
+  if (kind === "start") return "Start"
+  if (kind === "intent") return "Intent"
+  if (kind === "plan") return "Plan"
+  if (kind === "build") return "Build"
+  if (kind === "judge") return "Judge"
+  if (kind === "review") return "Review"
+  if (kind === "end") return "End"
+  return "Gate"
 }
 
 export function kindDesc(kind: WorkflowKind) {
-  if (kind === "start") return "作为流程入口，整理输入和上下文后进入下一步。"
-  if (kind === "plan") return "拆解目标，生成清晰的执行计划。"
-  if (kind === "build") return "在工作区中实现需求，或修改已有代码与文件。"
-  if (kind === "judge") return "输出 pass 或 fail，用来驱动后续分支。"
-  if (kind === "review") return "检查当前结果并给出 pass 或 fail。"
-  if (kind === "end") return "汇总结果并结束流程。"
-  return "等待人工确认后继续。"
+  if (kind === "start") return "Entry node for the workflow."
+  if (kind === "intent") return "Route the latest request to planning, execution, or checking through a tool result."
+  if (kind === "plan") return "Break the goal into an executable plan and hand it off through the workflow tool."
+  if (kind === "build") return "Execute the work in the workspace and hand off the result through the workflow tool."
+  if (kind === "judge") return "Decide pass or fail through the workflow tool to drive branching."
+  if (kind === "review") return "Review the current result and return pass or fail through the workflow tool."
+  if (kind === "end") return "Exit node for the workflow."
+  return "Pause for manual or explicit gate handling through the workflow tool."
 }
 
 export function kindPrompt(kind: WorkflowKind) {
-  if (kind === "start") return "阅读用户目标和已有上下文，整理出本次工作流的起点。"
-  if (kind === "plan") return "先产出清晰的实施计划，不要直接开始修改代码。"
-  if (kind === "build") return "在当前工作区内完成目标，并让结果可验证。"
-  if (kind === "judge") return '根据当前结果做判断，并输出包含 "pass"、"summary"、"issues"、"next_prompt" 的 JSON。'
-  if (kind === "review") return '检查当前结果，并输出包含 "pass"、"summary"、"issues"、"next_prompt" 的 JSON。'
-  if (kind === "end") return "总结最终结果，并给出明确结论。"
-  return "等待人工确认后再继续执行。"
-}
-
-export function kindMode(kind: WorkflowKind): WorkflowSessionMode {
-  if (kind === "review" || kind === "judge") return "isolated"
-  return "shared"
+  if (kind === "start") return "Read the user goal and existing context, then hand control to the next node."
+  if (kind === "intent") {
+    return 'Decide whether the next node should be `plan`, `build`, or `checker`, then call `smartx-workflow` with `kind: "intent"`, `summary`, `intent`, and `next_prompt`.'
+  }
+  if (kind === "plan")
+    return 'Produce the plan first, then call `smartx-workflow` with `kind: "plan"` plus `summary`, `plan`, `deliverables`, `risks`, and `next_prompt`.'
+  if (kind === "build")
+    return 'Complete the work, then call `smartx-workflow` with `kind: "build"` plus at least `summary` and `next_prompt`.'
+  if (kind === "judge")
+    return 'Make the branch decision, then call `smartx-workflow` with `kind: "judge"`, `summary`, `pass`, `issues`, and `next_prompt`.'
+  if (kind === "review")
+    return 'Review the current result, then call `smartx-workflow` with `kind: "review"`, `summary`, `pass`, `issues`, and `next_prompt`.'
+  if (kind === "end") return "Summarize the final result and finish the workflow."
+  return 'Handle the gate, then call `smartx-workflow` with `kind: "gate"`, `summary`, and `next_prompt`.'
 }
 
 export function kindAgent(kind: WorkflowKind) {
   if (kind === "start") return "operator"
-  if (kind === "plan") return "planner"
+  if (kind === "intent") return "intent"
+  if (kind === "plan") return "smartx-plan"
   if (kind === "build") return "coder"
   if (kind === "judge") return "reviewer"
-  if (kind === "review") return "reviewer"
+  if (kind === "review") return "checker"
   if (kind === "end") return "operator"
   return "operator"
 }
 
-function sessions(kind: WorkflowKind) {
-  const list = [
-    { label: "共享会话", value: "shared" },
-    { label: "命名会话", value: "keyed" },
-    { label: "独立会话", value: "isolated" },
-  ]
-  if (kind === "review" || kind === "judge") {
-    return [list[2], list[1], list[0]]
-  }
-  return list
+export function kindTool(kind: WorkflowKind) {
+  if (kind === "start" || kind === "end") return ""
+  return "smartx-workflow"
 }
 
-function times(value = 0) {
+export function kindRetry(kind: WorkflowKind) {
+  if (kind === "start" || kind === "end") return 0
+  return 2
+}
+
+export function timeoutOptions(value = 0) {
   const list = [
-    { label: "默认（30 分钟）", value: "0" },
-    { label: "5 分钟", value: "300000" },
-    { label: "15 分钟", value: "900000" },
-    { label: "30 分钟", value: "1800000" },
-    { label: "60 分钟", value: "3600000" },
+    { label: "Default (30m)", value: "0" },
+    { label: "5 min", value: "300000" },
+    { label: "15 min", value: "900000" },
+    { label: "30 min", value: "1800000" },
+    { label: "60 min", value: "3600000" },
   ]
   const raw = String(Math.max(0, Math.trunc(value || 0)))
   if (list.some((item) => item.value === raw)) return list
   return [{ label: `${raw} ms`, value: raw }, ...list]
 }
 
-function retries(value = 0) {
+export function retryOptions(value = 2) {
   const list = [
-    { label: "不重试", value: "0" },
-    { label: "重试 1 次", value: "1" },
-    { label: "重试 2 次", value: "2" },
-    { label: "重试 3 次", value: "3" },
-    { label: "重试 5 次", value: "5" },
+    { label: "Retry 2", value: "2" },
+    { label: "Retry 3", value: "3" },
+    { label: "Retry 5", value: "5" },
   ]
   const raw = String(Math.max(0, Math.trunc(value || 0)))
   if (list.some((item) => item.value === raw)) return list
-  return [{ label: `重试 ${raw} 次`, value: raw }, ...list]
+  return [{ label: `Retry ${raw}`, value: raw }, ...list]
 }
 
-function label(key: WorkflowFieldKey) {
-  if (key === workflowField.session) return "会话"
-  if (key === workflowField.sessionKey) return "会话键"
-  if (key === workflowField.skills) return "技能"
-  if (key === workflowField.timeout) return "超时"
-  if (key === workflowField.retry) return "重试"
-  if (key === workflowField.model) return "模型覆盖"
-  if (key === workflowField.variant) return "变体"
-  return "提示词"
+export function fieldLabel(key: WorkflowFieldKey) {
+  if (key === workflowField.skills) return "Skills"
+  if (key === workflowField.tool) return "Tool Contract"
+  if (key === workflowField.timeout) return "Timeout"
+  if (key === workflowField.retry) return "Retry"
+  if (key === workflowField.model) return "Model Override"
+  if (key === workflowField.variant) return "Variant"
+  return "Prompt"
 }
 
 function fields(kind: WorkflowKind, seed: WorkflowSeed) {
   if (kind === "start" || kind === "end") return []
 
-  const mode = seed.mode || kindMode(kind)
   return [
-    {
-      key: workflowField.session,
-      kind: "select" as const,
-      label: label(workflowField.session),
-      value: mode,
-      options: sessions(kind),
-    },
-    {
-      key: workflowField.sessionKey,
-      kind: "text" as const,
-      label: label(workflowField.sessionKey),
-      value: seed.session_key || "",
-    },
     {
       key: workflowField.timeout,
       kind: "select" as const,
-      label: label(workflowField.timeout),
+      label: fieldLabel(workflowField.timeout),
       value: String(Math.max(0, Math.trunc(seed.timeout || 0))),
-      options: times(seed.timeout),
+      options: timeoutOptions(seed.timeout),
     },
     {
       key: workflowField.retry,
       kind: "select" as const,
-      label: label(workflowField.retry),
-      value: String(Math.max(0, Math.trunc(seed.retry || 0))),
-      options: retries(seed.retry),
+      label: fieldLabel(workflowField.retry),
+      value: String(Math.max(0, Math.trunc(seed.retry ?? kindRetry(kind)))),
+      options: retryOptions(seed.retry ?? kindRetry(kind)),
     },
     {
       key: workflowField.skills,
       kind: "multi" as const,
-      label: label(workflowField.skills),
+      label: fieldLabel(workflowField.skills),
       value: seed.skills || [],
+    },
+    {
+      key: workflowField.tool,
+      kind: "text" as const,
+      label: fieldLabel(workflowField.tool),
+      value: seed.tool ?? kindTool(kind),
     },
     {
       key: workflowField.model,
       kind: "text" as const,
-      label: label(workflowField.model),
+      label: fieldLabel(workflowField.model),
       value: seed.model || "",
     },
     {
       key: workflowField.variant,
       kind: "text" as const,
-      label: label(workflowField.variant),
+      label: fieldLabel(workflowField.variant),
       value: seed.variant || "",
     },
     {
       key: workflowField.prompt,
       kind: "note" as const,
-      label: label(workflowField.prompt),
+      label: fieldLabel(workflowField.prompt),
       value: seed.prompt || kindPrompt(kind),
     },
   ]
@@ -436,13 +426,20 @@ function fields(kind: WorkflowKind, seed: WorkflowSeed) {
 export function makeNode(kind: WorkflowKind, id: string, pos: XYPosition, seed: WorkflowSeed = {}): WorkflowFlowNode {
   const title =
     seed.title ||
-    (kind === "start" || kind === "end" || kind === "judge" ? kindName(kind) : seed.agent || kindAgent(kind))
+    (kind === "start" || kind === "intent" || kind === "end" || kind === "judge"
+      ? kindName(kind)
+      : seed.agent || kindAgent(kind))
 
   const data = {
     kind,
     title,
     desc: seed.desc || kindDesc(kind),
-    tone: kind === "start" || kind === "plan" ? "blue" : kind === "build" || kind === "end" ? "amber" : "slate",
+    tone:
+      kind === "start" || kind === "intent" || kind === "plan"
+        ? "blue"
+        : kind === "build" || kind === "end"
+          ? "amber"
+          : "slate",
     fields: fields(kind, seed),
   } as const
 

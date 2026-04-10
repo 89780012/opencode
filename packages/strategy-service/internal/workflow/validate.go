@@ -43,14 +43,14 @@ func validateSave(flow Workflow) error {
 	}
 
 	for _, item := range flow.Nodes {
-		if item.Session == Keyed && item.SessionKey == "" {
-			return errors.New("workflow keyed session requires session_key")
-		}
 		if (item.ModelProviderID == "") != (item.ModelID == "") {
 			return errors.New("workflow node model override requires both model_provider_id and model_id")
 		}
-		if (item.Kind == Review || item.Kind == Judge) && outs[item.ID] == 0 {
-			return errors.New("review and judge nodes require at least one outgoing edge")
+		if item.Kind != Start && item.Kind != End && item.ToolID == "" {
+			return errors.New("workflow node tool_id is required for non-start/end nodes")
+		}
+		if (item.Kind == Intent || item.Kind == Review || item.Kind == Judge) && outs[item.ID] == 0 {
+			return errors.New("intent, review and judge nodes require at least one outgoing edge")
 		}
 	}
 
@@ -60,9 +60,6 @@ func validateSave(flow Workflow) error {
 func validateStart(flow Workflow) error {
 	if err := validateSave(flow); err != nil {
 		return err
-	}
-	if flow.WorkspacePath == "" {
-		return errors.New("workflow workspace_path is required")
 	}
 	if len(flow.Nodes) == 0 {
 		return errors.New("workflow requires at least one node")

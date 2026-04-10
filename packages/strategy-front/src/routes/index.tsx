@@ -6,6 +6,7 @@ const AppShellPage = lazy(() => import("@/pages/app-shell"))
 const IndexPage = lazy(() => import("@/pages/index"))
 const StrategiesPage = lazy(() => import("@/pages/strategies"))
 const StrategyDetailPage = lazy(() => import("@/pages/strategy-detail"))
+const StrategyWorkflowChatPage = lazy(() => import("@/pages/strategy-workflow-chat"))
 const StrategyMultiPage = lazy(() => import("@/pages/strategy-multi"))
 const WorkflowsPage = lazy(() => import("@/pages/workflows"))
 const WorkflowDetailPage = lazy(() => import("@/pages/workflow-detail"))
@@ -49,6 +50,10 @@ const router = createBrowserRouter([
           {
             path: "multi",
             element: <StrategyMultiPage />,
+          },
+          {
+            path: ":strategyID/workflow-chat",
+            element: <StrategyWorkflowChatPage />,
           },
           {
             path: ":strategyID",
@@ -163,7 +168,7 @@ const router = createBrowserRouter([
 
 export function AppRouter() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={<div>加载中...</div>}>
       <RouterProvider router={router} />
     </Suspense>
   )

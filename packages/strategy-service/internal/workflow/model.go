@@ -4,6 +4,7 @@ type Kind string
 
 const (
 	Start  Kind = "start"
+	Intent Kind = "intent"
 	Plan   Kind = "plan"
 	Build  Kind = "build"
 	Judge  Kind = "judge"
@@ -12,51 +13,47 @@ const (
 	Gate   Kind = "gate"
 )
 
-type Mode string
-
-const (
-	Shared   Mode = "shared"
-	Isolated Mode = "isolated"
-	Keyed    Mode = "keyed"
-)
-
 type Cond string
 
 const (
-	Always Cond = "always"
-	Pass   Cond = "pass"
-	Fail   Cond = "fail"
+	Always  Cond = "always"
+	PlanTo  Cond = "plan"
+	BuildTo Cond = "build"
+	CheckTo Cond = "checker"
+	Pass    Cond = "pass"
+	Fail    Cond = "fail"
 )
 
 type RunStatus string
 
 const (
-	RunPending RunStatus = "pending"
-	RunRunning RunStatus = "running"
-	RunBlocked RunStatus = "blocked"
-	RunFailed  RunStatus = "failed"
-	RunDone    RunStatus = "done"
+	RunPending     RunStatus = "pending"
+	RunRunning     RunStatus = "running"
+	RunBlocked     RunStatus = "blocked"
+	RunFailed      RunStatus = "failed"
+	RunDone        RunStatus = "done"
+	RunInterrupted RunStatus = "interrupted"
 )
 
 type NodeStatus string
 
 const (
-	NodePending NodeStatus = "pending"
-	NodeRunning NodeStatus = "running"
-	NodeBlocked NodeStatus = "blocked"
-	NodeFailed  NodeStatus = "failed"
-	NodeDone    NodeStatus = "done"
-	NodeTimeout NodeStatus = "timeout"
+	NodePending     NodeStatus = "pending"
+	NodeRunning     NodeStatus = "running"
+	NodeBlocked     NodeStatus = "blocked"
+	NodeFailed      NodeStatus = "failed"
+	NodeDone        NodeStatus = "done"
+	NodeTimeout     NodeStatus = "timeout"
+	NodeInterrupted NodeStatus = "interrupted"
 )
 
 type Workflow struct {
-	ID            string `json:"id"`
-	Name          string `json:"name"`
-	WorkspacePath string `json:"workspace_path"`
-	RootNodeID    string `json:"root_node_id"`
-	Nodes         []Node `json:"nodes"`
-	Edges         []Edge `json:"edges"`
-	UpdatedAt     int64  `json:"updated_at"`
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	RootNodeID string `json:"root_node_id"`
+	Nodes      []Node `json:"nodes"`
+	Edges      []Edge `json:"edges"`
+	UpdatedAt  int64  `json:"updated_at"`
 }
 
 type Node struct {
@@ -64,11 +61,10 @@ type Node struct {
 	Kind            Kind     `json:"kind"`
 	Title           string   `json:"title"`
 	Agent           string   `json:"agent"`
+	ToolID          string   `json:"tool_id,omitempty"`
 	X               float64  `json:"x,omitempty"`
 	Y               float64  `json:"y,omitempty"`
 	Skills          []string `json:"skills"`
-	Session         Mode     `json:"session_mode"`
-	SessionKey      string   `json:"session_key,omitempty"`
 	Prompt          string   `json:"prompt"`
 	TimeoutMS       int64    `json:"timeout_ms"`
 	RetryLimit      int      `json:"retry_limit"`
@@ -86,20 +82,22 @@ type Edge struct {
 }
 
 type Run struct {
-	ID             string            `json:"id"`
-	WorkflowID     string            `json:"workflow_id"`
-	WorkspacePath  string            `json:"workspace_path"`
-	RootSessionID  string            `json:"root_session_id"`
-	Lanes          map[string]string `json:"lanes,omitempty"`
-	Status         RunStatus         `json:"status"`
-	CurrentNodeID  string            `json:"current_node_id"`
-	BlockReason    string            `json:"block_reason,omitempty"`
-	BlockRequestID string            `json:"block_request_id,omitempty"`
-	Input          string            `json:"input"`
-	Loop           int               `json:"loop"`
-	StartedAt      int64             `json:"started_at"`
-	EndedAt        int64             `json:"ended_at,omitempty"`
-	Error          string            `json:"error,omitempty"`
+	ID              string    `json:"id"`
+	WorkflowID      string    `json:"workflow_id"`
+	WorkspacePath   string    `json:"workspace_path"`
+	SessionID       string    `json:"session_id"`
+	ModelProviderID string    `json:"model_provider_id,omitempty"`
+	ModelID         string    `json:"model_id,omitempty"`
+	Variant         string    `json:"variant,omitempty"`
+	Status          RunStatus `json:"status"`
+	CurrentNodeID   string    `json:"current_node_id"`
+	BlockReason     string    `json:"block_reason,omitempty"`
+	BlockRequestID  string    `json:"block_request_id,omitempty"`
+	Input           string    `json:"input"`
+	Loop            int       `json:"loop"`
+	StartedAt       int64     `json:"started_at"`
+	EndedAt         int64     `json:"ended_at,omitempty"`
+	Error           string    `json:"error,omitempty"`
 }
 
 type NodeRun struct {
@@ -131,6 +129,7 @@ type Result struct {
 	Structured string `json:"structured,omitempty"`
 	NextPrompt string `json:"next_prompt,omitempty"`
 	Pass       *bool  `json:"pass,omitempty"`
+	Intent     string `json:"intent,omitempty"`
 }
 
 type List struct {
@@ -182,4 +181,32 @@ type StartResult struct {
 
 type ContinueResult struct {
 	Run Run `json:"run"`
+}
+
+type WorkspaceStatus string
+
+const (
+	WorkspaceIdle        WorkspaceStatus = "idle"
+	WorkspaceRunning     WorkspaceStatus = "running"
+	WorkspaceBlocked     WorkspaceStatus = "blocked"
+	WorkspaceDone        WorkspaceStatus = "done"
+	WorkspaceFailed      WorkspaceStatus = "failed"
+	WorkspaceInterrupted WorkspaceStatus = "interrupted"
+)
+
+type WorkspaceState struct {
+	WorkspacePath   string          `json:"workspace_path"`
+	Status          WorkspaceStatus `json:"status"`
+	SessionID       string          `json:"session_id,omitempty"`
+	WorkflowID      string          `json:"workflow_id,omitempty"`
+	ModelProviderID string          `json:"model_provider_id,omitempty"`
+	ModelID         string          `json:"model_id,omitempty"`
+	Variant         string          `json:"variant,omitempty"`
+	RunID           string          `json:"run_id,omitempty"`
+	UpdatedAt       int64           `json:"updated_at"`
+}
+
+type WorkspaceSnapshot struct {
+	State WorkspaceState `json:"state"`
+	Run   *Run           `json:"run,omitempty"`
 }

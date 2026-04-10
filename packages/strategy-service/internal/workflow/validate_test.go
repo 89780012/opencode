@@ -2,23 +2,10 @@ package workflow
 
 import "testing"
 
-func TestValidateRequiresWorkspace(t *testing.T) {
-	err := validate(Workflow{
-		RootNodeID: "n1",
-		Nodes: []Node{
-			{ID: "n1", Kind: Plan},
-		},
-	})
-	if err == nil {
-		t.Fatal("expected workspace validation error")
-	}
-}
-
 func TestValidateRequiresRoot(t *testing.T) {
 	err := validate(Workflow{
-		WorkspacePath: "x",
 		Nodes: []Node{
-			{ID: "n1", Kind: Plan},
+			{ID: "n1", Kind: Plan, ToolID: "smartx-workflow"},
 		},
 	})
 	if err == nil {
@@ -28,10 +15,9 @@ func TestValidateRequiresRoot(t *testing.T) {
 
 func TestValidateRequiresKnownEdgeTargets(t *testing.T) {
 	err := validate(Workflow{
-		WorkspacePath: "x",
-		RootNodeID:    "n1",
+		RootNodeID: "n1",
 		Nodes: []Node{
-			{ID: "n1", Kind: Plan},
+			{ID: "n1", Kind: Plan, ToolID: "smartx-workflow"},
 		},
 		Edges: []Edge{
 			{ID: "e1", From: "n1", To: "n2", Cond: Always},
@@ -42,12 +28,23 @@ func TestValidateRequiresKnownEdgeTargets(t *testing.T) {
 	}
 }
 
+func TestValidateRequiresToolForNonAutoNode(t *testing.T) {
+	err := validate(Workflow{
+		RootNodeID: "n1",
+		Nodes: []Node{
+			{ID: "n1", Kind: Plan},
+		},
+	})
+	if err == nil {
+		t.Fatal("expected missing tool validation error")
+	}
+}
+
 func TestValidateRequiresReviewOutgoingEdge(t *testing.T) {
 	err := validate(Workflow{
-		WorkspacePath: "x",
-		RootNodeID:    "n1",
+		RootNodeID: "n1",
 		Nodes: []Node{
-			{ID: "n1", Kind: Review},
+			{ID: "n1", Kind: Review, ToolID: "smartx-workflow"},
 		},
 	})
 	if err == nil {
@@ -57,11 +54,10 @@ func TestValidateRequiresReviewOutgoingEdge(t *testing.T) {
 
 func TestValidateAcceptsBasicWorkflow(t *testing.T) {
 	err := validate(Workflow{
-		WorkspacePath: "x",
-		RootNodeID:    "n1",
+		RootNodeID: "n1",
 		Nodes: []Node{
-			{ID: "n1", Kind: Plan},
-			{ID: "n2", Kind: Build},
+			{ID: "n1", Kind: Plan, ToolID: "smartx-workflow"},
+			{ID: "n2", Kind: Build, ToolID: "smartx-workflow"},
 		},
 		Edges: []Edge{
 			{ID: "e1", From: "n1", To: "n2", Cond: Always},
@@ -74,10 +70,9 @@ func TestValidateAcceptsBasicWorkflow(t *testing.T) {
 
 func TestValidateRejectsHalfModelOverride(t *testing.T) {
 	err := validate(Workflow{
-		WorkspacePath: "x",
-		RootNodeID:    "n1",
+		RootNodeID: "n1",
 		Nodes: []Node{
-			{ID: "n1", Kind: Build, ModelProviderID: "openai"},
+			{ID: "n1", Kind: Build, ToolID: "smartx-workflow", ModelProviderID: "openai"},
 		},
 	})
 	if err == nil {
@@ -85,15 +80,14 @@ func TestValidateRejectsHalfModelOverride(t *testing.T) {
 	}
 }
 
-func TestValidateRequiresKeyForKeyedSession(t *testing.T) {
+func TestValidateRequiresIntentOutgoingEdge(t *testing.T) {
 	err := validate(Workflow{
-		WorkspacePath: "x",
-		RootNodeID:    "n1",
+		RootNodeID: "n1",
 		Nodes: []Node{
-			{ID: "n1", Kind: Build, Session: Keyed},
+			{ID: "n1", Kind: Intent, ToolID: "smartx-workflow"},
 		},
 	})
 	if err == nil {
-		t.Fatal("expected keyed session validation error")
+		t.Fatal("expected intent outgoing edge validation error")
 	}
 }

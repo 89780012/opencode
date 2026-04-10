@@ -27,53 +27,104 @@ type messageInfo struct {
 }
 
 type messagePart struct {
-	Type string `json:"type"`
-	Text string `json:"text"`
+	Type   string       `json:"type"`
+	Text   string       `json:"text,omitempty"`
+	CallID string       `json:"callID,omitempty"`
+	Tool   string       `json:"tool,omitempty"`
+	State  messageState `json:"state,omitempty"`
 }
 
-func parse(kind Kind, text string) (Result, error) {
-	raw := strings.TrimSpace(text)
-	res := Result{
-		Raw:  raw,
-		Text: raw,
-	}
-	if kind != Review && kind != Judge {
-		return res, nil
-	}
-	if raw == "" {
-		return Result{}, errors.New(string(kind) + " output is empty")
+type messageState struct {
+	Status string          `json:"status,omitempty"`
+	Input  json.RawMessage `json:"input,omitempty"`
+	Output string          `json:"output,omitempty"`
+	Error  string          `json:"error,omitempty"`
+}
+
+type contractError struct {
+	msg string
+}
+
+func (e contractError) Error() string {
+	return e.msg
+}
+
+func retryable(err error) bool {
+	var out contractError
+	return errors.As(err, &out)
+}
+
+func parseTool(kind Kind, raw json.RawMessage) (Result, error) {
+	raw = json.RawMessage(strings.TrimSpace(string(raw)))
+	if len(raw) == 0 {
+		return Result{}, contractError{msg: "tool input is empty"}
 	}
 
 	var body struct {
-		Pass       *bool    `json:"pass"`
+		Kind       string   `json:"kind"`
 		Summary    string   `json:"summary"`
 		NextPrompt string   `json:"next_prompt"`
+		Intent     string   `json:"intent"`
+		Pass       *bool    `json:"pass"`
 		Issues     []string `json:"issues"`
+		Plan       []string `json:"plan"`
 	}
-	if err := json.Unmarshal([]byte(raw), &body); err != nil {
-		return Result{}, errors.New(string(kind) + " output must be valid JSON")
-	}
-	if body.Pass == nil {
-		return Result{}, errors.New(string(kind) + " output must include boolean pass")
+	if err := json.Unmarshal(raw, &body); err != nil {
+		return Result{}, contractError{msg: "tool input must be valid JSON"}
 	}
 
-	res.Structured = raw
-	res.NextPrompt = strings.TrimSpace(body.NextPrompt)
-	res.Pass = body.Pass
-	if strings.TrimSpace(body.Summary) != "" {
-		res.Text = strings.TrimSpace(body.Summary)
+	body.Kind = strings.TrimSpace(body.Kind)
+	if body.Kind != "" && body.Kind != string(kind) {
+		return Result{}, contractError{msg: "tool kind must match workflow node kind"}
+	}
+
+	res := Result{
+		Raw:        string(raw),
+		Text:       strings.TrimSpace(body.Summary),
+		Structured: string(raw),
+		NextPrompt: strings.TrimSpace(body.NextPrompt),
+	}
+	if res.Text == "" && len(body.Plan) > 0 {
+		res.Text = strings.Join(body.Plan, "\n")
+	}
+	if res.Text == "" && len(body.Issues) > 0 {
+		res.Text = strings.Join(body.Issues, "\n")
+	}
+
+	if kind == Intent {
+		body.Intent = strings.TrimSpace(body.Intent)
+		if body.Intent != string(PlanTo) && body.Intent != string(BuildTo) && body.Intent != string(CheckTo) {
+			return Result{}, contractError{msg: `intent tool input must include intent = "plan" | "build" | "checker"`}
+		}
+		res.Intent = body.Intent
+	}
+
+	if kind == Review || kind == Judge {
+		if body.Pass == nil {
+			return Result{}, contractError{msg: string(kind) + " tool input must include boolean pass"}
+		}
+		res.Pass = body.Pass
+	}
+
+	if res.Text == "" {
+		return Result{}, contractError{msg: string(kind) + " tool input must include summary or structured items"}
 	}
 	return res, nil
 }
 
 func (s *Service) resolve(dir string, sid string, row NodeRun, node Node) (Result, error) {
+	if strings.TrimSpace(node.ToolID) == "" {
+		return Result{}, errors.New("workflow node tool_id is required")
+	}
+
 	list, err := s.messages(dir, sid)
 	if err != nil {
 		return Result{}, err
 	}
 
-	out := []string{}
 	past := row.Anchor.LastMessageID == ""
+	var done *messagePart
+	var fail *messagePart
 	for _, item := range list {
 		if !past {
 			if item.Info.ID == row.Anchor.LastMessageID {
@@ -87,13 +138,31 @@ func (s *Service) resolve(dir string, sid string, row NodeRun, node Node) (Resul
 		if row.Anchor.LastMessageID == "" && item.Info.Time.Created < row.Anchor.StartedAt {
 			continue
 		}
-		part := strings.TrimSpace(joinParts(item.Parts))
-		if part != "" {
-			out = append(out, part)
+		for _, part := range item.Parts {
+			if part.Type != "tool" || strings.TrimSpace(part.Tool) != node.ToolID {
+				continue
+			}
+			part := part
+			if part.State.Status == "completed" {
+				done = &part
+			}
+			if part.State.Status == "error" {
+				fail = &part
+			}
 		}
 	}
 
-	return parse(node.Kind, strings.TrimSpace(strings.Join(out, "\n\n")))
+	if done != nil {
+		return parseTool(node.Kind, done.State.Input)
+	}
+	if fail != nil {
+		msg := strings.TrimSpace(fail.State.Error)
+		if msg == "" {
+			msg = "tool execution failed"
+		}
+		return Result{}, contractError{msg: "required tool " + node.ToolID + " failed: " + msg}
+	}
+	return Result{}, contractError{msg: "required tool " + node.ToolID + " was not called"}
 }
 
 func (s *Service) completed(row NodeRun) (bool, error) {
@@ -165,18 +234,4 @@ func (s *Service) anchor(dir string, sid string) Anchor {
 		StartedAt:     time.Now().UnixMilli(),
 		LastMessageID: last.Info.ID,
 	}
-}
-
-func joinParts(parts []messagePart) string {
-	list := []string{}
-	for _, item := range parts {
-		if item.Type != "text" {
-			continue
-		}
-		if strings.TrimSpace(item.Text) == "" {
-			continue
-		}
-		list = append(list, item.Text)
-	}
-	return strings.TrimSpace(strings.Join(list, "\n"))
 }

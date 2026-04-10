@@ -36,10 +36,14 @@ export const workflowApi = {
     return request.delete<void>(`/workflow/${encodeURIComponent(id)}`)
   },
 
-  start(id: string, input: string) {
-    return request.post<WorkflowStartResult, { input: string }>(`/workflow/${encodeURIComponent(id)}/start`, {
-      input,
-    })
+  start(id: string, workspace_path: string, input: string) {
+    return request.post<WorkflowStartResult, { workspace_path: string; input: string }>(
+      `/workflow/${encodeURIComponent(id)}/start`,
+      {
+        workspace_path,
+        input,
+      },
+    )
   },
 
   runs(workflowID?: string) {

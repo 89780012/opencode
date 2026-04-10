@@ -21,6 +21,7 @@ type writer struct {
 	buf bytes.Buffer
 }
 
+// 写入日志
 func (w *writer) Write(p []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -49,6 +50,7 @@ func (w *writer) Write(p []byte) (int, error) {
 	}
 }
 
+// 日志级别
 func level(s string) slog.Level {
 	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "debug":

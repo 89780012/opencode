@@ -46,6 +46,14 @@ func (s *store) saveNodeRuns(list []NodeRun) error {
 	return save(s, "workflow-node-runs.json", cleanNodeRuns(list))
 }
 
+func (s *store) loadWorkspaceStates() ([]WorkspaceState, error) {
+	return load[WorkspaceState](s, "workflow-workspace-states.json", cleanWorkspaceStates)
+}
+
+func (s *store) saveWorkspaceStates(list []WorkspaceState) error {
+	return save(s, "workflow-workspace-states.json", cleanWorkspaceStates(list))
+}
+
 func load[T any](s *store, name string, clean func([]T) []T) ([]T, error) {
 	path, err := s.path(name)
 	if err != nil {
@@ -102,7 +110,6 @@ func cleanFlows(list []Workflow) []Workflow {
 		}
 		seen[item.ID] = true
 		item.Name = text(item.Name)
-		item.WorkspacePath = text(item.WorkspacePath)
 		item.RootNodeID = text(item.RootNodeID)
 		item.Nodes = cleanNodes(item.Nodes)
 		item.Edges = cleanEdges(item.Edges)
@@ -128,31 +135,34 @@ func cleanNodes(list []Node) []Node {
 		seen[item.ID] = true
 		item.Title = text(item.Title)
 		item.Agent = text(item.Agent)
+		item.ToolID = text(item.ToolID)
 		item.Prompt = strings.TrimSpace(strings.ReplaceAll(item.Prompt, "\r\n", "\n"))
-		item.SessionKey = text(item.SessionKey)
 		item.ModelProviderID = text(item.ModelProviderID)
 		item.ModelID = text(item.ModelID)
 		item.Variant = text(item.Variant)
-		item.Session = mode(item.Session)
 		item.Kind = kind(item.Kind)
 		item.Skills = uniq(item.Skills)
 		if item.Kind == Start || item.Kind == End {
 			item.Agent = ""
+			item.ToolID = ""
 			item.Prompt = ""
 			item.Skills = nil
-			item.SessionKey = ""
 			item.ModelProviderID = ""
 			item.ModelID = ""
 			item.Variant = ""
-		}
-		if item.Session != Keyed {
-			item.SessionKey = ""
+		} else {
+			if item.ToolID == "" {
+				item.ToolID = "smartx-workflow"
+			}
 		}
 		if item.TimeoutMS < 0 {
 			item.TimeoutMS = 0
 		}
 		if item.RetryLimit < 0 {
 			item.RetryLimit = 0
+		}
+		if item.Kind != Start && item.Kind != End && item.RetryLimit < 2 {
+			item.RetryLimit = 2
 		}
 		if item.X != item.X {
 			item.X = 0
@@ -197,13 +207,20 @@ func cleanRuns(list []Run) []Run {
 		seen[item.ID] = true
 		item.WorkflowID = text(item.WorkflowID)
 		item.WorkspacePath = text(item.WorkspacePath)
-		item.RootSessionID = text(item.RootSessionID)
-		item.Lanes = pairs(item.Lanes)
+		item.SessionID = text(item.SessionID)
+		item.ModelProviderID = text(item.ModelProviderID)
+		item.ModelID = text(item.ModelID)
+		item.Variant = text(item.Variant)
 		item.CurrentNodeID = text(item.CurrentNodeID)
 		item.BlockReason = text(item.BlockReason)
 		item.BlockRequestID = text(item.BlockRequestID)
 		item.Input = strings.TrimSpace(strings.ReplaceAll(item.Input, "\r\n", "\n"))
 		item.Error = text(item.Error)
+		if item.ModelProviderID == "" || item.ModelID == "" {
+			item.ModelProviderID = ""
+			item.ModelID = ""
+			item.Variant = ""
+		}
 		item.Status = runStatus(item.Status)
 		out = append(out, item)
 	}
@@ -251,6 +268,35 @@ func cleanNodeRuns(list []NodeRun) []NodeRun {
 	return out
 }
 
+func cleanWorkspaceStates(list []WorkspaceState) []WorkspaceState {
+	out := make([]WorkspaceState, 0, len(list))
+	seen := map[string]bool{}
+	for _, item := range list {
+		item.WorkspacePath = text(item.WorkspacePath)
+		if item.WorkspacePath == "" || seen[item.WorkspacePath] {
+			continue
+		}
+		seen[item.WorkspacePath] = true
+		item.SessionID = text(item.SessionID)
+		item.WorkflowID = text(item.WorkflowID)
+		item.ModelProviderID = text(item.ModelProviderID)
+		item.ModelID = text(item.ModelID)
+		item.Variant = text(item.Variant)
+		item.RunID = text(item.RunID)
+		if item.ModelProviderID == "" || item.ModelID == "" {
+			item.ModelProviderID = ""
+			item.ModelID = ""
+			item.Variant = ""
+		}
+		item.Status = workspaceStatus(item.Status)
+		out = append(out, item)
+	}
+	slices.SortFunc(out, func(a WorkspaceState, b WorkspaceState) int {
+		return strings.Compare(strings.ToLower(a.WorkspacePath), strings.ToLower(b.WorkspacePath))
+	})
+	return out
+}
+
 func text(v string) string {
 	return strings.TrimSpace(v)
 }
@@ -271,44 +317,16 @@ func uniq(list []string) []string {
 
 func kind(v Kind) Kind {
 	switch v {
-	case Start, Plan, Build, Judge, Review, End, Gate:
+	case Start, Intent, Plan, Build, Judge, Review, End, Gate:
 		return v
 	default:
 		return Plan
 	}
 }
 
-func mode(v Mode) Mode {
-	switch v {
-	case Shared, Isolated, Keyed:
-		return v
-	default:
-		return Shared
-	}
-}
-
-func pairs(input map[string]string) map[string]string {
-	if len(input) == 0 {
-		return nil
-	}
-	out := map[string]string{}
-	for key, value := range input {
-		key = text(key)
-		value = text(value)
-		if key == "" || value == "" {
-			continue
-		}
-		out[key] = value
-	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
-}
-
 func cond(v Cond) Cond {
 	switch v {
-	case Pass, Fail:
+	case PlanTo, BuildTo, Pass, Fail:
 		return v
 	default:
 		return Always
@@ -317,7 +335,7 @@ func cond(v Cond) Cond {
 
 func runStatus(v RunStatus) RunStatus {
 	switch v {
-	case RunRunning, RunBlocked, RunFailed, RunDone:
+	case RunRunning, RunBlocked, RunFailed, RunDone, RunInterrupted:
 		return v
 	default:
 		return RunPending
@@ -326,10 +344,19 @@ func runStatus(v RunStatus) RunStatus {
 
 func nodeStatus(v NodeStatus) NodeStatus {
 	switch v {
-	case NodeRunning, NodeBlocked, NodeFailed, NodeDone, NodeTimeout:
+	case NodeRunning, NodeBlocked, NodeFailed, NodeDone, NodeTimeout, NodeInterrupted:
 		return v
 	default:
 		return NodePending
+	}
+}
+
+func workspaceStatus(v WorkspaceStatus) WorkspaceStatus {
+	switch v {
+	case WorkspaceRunning, WorkspaceBlocked, WorkspaceDone, WorkspaceFailed, WorkspaceInterrupted:
+		return v
+	default:
+		return WorkspaceIdle
 	}
 }
 

@@ -23,8 +23,6 @@ type State struct {
 	Status    string     `json:"status"`
 	Ready     bool       `json:"ready"`
 	Running   bool       `json:"running"`
-	Owned     bool       `json:"owned"`
-	PID       int        `json:"pid,omitempty"`
 	Message   string     `json:"message,omitempty"`
 	StartedAt *time.Time `json:"started_at,omitempty"`
 }

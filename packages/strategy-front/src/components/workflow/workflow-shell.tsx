@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { ArrowLeft, PanelLeftClose, PanelLeftOpen } from "lucide-react"
 import { Link } from "react-router-dom"
 import { toast } from "sonner"
-import { permissionApi, questionApi, workflowApi } from "@/api/modules"
+import { workflowApi } from "@/api/modules"
 import { WorkflowCanvas } from "@/components/workflow/workflow-canvas"
 import { WorkflowLibrary } from "@/components/workflow/workflow-library"
 import { WorkflowSidepanel } from "@/components/workflow/workflow-sidepanel"
@@ -12,6 +12,7 @@ import { fromFlow, runtimeDetail } from "@/lib/workflow-runtime"
 import type {
   WorkflowDetail,
   WorkflowEdgeCond,
+  WorkflowField,
   WorkflowFlowEdge,
   WorkflowFlowNode,
   WorkflowNodeRun,
@@ -19,7 +20,6 @@ import type {
   WorkflowRuntimeDetail,
   WorkflowSummary,
 } from "@/types/workflow"
-import type { ChatQuestionAnswer, ChatQuestionRequest, PermissionRequest } from "@/types/chat"
 
 function sortRuns(list: WorkflowRun[]) {
   return [...list].sort((a, b) => b.started_at - a.started_at)
@@ -33,30 +33,29 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
   const [open, setOpen] = useState(true)
   const [q, setQ] = useState("")
   const [busy, setBusy] = useState(false)
-  const [text, setText] = useState("")
-  const [workspace, setWorkspace] = useState(props.item.workspace_path || "")
   const [run, setRun] = useState<WorkflowRun | null>(null)
   const [runs, setRuns] = useState<WorkflowRun[]>([])
   const [rows, setRows] = useState<WorkflowNodeRun[]>([])
   const [summary, setSummary] = useState<WorkflowSummary | null>(null)
-  const [permission, setPermission] = useState<PermissionRequest | null>(null)
-  const [question, setQuestion] = useState<ChatQuestionRequest | null>(null)
-  const [sending, setSending] = useState(false)
   const [item, setItem] = useState(props.item)
   const [flow, setFlow] = useState<WorkflowDetail>(() => runtimeDetail(props.item))
   const [edgeID, setEdgeID] = useState("")
+  const [nodeID, setNodeID] = useState("")
 
   useEffect(() => {
     setItem(props.item)
-    setWorkspace(props.item.workspace_path || "")
     setFlow(runtimeDetail(props.item))
     setEdgeID("")
+    setNodeID("")
   }, [props.item])
 
-  const blocked = run?.status === "blocked"
-  const current = useMemo(() => rows.find((row) => row.node_id === run?.current_node_id) ?? null, [rows, run])
-  const canRun = flow.nodes.length > 0 && !!workspace.trim()
+  const current = useMemo(() => {
+    const list = rows.filter((row) => row.node_id === run?.current_node_id)
+    return list.at(-1) ?? null
+  }, [rows, run?.current_node_id])
+
   const edge = useMemo(() => flow.edges.find((item) => item.id === edgeID) ?? null, [edgeID, flow.edges])
+  const node = useMemo(() => flow.nodes.find((item) => item.id === nodeID) ?? null, [flow.nodes, nodeID])
 
   useEffect(() => {
     if (!edgeID) return
@@ -64,26 +63,32 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
     setEdgeID("")
   }, [edgeID, flow.edges])
 
+  useEffect(() => {
+    if (!nodeID) return
+    if (flow.nodes.some((item) => item.id === nodeID)) return
+    setNodeID("")
+  }, [flow.nodes, nodeID])
+
   const sync = useCallback(
     async (runID?: string) => {
       const [stats, data] = await Promise.all([
         workflowApi.summary(item.id).catch(() => null),
         workflowApi.runs(item.id).catch(() => ({ items: [] })),
       ])
-      const runs = sortRuns(data.items || [])
+      const nextRuns = sortRuns(data.items || [])
       setSummary(stats)
-      setRuns(runs)
+      setRuns(nextRuns)
 
-      const id = runID || runs[0]?.id
+      const id = runID || nextRuns[0]?.id
       if (!id) {
         setRun(null)
         setRows([])
         return
       }
 
-      const [run, rows] = await Promise.all([workflowApi.run(id), workflowApi.nodeRuns(id)])
-      setRun(run)
-      setRows(sortRows(rows.items || []))
+      const [nextRun, nextRows] = await Promise.all([workflowApi.run(id), workflowApi.nodeRuns(id)])
+      setRun(nextRun)
+      setRows(sortRows(nextRows.items || []))
     },
     [item.id],
   )
@@ -103,33 +108,6 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
     return () => window.clearInterval(timer)
   }, [run?.id, run?.status, sync])
 
-  useEffect(() => {
-    if (!run?.block_request_id || run.status !== "blocked") {
-      setPermission(null)
-      setQuestion(null)
-      return
-    }
-
-    const load = async () => {
-      if (run.block_reason === "permission") {
-        const data = await permissionApi.list().catch(() => [])
-        setPermission(data.find((item) => item.id === run.block_request_id) ?? null)
-        setQuestion(null)
-        return
-      }
-      if (run.block_reason === "question") {
-        const data = await questionApi.list().catch(() => [])
-        setQuestion(data.find((item) => item.id === run.block_request_id) ?? null)
-        setPermission(null)
-        return
-      }
-      setPermission(null)
-      setQuestion(null)
-    }
-
-    void load()
-  }, [run?.block_reason, run?.block_request_id, run?.status])
-
   const onCanvasChange = useCallback((nodes: WorkflowFlowNode[], edges: WorkflowFlowEdge[]) => {
     setFlow((prev) => {
       if (prev.nodes === nodes && prev.edges === edges) return prev
@@ -142,42 +120,73 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
     })
   }, [])
 
-  const onEdgeCond = useCallback((cond: WorkflowEdgeCond) => {
-    setFlow((prev) => ({
-      ...prev,
-      edges: prev.edges.map((item) =>
-        item.id === edgeID
-          ? {
-              ...item,
-              data: {
-                ...item.data,
-                cond,
-              },
-            }
-          : item,
-      ),
-    }))
-  }, [edgeID])
+  const onPick = useCallback((node: WorkflowFlowNode | null) => {
+    setNodeID(node?.id || "")
+    if (node) setEdgeID("")
+  }, [])
 
-  const onEdgeLabel = useCallback((label: string) => {
-    setFlow((prev) => ({
-      ...prev,
-      edges: prev.edges.map((item) => (item.id === edgeID ? { ...item, label } : item)),
-    }))
-  }, [edgeID])
+  const onEdgeCond = useCallback(
+    (cond: WorkflowEdgeCond) => {
+      setFlow((prev) => ({
+        ...prev,
+        edges: prev.edges.map((item) =>
+          item.id === edgeID
+            ? {
+                ...item,
+                data: {
+                  ...item.data,
+                  cond,
+                },
+              }
+            : item,
+        ),
+      }))
+    },
+    [edgeID],
+  )
+
+  const onEdgeLabel = useCallback(
+    (label: string) => {
+      setFlow((prev) => ({
+        ...prev,
+        edges: prev.edges.map((item) => (item.id === edgeID ? { ...item, label } : item)),
+      }))
+    },
+    [edgeID],
+  )
+
+  const onNodeTitle = useCallback(
+    (title: string) => {
+      setFlow((prev) => ({
+        ...prev,
+        nodes: prev.nodes.map((item) => (item.id === nodeID ? { ...item, data: { ...item.data, title } } : item)),
+      }))
+    },
+    [nodeID],
+  )
+
+  const onNodeFields = useCallback(
+    (fields: WorkflowField[]) => {
+      setFlow((prev) => ({
+        ...prev,
+        nodes: prev.nodes.map((item) => (item.id === nodeID ? { ...item, data: { ...item.data, fields } } : item)),
+      }))
+    },
+    [nodeID],
+  )
 
   const persist = async () => {
-    const next = fromFlow(item, flow.nodes, flow.edges, workspace)
+    const next = fromFlow(item, flow.nodes, flow.edges)
     const data = item.id ? await workflowApi.update(item.id, next) : await workflowApi.save(next)
     setItem(data)
-    setWorkspace(data.workspace_path || "")
     return data
   }
 
   const onSave = async () => {
     setBusy(true)
     try {
-      await persist()
+      const data = await persist()
+      setFlow(runtimeDetail(data))
       toast.success("工作流已保存")
     } catch (err) {
       console.error(err)
@@ -187,109 +196,11 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
     }
   }
 
-  const onRun = async () => {
-    if (!workspace.trim()) {
-      toast.error("请先填写工作区路径")
-      return
-    }
-    if (flow.nodes.length === 0) {
-      toast.error("请先添加至少一个节点")
-      return
-    }
-
-    setBusy(true)
-    try {
-      const data = await persist()
-      const out = await workflowApi.start(data.id, text.trim())
-      setRun(out.run)
-      setRows([out.node_run])
-      await sync(out.run.id)
-      toast.success("工作流已启动")
-    } catch (err) {
-      console.error(err)
-      toast.error("启动工作流失败")
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const onContinue = async () => {
-    if (!run) return
-    setBusy(true)
-    try {
-      await workflowApi.continue(run.id)
-      await sync(run.id)
-      toast.success("工作流已继续")
-    } catch (err) {
-      console.error(err)
-      toast.error("继续工作流失败")
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const resume = useCallback(
-    async (runID: string) => {
-      await workflowApi.continue(runID).catch(() => null)
-      await sync(runID)
-    },
-    [sync],
-  )
-
-  const onPermission = async (reply: "once" | "always" | "reject") => {
-    if (!permission || !run) return
-    setSending(true)
-    try {
-      await permissionApi.respond(permission.id, { reply })
-      setPermission(null)
-      await resume(run.id)
-      toast.success("权限请求已处理")
-    } catch (err) {
-      console.error(err)
-      toast.error("处理权限请求失败")
-    } finally {
-      setSending(false)
-    }
-  }
-
-  const onQuestion = async (answers: ChatQuestionAnswer[]) => {
-    if (!question || !run) return
-    setSending(true)
-    try {
-      await questionApi.reply(question.id, answers)
-      setQuestion(null)
-      await resume(run.id)
-      toast.success("问题已回复")
-    } catch (err) {
-      console.error(err)
-      toast.error("提交问题回复失败")
-    } finally {
-      setSending(false)
-    }
-  }
-
-  const onRejectQuestion = async () => {
-    if (!question || !run) return
-    setSending(true)
-    try {
-      await questionApi.reject(question.id)
-      setQuestion(null)
-      await resume(run.id)
-      toast.success("问题已拒绝")
-    } catch (err) {
-      console.error(err)
-      toast.error("拒绝问题失败")
-    } finally {
-      setSending(false)
-    }
-  }
-
   const onRefresh = async () => {
     setBusy(true)
     try {
       const data = await workflowApi.get(item.id)
       setItem(data)
-      setWorkspace(data.workspace_path || "")
       setFlow(runtimeDetail(data))
       await sync(run?.id)
       await props.onRefresh?.()
@@ -314,19 +225,13 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
             </Button>
             <div className="min-w-0">
               <div className="truncate text-sm font-medium text-foreground">{item.name}</div>
-              <div className="truncate text-xs text-muted-foreground">{workspace.trim() || "未配置工作区路径"}</div>
+              <div className="truncate text-xs text-muted-foreground">
+                这里编辑的是工作流模板，真正的运行绑定会发生在策略创建后的固定聊天入口里。
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <WorkflowTopbar
-              busy={busy}
-              canRun={canRun}
-              blocked={blocked}
-              onSave={() => void onSave()}
-              onRun={() => void onRun()}
-              onRefresh={() => void onRefresh()}
-              onContinue={blocked ? () => void onContinue() : undefined}
-            />
+            <WorkflowTopbar busy={busy} onSave={() => void onSave()} onRefresh={() => void onRefresh()} />
             <Button variant="outline" size="sm" className="rounded-full" onClick={() => setOpen((prev) => !prev)}>
               {open ? <PanelLeftClose className="size-4" /> : <PanelLeftOpen className="size-4" />}
               {open ? "隐藏节点库" : "显示节点库"}
@@ -343,7 +248,7 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
             <div className="h-full">
               <WorkflowCanvas
                 item={flow}
-                onPick={() => {}}
+                onPick={onPick}
                 onEdgePick={(edge) => setEdgeID(edge?.id || "")}
                 onChange={onCanvasChange}
               />
@@ -352,25 +257,18 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
 
           <WorkflowSidepanel
             edge={edge}
-            workspace={workspace}
-            text={text}
+            node={node}
             run={run}
             runs={runs}
             summary={summary}
             rows={rows}
             current={current}
             nodes={item.nodes}
-            permission={permission}
-            question={question}
-            sending={sending}
             onPickRun={(id) => void sync(id)}
-            onPermission={onPermission}
-            onQuestion={onQuestion}
-            onRejectQuestion={onRejectQuestion}
-            onWorkspace={setWorkspace}
-            onText={setText}
             onEdgeCond={onEdgeCond}
             onEdgeLabel={onEdgeLabel}
+            onNodeTitle={onNodeTitle}
+            onNodeFields={onNodeFields}
           />
         </div>
       </div>

@@ -2,55 +2,43 @@ package workflow
 
 import "testing"
 
-func TestParseBuild(t *testing.T) {
-	res, err := parse(Build, "done")
+func TestParseToolPlan(t *testing.T) {
+	res, err := parseTool(Plan, []byte(`{"kind":"plan","summary":"ship it","plan":["a","b"],"deliverables":["code"]}`))
 	if err != nil {
-		t.Fatalf("parse returned error: %v", err)
+		t.Fatalf("parseTool returned error: %v", err)
 	}
-	if res.Raw != "done" {
-		t.Fatalf("expected raw output to be preserved, got %q", res.Raw)
-	}
-	if res.Text != "done" {
-		t.Fatalf("expected text output to be preserved, got %q", res.Text)
-	}
-}
-
-func TestParseReviewRejectsEmpty(t *testing.T) {
-	_, err := parse(Review, "")
-	if err == nil {
-		t.Fatal("expected parse to reject empty review output")
-	}
-}
-
-func TestParseReviewRejectsInvalidJSON(t *testing.T) {
-	_, err := parse(Review, "not json")
-	if err == nil {
-		t.Fatal("expected parse to reject invalid review JSON")
-	}
-}
-
-func TestParseReviewRejectsMissingPass(t *testing.T) {
-	_, err := parse(Review, `{"summary":"x"}`)
-	if err == nil {
-		t.Fatal("expected parse to require boolean pass")
-	}
-}
-
-func TestParseReviewPreservesRawAndSummary(t *testing.T) {
-	res, err := parse(Review, `{"pass":false,"summary":"fix this","next_prompt":"retry"}`)
-	if err != nil {
-		t.Fatalf("parse returned error: %v", err)
-	}
-	if res.Raw == "" {
-		t.Fatal("expected raw output to be present")
-	}
-	if res.Text != "fix this" {
+	if res.Text != "ship it" {
 		t.Fatalf("expected summary text, got %q", res.Text)
 	}
-	if res.NextPrompt != "retry" {
-		t.Fatalf("expected next prompt to be preserved, got %q", res.NextPrompt)
+	if res.Structured == "" {
+		t.Fatal("expected structured payload")
 	}
-	if res.Pass == nil || *res.Pass {
-		t.Fatal("expected pass to be false")
+}
+
+func TestParseToolBuildRequiresSummary(t *testing.T) {
+	_, err := parseTool(Build, []byte(`{"kind":"build","next_prompt":"keep going"}`))
+	if err == nil {
+		t.Fatal("expected parseTool to require summary for build nodes")
+	}
+}
+
+func TestParseToolIntentRequiresIntent(t *testing.T) {
+	_, err := parseTool(Intent, []byte(`{"kind":"intent","summary":"route"}`))
+	if err == nil {
+		t.Fatal("expected parseTool to require intent")
+	}
+}
+
+func TestParseToolReviewRequiresPass(t *testing.T) {
+	_, err := parseTool(Review, []byte(`{"kind":"review","summary":"check"}`))
+	if err == nil {
+		t.Fatal("expected parseTool to require pass")
+	}
+}
+
+func TestParseToolRejectsWrongKind(t *testing.T) {
+	_, err := parseTool(Review, []byte(`{"kind":"build","summary":"check","pass":true}`))
+	if err == nil {
+		t.Fatal("expected parseTool to reject mismatched kind")
 	}
 }

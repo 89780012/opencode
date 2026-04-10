@@ -1,0 +1,7 @@
+{
+  "name": "smartx-opencode-tools",
+  "private": true,
+  "dependencies": {
+    "@opencode-ai/plugin": "*"
+  }
+}

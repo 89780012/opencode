@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"strategy-service/internal/asset"
 	"strategy-service/internal/oprun"
 )
 
@@ -180,10 +181,204 @@ func (s *Service) NodeRuns(runID string) (NodeRunList, error) {
 	return s.nodeRuns(runID)
 }
 
-func (s *Service) Start(wid string, input string) (StartResult, error) {
+func (s *Service) Start(wid string, path string, input string) (StartResult, error) {
+	return s.StartWith(wid, path, input, "")
+}
+
+func (s *Service) StartWith(wid string, path string, input string, sid string) (StartResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.start(wid, path, input, sid)
+}
+
+func (s *Service) WorkspaceState(path string) (WorkspaceSnapshot, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	item, _, err := s.workspaceState(path)
+	if err != nil {
+		return WorkspaceSnapshot{}, err
+	}
+	run, err := s.syncState(&item)
+	if err != nil {
+		return WorkspaceSnapshot{}, err
+	}
+	return WorkspaceSnapshot{
+		State: item,
+		Run:   run,
+	}, nil
+}
+
+func (s *Service) BindWorkspace(path string, wid string, pid string, mid string, variant string) (WorkspaceSnapshot, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	path = text(path)
+	if path == "" {
+		return WorkspaceSnapshot{}, errors.New("workspace_path is required")
+	}
+	wid = text(wid)
+	if wid == "" {
+		return WorkspaceSnapshot{}, errors.New("workflow_id is required")
+	}
+	pid = text(pid)
+	mid = text(mid)
+	variant = text(variant)
+	if (pid == "") != (mid == "") {
+		return WorkspaceSnapshot{}, errors.New("workspace default model requires both model_provider_id and model_id")
+	}
+	if pid == "" {
+		variant = ""
+	}
+	if _, err := s.get(wid); err != nil {
+		return WorkspaceSnapshot{}, err
+	}
+
+	item, _, err := s.workspaceState(path)
+	if err != nil {
+		return WorkspaceSnapshot{}, err
+	}
+	item.WorkflowID = wid
+	item.ModelProviderID = pid
+	item.ModelID = mid
+	item.Variant = variant
+	item.UpdatedAt = time.Now().UnixMilli()
+	if err := s.putWorkspaceState(item); err != nil {
+		return WorkspaceSnapshot{}, err
+	}
+	run, err := s.syncState(&item)
+	if err != nil {
+		return WorkspaceSnapshot{}, err
+	}
+	return WorkspaceSnapshot{
+		State: item,
+		Run:   run,
+	}, nil
+}
+
+func (s *Service) DispatchWorkspace(path string, input string) (WorkspaceSnapshot, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	path = text(path)
+	if path == "" {
+		return WorkspaceSnapshot{}, errors.New("workspace_path is required")
+	}
+
+	item, _, err := s.workspaceState(path)
+	if err != nil {
+		return WorkspaceSnapshot{}, err
+	}
+	if item.WorkflowID == "" {
+		return WorkspaceSnapshot{}, errors.New("workflow_id is required")
+	}
+	if item.RunID != "" {
+		if err := s.interruptRun(item.RunID); err != nil {
+			return WorkspaceSnapshot{}, err
+		}
+		item.RunID = ""
+	}
+	out, err := s.start(item.WorkflowID, path, input, item.SessionID)
+	if err != nil {
+		return WorkspaceSnapshot{}, err
+	}
+	item.WorkspacePath = path
+	item.WorkflowID = out.Run.WorkflowID
+	item.RunID = out.Run.ID
+	item.SessionID = text(out.Run.SessionID)
+	item.Status = workspaceStatusOf(out.Run.Status)
+	item.UpdatedAt = time.Now().UnixMilli()
+	if err := s.putWorkspaceState(item); err != nil {
+		return WorkspaceSnapshot{}, err
+	}
+	run, err := s.syncState(&item)
+	if err != nil {
+		return WorkspaceSnapshot{}, err
+	}
+	return WorkspaceSnapshot{
+		State: item,
+		Run:   run,
+	}, nil
+}
+
+func (s *Service) ContinueWorkspace(path string) (WorkspaceSnapshot, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	item, _, err := s.workspaceState(path)
+	if err != nil {
+		return WorkspaceSnapshot{}, err
+	}
+	if item.RunID == "" {
+		return WorkspaceSnapshot{}, errors.New("workspace run is not set")
+	}
+	run, err := s.run(item.RunID)
+	if err != nil {
+		return WorkspaceSnapshot{}, err
+	}
+	if run.Status != RunBlocked {
+		return WorkspaceSnapshot{}, errors.New("workflow run is not resumable")
+	}
+	run.Status = RunRunning
+	run.Error = ""
+	run.BlockReason = ""
+	run.BlockRequestID = ""
+	if err := s.putRun(run); err != nil {
+		return WorkspaceSnapshot{}, err
+	}
+	row, ok := s.lastNodeRun(run.ID, run.CurrentNodeID)
+	if ok && row.Status == NodeBlocked {
+		row.Status = NodeRunning
+		row.Error = ""
+		row.BlockReason = ""
+		row.BlockRequestID = ""
+		if err := s.putNodeRun(row); err != nil {
+			return WorkspaceSnapshot{}, err
+		}
+	}
+	s.kick(run.ID)
+	item.RunID = run.ID
+	item.Status = workspaceStatusOf(run.Status)
+	item.UpdatedAt = time.Now().UnixMilli()
+	if err := s.putWorkspaceState(item); err != nil {
+		return WorkspaceSnapshot{}, err
+	}
+	runPtr, err := s.syncState(&item)
+	if err != nil {
+		return WorkspaceSnapshot{}, err
+	}
+	return WorkspaceSnapshot{
+		State: item,
+		Run:   runPtr,
+	}, nil
+}
+
+func (s *Service) InterruptWorkspace(path string) (WorkspaceSnapshot, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	item, _, err := s.workspaceState(path)
+	if err != nil {
+		return WorkspaceSnapshot{}, err
+	}
+	if item.RunID != "" {
+		if err := s.interruptRun(item.RunID); err != nil {
+			return WorkspaceSnapshot{}, err
+		}
+		item.RunID = ""
+		item.Status = WorkspaceInterrupted
+		item.UpdatedAt = time.Now().UnixMilli()
+		if err := s.putWorkspaceState(item); err != nil {
+			return WorkspaceSnapshot{}, err
+		}
+	}
+	return WorkspaceSnapshot{
+		State: item,
+		Run:   nil,
+	}, nil
+}
+
+func (s *Service) start(wid string, path string, input string, sid string) (StartResult, error) {
 	flow, err := s.get(wid)
 	if err != nil {
 		return StartResult{}, err
@@ -195,15 +390,23 @@ func (s *Service) Start(wid string, input string) (StartResult, error) {
 	if !ok {
 		return StartResult{}, errors.New("workflow root node not found")
 	}
+	state, _, err := s.workspaceState(path)
+	if err != nil {
+		return StartResult{}, err
+	}
 
 	run := Run{
-		ID:            id("run"),
-		WorkflowID:    flow.ID,
-		WorkspacePath: flow.WorkspacePath,
-		Status:        RunRunning,
-		CurrentNodeID: node.ID,
-		Input:         strings.TrimSpace(input),
-		StartedAt:     time.Now().UnixMilli(),
+		ID:              id("run"),
+		WorkflowID:      flow.ID,
+		WorkspacePath:   text(path),
+		SessionID:       text(sid),
+		ModelProviderID: state.ModelProviderID,
+		ModelID:         state.ModelID,
+		Variant:         state.Variant,
+		Status:          RunRunning,
+		CurrentNodeID:   node.ID,
+		Input:           strings.TrimSpace(input),
+		StartedAt:       time.Now().UnixMilli(),
 	}
 
 	if err := s.putRun(run); err != nil {
@@ -280,7 +483,7 @@ func (s *Service) exec(runID string) {
 			s.mu.Unlock()
 			return
 		}
-		if run.Status == RunFailed || run.Status == RunDone || run.Status == RunPending {
+		if run.Status == RunFailed || run.Status == RunDone || run.Status == RunPending || run.Status == RunInterrupted {
 			s.mu.Unlock()
 			return
 		}
@@ -319,6 +522,10 @@ func (s *Service) exec(runID string) {
 			s.mu.Lock()
 			run, err = s.run(runID)
 			if err != nil {
+				s.mu.Unlock()
+				return
+			}
+			if run.Status == RunInterrupted {
 				s.mu.Unlock()
 				return
 			}
@@ -374,6 +581,18 @@ func (s *Service) exec(runID string) {
 			default:
 				res, err := s.resolve(run.WorkspacePath, row.SessionID, row, node)
 				if err != nil {
+					if retryable(err) {
+						row.Status = NodeFailed
+						row.Error = err.Error()
+						row.BlockReason = ""
+						row.BlockRequestID = ""
+						row.EndedAt = time.Now().UnixMilli()
+						_ = s.putNodeRun(row)
+						if _, retryErr := s.queue(flow, &run, node, row.Turn+1, run.Input, "", retryPrompt(node, err)); retryErr == nil {
+							s.mu.Unlock()
+							continue
+						}
+					}
 					row.Status = NodeFailed
 					row.Error = err.Error()
 					row.BlockReason = ""
@@ -528,6 +747,98 @@ func (s *Service) rows(runID string) ([]NodeRun, error) {
 	return out, nil
 }
 
+func (s *Service) workspaceState(path string) (WorkspaceState, bool, error) {
+	list, err := s.store.loadWorkspaceStates()
+	if err != nil {
+		return WorkspaceState{}, false, err
+	}
+	path = text(path)
+	for _, item := range list {
+		if item.WorkspacePath == path {
+			return item, true, nil
+		}
+	}
+	return WorkspaceState{
+		WorkspacePath: path,
+		Status:        WorkspaceIdle,
+	}, false, nil
+}
+
+func (s *Service) putWorkspaceState(item WorkspaceState) error {
+	list, err := s.store.loadWorkspaceStates()
+	if err != nil {
+		return err
+	}
+	hit := false
+	next := make([]WorkspaceState, 0, len(list)+1)
+	for _, row := range list {
+		if row.WorkspacePath != item.WorkspacePath {
+			next = append(next, row)
+			continue
+		}
+		next = append(next, item)
+		hit = true
+	}
+	if !hit {
+		next = append(next, item)
+	}
+	return s.store.saveWorkspaceStates(next)
+}
+
+func workspaceStatusOf(status RunStatus) WorkspaceStatus {
+	if status == RunRunning {
+		return WorkspaceRunning
+	}
+	if status == RunBlocked {
+		return WorkspaceBlocked
+	}
+	if status == RunDone {
+		return WorkspaceDone
+	}
+	if status == RunInterrupted {
+		return WorkspaceInterrupted
+	}
+	if status == RunFailed {
+		return WorkspaceFailed
+	}
+	return WorkspaceIdle
+}
+
+func (s *Service) syncState(item *WorkspaceState) (*Run, error) {
+	if item == nil {
+		return nil, nil
+	}
+	if item.WorkspacePath == "" {
+		return nil, errors.New("workspace_path is required")
+	}
+	if item.RunID == "" {
+		if item.Status == "" {
+			item.Status = WorkspaceIdle
+		}
+		return nil, nil
+	}
+
+	run, err := s.run(item.RunID)
+	if err != nil {
+		item.RunID = ""
+		item.Status = WorkspaceIdle
+		if err := s.putWorkspaceState(*item); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	}
+	item.Status = workspaceStatusOf(run.Status)
+	item.WorkflowID = text(run.WorkflowID)
+	if item.SessionID == "" && run.SessionID != "" {
+		item.SessionID = text(run.SessionID)
+	}
+	item.UpdatedAt = time.Now().UnixMilli()
+	if err := s.putWorkspaceState(*item); err != nil {
+		return nil, err
+	}
+	return &run, nil
+}
+
 func count(list []NodeRun, nodeID string) int {
 	out := 0
 	for _, item := range list {
@@ -544,11 +855,11 @@ func auto(kind Kind) bool {
 }
 
 func (s *Service) session(dir string, run *Run, node Node) (string, error) {
-	if node.Session == Shared && run.RootSessionID != "" {
-		return run.RootSessionID, nil
+	if err := asset.EnsureWorkspace(dir); err != nil {
+		return "", err
 	}
-	if node.Session == Keyed && run.Lanes[node.SessionKey] != "" {
-		return run.Lanes[node.SessionKey], nil
+	if run.SessionID != "" {
+		return run.SessionID, nil
 	}
 	if err := s.ensure(); err != nil {
 		return "", err
@@ -557,16 +868,44 @@ func (s *Service) session(dir string, run *Run, node Node) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if node.Session == Shared {
-		run.RootSessionID = sid
-	}
-	if node.Session == Keyed {
-		if run.Lanes == nil {
-			run.Lanes = map[string]string{}
-		}
-		run.Lanes[node.SessionKey] = sid
-	}
+	run.SessionID = sid
 	return sid, nil
+}
+
+func (s *Service) interruptRun(id string) error {
+	run, err := s.run(id)
+	if err != nil {
+		return err
+	}
+	if run.Status != RunRunning && run.Status != RunBlocked {
+		return nil
+	}
+	if run.Status == RunRunning && run.WorkspacePath != "" && run.SessionID != "" {
+		if err := s.abortSession(run.WorkspacePath, run.SessionID); err != nil {
+			return err
+		}
+	}
+	run.Status = RunInterrupted
+	run.Error = ""
+	run.BlockReason = ""
+	run.BlockRequestID = ""
+	run.EndedAt = time.Now().UnixMilli()
+	if err := s.putRun(run); err != nil {
+		return err
+	}
+	row, ok := s.lastNodeRun(run.ID, run.CurrentNodeID)
+	if !ok {
+		return nil
+	}
+	if row.Status != NodeRunning && row.Status != NodeBlocked {
+		return nil
+	}
+	row.Status = NodeInterrupted
+	row.Error = ""
+	row.BlockReason = ""
+	row.BlockRequestID = ""
+	row.EndedAt = run.EndedAt
+	return s.putNodeRun(row)
 }
 
 func (s *Service) queue(
@@ -651,7 +990,7 @@ func (s *Service) queue(
 			continue
 		}
 
-		sid, err := s.session(flow.WorkspacePath, run, node)
+		sid, err := s.session(run.WorkspacePath, run, node)
 		if err != nil {
 			return NodeRun{}, err
 		}
@@ -665,7 +1004,7 @@ func (s *Service) queue(
 			Turn:      turn,
 			Input:     prompt,
 			StartedAt: now,
-			Anchor:    s.anchor(flow.WorkspacePath, sid),
+			Anchor:    s.anchor(run.WorkspacePath, sid),
 		}
 
 		run.Status = RunRunning
@@ -680,7 +1019,7 @@ func (s *Service) queue(
 		if err := s.putNodeRun(row); err != nil {
 			return NodeRun{}, err
 		}
-		if err := s.sendPrompt(flow.WorkspacePath, sid, node, prompt); err != nil {
+		if err := s.sendPrompt(run.WorkspacePath, sid, node, *run, prompt); err != nil {
 			row.Status = NodeFailed
 			row.Error = err.Error()
 			row.BlockReason = ""
@@ -768,17 +1107,48 @@ func buildPrompt(flow Workflow, node Node, input string, upstream string, feedba
 	if node.Prompt != "" {
 		parts = append(parts, "Node instructions:\n"+node.Prompt)
 	}
-	if node.Kind == Review || node.Kind == Judge {
-		parts = append(parts, `Output contract:
-Return JSON with keys pass, summary, issues, next_prompt.`)
-	}
+	parts = append(parts, toolPrompt(node))
 	if flow.Name != "" {
 		parts = append(parts, "Workflow:\n"+flow.Name)
 	}
 	return strings.TrimSpace(strings.Join(parts, "\n\n"))
 }
 
-func body(node Node, prompt string) map[string]any {
+func toolPrompt(node Node) string {
+	head := []string{
+		"Structured output contract:",
+		"After finishing this node, call tool `" + node.ToolID + "` exactly once.",
+		"Do not paste raw JSON in assistant text.",
+		`Set "kind" to "` + string(node.Kind) + `" and fill the fields required for this node.`,
+	}
+	if node.Kind == Intent {
+		head = append(head, `For intent nodes, provide summary, next_prompt, and intent = "plan" | "build" | "checker".`)
+	}
+	if node.Kind == Plan {
+		head = append(head, "For plan nodes, provide summary, plan, deliverables, risks, and next_prompt.")
+	}
+	if node.Kind == Review || node.Kind == Judge {
+		head = append(head, "For review or judge nodes, provide summary, pass, issues, and next_prompt.")
+	}
+	if node.Kind == Build {
+		head = append(head, "For build nodes, provide at least summary and next_prompt when a structured handoff is needed.")
+	}
+	if node.Kind == Gate {
+		head = append(head, "For gate nodes, provide summary and next_prompt for the next manual or automated step.")
+	}
+	return strings.Join(head, "\n")
+}
+
+func retryPrompt(node Node, err error) string {
+	return strings.TrimSpace(strings.Join([]string{
+		"The previous response did not satisfy the workflow contract.",
+		"Reason: " + err.Error(),
+		"Retry this node by calling tool `" + node.ToolID + "` with kind `" + string(node.Kind) + "`.",
+		"Do not reply with raw JSON in assistant text.",
+	}, "\n"))
+}
+
+func body(node Node, run Run, prompt string) map[string]any {
 	out := map[string]any{
 		"agent": node.Agent,
 		"parts": []map[string]any{
@@ -788,20 +1158,39 @@ func body(node Node, prompt string) map[string]any {
 			},
 		},
 	}
+	pid := run.ModelProviderID
+	mid := run.ModelID
 	if node.ModelProviderID != "" && node.ModelID != "" {
+		pid = node.ModelProviderID
+		mid = node.ModelID
+	}
+	if pid != "" && mid != "" {
 		out["model"] = map[string]string{
-			"providerID": node.ModelProviderID,
-			"modelID":    node.ModelID,
+			"providerID": pid,
+			"modelID":    mid,
 		}
 	}
+	variant := run.Variant
 	if node.Variant != "" {
-		out["variant"] = node.Variant
+		variant = node.Variant
+	}
+	if variant != "" {
+		out["variant"] = variant
 	}
 	return out
 }
 
 func next(flow Workflow, node Node, res Result) (string, string) {
 	check := Always
+	if node.Kind == Intent {
+		check = PlanTo
+		if res.Intent == string(BuildTo) {
+			check = BuildTo
+		}
+		if res.Intent == string(CheckTo) {
+			check = CheckTo
+		}
+	}
 	if node.Kind == Review || node.Kind == Judge {
 		check = Pass
 		if res.Pass != nil && !*res.Pass {
@@ -867,14 +1256,14 @@ func (s *Service) createSession(dir string) (string, error) {
 	return data.ID, nil
 }
 
-func (s *Service) sendPrompt(dir string, sid string, node Node, prompt string) error {
+func (s *Service) sendPrompt(dir string, sid string, node Node, run Run, prompt string) error {
 	u := *s.op.Target()
 	u.Path = "/session/" + sid + "/prompt_async"
 	q := url.Values{}
 	q.Set("directory", dir)
 	u.RawQuery = q.Encode()
 
-	buf, err := json.Marshal(body(node, prompt))
+	buf, err := json.Marshal(body(node, run, prompt))
 	if err != nil {
 		return err
 	}
@@ -895,4 +1284,28 @@ func (s *Service) sendPrompt(dir string, sid string, node Node, prompt string) e
 		return nil
 	}
 	return errors.New("opencode prompt submit failed")
+}
+
+func (s *Service) abortSession(dir string, sid string) error {
+	u := *s.op.Target()
+	u.Path = "/session/" + sid + "/abort"
+	q := url.Values{}
+	q.Set("directory", dir)
+	u.RawQuery = q.Encode()
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, u.String(), nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Accept", "application/json")
+
+	res, err := s.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode >= 200 && res.StatusCode < 300 {
+		return nil
+	}
+	return errors.New("opencode session abort failed")
 }
