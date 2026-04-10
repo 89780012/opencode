@@ -168,9 +168,7 @@ export default function StrategiesPage() {
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-6 py-4">
           <div className="flex items-center justify-between gap-3">
             <div className="text-sm font-medium text-foreground">{list.length} 个策略</div>
-            <div className="text-xs text-muted-foreground dark:text-slate-400">
-              从列表移除不会删除本地目录。
-            </div>
+            <div className="text-xs text-muted-foreground dark:text-slate-400">从列表移除不会删除本地目录。</div>
           </div>
           {selecting ? (
             <Card className="sticky top-0 z-10 gap-0 rounded-2xl border-primary/20 bg-background/95 py-0 shadow-sm backdrop-blur">

@@ -47,7 +47,7 @@ export function StrategyWorkflowPanel(props: Props) {
       draft.clear()
       files.clear()
     } catch (err) {
-      console.error("Failed to dispatch workflow input", err)
+      console.error("提交工作流输入失败", err)
       toast.error("提交工作流输入失败。")
     }
   }

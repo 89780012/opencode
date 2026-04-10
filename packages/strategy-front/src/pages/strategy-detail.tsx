@@ -160,7 +160,13 @@ export default function StrategyDetailPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" size="sm" className={ctrl} onClick={() => void onCreate()} disabled={chat.creating}>
+            <Button
+              variant="outline"
+              size="sm"
+              className={ctrl}
+              onClick={() => void onCreate()}
+              disabled={chat.creating}
+            >
               <Plus className="size-4" />
               新建会话
             </Button>
@@ -225,7 +231,11 @@ export default function StrategyDetailPage() {
             />
           </ResizablePanel>
           <ResizableHandle withHandle className="pointer" />
-          <ResizablePanel defaultSize={38} minSize={360} className="min-h-0 min-w-0 border-l border-black/6 dark:border-white/8">
+          <ResizablePanel
+            defaultSize={38}
+            minSize={360}
+            className="min-h-0 min-w-0 border-l border-black/6 dark:border-white/8"
+          >
             <WorkspaceDetailPane
               open={open}
               tab={tab}

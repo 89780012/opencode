@@ -17,12 +17,12 @@ function stamp(value?: number) {
 }
 
 function runLabel(value?: WorkflowItem["run_status"]) {
-  if (value === "running") return "Running"
-  if (value === "waiting") return "Waiting"
-  if (value === "failed") return "Failed"
-  if (value === "done") return "Done"
-  if (value === "interrupted") return "Interrupted"
-  return "Idle"
+  if (value === "running") return "运行中"
+  if (value === "waiting") return "等待中"
+  if (value === "failed") return "失败"
+  if (value === "done") return "已完成"
+  if (value === "interrupted") return "已中断"
+  return "空闲"
 }
 
 function tone(value?: WorkflowItem["run_status"]) {
@@ -59,7 +59,7 @@ export function WorkflowListCard(props: {
             </div>
             <div>
               <div className="text-[18px] tracking-tight text-foreground">{props.item.name}</div>
-              <div className="mt-1 text-xs text-muted-foreground">{props.item.status === "ready" ? "Ready" : "Draft"}</div>
+              <div className="mt-1 text-xs text-muted-foreground">{props.item.status === "ready" ? "就绪" : "草稿"}</div>
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -84,7 +84,7 @@ export function WorkflowListCard(props: {
 
         <div className="mt-4 flex flex-wrap gap-2">
           <span className="inline-flex items-center rounded-full border border-primary/20 bg-primary/8 px-2.5 py-1 text-[11px] font-medium text-primary">
-            {props.item.count} nodes
+            {props.item.count} 个节点
           </span>
           <span
             className={cn(
@@ -106,15 +106,15 @@ export function WorkflowListCard(props: {
 
         <div className="mt-4 grid grid-cols-3 gap-2 text-center">
           <div className="rounded-lg border border-border/70 bg-background/85 px-2 py-2">
-            <div className="text-[10px] text-muted-foreground">Runs</div>
+            <div className="text-[10px] text-muted-foreground">运行次数</div>
             <div className="mt-1 text-sm font-medium text-foreground">{props.item.run_total || 0}</div>
           </div>
           <div className="rounded-lg border border-border/70 bg-background/85 px-2 py-2">
-            <div className="text-[10px] text-muted-foreground">Done</div>
+            <div className="text-[10px] text-muted-foreground">已完成</div>
             <div className="mt-1 text-sm font-medium text-emerald-600">{props.item.done_runs || 0}</div>
           </div>
           <div className="rounded-lg border border-border/70 bg-background/85 px-2 py-2">
-            <div className="text-[10px] text-muted-foreground">Exceptions</div>
+            <div className="text-[10px] text-muted-foreground">异常</div>
             <div className="mt-1 text-sm font-medium text-destructive">
               {(props.item.failed_runs || 0) + (props.item.waiting_runs || 0)}
             </div>
@@ -124,11 +124,11 @@ export function WorkflowListCard(props: {
         <div className="mt-auto flex items-center justify-between border-t border-border/70 pt-4">
           <div className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
             <Clock3 className="size-3.5" />
-            Updated {stamp(props.item.updated_at)}
+            更新于 {stamp(props.item.updated_at)}
           </div>
           <div className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground">
             <Sparkles className="size-3.5 text-primary" />
-            Last run {stamp(props.item.run_at)}
+            最近运行 {stamp(props.item.run_at)}
           </div>
         </div>
       </div>
