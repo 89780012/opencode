@@ -3,23 +3,14 @@ import { workflowApi, workspaceChatApi } from "@/api/modules"
 import { useChatEvents } from "@/hooks/use-chat-events"
 import { useChatSessionDetail } from "@/hooks/use-chat-session-detail"
 import { useChatSessions } from "@/hooks/use-chat-sessions"
+import { useWorkspaceChatState } from "@/hooks/use-workspace-chat-state"
+import { busy as workflowBusy, note } from "@/lib/workspace-chat"
 import type { PromptInputMessage } from "@/types/chat"
 import type { WorkflowNodeRun, WorkflowRuntimeDetail, WorkflowWait } from "@/types/workflow"
-import type { WorkspaceSnapshot, WorkspaceStatus } from "@/types/workspace-chat"
 
-function note(err: unknown, fallback: string) {
-  if (err instanceof Error && err.message) return err.message
-  if (typeof err === "string" && err) return err
-  return fallback
-}
-
-function current(box: WorkspaceSnapshot | null): WorkspaceStatus {
-  return box?.state.status || "idle"
-}
-
-function model(box: WorkspaceSnapshot | null) {
-  const pid = box?.state.model_provider_id?.trim()
-  const mid = box?.state.model_id?.trim()
+function model(box?: { state?: { model_provider_id?: string; model_id?: string } | null } | null) {
+  const pid = box?.state?.model_provider_id?.trim()
+  const mid = box?.state?.model_id?.trim()
   if (!pid || !mid) return ""
   return `${pid}/${mid}`
 }
@@ -36,30 +27,29 @@ function ref(value: string) {
 
 export function useStrategyWorkflowChat(path?: string | null) {
   const chat = useChatSessions(path)
-  const [box, setBox] = useState<WorkspaceSnapshot | null>(null)
+  const room = useWorkspaceChatState(path)
   const [flow, setFlow] = useState<WorkflowRuntimeDetail | null>(null)
   const [rows, setRows] = useState<WorkflowNodeRun[]>([])
   const [waits, setWaits] = useState<WorkflowWait[]>([])
-  const [load, setLoad] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [send, setSend] = useState(false)
   const [replying, setReplying] = useState(false)
   const [stop, setStop] = useState(false)
 
-  const sid = box?.state.session_id ?? null
-  const mid = model(box)
-  const variant = box?.state.variant || null
+  const sid = room.state?.session_id ?? null
+  const mid = model(room.box)
+  const variant = room.state?.variant || null
   useChatEvents(path)
   const detail = useChatSessionDetail(path, sid)
-  const state = current(box)
+  const busy = workflowBusy(room.box, sid) || detail.status.type !== "idle"
 
   const pull = useCallback(
     async (soft?: boolean) => {
       if (!path) return
-      if (!soft) setLoad(true)
 
       try {
-        const next = await workspaceChatApi.getState(path)
+        const next = await room.refresh(soft)
+        if (!next) return
         const jobs = []
 
         if (next.run?.id) {
@@ -85,20 +75,17 @@ export function useStrategyWorkflowChat(path?: string | null) {
               .then(setFlow)
               .catch(() => setFlow(null)),
           )
-      } else {
+        } else {
           setFlow(null)
         }
 
         await Promise.all(jobs)
-        setBox(next)
         setErr(null)
       } catch (err) {
-        setErr(note(err, "加载固定工作流状态失败"))
-      } finally {
-        if (!soft) setLoad(false)
+        setErr(note(err, "加载工作流状态失败"))
       }
     },
-    [path],
+    [path, room.refresh],
   )
 
   useEffect(() => {
@@ -106,20 +93,10 @@ export function useStrategyWorkflowChat(path?: string | null) {
   }, [pull])
 
   useEffect(() => {
-    if (!box?.state.session_id) return
-    if (chat.selectedSessionId === box.state.session_id) return
-    chat.selectSession(box.state.session_id)
-  }, [box?.state.session_id, chat])
-
-  useEffect(() => {
-    if (state !== "running" && state !== "waiting") return
-    const timer = window.setInterval(() => {
-      void pull(true)
-    }, 3000)
-    return () => {
-      window.clearInterval(timer)
-    }
-  }, [pull, state])
+    if (!room.state?.session_id) return
+    if (chat.selectedSessionId === room.state.session_id) return
+    chat.selectSession(room.state.session_id)
+  }, [chat.selectSession, chat.selectedSessionId, room.state?.session_id])
 
   const submit = useCallback(
     async (msg: PromptInputMessage) => {
@@ -133,7 +110,7 @@ export function useStrategyWorkflowChat(path?: string | null) {
           workspace_path: path,
           input,
         })
-        setBox(next)
+        room.put(next)
         if (next.state.session_id) {
           chat.selectSession(next.state.session_id)
         }
@@ -142,12 +119,12 @@ export function useStrategyWorkflowChat(path?: string | null) {
         setSend(false)
       }
     },
-    [chat, path, pull],
+    [chat.selectSession, path, pull, room.put],
   )
 
   const reply = useCallback(
     async (waitID: string, payload?: unknown) => {
-      const runID = box?.run?.id
+      const runID = room.run?.id
       if (!runID) return
       setReplying(true)
       try {
@@ -161,27 +138,24 @@ export function useStrategyWorkflowChat(path?: string | null) {
         setReplying(false)
       }
     },
-    [box?.run?.id, pull],
+    [pull, room.run?.id],
   )
 
   const interrupt = useCallback(async () => {
     if (!path) return
     setStop(true)
     try {
-      const next = await workspaceChatApi.interrupt({
-        workspace_path: path,
-      })
-      setBox(next)
+      await room.interrupt()
       await pull(true)
     } finally {
       setStop(false)
     }
-  }, [path, pull])
+  }, [path, pull, room.interrupt])
 
   const save = useCallback(
     (input: { model?: string; variant?: string | null }) => {
       if (!path) return
-      const wid = box?.state.workflow_id?.trim()
+      const wid = room.state?.workflow_id?.trim()
       if (!wid) return
       const pick = ref(input.model ?? mid)
       const next = input.variant === undefined ? variant : input.variant
@@ -194,13 +168,13 @@ export function useStrategyWorkflowChat(path?: string | null) {
             ...pick,
             variant: next || "",
           })
-          setBox(row)
+          room.put(row)
         } catch (err) {
           setErr(note(err, "保存工作流默认模型失败"))
         }
       })()
     },
-    [box?.state.workflow_id, mid, path, variant],
+    [mid, path, room.put, room.state?.workflow_id, variant],
   )
 
   const setModel = useCallback(
@@ -229,18 +203,19 @@ export function useStrategyWorkflowChat(path?: string | null) {
       detailLoading: detail.loading,
       messages: detail.messages,
       status: detail.status,
+      busy,
       eventErr: detail.eventErr,
-      state: box?.state ?? null,
+      state: room.state,
       model: mid,
       variant,
-      run: box?.run ?? null,
+      run: room.run,
       flow,
       rows,
       waits,
       openWait,
-      phase: state,
-      load,
-      err,
+      phase: room.phase,
+      load: room.load,
+      err: err || room.err,
       sending: send,
       replying,
       interrupting: stop,
@@ -252,8 +227,7 @@ export function useStrategyWorkflowChat(path?: string | null) {
       refresh: pull,
     }),
     [
-      box?.run,
-      box?.state,
+      busy,
       chat.creating,
       chat.loading,
       chat.sessions,
@@ -263,18 +237,22 @@ export function useStrategyWorkflowChat(path?: string | null) {
       detail.status,
       err,
       flow,
-      load,
+      interrupt,
       mid,
       openWait,
       pull,
       reply,
       replying,
+      room.err,
+      room.load,
+      room.phase,
+      room.run,
+      room.state,
       rows,
+      send,
       setModel,
       setVariant,
-      send,
       sid,
-      state,
       stop,
       submit,
       variant,

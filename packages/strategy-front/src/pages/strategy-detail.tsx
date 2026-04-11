@@ -206,6 +206,7 @@ export default function StrategyDetailPage() {
               detailLoading={chat.detailLoading}
               messages={chat.messages}
               status={chat.status}
+              busy={chat.busy}
               eventErr={chat.eventErr}
               agents={composer.agents}
               models={composer.models}
@@ -254,7 +255,7 @@ export default function StrategyDetailPage() {
           </ResizablePanel>
         </ResizablePanelGroup>
 
-        {(chat.sessionLoading || chat.detailLoading) && (
+        {(chat.sessionLoading || chat.detailLoading || chat.load) && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm dark:bg-background/30">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>

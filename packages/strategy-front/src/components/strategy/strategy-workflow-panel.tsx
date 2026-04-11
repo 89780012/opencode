@@ -28,8 +28,7 @@ interface Props {
 export function StrategyWorkflowPanel(props: Props) {
   const draft = useSessionDraft(props.workspace.path, props.chat.selectedSessionId)
   const files = useSessionFiles(props.workspace.path, props.chat.selectedSessionId)
-  const live = !!props.chat.selectedSessionId && props.chat.status.type !== "idle"
-  const todo = useChatTodo(props.workspace.path, props.chat.selectedSessionId, live || !!props.chat.openWait)
+  const todo = useChatTodo(props.workspace.path, props.chat.selectedSessionId, props.chat.busy || !!props.chat.openWait)
   const waiting = !!props.chat.openWait
   const bound = !!props.chat.state?.workflow_id && !!props.chat.flow
 

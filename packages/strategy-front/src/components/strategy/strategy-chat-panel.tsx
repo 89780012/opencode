@@ -25,6 +25,7 @@ interface Props {
   detailLoading: boolean
   messages: ChatMessageInfo[]
   status: ChatStatus
+  busy?: boolean
   eventErr?: string
   agents: string[]
   models: ComposerModel[]
@@ -50,7 +51,7 @@ export function StrategyChatPanel(props: Props) {
   const files = useSessionFiles(props.workspace.path, props.selectedSessionId)
   const permission = useChatPermission(props.workspace.path, props.selectedSessionId)
   const question = useChatQuestion(props.workspace.path, props.selectedSessionId)
-  const busy = !!props.selectedSessionId && props.status.type !== "idle"
+  const busy = props.busy ?? (!!props.selectedSessionId && props.status.type !== "idle")
   const live = busy || !!permission.req || !!question.req
   const todo = useChatTodo(props.workspace.path, props.selectedSessionId, live)
   const ref = useMemo(() => {
