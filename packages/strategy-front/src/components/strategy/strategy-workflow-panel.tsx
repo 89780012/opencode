@@ -29,7 +29,6 @@ export function StrategyWorkflowPanel(props: Props) {
   const draft = useSessionDraft(props.workspace.path, props.chat.selectedSessionId)
   const files = useSessionFiles(props.workspace.path, props.chat.selectedSessionId)
   const todo = useChatTodo(props.workspace.path, props.chat.selectedSessionId, props.chat.busy || !!props.chat.openWait)
-  const waiting = !!props.chat.openWait
   const bound = !!props.chat.state?.workflow_id && !!props.chat.flow
 
   const submit = async () => {
@@ -107,14 +106,16 @@ export function StrategyWorkflowPanel(props: Props) {
             <PromptBar
               agent={props.agent}
               agents={props.agent ? [props.agent] : []}
-              busy={false}
+              busy={props.chat.busy || props.chat.interrupting}
               canImage={false}
-              disabled={props.load || waiting || !bound}
+              disabled={props.load || !bound}
               files={files.files}
               model={props.model}
               models={props.models}
               onAgent={() => {}}
-              onAbort={() => {}}
+              onAbort={() => {
+                void props.chat.interrupt()
+              }}
               onFilesChange={files.setFiles}
               onModel={props.onModel}
               onSubmit={() => {
