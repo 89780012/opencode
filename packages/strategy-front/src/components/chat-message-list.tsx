@@ -281,13 +281,27 @@ function workflowInput(info: ChatMessageInfo, parts: ChatPart[]) {
     .join("\n")
     .trim()
   if (!text) return false
-  if (!text.startsWith("User objective:")) return false
-  if (!text.includes("Workflow node:") && !text.includes("Node instructions:") && !text.includes("Workflow:")) return false
+  const marks = [
+    "User objective:\n",
+    "Workflow handoff:\n",
+    "Upstream summary:\n",
+    "Workflow feedback:\n",
+    "Review feedback:\n",
+    "Workflow node:\n",
+    "Node instructions:\n",
+    "Structured output contract:\n",
+    "Workflow:\n",
+  ]
+  const hit = marks.filter((item) => text.includes(item))
+  if (hit.length < 2) return false
+  if (!text.startsWith("User objective:")) return null
 
   const head = "User objective:\n"
   const body = text.slice(head.length)
   const tags = [
+    "\n\nWorkflow handoff:\n",
     "\n\nUpstream summary:\n",
+    "\n\nWorkflow feedback:\n",
     "\n\nReview feedback:\n",
     "\n\nWorkflow node:\n",
     "\n\nRequested skills:\n",
@@ -300,7 +314,7 @@ function workflowInput(info: ChatMessageInfo, parts: ChatPart[]) {
     .filter((item) => item >= 0)
     .sort((a, b) => a - b)[0]
   const input = (cut === undefined ? body : body.slice(0, cut)).trim()
-  return input || false
+  return input || null
 }
 
 const ChatMessageItem = memo(function ChatMessageItem(props: {
@@ -312,6 +326,10 @@ const ChatMessageItem = memo(function ChatMessageItem(props: {
   const body = parts.length > 0 ? parts : empty
   const err = props.info.role === "assistant" ? errorText(props.info.error) : undefined
   const input = props.hideWorkflowInternals ? workflowInput(props.info, body) : false
+
+  if (input === null) {
+    return null
+  }
 
   if (typeof input === "string") {
     return (

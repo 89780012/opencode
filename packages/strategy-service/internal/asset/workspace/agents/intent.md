@@ -35,9 +35,10 @@ permission:
 - 完成时必须调用 `smartx-workflow`
 - 使用 `kind: "router"`
 - 始终发送：
-  - `summary`
   - `route`
-  - `handoff`
+- `summary` 仅在有必要时用一行补充
+- `handoff` 仅在下一节点需要显式约束时补充
 - `route` 必须是 `plan`、`execute`、`check` 之一
 - 不要在助手文本中粘贴原始 JSON
 - 工具调用本身就是工作流输出
+- 默认不要输出额外助手文本，优先直接调用工具

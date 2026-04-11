@@ -17,6 +17,7 @@ func TestBuildPromptIncludesSkills(t *testing.T) {
 		"ship it",
 		"",
 		"",
+		true,
 	)
 	if text == "" {
 		t.Fatal("expected prompt text")
@@ -91,6 +92,7 @@ func TestBuildPromptRouterAllowsCheck(t *testing.T) {
 		"check it first",
 		"",
 		"",
+		true,
 	)
 	if !strings.Contains(text, `"check"`) {
 		t.Fatalf("expected router prompt contract to include check, got %q", text)
@@ -129,8 +131,40 @@ func TestBuildPromptRequiresToolCall(t *testing.T) {
 		"ship it",
 		"",
 		"",
+		true,
 	)
 	if !strings.Contains(text, "smartx-workflow") {
 		t.Fatalf("expected tool contract in prompt, got %q", text)
+	}
+}
+
+func TestBuildPromptSkipsObjectiveAfterEntry(t *testing.T) {
+	text := buildPrompt(
+		Workflow{Name: "demo"},
+		Node{
+			Kind:   Execute,
+			Title:  "execute",
+			Agent:  "strategy",
+			ToolID: "smartx-workflow",
+		},
+		"ship it",
+		"follow the plan",
+		"",
+		false,
+	)
+	if strings.Contains(text, "User objective:") {
+		t.Fatalf("expected prompt to skip objective after entry, got %q", text)
+	}
+	if !strings.Contains(text, "Workflow handoff:\nfollow the plan") {
+		t.Fatalf("expected prompt to include handoff, got %q", text)
+	}
+}
+
+func TestCarrySkipsRouterFallback(t *testing.T) {
+	if got := carry(Node{Kind: Router}, Result{Text: "pick plan"}); got != "" {
+		t.Fatalf("expected router carry to stay empty without handoff, got %q", got)
+	}
+	if got := carry(Node{Kind: Plan}, Result{Text: "do work"}); got != "do work" {
+		t.Fatalf("expected non-router carry fallback, got %q", got)
 	}
 }

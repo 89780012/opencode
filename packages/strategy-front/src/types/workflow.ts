@@ -342,7 +342,7 @@ export function kindDesc(kind: WorkflowKind) {
 export function kindPrompt(kind: WorkflowKind) {
   if (kind === "start") return "阅读用户目标和上下文，并把流程送入下一节点。"
   if (kind === "router") {
-    return '判断下一步应进入 `plan`、`execute` 还是 `check`，然后调用 `smartx-workflow`，返回 `kind: "router"`、`summary`、`route`、`handoff`。'
+    return '判断下一步应进入 `plan`、`execute` 还是 `check`，然后调用 `smartx-workflow`，至少返回 `kind: "router"`、`route`；`summary` 和 `handoff` 仅在必要时简短补充。'
   }
   if (kind === "plan") {
     return '先输出可执行计划，再调用 `smartx-workflow`，返回 `kind: "plan"`、`summary`、`steps`、`deliverables`、`risks`、`handoff`。'

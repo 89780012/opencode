@@ -102,6 +102,9 @@ func parseTool(kind Kind, raw json.RawMessage) (Result, error) {
 		if res.Route != string(PlanTo) && res.Route != string(ExecuteTo) && res.Route != string(CheckTo) {
 			return Result{}, contractError{msg: `router tool input must include route = "plan" | "execute" | "check"`}
 		}
+		if res.Text == "" {
+			res.Text = res.Route
+		}
 	}
 
 	if kind == Plan && len(res.Steps) == 0 {

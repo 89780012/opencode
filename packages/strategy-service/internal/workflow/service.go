@@ -524,7 +524,7 @@ func (s *Service) exec(runID string) {
 				row.EndedAt = time.Now().UnixMilli()
 				_ = s.putNodeRun(row)
 
-				nextID, feedback := next(flow, node, res)
+				nextID, _ := next(flow, node, res)
 				if nextID == "" {
 					run.Status = RunDone
 					run.EndedAt = time.Now().UnixMilli()
@@ -544,7 +544,7 @@ func (s *Service) exec(runID string) {
 					return
 				}
 
-				if _, err := s.queue(flow, &run, nextNode, row.Turn+1, run.Input, row.Result.Text, feedback); err != nil {
+				if _, err := s.queue(flow, &run, nextNode, row.Turn+1, run.Input, carry(node, row.Result), ""); err != nil {
 					run.Status = RunFailed
 					run.Error = err.Error()
 					run.EndedAt = time.Now().UnixMilli()
@@ -751,6 +751,27 @@ func count(list []NodeRun, nodeID string) int {
 	return out
 }
 
+func entry(flow Workflow, list []NodeRun) bool {
+	for _, row := range list {
+		node, ok := pickNode(flow, row.NodeID)
+		if !ok || auto(node.Kind) {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func carry(node Node, res Result) string {
+	if text := strings.TrimSpace(res.Handoff); text != "" {
+		return text
+	}
+	if node.Kind == Router {
+		return ""
+	}
+	return strings.TrimSpace(res.Text)
+}
+
 func auto(kind Kind) bool {
 	return kind == Start || kind == End
 }
@@ -855,7 +876,7 @@ func (s *Service) queue(
 				return row, nil
 			}
 
-			nextID, nextFeedback := next(flow, node, row.Result)
+			nextID, _ := next(flow, node, row.Result)
 			if nextID == "" {
 				run.Status = RunDone
 				run.EndedAt = now
@@ -876,10 +897,10 @@ func (s *Service) queue(
 				return NodeRun{}, err
 			}
 
+			upstream = carry(node, row.Result)
+			feedback = ""
 			node = nextNode
 			turn++
-			upstream = row.Result.Text
-			feedback = nextFeedback
 			continue
 		}
 
@@ -887,7 +908,7 @@ func (s *Service) queue(
 		if err != nil {
 			return NodeRun{}, err
 		}
-		prompt := buildPrompt(flow, node, input, upstream, feedback)
+		prompt := buildPrompt(flow, node, input, upstream, feedback, entry(flow, list))
 		row := NodeRun{
 			ID:        id("node"),
 			RunID:     run.ID,
@@ -976,13 +997,13 @@ func pickNode(flow Workflow, id string) (Node, bool) {
 	return Node{}, false
 }
 
-func buildPrompt(flow Workflow, node Node, input string, upstream string, feedback string) string {
+func buildPrompt(flow Workflow, node Node, input string, upstream string, feedback string, root bool) string {
 	parts := []string{}
-	if input != "" {
+	if root && input != "" {
 		parts = append(parts, "User objective:\n"+input)
 	}
 	if upstream != "" {
-		parts = append(parts, "Upstream summary:\n"+upstream)
+		parts = append(parts, "Workflow handoff:\n"+upstream)
 	}
 	if feedback != "" {
 		parts = append(parts, "Workflow feedback:\n"+feedback)
@@ -1009,7 +1030,7 @@ func toolPrompt(node Node) string {
 		`Set "kind" to "` + string(node.Kind) + `" and fill the fields required for this node.`,
 	}
 	if node.Kind == Router {
-		head = append(head, `For router nodes, provide summary, route = "plan" | "execute" | "check", and handoff.`)
+		head = append(head, `For router nodes, provide route = "plan" | "execute" | "check". Keep summary and handoff optional and brief.`)
 	}
 	if node.Kind == Plan {
 		head = append(head, "For plan nodes, provide summary, steps, deliverables, risks, and handoff.")

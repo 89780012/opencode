@@ -29,6 +29,16 @@ func TestParseToolRouterRequiresRoute(t *testing.T) {
 	}
 }
 
+func TestParseToolRouterAllowsEmptySummary(t *testing.T) {
+	res, err := parseTool(Router, []byte(`{"kind":"router","route":"plan"}`))
+	if err != nil {
+		t.Fatalf("expected parseTool to allow router without summary, got %v", err)
+	}
+	if res.Text != "plan" {
+		t.Fatalf("expected router fallback text, got %q", res.Text)
+	}
+}
+
 func TestParseToolCheckRequiresPass(t *testing.T) {
 	_, err := parseTool(Check, []byte(`{"kind":"check","summary":"check"}`))
 	if err == nil {
