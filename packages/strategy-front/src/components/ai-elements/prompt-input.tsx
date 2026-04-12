@@ -202,7 +202,7 @@ export const PromptInputSubmit = ({
   }
 
   return (
-    <Button aria-label="Submit" className={cn(className)} size={size} type="submit" variant={variant} {...props}>
+    <Button aria-label="提交" className={cn(className)} size={size} type="submit" variant={variant} {...props}>
       {icon}
     </Button>
   )

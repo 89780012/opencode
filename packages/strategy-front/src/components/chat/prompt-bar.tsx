@@ -66,7 +66,7 @@ export function PromptBar(props: Props) {
   const vision = (on: boolean) =>
     on ? (
       <span className="shrink-0 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-500/12 dark:text-emerald-300">
-        Vision
+        识图
       </span>
     ) : null
 
@@ -89,14 +89,14 @@ export function PromptBar(props: Props) {
     const next = [...props.files]
     for (const file of Array.from(list)) {
       if (next.length >= imageCount) {
-        fail(`You can attach up to ${imageCount} images.`)
+        fail(`最多只能上传 ${imageCount} 张图片。`)
         break
       }
       const result = await imagePart(file)
       if ("err" in result) {
-        if (result.err === "type") fail("Only PNG, JPEG, GIF, and WEBP images are supported.")
-        if (result.err === "size") fail("Each image must be 10MB or smaller.")
-        if (result.err === "read") fail("Failed to read the selected image.")
+        if (result.err === "type") fail("仅支持 PNG、JPEG、GIF 和 WEBP 图片。")
+        if (result.err === "size") fail("每张图片必须小于等于 10MB。")
+        if (result.err === "read") fail("读取所选图片失败。")
         continue
       }
       next.push(result.part)
@@ -170,7 +170,7 @@ export function PromptBar(props: Props) {
             value={props.agent ?? ""}
           >
             <SelectTrigger className={`${ctrl} ${item} ${agent} px-2.5`}>
-              <SelectValue placeholder="选择 agent" />
+              <SelectValue placeholder="选择智能体" />
             </SelectTrigger>
             <SelectContent align="start" className={menu} position="popper">
               {props.agents.map((item) => (
@@ -205,7 +205,7 @@ export function PromptBar(props: Props) {
           <PromptInputButton
             className={`${upload} rounded-md p-0`}
             disabled={props.disabled}
-            aria-label="Upload image"
+            aria-label="上传图片"
             onClick={() => {
               if (!props.canImage) {
                 fail("当前模型不支持图片输入。")

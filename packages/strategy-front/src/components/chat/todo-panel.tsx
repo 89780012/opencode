@@ -75,7 +75,7 @@ export function TodoPanel(props: Props) {
           }}
         >
           <div className="flex items-center gap-2 text-sm font-medium leading-none">
-            <span>Todos</span>
+            <span>待办</span>
             <span className="rounded-full bg-background/90 px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground ring-1 ring-black/6 dark:bg-white/[0.05] dark:ring-white/10">
               {count} / {total}
             </span>
@@ -87,7 +87,7 @@ export function TodoPanel(props: Props) {
                 collapsed ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0",
               )}
             >
-              {props.preview || "Tracking current work"}
+              {props.preview || "正在跟踪当前任务"}
             </div>
             <div
               className={cn(
@@ -95,7 +95,7 @@ export function TodoPanel(props: Props) {
                 collapsed ? "-translate-y-1 opacity-0" : "translate-y-0 opacity-100",
               )}
             >
-              {`${total} items tracked`}
+              {`已跟踪 ${total} 项`}
             </div>
           </div>
         </button>

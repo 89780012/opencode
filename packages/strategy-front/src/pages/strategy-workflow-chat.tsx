@@ -15,12 +15,12 @@ const ctrl =
   "rounded-md border border-black/8 bg-black/[0.03] text-xs shadow-none hover:bg-black/[0.05] dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.06]"
 
 function phaseText(value: string) {
-  if (value === "running") return "Running"
-  if (value === "waiting") return "Waiting"
-  if (value === "done") return "Done"
-  if (value === "failed") return "Failed"
-  if (value === "interrupted") return "Interrupted"
-  return "Idle"
+  if (value === "running") return "运行中"
+  if (value === "waiting") return "等待中"
+  if (value === "done") return "已完成"
+  if (value === "failed") return "失败"
+  if (value === "interrupted") return "已中断"
+  return "空闲"
 }
 
 export default function StrategyWorkflowChatPage() {
@@ -54,7 +54,7 @@ export default function StrategyWorkflowChatPage() {
       await Promise.all([refresh(), chat.refresh()])
     } catch (err) {
       console.error("Failed to refresh workflow chat page", err)
-      toast.error("Failed to refresh the workflow chat page.")
+      toast.error("刷新工作流会话页面失败。")
     } finally {
       setSpin(false)
     }
@@ -62,25 +62,25 @@ export default function StrategyWorkflowChatPage() {
 
   if (loading && !workspace) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Loading strategy...</div>
+      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">正在加载策略...</div>
     )
   }
 
   if (!workspace) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-        <div className="text-base font-semibold">Strategy not found</div>
-        <div className="text-sm text-muted-foreground">The requested workspace could not be loaded.</div>
+        <div className="text-base font-semibold">未找到策略</div>
+        <div className="text-sm text-muted-foreground">无法加载请求的工作区。</div>
         <div className="flex gap-2">
           <Button variant="outline" asChild>
             <Link to="/app/strategies">
               <ArrowLeft className="size-4" />
-              Back
+              返回
             </Link>
           </Button>
           <Button variant="outline" onClick={() => void reload()} disabled={spin}>
             <RefreshCw className={`size-4 ${spin ? "animate-spin" : ""}`} />
-            {spin ? "Refreshing..." : "Refresh"}
+            {spin ? "刷新中..." : "刷新"}
           </Button>
         </div>
       </div>
@@ -90,20 +90,20 @@ export default function StrategyWorkflowChatPage() {
   if (workspace.missing) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-        <div className="text-base font-semibold">Workspace directory is missing</div>
+        <div className="text-base font-semibold">工作区目录缺失</div>
         <div className="text-sm text-muted-foreground">
-          The strategy exists in metadata, but the local directory no longer exists.
+          该策略仍存在于元数据中，但本地目录已经不存在了。
         </div>
         <div className="flex gap-2">
           <Button variant="outline" asChild>
             <Link to="/app/strategies">
               <ArrowLeft className="size-4" />
-              Back
+              返回
             </Link>
           </Button>
           <Button variant="outline" onClick={() => void reload()} disabled={spin}>
             <RefreshCw className={`size-4 ${spin ? "animate-spin" : ""}`} />
-            {spin ? "Refreshing..." : "Refresh"}
+            {spin ? "刷新中..." : "刷新"}
           </Button>
         </div>
       </div>
@@ -121,7 +121,7 @@ export default function StrategyWorkflowChatPage() {
               </Link>
             </Button>
             <div className="rounded-full border border-black/8 bg-black/[0.03] px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
-              Workflow Chat
+              工作流会话
             </div>
             <div className="rounded-full border border-black/8 bg-black/[0.03] px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
               {phaseText(chat.phase)}
@@ -139,11 +139,11 @@ export default function StrategyWorkflowChatPage() {
               }}
             >
               {open ? <PanelRightClose className="size-4" /> : <PanelRightOpen className="size-4" />}
-              {open ? "Hide Code" : "Show Code"}
+              {open ? "隐藏代码" : "显示代码"}
             </Button>
             <Button variant="outline" size="sm" className={ctrl} onClick={() => void reload()} disabled={spin}>
               <RefreshCw className={`size-4 ${spin ? "animate-spin" : ""}`} />
-              {spin ? "Refreshing..." : "Refresh"}
+              {spin ? "刷新中..." : "刷新"}
             </Button>
           </div>
         </div>

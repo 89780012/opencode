@@ -39,14 +39,14 @@ export function WaitPanel(props: Props) {
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-muted-foreground">
           <div>权限：{grant.permission}</div>
-          {grant.patterns.length > 0 ? <div>匹配：{grant.patterns.join(", ")}</div> : null}
+          {grant.patterns.length > 0 ? <div>匹配范围：{grant.patterns.join(", ")}</div> : null}
         </CardContent>
         <CardFooter className="justify-end gap-2">
           <Button disabled={props.sending} type="button" variant="outline" onClick={() => props.onReply({ reply: "reject" })}>
             拒绝
           </Button>
           <Button disabled={props.sending} type="button" variant="outline" onClick={() => props.onReply({ reply: "once" })}>
-            允许一次
+            仅允许一次
           </Button>
           <Button disabled={props.sending} type="button" onClick={() => props.onReply({ reply: "always" })}>
             始终允许
@@ -61,7 +61,7 @@ export function WaitPanel(props: Props) {
       <Card className="mb-3 gap-3 py-4">
         <CardHeader className="gap-2 pb-0">
           <CardTitle>等待问题回复</CardTitle>
-          <CardDescription>{props.wait.prompt || "请补充当前步骤所需信息。"}</CardDescription>
+          <CardDescription>{props.wait.prompt || "请补充当前步骤所需的信息。"}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {ask.questions.map((item, i) => (

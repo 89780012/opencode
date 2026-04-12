@@ -1,5 +1,4 @@
 import { useState } from "react"
-
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -25,7 +24,7 @@ export function QuestionPanel(props: Props) {
         if (i !== q) return item
         if (!multi) return [label]
         return item.includes(label) ? item.filter((v) => v !== label) : [...item, label]
-      })
+      }),
     )
   }
 
@@ -38,7 +37,7 @@ export function QuestionPanel(props: Props) {
         if (!extra[q] || !value.trim()) return next
         if (!multi) return [value.trim()]
         return next.includes(value.trim()) ? next : [...next, value.trim()]
-      })
+      }),
     )
   }
 
@@ -53,7 +52,7 @@ export function QuestionPanel(props: Props) {
         if (!on) return item.filter((v) => v !== text)
         if (!multi) return [text]
         return item.includes(text) ? item : [...item, text]
-      })
+      }),
     )
   }
 
@@ -65,11 +64,9 @@ export function QuestionPanel(props: Props) {
         <div className="flex items-start justify-between gap-2">
           <div className="space-y-0.5">
             <CardTitle>需要你确认几个问题</CardTitle>
-            <CardDescription>当前任务被问题阻塞。回答后会继续执行。</CardDescription>
+            <CardDescription>当前任务被问题阻塞，回答后会继续执行。</CardDescription>
           </div>
-          <div className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">
-            {props.req.questions.length} 个问题
-          </div>
+          <div className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">{props.req.questions.length} 个问题</div>
         </div>
       </CardHeader>
       <CardContent>
@@ -117,9 +114,7 @@ export function QuestionPanel(props: Props) {
                           className={cn(
                             "flex w-full items-start gap-2.5 rounded-md border px-3 py-2.5 text-left transition-colors outline-none",
                             "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
-                            hit
-                              ? "border-primary/60 bg-accent/50 text-foreground"
-                              : "border-border bg-background hover:bg-accent/30"
+                            hit ? "border-primary/60 bg-accent/50 text-foreground" : "border-border bg-background hover:bg-accent/30",
                           )}
                           disabled={props.sending}
                           onClick={() => pick(i, opt.label, multi)}
@@ -128,12 +123,10 @@ export function QuestionPanel(props: Props) {
                             className={cn(
                               "mt-0.5 flex size-4 shrink-0 items-center justify-center border",
                               multi ? "rounded-sm" : "rounded-full",
-                              hit ? "border-primary bg-primary" : "border-muted-foreground/40 bg-background"
+                              hit ? "border-primary bg-primary" : "border-muted-foreground/40 bg-background",
                             )}
                           >
-                            {hit ? (
-                              <div className={cn("bg-primary-foreground", multi ? "size-2 rounded-[2px]" : "size-2 rounded-full")} />
-                            ) : null}
+                            {hit ? <div className={cn("bg-primary-foreground", multi ? "size-2 rounded-[2px]" : "size-2 rounded-full")} /> : null}
                           </div>
                           <div className="min-w-0 space-y-1">
                             <div className="text-sm font-medium">{opt.label}</div>
@@ -146,7 +139,7 @@ export function QuestionPanel(props: Props) {
                       <div
                         className={cn(
                           "rounded-md border px-3 py-2.5 transition-colors",
-                          on ? "border-primary/60 bg-accent/40" : "border-border bg-background"
+                          on ? "border-primary/60 bg-accent/40" : "border-border bg-background",
                         )}
                       >
                         <button
@@ -158,7 +151,7 @@ export function QuestionPanel(props: Props) {
                           <div
                             className={cn(
                               "flex size-4 shrink-0 items-center justify-center rounded-md border",
-                              on ? "border-primary bg-primary" : "border-muted-foreground/40 bg-background"
+                              on ? "border-primary bg-primary" : "border-muted-foreground/40 bg-background",
                             )}
                           >
                             {on ? <div className="size-2 rounded-[2px] bg-primary-foreground" /> : null}
@@ -168,12 +161,7 @@ export function QuestionPanel(props: Props) {
                             <div className="text-xs text-muted-foreground">开启后可直接填写答案</div>
                           </div>
                         </button>
-                        <Input
-                          disabled={!on || props.sending}
-                          onChange={(e) => write(i, e.target.value, multi)}
-                          placeholder="输入你的答案"
-                          value={text}
-                        />
+                        <Input disabled={!on || props.sending} onChange={(e) => write(i, e.target.value, multi)} placeholder="输入你的答案" value={text} />
                       </div>
                     ) : null}
                   </div>

@@ -33,7 +33,7 @@ export function StrategyWorkflowPanel(props: Props) {
 
   const submit = async () => {
     if (files.files.length > 0) {
-      toast.error("固定工作流聊天暂不支持图片输入。")
+      toast.error("固定工作流会话暂不支持图片输入。")
       return
     }
 
@@ -69,10 +69,10 @@ export function StrategyWorkflowPanel(props: Props) {
             bound ? (
               <ChatEmptyState
                 title="从这里开始固定工作流"
-                desc="你在这个窗口里发出的每条自然语言消息，都会作为一次新的工作流输入。系统会先经过意图识别，再路由到规划或执行。"
+                desc="你在这个窗口里发送的每条自然语言消息，都会作为一次新的工作流输入。系统会先判断意图，再路由到规划或执行节点。"
                 tips={[
                   "输入新的需求时，系统会在同一个会话里开启新一轮工作流。",
-                  "如果当前工作流因为权限或问题阻塞，先处理下方卡片，再继续执行。",
+                  "如果当前工作流因为权限或问题被阻塞，先处理下方卡片，再继续执行。",
                 ]}
               />
             ) : (
@@ -80,7 +80,7 @@ export function StrategyWorkflowPanel(props: Props) {
                 title="当前策略尚未绑定固定工作流"
                 desc="这个聊天页只负责运行已经绑定好的固定工作流。请先在“新建策略”时选择工作流创建，或为当前策略补充固定工作流绑定。"
                 tips={[
-                  "普通创建模式仍然走原来的普通策略聊天。",
+                  "普通创建模式仍然会使用原来的普通策略聊天。",
                   "绑定完成后，这里会固定使用同一个工作流模板来执行每一轮消息。",
                 ]}
               />

@@ -59,7 +59,7 @@ export function SessionSidebarPanel(props: Props) {
           </Button>
         </div>
         <div className="px-1 text-xs text-muted-foreground">
-          {workspace ? `当前工作区: ${workspace.name}` : "请先选择工作区"}
+          {workspace ? `当前工作区：${workspace.name}` : "请先选择工作区"}
         </div>
       </SidebarHeader>
 
@@ -73,7 +73,7 @@ export function SessionSidebarPanel(props: Props) {
                 </div>
                 <div className="text-sm font-semibold">请先选择工作区</div>
                 <p className="text-xs leading-5 text-muted-foreground">
-                  会话列表会按工作区隔离展示。先在工作区标签中选择一个工作区，再回到这里查看对应会话。
+                  会话列表会按工作区隔离展示。先在工作区标签里选择一个工作区，再回到这里查看对应会话。
                 </p>
                 <Button variant="outline" size="sm" onClick={() => props.onWorkspace?.()}>
                   前往工作区
@@ -88,9 +88,7 @@ export function SessionSidebarPanel(props: Props) {
             <SidebarGroupLabel className="px-3">会话</SidebarGroupLabel>
             <SidebarGroupContent className="h-full overflow-hidden px-2 pb-2">
               {loading && sessions.length === 0 ? (
-                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                  正在加载会话...
-                </div>
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">正在加载会话...</div>
               ) : sessions.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
                   <div className="flex size-12 items-center justify-center rounded-2xl bg-muted">
