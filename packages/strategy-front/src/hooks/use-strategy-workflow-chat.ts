@@ -8,9 +8,9 @@ import { busy as workflowBusy, note } from "@/lib/workspace-chat"
 import type { PromptInputMessage } from "@/types/chat"
 import type { WorkflowNodeRun, WorkflowRuntimeDetail, WorkflowWait } from "@/types/workflow"
 
-function model(box?: { state?: { model_provider_id?: string; model_id?: string } | null } | null) {
-  const pid = box?.state?.model_provider_id?.trim()
-  const mid = box?.state?.model_id?.trim()
+function model(box?: { state?: { default_model_provider_id?: string; default_model_id?: string } | null } | null) {
+  const pid = box?.state?.default_model_provider_id?.trim()
+  const mid = box?.state?.default_model_id?.trim()
   if (!pid || !mid) return ""
   return `${pid}/${mid}`
 }
@@ -20,8 +20,8 @@ function ref(value: string) {
   const mid = rest.join("/").trim()
   if (!pid?.trim() || !mid) return
   return {
-    model_provider_id: pid.trim(),
-    model_id: mid,
+    default_model_provider_id: pid.trim(),
+    default_model_id: mid,
   }
 }
 
@@ -38,7 +38,7 @@ export function useStrategyWorkflowChat(path?: string | null) {
 
   const sid = room.state?.session_id ?? null
   const mid = model(room.box)
-  const variant = room.state?.variant || null
+  const variant = room.state?.default_variant || null
   useChatEvents(path)
   const detail = useChatSessionDetail(path, sid)
   const busy = workflowBusy(room.box, sid) || detail.status.type !== "idle"
@@ -166,7 +166,7 @@ export function useStrategyWorkflowChat(path?: string | null) {
             workspace_path: path,
             workflow_id: wid,
             ...pick,
-            variant: next || "",
+            default_variant: next || "",
           })
           room.put(row)
         } catch (err) {

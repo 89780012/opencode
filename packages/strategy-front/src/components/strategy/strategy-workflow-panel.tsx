@@ -14,7 +14,6 @@ import type { LocalWorkspace } from "@/types/workspace"
 interface Props {
   workspace: LocalWorkspace
   chat: ReturnType<typeof useStrategyWorkflowChat>
-  agent?: string
   models: ComposerModel[]
   model?: string
   variant?: string | null
@@ -25,11 +24,16 @@ interface Props {
   onOpenDiff: (path: string) => void
 }
 
+const chip =
+  "rounded-full border border-black/8 bg-black/[0.03] px-2.5 py-1 text-[11px] text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]"
+
 export function StrategyWorkflowPanel(props: Props) {
   const draft = useSessionDraft(props.workspace.path, props.chat.selectedSessionId)
   const files = useSessionFiles(props.workspace.path, props.chat.selectedSessionId)
   const todo = useChatTodo(props.workspace.path, props.chat.selectedSessionId, props.chat.busy || !!props.chat.openWait)
   const bound = !!props.chat.state?.workflow_id && !!props.chat.flow
+  const node = props.chat.flow?.nodes.find((item) => item.id === props.chat.run?.current_node_id) ?? null
+  const source = node?.model_provider_id && node?.model_id ? "node override" : "workspace default"
 
   const submit = async () => {
     if (files.files.length > 0) {
@@ -68,20 +72,20 @@ export function StrategyWorkflowPanel(props: Props) {
           {empty ? (
             bound ? (
               <ChatEmptyState
-                title="从这里开始固定工作流"
-                desc="你在这个窗口里发送的每条自然语言消息，都会作为一次新的工作流输入。系统会先判断意图，再路由到规划或执行节点。"
+                title="从这里开始运行工作流"
+                desc="你在这里发送的每条自然语言消息，都会作为新一轮工作流输入。实际执行时使用的是工作流节点自己的 Agent。"
                 tips={[
-                  "输入新的需求时，系统会在同一个会话里开启新一轮工作流。",
-                  "如果当前工作流因为权限或问题被阻塞，先处理下方卡片，再继续执行。",
+                  "这里的模型选择器会修改工作区绑定的默认模型，影响后续工作流运行。",
+                  "如果某个节点配置了自己的模型覆盖，仍然会优先使用节点模型。",
                 ]}
               />
             ) : (
               <ChatEmptyState
-                title="当前策略尚未绑定固定工作流"
-                desc="这个聊天页只负责运行已经绑定好的固定工作流。请先在“新建策略”时选择工作流创建，或为当前策略补充固定工作流绑定。"
+                title="当前策略还没有绑定工作流"
+                desc="这个页面只负责运行已经绑定到当前策略工作区的工作流。"
                 tips={[
-                  "普通创建模式仍然会使用原来的普通策略聊天。",
-                  "绑定完成后，这里会固定使用同一个工作流模板来执行每一轮消息。",
+                  "请先在创建策略时选择工作流模式，或先完成工作流绑定。",
+                  "Agent 选择在工作流节点上，这里不再提供单独切换。",
                 ]}
               />
             )
@@ -91,6 +95,14 @@ export function StrategyWorkflowPanel(props: Props) {
 
       <div className="shrink-0 px-2 pb-2 pt-1">
         <div className="mx-auto flex max-w-[780px] flex-col gap-2">
+          {bound ? (
+            <div className="flex flex-wrap items-center gap-2 px-1">
+              <div className={chip}>Agent 由工作流节点控制</div>
+              <div className={chip}>{`当前节点：${node?.title || "-"}`}</div>
+              <div className={chip}>{`节点智能体：${node?.agent || "-"}`}</div>
+              <div className={chip}>{`模型来源：${source === "node override" ? "节点覆盖" : "工作区默认"}`}</div>
+            </div>
+          ) : null}
           {props.chat.openWait ? (
             <WaitPanel
               key={props.chat.openWait.id}
@@ -104,8 +116,7 @@ export function StrategyWorkflowPanel(props: Props) {
           {todo.visible ? <TodoPanel todos={todo.todos} collapsed={todo.collapsed} preview={todo.preview} /> : null}
           <div className="w-full">
             <PromptBar
-              agent={props.agent}
-              agents={props.agent ? [props.agent] : []}
+              agents={[]}
               busy={props.chat.busy || props.chat.interrupting}
               canImage={false}
               disabled={props.load || !bound}
@@ -123,6 +134,7 @@ export function StrategyWorkflowPanel(props: Props) {
               }}
               onValueChange={draft.setText}
               onVariant={props.onVariant}
+              showAgent={false}
               submitting={props.chat.sending || props.chat.replying || props.chat.sessionLoading || props.chat.creating}
               value={draft.text}
               variant={props.variant}

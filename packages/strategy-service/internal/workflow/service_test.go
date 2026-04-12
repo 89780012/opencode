@@ -27,6 +27,18 @@ func TestBuildPromptIncludesSkills(t *testing.T) {
 	}
 }
 
+func TestBodyUsesNodeAgent(t *testing.T) {
+	out := body(Node{
+		Agent: "smartx-plan",
+	}, Run{
+		ModelProviderID: "openai",
+		ModelID:         "gpt-5.3",
+	}, "hello")
+	if out["agent"] != "smartx-plan" {
+		t.Fatalf("expected node agent, got %#v", out["agent"])
+	}
+}
+
 func TestBodyIncludesModelAndVariant(t *testing.T) {
 	out := body(Node{
 		Agent:           "coder",

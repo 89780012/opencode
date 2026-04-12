@@ -225,7 +225,7 @@ func (s *Service) BindWorkspace(path string, wid string, pid string, mid string,
 	mid = text(mid)
 	variant = text(variant)
 	if (pid == "") != (mid == "") {
-		return WorkspaceSnapshot{}, errors.New("workspace default model requires both model_provider_id and model_id")
+		return WorkspaceSnapshot{}, errors.New("workspace default model requires both default_model_provider_id and default_model_id")
 	}
 	if pid == "" {
 		variant = ""
@@ -239,9 +239,9 @@ func (s *Service) BindWorkspace(path string, wid string, pid string, mid string,
 		return WorkspaceSnapshot{}, err
 	}
 	item.WorkflowID = wid
-	item.ModelProviderID = pid
-	item.ModelID = mid
-	item.Variant = variant
+	item.DefaultModelProviderID = pid
+	item.DefaultModelID = mid
+	item.DefaultVariant = variant
 	item.UpdatedAt = time.Now().UnixMilli()
 	if err := s.putWorkspaceState(item); err != nil {
 		return WorkspaceSnapshot{}, err
@@ -348,9 +348,9 @@ func (s *Service) start(wid string, path string, input string, sid string) (Star
 		WorkflowID:      flow.ID,
 		WorkspacePath:   text(path),
 		SessionID:       text(sid),
-		ModelProviderID: state.ModelProviderID,
-		ModelID:         state.ModelID,
-		Variant:         state.Variant,
+		ModelProviderID: state.DefaultModelProviderID,
+		ModelID:         state.DefaultModelID,
+		Variant:         state.DefaultVariant,
 		Status:          RunRunning,
 		CurrentNodeID:   node.ID,
 		Input:           strings.TrimSpace(input),

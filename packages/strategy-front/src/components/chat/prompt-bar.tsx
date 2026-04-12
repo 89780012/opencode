@@ -12,7 +12,7 @@ import {
 import { ImageAttachments } from "@/components/chat/image-attachments"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { imageCount, imageModel, imagePart, imageTypes } from "@/lib/attachment"
-import type { PromptInputMessage, ChatImageInput } from "@/types/chat"
+import type { ChatImageInput, PromptInputMessage } from "@/types/chat"
 import type { ComposerModel } from "@/types/composer"
 
 interface Props {
@@ -24,6 +24,7 @@ interface Props {
   busy?: boolean
   canImage?: boolean
   submitting?: boolean
+  showAgent?: boolean
   agents: string[]
   models: ComposerModel[]
   agent?: string
@@ -46,6 +47,7 @@ const menu = "custom-scrollbar max-h-[240px] overflow-y-auto rounded-md border-b
 
 export function PromptBar(props: Props) {
   const { model, models, onModel } = props
+  const showAgent = props.showAgent !== false
   const pick = models.some((item) => `${item.provider.id}/${item.id}` === model)
     ? (model ?? "")
     : models[0]
@@ -92,14 +94,14 @@ export function PromptBar(props: Props) {
         fail(`最多只能上传 ${imageCount} 张图片。`)
         break
       }
-      const result = await imagePart(file)
-      if ("err" in result) {
-        if (result.err === "type") fail("仅支持 PNG、JPEG、GIF 和 WEBP 图片。")
-        if (result.err === "size") fail("每张图片必须小于等于 10MB。")
-        if (result.err === "read") fail("读取所选图片失败。")
+      const out = await imagePart(file)
+      if ("err" in out) {
+        if (out.err === "type") fail("仅支持 PNG、JPEG、GIF 和 WEBP 图片。")
+        if (out.err === "size") fail("每张图片必须小于等于 10MB。")
+        if (out.err === "read") fail("读取所选图片失败。")
         continue
       }
-      next.push(result.part)
+      next.push(out.part)
     }
     props.onFilesChange(next)
   }
@@ -164,22 +166,24 @@ export function PromptBar(props: Props) {
       </PromptInputBody>
       <PromptInputFooter className={foot}>
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-          <Select
-            disabled={props.disabled || props.agents.length === 0}
-            onValueChange={props.onAgent}
-            value={props.agent ?? ""}
-          >
-            <SelectTrigger className={`${ctrl} ${item} ${agent} px-2.5`}>
-              <SelectValue placeholder="选择智能体" />
-            </SelectTrigger>
-            <SelectContent align="start" className={menu} position="popper">
-              {props.agents.map((item) => (
-                <SelectItem key={item} value={item}>
-                  {item}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {showAgent ? (
+            <Select
+              disabled={props.disabled || props.agents.length === 0}
+              onValueChange={props.onAgent}
+              value={props.agent ?? ""}
+            >
+              <SelectTrigger className={`${ctrl} ${item} ${agent} px-2.5`}>
+                <SelectValue placeholder="选择智能体" />
+              </SelectTrigger>
+              <SelectContent align="start" className={menu} position="popper">
+                {props.agents.map((item) => (
+                  <SelectItem key={item} value={item}>
+                    {item}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : null}
           <Select disabled={props.disabled || models.length === 0} onValueChange={props.onModel} value={pick}>
             <SelectTrigger className={`${ctrl} ${item} ${modelw} px-2`}>
               {cur ? (

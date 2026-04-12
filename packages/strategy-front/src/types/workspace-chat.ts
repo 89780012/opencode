@@ -7,9 +7,9 @@ export type WorkspaceState = {
   status: WorkspaceStatus
   session_id?: string
   workflow_id?: string
-  model_provider_id?: string
-  model_id?: string
-  variant?: string
+  default_model_provider_id?: string
+  default_model_id?: string
+  default_variant?: string
   run_id?: string
   updated_at: number
 }
@@ -22,9 +22,9 @@ export type WorkspaceSnapshot = {
 export type WorkspaceBindInput = {
   workspace_path: string
   workflow_id: string
-  model_provider_id?: string
-  model_id?: string
-  variant?: string
+  default_model_provider_id?: string
+  default_model_id?: string
+  default_variant?: string
 }
 
 export type WorkspaceDispatchInput = {

@@ -318,15 +318,15 @@ const (
 )
 
 type WorkspaceState struct {
-	WorkspacePath   string          `json:"workspace_path"`
-	Status          WorkspaceStatus `json:"status"`
-	SessionID       string          `json:"session_id,omitempty"`
-	WorkflowID      string          `json:"workflow_id,omitempty"`
-	ModelProviderID string          `json:"model_provider_id,omitempty"`
-	ModelID         string          `json:"model_id,omitempty"`
-	Variant         string          `json:"variant,omitempty"`
-	RunID           string          `json:"run_id,omitempty"`
-	UpdatedAt       int64           `json:"updated_at"`
+	WorkspacePath          string          `json:"workspace_path"`
+	Status                 WorkspaceStatus `json:"status"`
+	SessionID              string          `json:"session_id,omitempty"`
+	WorkflowID             string          `json:"workflow_id,omitempty"`
+	DefaultModelProviderID string          `json:"default_model_provider_id,omitempty"`
+	DefaultModelID         string          `json:"default_model_id,omitempty"`
+	DefaultVariant         string          `json:"default_variant,omitempty"`
+	RunID                  string          `json:"run_id,omitempty"`
+	UpdatedAt              int64           `json:"updated_at"`
 }
 
 type WorkspaceSnapshot struct {

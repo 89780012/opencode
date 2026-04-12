@@ -31,7 +31,6 @@ export default function StrategyWorkflowChatPage() {
   const kind = workspace?.type ?? "other"
   const composer = useStrategyComposer(path, kind)
   const chat = useStrategyWorkflowChat(path)
-  const agent = composer.agents.includes("plan") ? "plan" : (composer.agent ?? composer.agents[0])
   const [open, setOpen] = useState(false)
   const [file, setFile] = useState<string | null>(null)
   const [tab, setTab] = useState<WorkspaceDetailTab>("files")
@@ -41,12 +40,6 @@ export default function StrategyWorkflowChatPage() {
     if (!workspace) return
     select(workspace)
   }, [select, workspace])
-
-  useEffect(() => {
-    if (!chat.state?.workflow_id) return
-    if (chat.model || !composer.model) return
-    chat.setModel(composer.model)
-  }, [chat.model, chat.setModel, chat.state?.workflow_id, composer.model])
 
   const reload = useCallback(async () => {
     setSpin(true)
@@ -160,7 +153,6 @@ export default function StrategyWorkflowChatPage() {
             <StrategyWorkflowPanel
               workspace={workspace}
               chat={chat}
-              agent={agent}
               models={composer.models}
               model={chat.model}
               variant={chat.variant}

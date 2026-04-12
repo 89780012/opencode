@@ -19,18 +19,24 @@ func (a *API) workspaceChatState(c *gin.Context) {
 
 func (a *API) workspaceChatBind(c *gin.Context) {
 	body := struct {
-		WorkspacePath   string `json:"workspace_path"`
-		WorkflowID      string `json:"workflow_id"`
-		ModelProviderID string `json:"model_provider_id"`
-		ModelID         string `json:"model_id"`
-		Variant         string `json:"variant"`
+		WorkspacePath          string `json:"workspace_path"`
+		WorkflowID             string `json:"workflow_id"`
+		DefaultModelProviderID string `json:"default_model_provider_id"`
+		DefaultModelID         string `json:"default_model_id"`
+		DefaultVariant         string `json:"default_variant"`
 	}{}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		bad(c, err)
 		return
 	}
 
-	data, err := a.wf.BindWorkspace(body.WorkspacePath, body.WorkflowID, body.ModelProviderID, body.ModelID, body.Variant)
+	data, err := a.wf.BindWorkspace(
+		body.WorkspacePath,
+		body.WorkflowID,
+		body.DefaultModelProviderID,
+		body.DefaultModelID,
+		body.DefaultVariant,
+	)
 	if err != nil {
 		slog.Error("workspace chat bind failed", "workspace_path", body.WorkspacePath, "workflow_id", body.WorkflowID, "error", err)
 		bad(c, err)

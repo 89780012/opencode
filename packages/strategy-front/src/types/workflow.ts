@@ -406,13 +406,13 @@ export function retryOptions(value = 2) {
 }
 
 export function fieldLabel(key: WorkflowFieldKey) {
-  if (key === workflowField.agent) return "节点 Agent"
+  if (key === workflowField.agent) return "节点智能体"
   if (key === workflowField.skills) return "技能"
   if (key === workflowField.tool) return "工具协议"
   if (key === workflowField.timeout) return "超时"
   if (key === workflowField.retry) return "重试"
-  if (key === workflowField.model) return "模型覆盖"
-  if (key === workflowField.variant) return "变体"
+  if (key === workflowField.model) return "节点模型覆盖"
+  if (key === workflowField.variant) return "节点变体覆盖"
   return "提示词"
 }
 

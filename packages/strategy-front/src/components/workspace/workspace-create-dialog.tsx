@@ -102,8 +102,8 @@ function ref(value: string) {
   const mid = rest.join("/").trim()
   if (!pid?.trim() || !mid) return
   return {
-    model_provider_id: pid.trim(),
-    model_id: mid,
+    default_model_provider_id: pid.trim(),
+    default_model_id: mid,
   }
 }
 
@@ -265,6 +265,10 @@ export function WorkspaceCreateDialog(props: Props) {
       toast.error("请选择工作流")
       return
     }
+    if (mode === "workflow" && !composer.model) {
+      toast.error("请先为工作流选择默认模型")
+      return
+    }
     if (mode === "plain" && (!composer.agent || !composer.model)) {
       toast.error("当前没有可用的模型或模式，无法自动发起引导会话")
       return
@@ -280,7 +284,7 @@ export function WorkspaceCreateDialog(props: Props) {
           workspace_path: data.workspace.path,
           workflow_id: pick.id,
           ...pickModel,
-          variant: pickModel ? (composer.variant ?? undefined) : undefined,
+          default_variant: pickModel ? (composer.variant ?? undefined) : undefined,
         })
         await workspaceChatApi.dispatch({
           workspace_path: data.workspace.path,

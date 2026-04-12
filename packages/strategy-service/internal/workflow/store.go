@@ -275,14 +275,14 @@ func cleanWorkspaceStates(list []WorkspaceState) []WorkspaceState {
 		seen[item.WorkspacePath] = true
 		item.SessionID = text(item.SessionID)
 		item.WorkflowID = text(item.WorkflowID)
-		item.ModelProviderID = text(item.ModelProviderID)
-		item.ModelID = text(item.ModelID)
-		item.Variant = text(item.Variant)
+		item.DefaultModelProviderID = text(item.DefaultModelProviderID)
+		item.DefaultModelID = text(item.DefaultModelID)
+		item.DefaultVariant = text(item.DefaultVariant)
 		item.RunID = text(item.RunID)
-		if item.ModelProviderID == "" || item.ModelID == "" {
-			item.ModelProviderID = ""
-			item.ModelID = ""
-			item.Variant = ""
+		if item.DefaultModelProviderID == "" || item.DefaultModelID == "" {
+			item.DefaultModelProviderID = ""
+			item.DefaultModelID = ""
+			item.DefaultVariant = ""
 		}
 		item.Status = workspaceStatus(item.Status)
 		out = append(out, item)
