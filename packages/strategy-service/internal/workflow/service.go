@@ -1024,32 +1024,32 @@ func buildPrompt(flow Workflow, node Node, input string, upstream string, feedba
 
 func toolPrompt(node Node) string {
 	head := []string{
-		"Structured output contract:",
-		"After finishing this node, call tool `" + node.ToolID + "` exactly once.",
-		"Do not paste raw JSON in assistant text.",
-		`Set "kind" to "` + string(node.Kind) + `" and fill the fields required for this node.`,
+		"结构化输出约定：",
+		"完成当前节点后，必须且只调用一次工具 `" + node.ToolID + "`。",
+		"不要在助手文本中粘贴原始 JSON。",
+		"将 \"kind\" 设为 \"" + string(node.Kind) + "\"，并填写当前节点要求的字段。",
 	}
 	if node.Kind == Router {
-		head = append(head, `For router nodes, provide route = "plan" | "execute" | "check". Keep summary and handoff optional and brief.`)
+		head = append(head, `对于 router 节点，请提供 route = "plan" | "execute" | "check"。summary 和 handoff 保持可选且尽量简短。`)
 	}
 	if node.Kind == Plan {
-		head = append(head, "For plan nodes, provide summary, steps, deliverables, risks, and handoff.")
+		head = append(head, "对于 plan 节点，请提供 summary、steps、deliverables、risks 和 handoff。")
 	}
 	if node.Kind == Check {
-		head = append(head, "For check nodes, provide summary, pass, issues, and handoff.")
+		head = append(head, "对于 check 节点，请提供 summary、pass、issues 和 handoff。")
 	}
 	if node.Kind == Execute {
-		head = append(head, "For execute nodes, provide at least summary and optional handoff.")
+		head = append(head, "对于 execute 节点，至少提供 summary，并可按需补充 handoff。")
 	}
 	return strings.Join(head, "\n")
 }
 
 func retryPrompt(node Node, err error) string {
 	return strings.TrimSpace(strings.Join([]string{
-		"The previous response did not satisfy the workflow contract.",
-		"Reason: " + err.Error(),
-		"Retry this node by calling tool `" + node.ToolID + "` with kind `" + string(node.Kind) + "`.",
-		"Do not reply with raw JSON in assistant text.",
+		"上一轮响应未满足工作流约定。",
+		"原因：" + err.Error(),
+		"请重新执行当前节点，并调用工具 `" + node.ToolID + "`，其中 kind 使用 `" + string(node.Kind) + "`。",
+		"不要在助手文本中回复原始 JSON。",
 	}, "\n"))
 }
 
