@@ -39,6 +39,23 @@ func TestParseToolRouterAllowsEmptySummary(t *testing.T) {
 	}
 }
 
+func TestParseToolRouterAllowsRespondRoute(t *testing.T) {
+	res, err := parseTool(Router, []byte(`{"kind":"router","route":"respond"}`))
+	if err != nil {
+		t.Fatalf("expected parseTool to allow respond route, got %v", err)
+	}
+	if res.Route != "respond" {
+		t.Fatalf("expected respond route, got %q", res.Route)
+	}
+}
+
+func TestParseToolRespondRequiresSummary(t *testing.T) {
+	_, err := parseTool(Respond, []byte(`{"kind":"respond","handoff":"done"}`))
+	if err == nil {
+		t.Fatal("expected parseTool to require summary for respond nodes")
+	}
+}
+
 func TestParseToolCheckRequiresPass(t *testing.T) {
 	_, err := parseTool(Check, []byte(`{"kind":"check","summary":"check"}`))
 	if err == nil {

@@ -1030,7 +1030,10 @@ func toolPrompt(node Node) string {
 		"将 \"kind\" 设为 \"" + string(node.Kind) + "\"，并填写当前节点要求的字段。",
 	}
 	if node.Kind == Router {
-		head = append(head, `对于 router 节点，请提供 route = "plan" | "execute" | "check"。summary 和 handoff 保持可选且尽量简短。`)
+		head = append(head, `对于 router 节点，请提供 route = "respond" | "plan" | "execute" | "check"。summary 和 handoff 保持可选且尽量简短。`)
+	}
+	if node.Kind == Respond {
+		head = append(head, "对于 respond 节点，请先直接回答用户，再提供 summary，并按需补充 handoff。")
 	}
 	if node.Kind == Plan {
 		head = append(head, "对于 plan 节点，请提供 summary、steps、deliverables、risks 和 handoff。")
@@ -1039,7 +1042,7 @@ func toolPrompt(node Node) string {
 		head = append(head, "对于 check 节点，请提供 summary、pass、issues 和 handoff。")
 	}
 	if node.Kind == Execute {
-		head = append(head, "对于 execute 节点，至少提供 summary，并可按需补充 handoff。")
+		head = append(head, "对于 execute 节点，至少提供 summary，并仅在确有帮助时补充 handoff。")
 	}
 	return strings.Join(head, "\n")
 }
@@ -1088,7 +1091,10 @@ func body(node Node, run Run, prompt string) map[string]any {
 func next(flow Workflow, node Node, res Result) (string, string) {
 	check := Always
 	if node.Kind == Router {
-		check = PlanTo
+		check = RespondTo
+		if res.Route == string(PlanTo) {
+			check = PlanTo
+		}
 		if res.Route == string(ExecuteTo) {
 			check = ExecuteTo
 		}

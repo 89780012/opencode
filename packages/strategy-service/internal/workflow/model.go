@@ -7,6 +7,7 @@ type Kind string
 const (
 	Start   Kind = "start"
 	Router  Kind = "router"
+	Respond Kind = "respond"
 	Plan    Kind = "plan"
 	Execute Kind = "execute"
 	Check   Kind = "check"
@@ -17,6 +18,7 @@ type Cond string
 
 const (
 	Always    Cond = "always"
+	RespondTo Cond = "respond"
 	PlanTo    Cond = "plan"
 	ExecuteTo Cond = "execute"
 	CheckTo   Cond = "check"

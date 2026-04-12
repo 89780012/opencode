@@ -109,6 +109,9 @@ func TestBuildPromptRouterAllowsCheck(t *testing.T) {
 	if !strings.Contains(text, `"check"`) {
 		t.Fatalf("expected router prompt contract to include check, got %q", text)
 	}
+	if !strings.Contains(text, `"respond"`) {
+		t.Fatalf("expected router prompt contract to include respond, got %q", text)
+	}
 }
 
 func TestNextRoutesRouterToCheck(t *testing.T) {
@@ -127,6 +130,25 @@ func TestNextRoutesRouterToCheck(t *testing.T) {
 		t.Fatalf("expected check route, got %q", nextID)
 	}
 	if handoff != "go check" {
+		t.Fatalf("expected handoff to be preserved, got %q", handoff)
+	}
+}
+
+func TestNextRoutesRouterToRespond(t *testing.T) {
+	nextID, handoff := next(
+		Workflow{
+			Edges: []Edge{
+				{From: "router", To: "respond", Cond: RespondTo},
+				{From: "router", To: "plan", Cond: PlanTo},
+			},
+		},
+		Node{ID: "router", Kind: Router},
+		Result{Route: string(RespondTo), Handoff: "reply now"},
+	)
+	if nextID != "respond" {
+		t.Fatalf("expected respond route, got %q", nextID)
+	}
+	if handoff != "reply now" {
 		t.Fatalf("expected handoff to be preserved, got %q", handoff)
 	}
 }

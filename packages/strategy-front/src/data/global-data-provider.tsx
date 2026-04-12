@@ -230,6 +230,9 @@ function role(value?: unknown): WorkflowAgentRole | undefined {
   if (text === "router" || text === "route") {
     return "router"
   }
+  if (text === "responder" || text === "respond" || text === "reply" || text === "chat") {
+    return "responder"
+  }
   if (text === "planner" || text === "plan") {
     return "planner"
   }

@@ -76,13 +76,13 @@ func validateNode(node Node, outs []Cond) error {
 		}
 		seen := map[Cond]bool{}
 		for _, item := range outs {
-			if item != PlanTo && item != ExecuteTo && item != CheckTo {
-				return errors.New("router nodes only allow plan, execute, or check edges")
+			if item != RespondTo && item != PlanTo && item != ExecuteTo && item != CheckTo {
+				return errors.New("router nodes only allow respond, plan, execute, or check edges")
 			}
 			seen[item] = true
 		}
-		if !seen[PlanTo] && !seen[ExecuteTo] && !seen[CheckTo] {
-			return errors.New("router nodes require plan, execute, or check edges")
+		if !seen[RespondTo] && !seen[PlanTo] && !seen[ExecuteTo] && !seen[CheckTo] {
+			return errors.New("router nodes require respond, plan, execute, or check edges")
 		}
 		return nil
 	}
@@ -106,7 +106,7 @@ func validateNode(node Node, outs []Cond) error {
 
 	for _, item := range outs {
 		if item != Always {
-			return errors.New("plan and execute nodes only allow always edges")
+			return errors.New("respond, plan, and execute nodes only allow always edges")
 		}
 	}
 	return nil

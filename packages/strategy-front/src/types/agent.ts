@@ -1,6 +1,6 @@
 import type { ChatModelRef } from "@/types/chat";
 
-export type WorkflowAgentRole = "router" | "planner" | "executor" | "checker";
+export type WorkflowAgentRole = "router" | "responder" | "planner" | "executor" | "checker";
 
 export interface RuntimeAgent {
   name: string;

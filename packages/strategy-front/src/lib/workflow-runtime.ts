@@ -22,7 +22,7 @@ import type {
 } from "@/types/workflow"
 
 function tone(kind: WorkflowRuntimeNode["kind"]) {
-  if (kind === "start" || kind === "router" || kind === "plan") return "blue"
+  if (kind === "start" || kind === "router" || kind === "respond" || kind === "plan") return "blue"
   if (kind === "execute" || kind === "end") return "amber"
   return "slate"
 }
@@ -201,6 +201,7 @@ export function fromFlow(
     from: edge.source,
     to: edge.target,
     cond:
+      edge.data?.cond === "respond" ||
       edge.data?.cond === "plan" ||
       edge.data?.cond === "execute" ||
       edge.data?.cond === "check" ||
@@ -222,6 +223,7 @@ export function fromFlow(
 export function edgeOptions(kind?: WorkflowFlowNode["data"]["kind"]) {
   if (kind === "router") {
     return [
+      { label: "直接回复", value: "respond" },
       { label: "进入规划", value: "plan" },
       { label: "进入执行", value: "execute" },
       { label: "进入检查", value: "check" },

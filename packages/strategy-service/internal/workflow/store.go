@@ -313,7 +313,7 @@ func uniq(list []string) []string {
 
 func kind(v Kind) Kind {
 	switch v {
-	case Start, Router, Plan, Execute, Check, End:
+	case Start, Router, Respond, Plan, Execute, Check, End:
 		return v
 	default:
 		return Execute
@@ -322,7 +322,7 @@ func kind(v Kind) Kind {
 
 func cond(v Cond) Cond {
 	switch v {
-	case PlanTo, ExecuteTo, CheckTo, Pass, Fail:
+	case RespondTo, PlanTo, ExecuteTo, CheckTo, Pass, Fail:
 		return v
 	default:
 		return Always

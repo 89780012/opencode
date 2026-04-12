@@ -5,6 +5,7 @@ import {
   ClipboardList,
   FileSearch,
   Hammer,
+  MessageSquareText,
   Play,
   Search,
   Square,
@@ -17,7 +18,7 @@ import { cn } from "@/lib/utils"
 import { kindAgent, kindDesc, kindPrompt, type WorkflowKind } from "@/types/workflow"
 
 const cut = 16
-const init = ["流程控制", "规划智能体", "执行智能体", "检查智能体"]
+const init = ["流程控制", "通用回复", "规划智能体", "执行智能体", "检查智能体"]
 
 type Item = {
   kind: WorkflowKind
@@ -42,16 +43,29 @@ function build() {
         {
           kind: "router",
           title: "路由",
-          desc: "把当前请求路由到规划、执行或检查。",
+          desc: "把当前请求路由到回复、规划、执行或检查。",
           agent: kindAgent("router"),
           prompt: kindPrompt("router"),
-          search: "路由 router plan execute check 分支",
+          search: "路由 router respond plan execute check 分支",
         },
         {
           kind: "end",
           title: "结束",
           desc: "汇总结论并结束整条工作流。",
           search: "结束 流程控制 end 终点",
+        },
+      ] satisfies Item[],
+    },
+    {
+      title: "通用回复",
+      items: [
+        {
+          kind: "respond",
+          title: "回复",
+          desc: kindDesc("respond"),
+          agent: kindAgent("respond"),
+          prompt: kindPrompt("respond"),
+          search: "回复 respond chat answer 直接回答",
         },
       ] satisfies Item[],
     },
@@ -100,6 +114,7 @@ function build() {
 function icon(kind: WorkflowKind) {
   if (kind === "start") return <Play className="size-4 text-primary" />
   if (kind === "router") return <Search className="size-4 text-primary" />
+  if (kind === "respond") return <MessageSquareText className="size-4 text-primary" />
   if (kind === "plan") return <ClipboardList className="size-4 text-primary" />
   if (kind === "execute") return <Hammer className="size-4 text-amber-500" />
   if (kind === "check") return <FileSearch className="size-4 text-slate-500" />
@@ -109,6 +124,7 @@ function icon(kind: WorkflowKind) {
 function gicon(kinds: WorkflowKind[]) {
   if (kinds.includes("start")) return <Play className="size-3.5 text-muted-foreground" />
   if (kinds.includes("router")) return <Search className="size-3.5 text-muted-foreground" />
+  if (kinds.includes("respond")) return <MessageSquareText className="size-3.5 text-muted-foreground" />
   if (kinds.includes("plan")) return <ClipboardList className="size-3.5 text-muted-foreground" />
   if (kinds.includes("execute")) return <Hammer className="size-3.5 text-muted-foreground" />
   if (kinds.includes("check")) return <FileSearch className="size-3.5 text-muted-foreground" />

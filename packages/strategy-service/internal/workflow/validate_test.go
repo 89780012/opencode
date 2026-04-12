@@ -107,3 +107,35 @@ func TestValidateRequiresRouterOutgoingEdge(t *testing.T) {
 		t.Fatal("expected router outgoing edge validation error")
 	}
 }
+
+func TestValidateAcceptsRouterRespondEdge(t *testing.T) {
+	err := validate(Workflow{
+		RootNodeID: "n1",
+		Nodes: []Node{
+			{ID: "n1", Kind: Router, ToolID: "smartx-workflow"},
+			{ID: "n2", Kind: Respond, ToolID: "smartx-workflow"},
+		},
+		Edges: []Edge{
+			{ID: "e1", From: "n1", To: "n2", Cond: RespondTo},
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected router respond edge to validate, got %v", err)
+	}
+}
+
+func TestValidateRejectsRespondConditionalEdge(t *testing.T) {
+	err := validate(Workflow{
+		RootNodeID: "n1",
+		Nodes: []Node{
+			{ID: "n1", Kind: Respond, ToolID: "smartx-workflow"},
+			{ID: "n2", Kind: End},
+		},
+		Edges: []Edge{
+			{ID: "e1", From: "n1", To: "n2", Cond: Pass},
+		},
+	})
+	if err == nil {
+		t.Fatal("expected respond edge validation error")
+	}
+}

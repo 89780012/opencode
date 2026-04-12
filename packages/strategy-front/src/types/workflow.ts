@@ -1,13 +1,10 @@
 import type { Edge, Node, XYPosition } from "@xyflow/react"
 import type { WorkflowAgentRole } from "@/types/agent"
 
-//节点类型
-export type WorkflowKind = "start" | "router" | "plan" | "execute" | "check" | "end"
+export type WorkflowKind = "start" | "router" | "respond" | "plan" | "execute" | "check" | "end"
 
-// 颜色
 export type WorkflowTone = "slate" | "blue" | "amber"
 
-//面板字段
 export const workflowField = {
   agent: "agent",
   prompt: "prompt",
@@ -21,7 +18,6 @@ export const workflowField = {
 
 export type WorkflowFieldKey = (typeof workflowField)[keyof typeof workflowField]
 
-//属性面板字典
 export type WorkflowField =
   | {
       key: WorkflowFieldKey
@@ -64,7 +60,6 @@ export type WorkflowField =
       value: string
     }
 
-//节点数据
 export type WorkflowNodeData = {
   kind: WorkflowKind
   title: string
@@ -73,19 +68,19 @@ export type WorkflowNodeData = {
   fields: WorkflowField[]
 }
 
-// 节点类型
 export type WorkflowNodeType =
   | "workflow-start"
   | "workflow-router"
+  | "workflow-respond"
   | "workflow-plan"
   | "workflow-execute"
   | "workflow-check"
   | "workflow-end"
 
-// 节点类型
 export function nodeType(kind: WorkflowKind): WorkflowNodeType {
   if (kind === "start") return "workflow-start"
   if (kind === "router") return "workflow-router"
+  if (kind === "respond") return "workflow-respond"
   if (kind === "plan") return "workflow-plan"
   if (kind === "execute") return "workflow-execute"
   if (kind === "check") return "workflow-check"
@@ -96,7 +91,6 @@ export type WorkflowFlowNode = Node<WorkflowNodeData, WorkflowNodeType>
 
 export type WorkflowFlowEdge = Edge
 
-//工作流状态 草稿|就绪
 export type WorkflowListStatus = "draft" | "ready"
 
 export type WorkflowItem = {
@@ -135,7 +129,7 @@ export type WorkflowSeed = {
   variant?: string
 }
 
-export type WorkflowEdgeCond = "always" | "plan" | "execute" | "check" | "pass" | "fail"
+export type WorkflowEdgeCond = "always" | "respond" | "plan" | "execute" | "check" | "pass" | "fail"
 
 export type WorkflowRunStatus = "pending" | "queued" | "running" | "waiting" | "failed" | "done" | "interrupted" | "cancelled"
 
@@ -324,6 +318,7 @@ export type WorkflowReply = {
 export function kindName(kind: WorkflowKind) {
   if (kind === "start") return "开始"
   if (kind === "router") return "路由"
+  if (kind === "respond") return "回复"
   if (kind === "plan") return "规划"
   if (kind === "execute") return "执行"
   if (kind === "check") return "检查"
@@ -331,18 +326,22 @@ export function kindName(kind: WorkflowKind) {
 }
 
 export function kindDesc(kind: WorkflowKind) {
-  if (kind === "start") return "读取输入和上下文，把流程送入第一个有效节点。"
-  if (kind === "router") return "判断下一步应进入规划、执行还是检查。"
+  if (kind === "start") return "读取输入与上下文，并把流程送入第一个有效节点。"
+  if (kind === "router") return "判断下一步应进入回复、规划、执行还是检查。"
+  if (kind === "respond") return "直接回答用户，不做代码开发，并在回复后结束流程。"
   if (kind === "plan") return "拆解目标、明确步骤、交付物和风险。"
-  if (kind === "execute") return "在工作区内实际执行任务、修改文件并完成验证。"
+  if (kind === "execute") return "在工作区内真实执行任务、修改文件并完成验证。"
   if (kind === "check") return "检查当前结果是否通过，并输出 pass 或 fail。"
-  return "汇总最终结果，结束整条工作流。"
+  return "汇总最终结果并结束整条工作流。"
 }
 
 export function kindPrompt(kind: WorkflowKind) {
   if (kind === "start") return "阅读用户目标和上下文，并把流程送入下一节点。"
   if (kind === "router") {
-    return '判断下一步应进入 `plan`、`execute` 还是 `check`，然后调用 `smartx-workflow`，至少返回 `kind: "router"`、`route`；`summary` 和 `handoff` 仅在必要时简短补充。'
+    return '判断下一步应进入 `respond`、`plan`、`execute` 还是 `check`，然后调用 `smartx-workflow`。默认只做路由，不输出多余聊天文本。'
+  }
+  if (kind === "respond") {
+    return '直接回答用户，然后调用 `smartx-workflow`，返回 `kind: "respond"`、`summary`，并仅在确有必要时补充 `handoff`。'
   }
   if (kind === "plan") {
     return '先输出可执行计划，再调用 `smartx-workflow`，返回 `kind: "plan"`、`summary`、`steps`、`deliverables`、`risks`、`handoff`。'
@@ -353,11 +352,12 @@ export function kindPrompt(kind: WorkflowKind) {
   if (kind === "check") {
     return '检查当前结果是否通过，然后调用 `smartx-workflow`，返回 `kind: "check"`、`summary`、`pass`、`issues`、`handoff`。'
   }
-  return "汇总结果并结束流程。"
+  return "汇总结论并结束流程。"
 }
 
 export function kindRole(kind: WorkflowKind): WorkflowAgentRole | undefined {
   if (kind === "router") return "router"
+  if (kind === "respond") return "responder"
   if (kind === "plan") return "planner"
   if (kind === "execute") return "executor"
   if (kind === "check") return "checker"
@@ -365,6 +365,7 @@ export function kindRole(kind: WorkflowKind): WorkflowAgentRole | undefined {
 
 export function kindAgent(kind: WorkflowKind) {
   if (kind === "router") return "intent"
+  if (kind === "respond") return "respond"
   if (kind === "plan") return "smartx-plan"
   if (kind === "execute") return "strategy"
   if (kind === "check") return "checker"
@@ -480,7 +481,7 @@ export function makeNode(kind: WorkflowKind, id: string, pos: XYPosition, seed: 
     title: seed.title || kindName(kind),
     desc: seed.desc || kindDesc(kind),
     tone:
-      kind === "start" || kind === "router" || kind === "plan"
+      kind === "start" || kind === "router" || kind === "respond" || kind === "plan"
         ? "blue"
         : kind === "execute" || kind === "end"
           ? "amber"
