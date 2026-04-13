@@ -5,44 +5,22 @@ import (
 	"errors"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 )
 
-type Service struct {
-	root string
-	over map[string]string
-}
+type Service struct{}
 
-// New 根据配置创建运行时服务，并预处理覆盖路径。
-func New(cfg Config) *Service {
-	over := map[string]string{}
-	for key, value := range cfg.Over {
-		over[key] = strings.TrimSpace(value)
-	}
+func New() *Service { return &Service{} }
 
-	return &Service{
-		root: strings.TrimSpace(cfg.Root),
-		over: over,
-	}
-}
-
-// Resolve 按配置、本地缓存和系统 PATH 的顺序解析工具。
 func (s *Service) Resolve(_ context.Context, id string) (Result, error) {
 	id = strings.TrimSpace(id)
 	if id == "" {
 		return Result{}, errors.New("tool id is required")
 	}
 
-	if out, ok := s.config(id); ok {
-		return out, nil
-	}
 	if out, ok := s.local(id); ok {
-		return out, nil
-	}
-	if out, ok := s.system(id); ok {
 		return out, nil
 	}
 
@@ -52,7 +30,6 @@ func (s *Service) Resolve(_ context.Context, id string) (Result, error) {
 	}, nil
 }
 
-// Ensure 确保指定内置工具已经激活到本地缓存目录。
 func (s *Service) Ensure(_ context.Context, id string) (Result, error) {
 	id = strings.TrimSpace(id)
 	if id == "" {
@@ -99,7 +76,6 @@ func (s *Service) Ensure(_ context.Context, id string) (Result, error) {
 	return out, nil
 }
 
-// Remove 删除本地缓存中的内置工具。
 func (s *Service) Remove(id string) error {
 	id = strings.TrimSpace(id)
 	if id == "" {
@@ -113,7 +89,6 @@ func (s *Service) Remove(id string) error {
 	return os.RemoveAll(filepath.Join(base, id))
 }
 
-// Has 判断给定工具是否存在可用的内置包。
 func (s *Service) Has(id string) bool {
 	id = strings.TrimSpace(id)
 	if id == "" {
@@ -124,7 +99,6 @@ func (s *Service) Has(id string) bool {
 	return err == nil
 }
 
-// Own 判断路径是否属于当前服务安装的内置工具。
 func (s *Service) Own(id string, path string) bool {
 	id = strings.TrimSpace(id)
 	path = strings.TrimSpace(path)
@@ -146,7 +120,6 @@ func (s *Service) Own(id string, path string) bool {
 	return false
 }
 
-// found 统一生成一条命中的运行时解析结果。
 func found(id string, src Source, path string) Result {
 	return Result{
 		ID:     id,
@@ -157,21 +130,6 @@ func found(id string, src Source, path string) Result {
 	}
 }
 
-// config 从显式配置的覆盖路径中解析工具。
-func (s *Service) config(id string) (Result, bool) {
-	path := strings.TrimSpace(s.over[id])
-	if path == "" || path == id {
-		return Result{}, false
-	}
-
-	file, err := exec.LookPath(path)
-	if err != nil {
-		return Result{}, false
-	}
-	return found(id, SourceConfig, file), true
-}
-
-// local 在本地缓存目录中查找已激活的内置工具。
 func (s *Service) local(id string) (Result, bool) {
 	base, err := s.base()
 	if err != nil {
@@ -187,16 +145,6 @@ func (s *Service) local(id string) (Result, bool) {
 	return Result{}, false
 }
 
-// system 在系统 PATH 中查找同名可执行文件。
-func (s *Service) system(id string) (Result, bool) {
-	path, err := exec.LookPath(id)
-	if err != nil {
-		return Result{}, false
-	}
-	return found(id, SourceSystem, path), true
-}
-
-// pkg 在候选目录中定位内置工具的压缩包或解压目录。
 func (s *Service) pkg(id string) (Result, error) {
 	for _, root := range s.candidates() {
 		arc := filepath.Join(root, id+".zip")
@@ -223,12 +171,8 @@ func (s *Service) pkg(id string) (Result, error) {
 	return Result{}, errors.New("builtin runtime not found")
 }
 
-// candidates 汇总并去重所有可能存放内置运行时资源的目录。
 func (s *Service) candidates() []string {
 	list := []string{}
-	if s.root != "" {
-		list = append(list, s.target(s.root), s.root)
-	}
 
 	if cwd, err := os.Getwd(); err == nil {
 		list = append(list,
@@ -260,15 +204,6 @@ func (s *Service) candidates() []string {
 	return out
 }
 
-// target 确保根目录最终指向当前平台对应的运行时子目录。
-func (s *Service) target(root string) string {
-	if strings.HasSuffix(filepath.Clean(root), target()) {
-		return filepath.Clean(root)
-	}
-	return filepath.Join(root, target())
-}
-
-// copydir 递归复制目录内容，并尽量保留文件权限。
 func copydir(src string, dst string) error {
 	return filepath.WalkDir(src, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -314,7 +249,6 @@ func copydir(src string, dst string) error {
 	})
 }
 
-// base 返回本地运行时缓存根目录，并确保目录已创建。
 func (s *Service) base() (string, error) {
 	dir, err := os.UserCacheDir()
 	if err != nil {
@@ -328,12 +262,10 @@ func (s *Service) base() (string, error) {
 	return out, nil
 }
 
-// target 返回当前平台在 runtime 目录中的标准子目录名。
 func target() string {
 	return runtime.GOOS + "-" + arch()
 }
 
-// arch 将 Go 架构名称映射为运行时目录使用的命名。
 func arch() string {
 	if runtime.GOARCH == "amd64" {
 		return "x64"
@@ -344,7 +276,6 @@ func arch() string {
 	return runtime.GOARCH
 }
 
-// bins 返回指定工具在当前平台下可能的可执行文件路径。
 func bins(id string) []string {
 	ext := ""
 	if runtime.GOOS == "windows" {

@@ -219,24 +219,9 @@ func (s *Service) resolveGit(ctx context.Context) (rt.Result, error) {
 	if s.rt != nil {
 		return s.rt.Resolve(ctx, "git")
 	}
-
-	path, err := exec.LookPath("git")
-	if err != nil {
-		if errors.Is(err, exec.ErrNotFound) {
-			return rt.Result{
-				ID:      "git",
-				Message: "command not found",
-			}, nil
-		}
-		return rt.Result{}, err
-	}
-
 	return rt.Result{
-		ID:     "git",
-		Found:  true,
-		Source: rt.SourceSystem,
-		Path:   path,
-		Dir:    filepath.Dir(path),
+		ID:      "git",
+		Message: "command not found",
 	}, nil
 }
 

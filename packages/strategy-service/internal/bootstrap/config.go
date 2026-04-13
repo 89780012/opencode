@@ -52,7 +52,6 @@ func LoadConfig() Config {
 		Opencode: OpencodeConfig{
 			Enabled:      truth("STRATEGY_OPENCODE_ENABLED", true),
 			Startup:      text("STRATEGY_OPENCODE_STARTUP", "auto"),
-			Bin:          text("STRATEGY_OPENCODE_BIN", "opencode"),
 			Host:         text("STRATEGY_OPENCODE_HOST", "127.0.0.1"),
 			Port:         number("STRATEGY_OPENCODE_PORT", 4096),
 			Cwd:          text("STRATEGY_OPENCODE_CWD", ""),

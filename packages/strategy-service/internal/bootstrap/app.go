@@ -49,11 +49,7 @@ func New(cfg Config) (*Service, error) {
 		}
 	}
 
-	run := rt.New(rt.Config{
-		Over: map[string]string{
-			"opencode": cfg.Opencode.Bin,
-		},
-	})
+	run := rt.New()
 	cfg = resolveOpencode(run, cfg)
 	cfg = resolveGit(run, cfg)
 
@@ -94,9 +90,6 @@ func resolveTool(run *rt.Service, id string, preferBuiltin bool) rt.Result {
 		return rt.Result{}
 	}
 
-	if row.Found && row.Source == rt.SourceConfig {
-		return row
-	}
 	if run.Has(id) && (preferBuiltin || !row.Found) {
 		out, err := run.Ensure(context.Background(), id)
 		if err == nil && out.Found {
@@ -106,7 +99,7 @@ func resolveTool(run *rt.Service, id string, preferBuiltin bool) rt.Result {
 	return row
 }
 
-// resolveOpencode 优先选择显式配置或内置 opencode。
+// resolveOpencode 优先激活内置 opencode。
 func resolveOpencode(run *rt.Service, cfg Config) Config {
 	row := resolveTool(run, "opencode", true)
 	if row.Found {
@@ -115,9 +108,9 @@ func resolveOpencode(run *rt.Service, cfg Config) Config {
 	return cfg
 }
 
-// resolveGit 优先复用系统 Git，缺失时再回退到内置 Git。
+// resolveGit 优先激活内置 Git，并将路径注入到 opencode 环境。
 func resolveGit(run *rt.Service, cfg Config) Config {
-	row := resolveTool(run, "git", false)
+	row := resolveTool(run, "git", true)
 	if !row.Found {
 		return cfg
 	}

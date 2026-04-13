@@ -200,11 +200,11 @@ func summary(op Tool, git Tool) string {
 	if !op.Installed {
 		return "系统会优先准备 OpenCode，确保 AI 策略研发环境可以直接进入。"
 	}
-	if git.Source == string(rt.SourceSystem) {
-		return "已检测到系统 Git，启动 OpenCode 时会自动复用系统 Git。"
-	}
 	if git.Source == string(rt.SourceBuiltin) {
-		return "未检测到系统 Git，启动 OpenCode 时会自动注入内置 Git。"
+		return "启动 OpenCode 时会自动注入内置 Git。"
+	}
+	if !git.Installed {
+		return "OpenCode 已准备，但尚未激活内置 Git。"
 	}
 	return "AI 策略研发环境已准备完成。"
 }
