@@ -9,6 +9,7 @@ import { useChatTodo } from "@/hooks/use-chat-todo"
 import { useSessionDraft } from "@/hooks/use-session-draft"
 import { useSessionFiles } from "@/hooks/use-session-files"
 import { useStrategyWorkflowChat } from "@/hooks/use-strategy-workflow-chat"
+import type { ChatMessageInfo } from "@/types/chat"
 import type { ComposerModel } from "@/types/composer"
 import type { LocalWorkspace } from "@/types/workspace"
 
@@ -35,6 +36,15 @@ function current(rows: Props["chat"]["rows"], id?: string) {
     rows[0] ||
     null
   )
+}
+
+function done(msg?: ChatMessageInfo) {
+  if (!msg || msg.role !== "assistant") return false
+  if (msg.finish?.toLowerCase().includes("abort")) return false
+  if (!msg.error) return true
+  const txt = msg.error.data?.message
+  if (typeof txt === "string" && txt.toLowerCase().includes("abort")) return false
+  return false
 }
 
 export function StrategyWorkflowPanel(props: Props) {
@@ -70,15 +80,22 @@ export function StrategyWorkflowPanel(props: Props) {
   }
 
   const empty = !props.chat.sessionLoading && !props.chat.detailLoading && props.chat.messages.length === 0 && !props.chat.eventErr
+  const ready =
+    !props.chat.busy &&
+    !props.chat.sending &&
+    !props.chat.replying &&
+    !props.chat.interrupting &&
+    !props.chat.sessionLoading &&
+    !props.chat.creating
   const suggest =
     bound &&
     !empty &&
+    ready &&
     !props.load &&
     !props.chat.err &&
     !props.chat.eventErr &&
     !props.chat.openWait &&
-    props.chat.status.type === "idle" &&
-    last?.role === "assistant"
+    done(last)
 
   return (
     <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-transparent">

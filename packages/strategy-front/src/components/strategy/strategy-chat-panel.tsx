@@ -19,6 +19,15 @@ import type { ChatMessageInfo, ChatStatus, PromptInputMessage } from "@/types/ch
 import type { ComposerModel } from "@/types/composer"
 import type { LocalWorkspace } from "@/types/workspace"
 
+function done(msg?: ChatMessageInfo) {
+  if (!msg || msg.role !== "assistant") return false
+  if (msg.finish?.toLowerCase().includes("abort")) return false
+  if (!msg.error) return true
+  const txt = msg.error.data?.message
+  if (typeof txt === "string" && txt.toLowerCase().includes("abort")) return false
+  return false
+}
+
 interface Props {
   workspace: LocalWorkspace
   selectedSessionId: string | null
@@ -103,13 +112,14 @@ export function StrategyChatPanel(props: Props) {
   }
 
   const empty = !props.sessionLoading && !props.detailLoading && props.messages.length === 0 && !props.eventErr
+  const ready = !busy && !submitting && !props.creating && !props.sessionLoading
   const suggest =
     !empty &&
+    ready &&
     !props.eventErr &&
     !permission.req &&
     !question.req &&
-    props.status.type === "idle" &&
-    last?.role === "assistant" &&
+    done(last) &&
     !!props.agent &&
     !!ref &&
     !props.load
