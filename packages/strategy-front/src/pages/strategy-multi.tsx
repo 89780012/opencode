@@ -6,8 +6,8 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { MultiWorkspaceChatPanel } from "@/components/workspace/multi-workspace-chat-panel"
 import { useWorkspaceList } from "@/data/global-data-provider"
-import { useChatSessions } from "@/hooks/use-chat-sessions"
 import { useStrategyComposer } from "@/hooks/use-strategy-composer"
+import { useChatSessions } from "@/hooks/use-strategy-session"
 import { decodeStrategyPath } from "@/lib/strategy-path"
 import type { LocalWorkspace } from "@/types/workspace"
 

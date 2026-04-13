@@ -1,5 +1,3 @@
-import { useMemo } from "react"
-import { toast } from "sonner"
 import { ChatEmptyState } from "@/components/chat/chat-empty-state"
 import { ChatMessageList } from "@/components/chat-message-list"
 import { PermissionPanel } from "@/components/chat/permission-panel"
@@ -7,13 +5,8 @@ import { PromptBar } from "@/components/chat/prompt-bar"
 import { QuestionPanel } from "@/components/chat/question-panel"
 import { StrategyStarterRow } from "@/components/strategy/strategy-starter-row"
 import { TodoPanel } from "@/components/chat/todo-panel"
-import { useChatEvents } from "@/hooks/use-chat-events"
-import { useChatPermission } from "@/hooks/use-chat-permission"
-import { useChatQuestion } from "@/hooks/use-chat-question"
-import { useChatTodo } from "@/hooks/use-chat-todo"
-import { usePromptSubmit } from "@/hooks/use-prompt-submit"
-import { useSessionDraft } from "@/hooks/use-session-draft"
-import type { ChatMessageInfo, ChatStatus, PromptInputMessage } from "@/types/chat"
+import { useChatRuntime } from "@/hooks/use-chat-runtime"
+import type { ChatMessageInfo, ChatStatus } from "@/types/chat"
 import type { ComposerModel } from "@/types/composer"
 import type { LocalWorkspace } from "@/types/workspace"
 
@@ -55,61 +48,29 @@ interface Props {
 }
 
 export function StrategyChatPanel(props: Props) {
-  useChatEvents(props.workspace.path)
-
-  const draft = useSessionDraft(props.workspace.path, props.selectedSessionId)
-  const permission = useChatPermission(props.workspace.path, props.selectedSessionId)
-  const question = useChatQuestion(props.workspace.path, props.selectedSessionId)
-  const busy = props.busy ?? (!!props.selectedSessionId && props.status.type !== "idle")
-  const live = busy || !!permission.req || !!question.req
-  const todo = useChatTodo(props.workspace.path, props.selectedSessionId, live)
-  const last = props.messages[props.messages.length - 1]
-  const ref = useMemo(() => {
-    if (!props.model) return
-    const [providerID, ...rest] = props.model.split("/")
-    return {
-      providerID,
-      modelID: rest.join("/"),
-    }
-  }, [props.model])
-  const { submitting, submit } = usePromptSubmit({
+  const chat = useChatRuntime({
     workspacePath: props.workspace.path,
     sessionId: props.selectedSessionId,
+    status: props.status,
+    busy: props.busy,
     agent: props.agent,
-    model: ref,
-    variant: props.variant ?? undefined,
+    model: props.model,
+    variant: props.variant,
     createSession: props.onCreate,
     selectSession: props.onSelectSession,
-    onSubmitted: () => {
-      draft.clear()
-    },
   })
-
-  const onSubmit = async (msg: PromptInputMessage) => {
-    if (!props.agent || !ref) {
-      toast.error("请先选择智能体和模型。")
-      return
-    }
-
-    try {
-      await submit(msg)
-    } catch (err) {
-      console.error("Failed to submit prompt", err)
-      toast.error("提交失败。")
-    }
-  }
-
+  const last = props.messages[props.messages.length - 1]
   const empty = !props.sessionLoading && !props.detailLoading && props.messages.length === 0 && !props.eventErr
-  const ready = !busy && !submitting && !props.creating && !props.sessionLoading
+  const ready = !chat.busy && !chat.submitting && !props.creating && !props.sessionLoading
   const suggest =
     !empty &&
     ready &&
     !props.eventErr &&
-    !permission.req &&
-    !question.req &&
+    !chat.permission.req &&
+    !chat.question.req &&
     done(last) &&
     !!props.agent &&
-    !!ref &&
+    !!props.model &&
     !props.load
 
   return (
@@ -127,7 +88,7 @@ export function StrategyChatPanel(props: Props) {
               suggest ? (
                 <StrategyStarterRow
                   onRun={(text) => {
-                    void onSubmit({ text })
+                    void chat.submit({ text })
                   }}
                 />
               ) : null
@@ -148,38 +109,40 @@ export function StrategyChatPanel(props: Props) {
 
       <div className="shrink-0 px-2 pb-2 pt-1">
         <div className="mx-auto flex max-w-[780px] flex-col gap-1.5">
-          {permission.req ? (
+          {chat.permission.req ? (
             <PermissionPanel
-              key={permission.req.id}
-              req={permission.req}
-              sending={permission.sending}
+              key={chat.permission.req.id}
+              req={chat.permission.req}
+              sending={chat.permission.sending}
               onReject={() => {
-                void permission.allow("reject")
+                void chat.permission.allow("reject")
               }}
               onAllow={(value) => {
-                void permission.allow(value)
+                void chat.permission.allow(value)
               }}
             />
           ) : null}
-          {question.req ? (
+          {chat.question.req ? (
             <QuestionPanel
-              key={question.req.id}
-              req={question.req}
-              sending={question.sending}
+              key={chat.question.req.id}
+              req={chat.question.req}
+              sending={chat.question.sending}
               onReject={() => {
-                void question.reject()
+                void chat.question.reject()
               }}
               onReply={(answers) => {
-                void question.reply(answers)
+                void chat.question.reply(answers)
               }}
             />
           ) : null}
-          {todo.visible ? <TodoPanel todos={todo.todos} collapsed={todo.collapsed} preview={todo.preview} /> : null}
+          {chat.todo.visible ? (
+            <TodoPanel todos={chat.todo.todos} collapsed={chat.todo.collapsed} preview={chat.todo.preview} />
+          ) : null}
           <div className="w-full">
             <PromptBar
               agent={props.agent}
               agents={props.agents}
-              busy={busy}
+              busy={chat.busy}
               disabled={props.load}
               model={props.model}
               models={props.models}
@@ -187,14 +150,14 @@ export function StrategyChatPanel(props: Props) {
               onAbort={props.onAbort}
               onModel={props.onModel}
               onSubmit={(value) => {
-                void onSubmit(value)
+                void chat.submit(value)
               }}
-              onValueChange={draft.setText}
+              onValueChange={chat.draft.setText}
               onVariant={props.onVariant}
               showAgent={props.showAgent}
               showModel={props.showModel}
-              submitting={submitting || props.creating || props.sessionLoading}
-              value={draft.text}
+              submitting={chat.submitting || props.creating || props.sessionLoading}
+              value={chat.draft.text}
               variant={props.variant}
               variants={props.variants}
             />

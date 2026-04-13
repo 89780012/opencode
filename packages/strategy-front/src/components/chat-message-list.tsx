@@ -3,8 +3,8 @@ import { CheckCircle2, ChevronDown, Circle, ListTodo, LoaderCircle, MinusCircle 
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation"
 import { Message, MessageContent } from "@/components/ai-elements/message"
 import { Response } from "@/components/ai-elements/response"
-import { useAppSelector } from "@/hooks/useAppSelector"
 import { cn } from "@/lib/utils"
+import { selectSessionParts, useAppSelector } from "@/store"
 import type {
   ChatError,
   ChatMessageInfo,
@@ -262,7 +262,7 @@ const ChatMessageItem = memo(function ChatMessageItem(props: {
   info: ChatMessageInfo
   onOpenDiff?: (file: string) => void
 }) {
-  const parts = useAppSelector((state) => state.chatSession.parts[props.info.id] ?? empty)
+  const parts = useAppSelector((state) => selectSessionParts(state, props.info.id))
   const body = parts.length > 0 ? parts : empty
   const err = props.info.role === "assistant" ? errorText(props.info.error) : undefined
 

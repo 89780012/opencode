@@ -13,7 +13,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { useChatSessions } from "@/hooks/use-chat-sessions"
+import { useChatSessions } from "@/hooks/use-strategy-session"
 
 interface Props {
   onWorkspace?: () => void

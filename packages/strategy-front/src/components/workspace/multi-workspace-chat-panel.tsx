@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { FolderCode, Plus, Square } from "lucide-react"
 import { toast } from "sonner"
 import { ChatEmptyState } from "@/components/chat/chat-empty-state"
@@ -11,14 +11,8 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { WorkspaceDetailPane, type WorkspaceDetailTab } from "@/components/workspace/workspace-detail-pane"
-import { useChatEvents } from "@/hooks/use-chat-events"
-import { useChatPermission } from "@/hooks/use-chat-permission"
-import { useChatQuestion } from "@/hooks/use-chat-question"
+import { useChatRuntime } from "@/hooks/use-chat-runtime"
 import { useStrategySession } from "@/hooks/use-strategy-session"
-import { useChatTodo } from "@/hooks/use-chat-todo"
-import { usePromptSubmit } from "@/hooks/use-prompt-submit"
-import { useSessionDraft } from "@/hooks/use-session-draft"
-import type { PromptInputMessage } from "@/types/chat"
 import type { ComposerModel } from "@/types/composer"
 import type { LocalWorkspace } from "@/types/workspace"
 
@@ -41,54 +35,25 @@ const ctrl =
   "rounded-xl border border-black/8 bg-black/[0.03] text-xs shadow-none hover:bg-black/[0.05] dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.06]"
 
 export function MultiWorkspaceChatPanel(props: Props) {
-  useChatEvents(props.workspace.path)
   const [open, setOpen] = useState(false)
   const [file, setFile] = useState<string | null>(null)
   const [tab, setTab] = useState<WorkspaceDetailTab>("files")
   const chat = useStrategySession(props.workspace.path)
-  const draft = useSessionDraft(props.workspace.path, chat.selectedSessionId)
-  const permission = useChatPermission(props.workspace.path, chat.selectedSessionId)
-  const question = useChatQuestion(props.workspace.path, chat.selectedSessionId)
-  const live = chat.busy || !!permission.req || !!question.req
-  const todo = useChatTodo(props.workspace.path, chat.selectedSessionId, live)
-  const ref = useMemo(() => {
-    if (!props.model) return
-    const [providerID, ...rest] = props.model.split("/")
-    return {
-      providerID,
-      modelID: rest.join("/"),
-    }
-  }, [props.model])
-  const { submitting, submit } = usePromptSubmit({
+  const feed = useChatRuntime({
     workspacePath: props.workspace.path,
     sessionId: chat.selectedSessionId,
+    status: chat.status,
+    busy: chat.busy,
     agent: props.agent,
-    model: ref,
-    variant: props.variant ?? undefined,
+    model: props.model,
+    variant: props.variant,
     createSession: chat.createSession,
     selectSession: chat.selectSession,
-    onSubmitted: () => {
-      draft.clear()
-    },
   })
 
   useEffect(() => {
     props.onLoad?.(chat.sessionLoading && chat.sessions.length === 0)
   }, [chat.sessionLoading, chat.sessions.length, props])
-
-  const onSubmit = async (msg: PromptInputMessage) => {
-    if (!props.agent || !ref) {
-      toast.error("请先选择智能体和模型。")
-      return
-    }
-
-    try {
-      await submit(msg)
-    } catch (err) {
-      console.error("Failed to submit prompt", err)
-      toast.error("提交失败")
-    }
-  }
 
   const onAbort = async () => {
     try {
@@ -195,34 +160,34 @@ export function MultiWorkspaceChatPanel(props: Props) {
 
         <div className="shrink-0 px-4 pb-1.5 pt-0.5">
           <div className="flex w-full flex-col gap-1.5">
-            {permission.req ? (
+            {feed.permission.req ? (
               <PermissionPanel
-                key={permission.req.id}
-                req={permission.req}
-                sending={permission.sending}
+                key={feed.permission.req.id}
+                req={feed.permission.req}
+                sending={feed.permission.sending}
                 onReject={() => {
-                  void permission.allow("reject")
+                  void feed.permission.allow("reject")
                 }}
                 onAllow={(value) => {
-                  void permission.allow(value)
+                  void feed.permission.allow(value)
                 }}
               />
             ) : null}
-            {question.req ? (
+            {feed.question.req ? (
               <QuestionPanel
-                key={question.req.id}
-                req={question.req}
-                sending={question.sending}
+                key={feed.question.req.id}
+                req={feed.question.req}
+                sending={feed.question.sending}
                 onReject={() => {
-                  void question.reject()
+                  void feed.question.reject()
                 }}
                 onReply={(answers) => {
-                  void question.reply(answers)
+                  void feed.question.reply(answers)
                 }}
               />
             ) : null}
-            {todo.visible ? (
-              <TodoPanel todos={todo.todos} collapsed={todo.collapsed} compact preview={todo.preview} />
+            {feed.todo.visible ? (
+              <TodoPanel todos={feed.todo.todos} collapsed={feed.todo.collapsed} compact preview={feed.todo.preview} />
             ) : null}
             <div className="w-full">
               <PromptBar
@@ -239,12 +204,12 @@ export function MultiWorkspaceChatPanel(props: Props) {
                 }}
                 onModel={props.onModel}
                 onSubmit={(value) => {
-                  void onSubmit(value)
+                  void feed.submit(value)
                 }}
-                onValueChange={draft.setText}
+                onValueChange={feed.draft.setText}
                 onVariant={props.onVariant}
-                submitting={submitting || chat.creating || chat.sessionLoading}
-                value={draft.text}
+                submitting={feed.submitting || chat.creating || chat.sessionLoading}
+                value={feed.draft.text}
                 variant={props.variant}
                 variants={props.variants}
               />

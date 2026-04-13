@@ -1,14 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { chatApi } from "@/api/modules"
-import { useAppDispatch } from "@/hooks/useAppDispatch"
-import { useAppSelector } from "@/hooks/useAppSelector"
 import { hydrateSessionDiff } from "@/store/chat-session-slice"
-import type { ChatFileDiff } from "@/types/chat"
+import { selectSessionDiffs, useAppDispatch, useAppSelector } from "@/store"
 
 export type ReviewMode = "split" | "unified"
 
 const modeKey = "strategy-front:review-mode:v1"
-const empty: ChatFileDiff[] = []
 
 function readMode(): ReviewMode {
   if (typeof window === "undefined") {
@@ -21,7 +18,7 @@ function readMode(): ReviewMode {
 
 export function useChatReview(workspacePath?: string | null, sessionId?: string | null, active?: boolean) {
   const dispatch = useAppDispatch()
-  const diffs = useAppSelector((state) => (sessionId ? (state.chatSession.sessionDiffs[sessionId] ?? empty) : empty))
+  const diffs = useAppSelector((state) => selectSessionDiffs(state, sessionId))
   const [mode, setModeState] = useState<ReviewMode>(readMode)
   const [file, setFile] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
