@@ -7,7 +7,6 @@ const IndexPage = lazy(() => import("@/pages/index"))
 const EmbedSessionPage = lazy(() => import("@/pages/embed-session"))
 const StrategiesPage = lazy(() => import("@/pages/strategies"))
 const StrategyDetailPage = lazy(() => import("@/pages/strategy-detail"))
-const StrategyMultiPage = lazy(() => import("@/pages/strategy-multi"))
 const SettingsPage = lazy(() => import("@/pages/settings"))
 const SettingsAppearancePage = lazy(() => import("@/pages/settings-appearance"))
 const SettingsRuntimePage = lazy(() => import("@/pages/settings-runtime"))
@@ -54,10 +53,6 @@ const router = createBrowserRouter([
           {
             index: true,
             element: <StrategiesPage />,
-          },
-          {
-            path: "multi",
-            element: <StrategyMultiPage />,
           },
           {
             path: ":strategyID",

@@ -1,4 +1,4 @@
-import { ArrowUpRight, Braces, CalendarClock, Check, Code2, RefreshCw, Sparkles, Trash2 } from "lucide-react"
+import { ArrowUpRight, Braces, CalendarClock, Code2, RefreshCw, Sparkles, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
@@ -11,9 +11,6 @@ interface Props {
   onRetry: () => void
   onSelect: (item: LocalWorkspace) => void
   onDelete: (item: LocalWorkspace) => void
-  selecting: boolean
-  selected: string[]
-  onToggle: (item: LocalWorkspace) => void
 }
 
 const fmt = new Intl.DateTimeFormat("zh-CN", {
@@ -94,33 +91,19 @@ function Row(props: {
   item: LocalWorkspace
   onSelect: (item: LocalWorkspace) => void
   onDelete: (item: LocalWorkspace) => void
-  selecting: boolean
-  selected: boolean
-  onToggle: (item: LocalWorkspace) => void
 }) {
   const ui = tone(props.item.type)
-  const action = () => {
-    if (props.selecting) {
-      props.onToggle(props.item)
-      return
-    }
-    props.onSelect(props.item)
-  }
 
   return (
     <Card
       role="button"
       tabIndex={0}
-      className={cn(
-        "group relative min-h-[180px] cursor-pointer gap-0 overflow-hidden rounded-xl border py-0 text-left shadow-[0_18px_36px_-30px_rgba(15,23,42,0.35)] transition-all duration-200 hover:-translate-y-1 hover:border-primary/25 hover:shadow-[0_22px_42px_-28px_rgba(15,23,42,0.38)] dark:shadow-black/20",
-        props.selected &&
-          "border-primary/55 shadow-[0_0_0_1px_hsl(var(--primary)/0.16),0_22px_40px_-28px_rgba(15,23,42,0.4)]",
-      )}
-      onClick={action}
+      className="group relative min-h-[180px] cursor-pointer gap-0 overflow-hidden rounded-xl border py-0 text-left shadow-[0_18px_36px_-30px_rgba(15,23,42,0.35)] transition-all duration-200 hover:-translate-y-1 hover:border-primary/25 hover:shadow-[0_22px_42px_-28px_rgba(15,23,42,0.38)] dark:shadow-black/20"
+      onClick={() => props.onSelect(props.item)}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault()
-          action()
+          props.onSelect(props.item)
         }
       }}
     >
@@ -137,28 +120,9 @@ function Row(props: {
             </div>
           </div>
 
-          {props.selecting ? (
-            <button
-              type="button"
-              aria-label={props.selected ? "取消选择策略" : "选择策略"}
-              className={cn(
-                "flex size-8 shrink-0 items-center justify-center rounded-full border bg-background/90 transition-all",
-                props.selected
-                  ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                  : "border-border/80 text-transparent hover:border-primary/40",
-              )}
-              onClick={(event) => {
-                event.stopPropagation()
-                props.onToggle(props.item)
-              }}
-            >
-              <Check className="size-4" />
-            </button>
-          ) : (
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-full border border-border/70 bg-background/90 text-muted-foreground transition-all group-hover:border-primary/30 group-hover:text-foreground">
-              <ArrowUpRight className="size-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-            </div>
-          )}
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-full border border-border/70 bg-background/90 text-muted-foreground transition-all group-hover:border-primary/30 group-hover:text-foreground">
+            <ArrowUpRight className="size-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+          </div>
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -234,15 +198,7 @@ export function StrategyList(props: Props) {
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
       {props.items.map((item) => (
-        <Row
-          key={item.path}
-          item={item}
-          onSelect={props.onSelect}
-          onDelete={props.onDelete}
-          selecting={props.selecting}
-          selected={props.selected.includes(item.path)}
-          onToggle={props.onToggle}
-        />
+        <Row key={item.path} item={item} onSelect={props.onSelect} onDelete={props.onDelete} />
       ))}
     </div>
   )
