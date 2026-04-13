@@ -4,7 +4,6 @@ import "time"
 
 type Config struct {
 	Enabled      bool
-	Startup      string
 	Bin          string
 	GitBin       string
 	Host         string
@@ -15,7 +14,6 @@ type Config struct {
 
 type State struct {
 	Enabled   bool       `json:"enabled"`
-	Startup   string     `json:"startup"`
 	Bin       string     `json:"bin"`
 	URL       string     `json:"url"`
 	Cwd       string     `json:"cwd,omitempty"`

@@ -163,7 +163,7 @@ func (s *Service) activate(addr string) {
 	if err := asset.EnsureMCP(url); err != nil {
 		slog.Error("failed to inject strategy-service mcp config", "url", url, "error", err)
 	}
-	if !s.op.Enabled() || s.op.StartupMode() != "auto" {
+	if !s.op.Enabled() {
 		return
 	}
 

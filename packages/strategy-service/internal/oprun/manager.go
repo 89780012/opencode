@@ -64,7 +64,6 @@ func New(cfg Config) *Manager {
 		log: newLogger(),
 		state: State{
 			Enabled: cfg.Enabled,
-			Startup: cfg.Startup,
 			Bin:     cfg.Bin,
 			URL:     target.String(),
 			Cwd:     cfg.Cwd,
@@ -75,11 +74,6 @@ func New(cfg Config) *Manager {
 
 func (m *Manager) Enabled() bool {
 	return m.cfg.Enabled
-}
-
-// Startup 返回标准化后的启动策略。
-func (m *Manager) Startup() string {
-	return strings.ToLower(strings.TrimSpace(m.cfg.Startup))
 }
 
 // Target 返回 opencode 目标地址的只读副本。

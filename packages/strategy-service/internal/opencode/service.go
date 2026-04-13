@@ -57,11 +57,6 @@ func (s *Service) Enabled() bool {
 	return s.mgr.Enabled()
 }
 
-// StartupMode 返回当前 opencode 的启动策略。
-func (s *Service) StartupMode() string {
-	return s.mgr.Startup()
-}
-
 // State 返回当前 opencode 运行状态。
 func (s *Service) State() oprun.State {
 	return s.mgr.State()

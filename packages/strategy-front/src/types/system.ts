@@ -53,7 +53,6 @@ export interface LogSources {
 
 export interface OpencodeState {
   enabled: boolean
-  startup: string
   bin: string
   url: string
   cwd?: string

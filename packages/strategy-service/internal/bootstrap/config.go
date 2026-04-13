@@ -10,26 +10,24 @@ import (
 )
 
 type Config struct {
-	Host     string
-	Port     string
-	Dist     string
-	Runtime  string
-	Opencode OpencodeConfig
-	Platform string
-	Account  string
-	WindowId string
-	LogDir   string
+	Host     string         // 服务监听地址
+	Port     string         // 服务监听端口
+	Dist     string         // 前端静态资源目录
+	Opencode OpencodeConfig //opencode配置
+	Platform string         // 运行平台
+	Account  string         // 资金账号
+	WindowId string         // 运行窗口ID
+	LogDir   string         // 策略日志目录
 }
 
 type OpencodeConfig struct {
-	Enabled      bool
-	Startup      string
-	Bin          string
-	GitBin       string
-	Host         string
-	Port         int
-	Cwd          string
-	StartTimeout time.Duration
+	Enabled      bool          // 是否启用 opencode
+	Bin          string        // opencode 二进制文件
+	GitBin       string        // git 二进制文件
+	Host         string        // opencode 服务监听地址
+	Port         int           // opencode 服务监听端口
+	Cwd          string        // opencode 工作目录
+	StartTimeout time.Duration // opencode 启动超时时间
 }
 
 // LoadConfig 从环境变量装配服务启动配置。
@@ -50,7 +48,6 @@ func LoadConfig() Config {
 		LogDir:   logDir,
 		Opencode: OpencodeConfig{
 			Enabled:      truth("STRATEGY_OPENCODE_ENABLED", true),
-			Startup:      text("STRATEGY_OPENCODE_STARTUP", "auto"),
 			Host:         text("STRATEGY_OPENCODE_HOST", "127.0.0.1"),
 			Port:         number("STRATEGY_OPENCODE_PORT", 4096),
 			Cwd:          text("STRATEGY_OPENCODE_CWD", ""),

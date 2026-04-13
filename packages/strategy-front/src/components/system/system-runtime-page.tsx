@@ -8,7 +8,6 @@ import type { OpencodeState } from "@/types/system"
 
 const empty: OpencodeState = {
   enabled: false,
-  startup: "manual",
   bin: "",
   url: "",
   status: "disabled",
@@ -99,7 +98,7 @@ export function SystemRuntimePage() {
               <div className="space-y-1">
                 <CardTitle>运行配置</CardTitle>
                 <CardDescription>
-                  当前页聚焦 strategy-service 管理的 opencode 运行状态，便于判断是自管进程还是外部进程。
+                  当前页面聚焦 strategy-service 管理的 opencode 运行状态，便于判断是自管进程还是外部进程。
                 </CardDescription>
               </div>
               <Button variant="outline" onClick={() => void reload()} disabled={load}>
@@ -108,16 +107,12 @@ export function SystemRuntimePage() {
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="grid gap-4 py-6 md:grid-cols-3">
+          <CardContent className="grid gap-4 py-6 md:grid-cols-2">
             <div className="rounded-3xl border bg-muted/20 p-4">
               <div className="text-muted-foreground text-xs">状态</div>
               <div className={`mt-3 inline-flex rounded-full border px-3 py-1 text-xs font-medium ${tone(state)}`}>
                 {state.status}
               </div>
-            </div>
-            <div className="rounded-3xl border bg-muted/20 p-4">
-              <div className="text-muted-foreground text-xs">启动策略</div>
-              <div className="mt-3 text-2xl font-semibold">{state.startup || "-"}</div>
             </div>
             <div className="rounded-3xl border bg-muted/20 p-4">
               <div className="text-muted-foreground text-xs">PID</div>
@@ -147,7 +142,7 @@ export function SystemRuntimePage() {
           <Card>
             <CardHeader className="border-b">
               <CardTitle>运行操作</CardTitle>
-              <CardDescription>优先保留简单直接的三种操作，避免系统设置页承载过多低频控制项。</CardDescription>
+              <CardDescription>保留最直接的启动、重启、停止操作，避免设置页承载过多低频控制项。</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 py-6">
               <div className="grid gap-3 md:grid-cols-3">
@@ -160,11 +155,7 @@ export function SystemRuntimePage() {
                   重启
                 </Button>
                 <Button variant="outline" onClick={() => void run("stop")} disabled={busy !== ""}>
-                  {busy === "stop" ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <SquareTerminal className="size-4" />
-                  )}
+                  {busy === "stop" ? <Loader2 className="size-4 animate-spin" /> : <SquareTerminal className="size-4" />}
                   停止
                 </Button>
               </div>
