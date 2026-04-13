@@ -16,6 +16,7 @@ const file = "strategies.json"
 
 type store struct{}
 
+// path 返回工作区索引文件的绝对路径。
 func (s *store) path() (string, error) {
 	dir, err := cfg.Root()
 	if err != nil {
@@ -24,6 +25,7 @@ func (s *store) path() (string, error) {
 	return filepath.Join(dir, file), nil
 }
 
+// load 读取索引文件；首次启动时会自动构建默认内容。
 func (s *store) load() ([]Local, error) {
 	path, err := s.path()
 	if err != nil {
@@ -50,6 +52,7 @@ func (s *store) load() ([]Local, error) {
 	return clean(rows), nil
 }
 
+// save 原子写回工作区索引文件。
 func (s *store) save(rows []Local) error {
 	path, err := s.path()
 	if err != nil {
@@ -76,6 +79,7 @@ func (s *store) save(rows []Local) error {
 	return err
 }
 
+// seed 扫描默认插件和用户工作区，生成初始索引。
 func (s *store) seed() ([]Local, error) {
 	smartx, err := base()
 	if err != nil {
@@ -112,6 +116,7 @@ func (s *store) seed() ([]Local, error) {
 	return clean(rows), nil
 }
 
+// clean 对工作区记录做去重、规范化和排序。
 func clean(rows []Local) []Local {
 	out := make([]Local, 0, len(rows))
 	seen := map[string]bool{}
@@ -147,6 +152,7 @@ func clean(rows []Local) []Local {
 	return out
 }
 
+// kind 规范化工作区类型。
 func kind(value string) string {
 	value = strings.ToLower(strings.TrimSpace(value))
 	if value == "smartx" || value == "python" || value == "js" || value == "other" {
@@ -155,6 +161,7 @@ func kind(value string) string {
 	return ""
 }
 
+// source 规范化工作区来源。
 func source(value string) string {
 	value = strings.ToLower(strings.TrimSpace(value))
 	if value == "default_plugin" || value == "user_created" || value == "imported" || value == "external" {
@@ -163,6 +170,7 @@ func source(value string) string {
 	return ""
 }
 
+// uniq 对关键词去重并去掉空值。
 func uniq(list []string) []string {
 	seen := map[string]bool{}
 	out := []string{}
@@ -177,6 +185,7 @@ func uniq(list []string) []string {
 	return out
 }
 
+// next 生成一条新的工作区 ID。
 func next() string {
 	body := make([]byte, 8)
 	_, _ = rand.Read(body)

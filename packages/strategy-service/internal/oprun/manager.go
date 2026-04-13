@@ -11,11 +11,11 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
+	"strategy-service/internal/gitenv"
 	"strategy-service/internal/logs"
 	"strategy-service/internal/proc"
 )
@@ -77,22 +77,25 @@ func (m *Manager) Enabled() bool {
 	return m.cfg.Enabled
 }
 
+// Startup 返回标准化后的启动策略。
 func (m *Manager) Startup() string {
 	return strings.ToLower(strings.TrimSpace(m.cfg.Startup))
 }
 
+// Target 返回 opencode 目标地址的只读副本。
 func (m *Manager) Target() *url.URL {
 	out := *m.url
 	return &out
 }
 
+// State 返回当前托管状态快照。
 func (m *Manager) State() State {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-
 	return m.state
 }
 
+// Ensure 确保目标地址上存在一个可用的 opencode 服务。
 func (m *Manager) Ensure(ctx context.Context) error {
 	if !m.cfg.Enabled {
 		m.log.Warn("opencode ensure called but disabled")
@@ -134,8 +137,7 @@ func (m *Manager) Ensure(ctx context.Context) error {
 		return err
 	}
 
-	err := m.ready(ctx)
-	if err != nil {
+	if err := m.ready(ctx); err != nil {
 		m.log.Error("opencode did not become ready", "error", err, "timeout", m.cfg.StartTimeout)
 		_ = m.Stop(context.Background())
 		m.fail("opencode did not become ready", err)
@@ -147,21 +149,21 @@ func (m *Manager) Ensure(ctx context.Context) error {
 	return nil
 }
 
+// Restart 先停止当前进程，再重新拉起 opencode。
 func (m *Manager) Restart(ctx context.Context) error {
 	m.log.Info("restarting opencode")
 	if err := m.Stop(ctx); err != nil {
 		m.log.Error("opencode stop failed during restart", "error", err)
 		return err
 	}
-
 	if err := m.down(ctx); err != nil {
 		m.log.Error("opencode did not stop during restart", "error", err)
 		return err
 	}
-
 	return m.Ensure(ctx)
 }
 
+// Stop 停止当前由 strategy-service 托管的 opencode 进程。
 func (m *Manager) Stop(context.Context) error {
 	m.log.Info("stopping opencode")
 	m.mu.Lock()
@@ -201,6 +203,7 @@ func (m *Manager) Stop(context.Context) error {
 	return proc.Kill(cmd)
 }
 
+// begin 抢占启动权，避免并发重复拉起进程。
 func (m *Manager) begin() (chan struct{}, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -220,6 +223,7 @@ func (m *Manager) begin() (chan struct{}, bool) {
 	return ch, true
 }
 
+// done 释放启动锁，并唤醒等待中的调用方。
 func (m *Manager) done() {
 	m.mu.Lock()
 	ch := m.wait
@@ -231,6 +235,7 @@ func (m *Manager) done() {
 	}
 }
 
+// await 等待其他协程完成启动流程，并复用最终结果。
 func (m *Manager) await(ctx context.Context, ch chan struct{}) error {
 	select {
 	case <-ctx.Done():
@@ -248,6 +253,7 @@ func (m *Manager) await(ctx context.Context, ch chan struct{}) error {
 	}
 }
 
+// spawn 启动 opencode 子进程并接管日志流。
 func (m *Manager) spawn() error {
 	m.log.Info("spawning opencode", "bin", m.cfg.Bin, "host", m.cfg.Host, "port", m.cfg.Port, "cwd", m.cfg.Cwd)
 	cmd := exec.Command(m.cfg.Bin, "serve", "--hostname", m.cfg.Host, "--port", fmt.Sprintf("%d", m.cfg.Port))
@@ -275,20 +281,19 @@ func (m *Manager) spawn() error {
 	}
 
 	now := time.Now()
-
 	m.mu.Lock()
 	m.cmd = cmd
 	m.state.StartedAt = &now
 	m.mu.Unlock()
 
 	m.log.Info("opencode process started", "pid", cmd.Process.Pid)
-
 	go m.scan(stdout)
 	go m.scan(stderr)
 	go m.watch(cmd)
 	return nil
 }
 
+// ready 轮询健康检查，直到服务可访问或超时。
 func (m *Manager) ready(ctx context.Context) error {
 	limit := time.NewTimer(m.cfg.StartTimeout)
 	defer limit.Stop()
@@ -311,6 +316,7 @@ func (m *Manager) ready(ctx context.Context) error {
 	}
 }
 
+// down 等待托管进程和健康状态都彻底消失。
 func (m *Manager) down(ctx context.Context) error {
 	tick := time.NewTicker(50 * time.Millisecond)
 	defer tick.Stop()
@@ -335,7 +341,7 @@ func (m *Manager) down(ctx context.Context) error {
 	}
 }
 
-// 存活状态
+// live 将状态切换为本服务托管且可用。
 func (m *Manager) live() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -347,7 +353,7 @@ func (m *Manager) live() {
 	m.state.Message = ""
 }
 
-// 标识为外部状态
+// external 将状态标记为“服务可用但不归当前进程托管”。
 func (m *Manager) external() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -361,6 +367,7 @@ func (m *Manager) external() {
 	m.cmd = nil
 }
 
+// fail 记录一次启动或运行失败，并写入日志中心。
 func (m *Manager) fail(msg string, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -375,6 +382,7 @@ func (m *Manager) fail(msg string, err error) {
 	}
 }
 
+// watch 等待子进程退出，并把退出原因写回状态机。
 func (m *Manager) watch(cmd *exec.Cmd) {
 	err := cmd.Wait()
 	if err == nil {
@@ -382,13 +390,11 @@ func (m *Manager) watch(cmd *exec.Cmd) {
 		m.close(cmd, "stopped", "", nil)
 		return
 	}
-
 	if errors.Is(err, os.ErrProcessDone) {
 		m.log.Info("opencode process already done", "pid", cmd.Process.Pid)
 		m.close(cmd, "stopped", "", nil)
 		return
 	}
-
 	if exit, ok := err.(*exec.ExitError); ok {
 		m.log.Error("opencode process exited with error", "pid", cmd.Process.Pid, "exit_code", exit.ExitCode(), "error", exit.Error())
 		m.close(cmd, "failed", strings.TrimSpace(exit.Error()), err)
@@ -399,6 +405,7 @@ func (m *Manager) watch(cmd *exec.Cmd) {
 	m.close(cmd, "failed", "opencode exited unexpectedly", err)
 }
 
+// close 在子进程退出后收尾状态，并处理主动停止场景。
 func (m *Manager) close(cmd *exec.Cmd, status string, msg string, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -425,6 +432,7 @@ func (m *Manager) close(cmd *exec.Cmd, status string, msg string, err error) {
 	}
 }
 
+// scan 持续读取子进程日志并追加到统一日志文件。
 func (m *Manager) scan(in io.ReadCloser) {
 	defer in.Close()
 
@@ -436,12 +444,11 @@ func (m *Manager) scan(in io.ReadCloser) {
 		if line == "" {
 			continue
 		}
-
 		_ = logs.Append(logs.OpencodeKind, line)
 	}
 }
 
-// 表示url服务起来了，查询path接口返回正常
+// health 通过健康检查判断目标地址上的 opencode 是否可用。
 func (m *Manager) health(ctx context.Context) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, m.url.String()+"/global/health", nil)
 	if err != nil {
@@ -457,81 +464,32 @@ func (m *Manager) health(ctx context.Context) error {
 	if res.StatusCode >= 200 && res.StatusCode < 300 {
 		return nil
 	}
-
 	return fmt.Errorf("unexpected status: %s", res.Status)
 }
 
+// healthy 用短超时快速判断当前目标地址是否存活。
 func (m *Manager) healthy() bool {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	return m.health(ctx) == nil
 }
 
+// env 构造拉起 opencode 时使用的完整环境变量。
 func env(cfg Config) []string {
 	out := append([]string{}, os.Environ()...)
 	out = set(out, "OPENCODE_CLIENT", "strategy-service")
 	out = set(out, "OPENCODE_SERVER_PASSWORD", "")
 	out = set(out, "OPENCODE_SERVER_USERNAME", "")
-	out = gitenv(out, cfg)
+	out = injectGit(out, cfg)
 	return out
 }
 
-func gitenv(all []string, cfg Config) []string {
-	bin := strings.TrimSpace(cfg.GitBin)
-	if bin == "" {
-		return all
-	}
-
-	dir := filepath.Dir(bin)
-	root := dir
-	base := strings.ToLower(filepath.Base(dir))
-	if base == "cmd" || base == "bin" {
-		root = filepath.Dir(dir)
-	}
-
-	parts := []string{}
-	for _, item := range []string{
-		filepath.Join(root, "cmd"),
-		filepath.Join(root, "bin"),
-		filepath.Join(root, "usr", "bin"),
-		filepath.Join(root, "mingw64", "bin"),
-		filepath.Join(root, "mingw64", "libexec", "git-core"),
-	} {
-		if info, err := os.Stat(item); err == nil && info.IsDir() {
-			parts = append(parts, item)
-		}
-	}
-
-	path := ""
-	out := make([]string, 0, len(all)+2)
-	for _, item := range all {
-		upper := strings.ToUpper(item)
-		if strings.HasPrefix(upper, "PATH=") {
-			path = item[5:]
-			continue
-		}
-		if strings.HasPrefix(upper, "GIT_TEMPLATE_DIR=") {
-			continue
-		}
-		out = append(out, item)
-	}
-
-	if path != "" {
-		parts = append(parts, path)
-	}
-	if len(parts) > 0 {
-		out = append(out, "PATH="+strings.Join(parts, string(os.PathListSeparator)))
-	}
-
-	tpl := filepath.Join(root, "mingw64", "share", "git-core", "templates")
-	if info, err := os.Stat(tpl); err == nil && info.IsDir() {
-		out = append(out, "GIT_TEMPLATE_DIR="+tpl)
-	}
-
-	out = set(out, "GIT_EXEC_PATH", filepath.Join(root, "mingw64", "libexec", "git-core"))
-	return out
+// injectGit 为 opencode 注入便携版 Git 所需环境。
+func injectGit(all []string, cfg Config) []string {
+	return gitenv.Apply(all, cfg.GitBin, true)
 }
 
+// set 覆盖或追加一条环境变量。
 func set(all []string, key string, value string) []string {
 	pre := key + "="
 	for i, item := range all {
@@ -543,6 +501,7 @@ func set(all []string, key string, value string) []string {
 	return append(all, pre+value)
 }
 
+// idle 根据功能开关返回初始状态名。
 func idle(ok bool) string {
 	if ok {
 		return "stopped"

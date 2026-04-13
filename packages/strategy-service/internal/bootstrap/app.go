@@ -20,29 +20,28 @@ import (
 )
 
 type Service struct {
-	cfg Config         //配置文件
-	srv *http.Server   //http服务
-	op  *oprun.Manager //opencode运行管理
+	cfg Config
+	srv *http.Server
+	op  *oprun.Manager
 }
 
+// New 根据配置创建完整的 HTTP 服务。
 func New(cfg Config) (*Service, error) {
 	slog.Info("initializing service", "addr", cfg.Addr(), "opencode_enabled", cfg.Opencode.Enabled)
 
-	// 将asset资源同步到客户本地，主要是agent 和 skill
+	// 同步内置的 agent 和 skill 资源。
 	if err := asset.EnsureBuiltins(); err != nil {
 		slog.Error("builtin opencode asset provision failed", "error", err)
 		return nil, err
 	}
 
-	// 确保opencode资源
+	// 如果端口被占用，则自动探测下一个可用端口。
 	if cfg.Opencode.Enabled {
-		// 找到可用端口
 		port, err := port(cfg.Opencode.Host, cfg.Opencode.Port)
 		if err != nil {
 			slog.Error("opencode port probe failed", "host", cfg.Opencode.Host, "port", cfg.Opencode.Port, "error", err)
 			return nil, err
 		}
-		// 和可用端口不一致, 则重置配置
 		if port != cfg.Opencode.Port {
 			slog.Info("opencode port adjusted", "host", cfg.Opencode.Host, "from", cfg.Opencode.Port, "to", port)
 			cfg.Opencode.Port = port
@@ -51,14 +50,13 @@ func New(cfg Config) (*Service, error) {
 
 	run := rt.New(rt.Config{
 		Over: map[string]string{
-			"opencode": cfg.Opencode.Bin, //opencode运行二进制文件
+			"opencode": cfg.Opencode.Bin,
 		},
 	})
 	cfg = resolveOpencode(run, cfg)
 	cfg = resolveGit(run, cfg)
 
 	op := oprun.New(oprun.Config(cfg.Opencode))
-	//注册api 端点
 	api := web.NewAPI(run, op, &conf.Store{}, smartx.New(smartx.Config{
 		Platform: cfg.Platform,
 		Account:  cfg.Account,
@@ -87,45 +85,37 @@ func New(cfg Config) (*Service, error) {
 	}, nil
 }
 
-func resolveOpencode(run *rt.Service, cfg Config) Config {
-	row, err := run.Resolve(context.Background(), "opencode")
+// resolveTool 按优先级解析工具，并在需要时激活内置运行时。
+func resolveTool(run *rt.Service, id string, preferBuiltin bool) rt.Result {
+	row, err := run.Resolve(context.Background(), id)
 	if err != nil {
-		return cfg
+		return rt.Result{}
 	}
 
-	// 配置则直接返回配置
 	if row.Found && row.Source == rt.SourceConfig {
-		cfg.Opencode.Bin = row.Path
-		return cfg
+		return row
 	}
-
-	if run.Has("opencode") {
-		out, err := run.Ensure(context.Background(), "opencode")
+	if run.Has(id) && (preferBuiltin || !row.Found) {
+		out, err := run.Ensure(context.Background(), id)
 		if err == nil && out.Found {
-			cfg.Opencode.Bin = out.Path
+			return out
 		}
-		return cfg
 	}
+	return row
+}
 
+// resolveOpencode 优先选择显式配置或内置 opencode。
+func resolveOpencode(run *rt.Service, cfg Config) Config {
+	row := resolveTool(run, "opencode", true)
 	if row.Found {
 		cfg.Opencode.Bin = row.Path
 	}
 	return cfg
 }
 
+// resolveGit 优先复用系统 Git，缺失时再回退到内置 Git。
 func resolveGit(run *rt.Service, cfg Config) Config {
-	row, err := run.Resolve(context.Background(), "git")
-	if err != nil {
-		return cfg
-	}
-
-	if !row.Found && run.Has("git") {
-		out, err := run.Ensure(context.Background(), "git")
-		if err == nil && out.Found {
-			row = out
-		}
-	}
-
+	row := resolveTool(run, "git", false)
 	if !row.Found {
 		return cfg
 	}
@@ -136,16 +126,19 @@ func resolveGit(run *rt.Service, cfg Config) Config {
 	return cfg
 }
 
+// Addr 返回服务监听地址。
 func (s *Service) Addr() string {
 	return s.cfg.Addr()
 }
 
+// Serve 使用现成监听器启动服务。
 func (s *Service) Serve(ln net.Listener) error {
 	slog.Info("serving on listener", "addr", ln.Addr().String())
 	go s.activate(ln.Addr().String())
 	return s.srv.Serve(ln)
 }
 
+// ListenAndServe 创建 TCP 监听器并启动服务。
 func (s *Service) ListenAndServe() error {
 	slog.Info("listen and serve", "addr", s.cfg.Addr())
 	ln, err := net.Listen("tcp", s.cfg.Addr())
@@ -155,6 +148,7 @@ func (s *Service) ListenAndServe() error {
 	return s.Serve(ln)
 }
 
+// Shutdown 优雅关闭 HTTP 服务和托管的 opencode 进程。
 func (s *Service) Shutdown(ctx context.Context) error {
 	slog.Info("shutting down service")
 	err := s.srv.Shutdown(ctx)
@@ -166,12 +160,12 @@ func (s *Service) Shutdown(ctx context.Context) error {
 	return err
 }
 
+// activate 在服务可用后补齐 MCP 配置，并按策略自动拉起 opencode。
 func (s *Service) activate(addr string) {
 	url := addr
 	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
 		url = "http://" + addr
 	}
-	// 开启mcp服务
 	if err := asset.EnsureMCP(url); err != nil {
 		slog.Error("failed to inject strategy-service mcp config", "url", url, "error", err)
 	}
@@ -180,13 +174,12 @@ func (s *Service) activate(addr string) {
 	}
 
 	slog.Info("auto-starting opencode process")
-	// 自动开启opencode服务
 	if err := s.op.Ensure(context.Background()); err != nil {
 		slog.Error("opencode auto-start failed", "error", err)
 	}
 }
 
-// 找到可用端口
+// port 从起始端口开始寻找当前主机上的空闲端口。
 func port(host string, start int) (int, error) {
 	if start <= 0 {
 		return 0, fmt.Errorf("invalid port: %d", start)

@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"strategy-service/internal/asset"
+	"strategy-service/internal/gitenv"
 	"strategy-service/internal/proc"
 	rt "strategy-service/internal/runtime"
 )
@@ -23,6 +24,7 @@ type Service struct {
 	mu  sync.Mutex
 }
 
+// NewService 创建工作区服务，并复用运行时解析能力。
 func NewService(rt *rt.Service) *Service {
 	return &Service{
 		rt:  rt,
@@ -30,6 +32,7 @@ func NewService(rt *rt.Service) *Service {
 	}
 }
 
+// local 从目录读取工作区元数据，并尽量推断模板信息。
 func local(path string) Local {
 	info, err := os.Stat(path)
 	if err != nil {
@@ -79,6 +82,7 @@ func local(path string) Local {
 	return row
 }
 
+// row 用持久化记录补全本地扫描结果，避免丢失来源和管理状态。
 func (s *Service) row(item Local) Local {
 	out := local(item.Path)
 	out.ID = item.ID
@@ -105,6 +109,38 @@ func (s *Service) row(item Local) Local {
 	return out
 }
 
+// draft 按目录和类型提示生成一条可保存的工作区记录。
+func draft(path string, typ string) Local {
+	row := local(path)
+	if row.Type == "" {
+		row.Type = kind(typ)
+	}
+	if row.Type == "" {
+		row.Type = "other"
+	}
+	if len(row.Keywords) == 0 {
+		row.Keywords = uniq([]string{row.Name, row.Type})
+	}
+	return row
+}
+
+// remember 保留已有记录的身份信息，否则补一条新的来源信息。
+func (s *Service) remember(row Local, src string, managed bool) Local {
+	old, err := s.pick(row.Path)
+	if err == nil {
+		row.ID = old.ID
+		row.Source = old.Source
+		row.Managed = old.Managed
+		return row
+	}
+
+	row.ID = next()
+	row.Source = src
+	row.Managed = managed
+	return row
+}
+
+// List 返回当前已登记的工作区列表。
 func (s *Service) List() (ListResult, error) {
 	base, err := base()
 	if err != nil {
@@ -132,6 +168,7 @@ func (s *Service) List() (ListResult, error) {
 	}, nil
 }
 
+// initGit 在目标目录中执行一次 git init。
 func (s *Service) initGit(ctx context.Context, dir string) error {
 	bin := "git"
 	src := "system"
@@ -146,7 +183,9 @@ func (s *Service) initGit(ctx context.Context, dir string) error {
 		}
 		bin = row.Path
 		src = string(row.Source)
-		env = gitEnv(env, row)
+		if row.Source == rt.SourceBuiltin {
+			env = gitenv.Apply(env, row.Path, false)
+		}
 	}
 
 	slog.Info("workspace git init", "bin", bin, "dir", dir, "source", src)
@@ -169,11 +208,13 @@ func (s *Service) initGit(ctx context.Context, dir string) error {
 	return err
 }
 
+// git 判断目录当前是否已经是 Git 仓库。
 func git(dir string) bool {
 	_, err := os.Stat(filepath.Join(dir, ".git"))
 	return err == nil
 }
 
+// resolveGit 统一解析当前环境中的 Git 可执行文件。
 func (s *Service) resolveGit(ctx context.Context) (rt.Result, error) {
 	if s.rt != nil {
 		return s.rt.Resolve(ctx, "git")
@@ -199,6 +240,7 @@ func (s *Service) resolveGit(ctx context.Context) (rt.Result, error) {
 	}, nil
 }
 
+// ensureGit 确保目标目录具备可用的 Git 仓库状态。
 func (s *Service) ensureGit(ctx context.Context, dir string) (GitState, error) {
 	row, err := s.resolveGit(ctx)
 	if err != nil {
@@ -228,58 +270,7 @@ func (s *Service) ensureGit(ctx context.Context, dir string) (GitState, error) {
 	return out, nil
 }
 
-func gitEnv(env []string, row rt.Result) []string {
-	if row.Source != rt.SourceBuiltin {
-		return env
-	}
-
-	root := filepath.Dir(row.Path)
-	if filepath.Base(root) == "cmd" || filepath.Base(root) == "bin" {
-		root = filepath.Dir(root)
-	}
-
-	list := []string{
-		filepath.Join(root, "cmd"),
-		filepath.Join(root, "bin"),
-		filepath.Join(root, "usr", "bin"),
-		filepath.Join(root, "mingw64", "bin"),
-		filepath.Join(root, "mingw64", "libexec", "git-core"),
-	}
-
-	path := ""
-	out := make([]string, 0, len(env)+2)
-	for _, item := range env {
-		if strings.HasPrefix(strings.ToUpper(item), "PATH=") {
-			path = strings.TrimPrefix(item, item[:5])
-			continue
-		}
-		if strings.HasPrefix(strings.ToUpper(item), "GIT_TEMPLATE_DIR=") {
-			continue
-		}
-		out = append(out, item)
-	}
-
-	parts := make([]string, 0, len(list)+1)
-	for _, item := range list {
-		if info, err := os.Stat(item); err == nil && info.IsDir() {
-			parts = append(parts, item)
-		}
-	}
-	if path != "" {
-		parts = append(parts, path)
-	}
-	if len(parts) > 0 {
-		out = append(out, "PATH="+strings.Join(parts, string(os.PathListSeparator)))
-	}
-
-	tpl := filepath.Join(root, "mingw64", "share", "git-core", "templates")
-	if info, err := os.Stat(tpl); err == nil && info.IsDir() {
-		out = append(out, "GIT_TEMPLATE_DIR="+tpl)
-	}
-
-	return out
-}
-
+// workspaceRoot 根据类型选择默认落盘目录。
 func workspaceRoot(kind string) (string, error) {
 	if strings.EqualFold(strings.TrimSpace(kind), "smartx") {
 		return base()
@@ -287,6 +278,7 @@ func workspaceRoot(kind string) (string, error) {
 	return root()
 }
 
+// put 将工作区记录按路径写回索引文件。
 func (s *Service) put(item Local) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -308,6 +300,7 @@ func (s *Service) put(item Local) error {
 	return s.doc.save(rows)
 }
 
+// pick 根据路径读取一条现有工作区记录。
 func (s *Service) pick(path string) (Local, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -327,6 +320,7 @@ func (s *Service) pick(path string) (Local, error) {
 	return rows[at], nil
 }
 
+// dir 校验给定路径是否指向已登记的工作区目录。
 func (s *Service) dir(path string) (string, error) {
 	row, err := s.pick(path)
 	if err != nil {
@@ -344,6 +338,7 @@ func (s *Service) dir(path string) (string, error) {
 	return dir, nil
 }
 
+// Create 创建并登记一个新的工作区。
 func (s *Service) Create(name string, kind string, template string, git bool) (CreateResult, error) {
 	slog.Info("workspace create", "name", name, "type", kind, "template", template)
 	root, err := workspaceRoot(kind)
@@ -400,10 +395,7 @@ func (s *Service) Create(name string, kind string, template string, git bool) (C
 		}
 	}
 
-	row := local(path)
-	row.ID = next()
-	row.Source = "user_created"
-	row.Managed = true
+	row := s.remember(local(path), "user_created", true)
 	err = s.put(row)
 	if err != nil {
 		return CreateResult{}, err
@@ -416,6 +408,7 @@ func (s *Service) Create(name string, kind string, template string, git bool) (C
 	}, nil
 }
 
+// Open 重新打开一个已登记的工作区，并按需初始化 Git。
 func (s *Service) Open(path string, git bool) (OpenResult, error) {
 	slog.Info("workspace open", "path", path)
 	dir, err := s.dir(path)
@@ -449,6 +442,7 @@ func (s *Service) Open(path string, git bool) (OpenResult, error) {
 	}, nil
 }
 
+// Import 将本地目录导入到工作区索引中。
 func (s *Service) Import(path string, typ string, git bool) (OpenResult, error) {
 	slog.Info("workspace import", "path", path, "type", typ)
 	dir := filepath.Clean(strings.TrimSpace(path))
@@ -471,27 +465,7 @@ func (s *Service) Import(path string, typ string, git bool) (OpenResult, error) 
 		}
 	}
 
-	row := local(dir)
-	if row.Type == "" {
-		row.Type = kind(typ)
-	}
-	if row.Type == "" {
-		row.Type = "other"
-	}
-	if len(row.Keywords) == 0 {
-		row.Keywords = uniq([]string{row.Name, row.Type})
-	}
-
-	old, err := s.pick(dir)
-	if err == nil {
-		row.ID = old.ID
-		row.Source = old.Source
-		row.Managed = old.Managed
-	} else {
-		row.ID = next()
-		row.Source = "imported"
-		row.Managed = false
-	}
+	row := s.remember(draft(dir, typ), "imported", false)
 
 	err = s.put(row)
 	if err != nil {
@@ -504,6 +478,7 @@ func (s *Service) Import(path string, typ string, git bool) (OpenResult, error) 
 	}, nil
 }
 
+// Attach 在 opencode 就绪后把现有目录接入工作区。
 func (s *Service) Attach(ctx context.Context, path string, typ string) (AttachResult, error) {
 	slog.Info("workspace attach", "path", path, "type", typ)
 	dir := filepath.Clean(strings.TrimSpace(path))
@@ -524,27 +499,7 @@ func (s *Service) Attach(ctx context.Context, path string, typ string) (AttachRe
 		return AttachResult{}, err
 	}
 
-	row := local(dir)
-	if row.Type == "" {
-		row.Type = kind(typ)
-	}
-	if row.Type == "" {
-		row.Type = "other"
-	}
-	if len(row.Keywords) == 0 {
-		row.Keywords = uniq([]string{row.Name, row.Type})
-	}
-
-	old, err := s.pick(dir)
-	if err == nil {
-		row.ID = old.ID
-		row.Source = old.Source
-		row.Managed = old.Managed
-	} else {
-		row.ID = next()
-		row.Source = "external"
-		row.Managed = false
-	}
+	row := s.remember(draft(dir, typ), "external", false)
 
 	if err := s.put(row); err != nil {
 		return AttachResult{}, err
@@ -556,6 +511,7 @@ func (s *Service) Attach(ctx context.Context, path string, typ string) (AttachRe
 	}, nil
 }
 
+// Files 列出工作区内可浏览的文件。
 func (s *Service) Files(path string) (FilesResult, error) {
 	slog.Debug("workspace files", "path", path)
 	dir, err := s.dir(path)
@@ -578,6 +534,7 @@ func (s *Service) Files(path string) (FilesResult, error) {
 	}, nil
 }
 
+// Content 读取工作区中的单个文件内容，并判断是否可预览。
 func (s *Service) Content(path string, file string) (FileContentResult, error) {
 	slog.Debug("workspace content", "path", path, "file", file)
 	dir, err := s.dir(path)
@@ -626,6 +583,7 @@ func (s *Service) Content(path string, file string) (FileContentResult, error) {
 	}, nil
 }
 
+// Write 将文本内容写回工作区中的目标文件。
 func (s *Service) Write(path string, file string, body string) (FileContentResult, error) {
 	slog.Info("workspace write", "path", path, "file", file)
 	dir, err := s.dir(path)
@@ -663,6 +621,7 @@ func (s *Service) Write(path string, file string, body string) (FileContentResul
 	return s.Content(path, file)
 }
 
+// Delete 只从工作区索引中移除记录，不删除真实目录。
 func (s *Service) Delete(path string) error {
 	slog.Info("workspace delete", "path", path)
 	s.mu.Lock()

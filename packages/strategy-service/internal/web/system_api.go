@@ -37,10 +37,12 @@ type startupState struct {
 	Git      startupTool `json:"git"`
 }
 
+// startup 返回当前启动环境的检测结果。
 func (a *API) startup(c *gin.Context) {
 	ok(c, a.inspectStartup(c.Request.Context()))
 }
 
+// startupPrepare 预激活内置 opencode，便于首次启动前完成准备。
 func (a *API) startupPrepare(c *gin.Context) {
 	state := a.inspectStartup(c.Request.Context())
 	if state.Opencode.Installed {
@@ -62,16 +64,17 @@ func (a *API) startupPrepare(c *gin.Context) {
 	ok(c, a.inspectStartup(c.Request.Context()))
 }
 
+// configGet 读取 strategy-service 的持久化配置。
 func (a *API) configGet(c *gin.Context) {
 	cfg, err := a.cfg.Load()
 	if err != nil {
 		bad(c, err)
 		return
 	}
-
 	ok(c, cfg)
 }
 
+// configPut 保存 strategy-service 的持久化配置。
 func (a *API) configPut(c *gin.Context) {
 	body := cfg.Config{}
 	if err := c.ShouldBindJSON(&body); err != nil {
@@ -84,36 +87,37 @@ func (a *API) configPut(c *gin.Context) {
 		bad(c, err)
 		return
 	}
-
 	ok(c, cfg)
 }
 
+// inspectStartup 汇总 opencode 和 Git 的准备情况。
 func (a *API) inspectStartup(ctx context.Context) startupState {
 	op := a.inspectRuntime(ctx, "opencode")
 	git := a.inspectRuntime(ctx, "git")
 
-	out := startupState{
+	return startupState{
 		Ready:    op.Installed,
+		Summary:  summary(op, git),
 		Opencode: op,
 		Git:      git,
 	}
-
-	if !op.Installed {
-		out.Summary = "系统会优先准备 OpenCode，确保 AI 策略研发环境可以直接进入。"
-		return out
-	}
-	if git.Source == string(rt.SourceSystem) {
-		out.Summary = "已检测到系统 Git，启动 OpenCode 时会自动继承系统 Git。"
-		return out
-	}
-	if git.Source == string(rt.SourceBuiltin) {
-		out.Summary = "未检测到系统 Git，启动 OpenCode 时会自动注入内置 Git。"
-		return out
-	}
-	out.Summary = "AI 策略研发环境已准备完成。"
-	return out
 }
 
+// summary 根据工具准备情况生成更易懂的状态说明。
+func summary(op startupTool, git startupTool) string {
+	if !op.Installed {
+		return "系统会优先准备 OpenCode，确保 AI 策略研发环境可以直接进入。"
+	}
+	if git.Source == string(rt.SourceSystem) {
+		return "已检测到系统 Git，启动 OpenCode 时会自动复用系统 Git。"
+	}
+	if git.Source == string(rt.SourceBuiltin) {
+		return "未检测到系统 Git，启动 OpenCode 时会自动注入内置 Git。"
+	}
+	return "AI 策略研发环境已准备完成。"
+}
+
+// inspectRuntime 读取单个运行时工具的安装与版本信息。
 func (a *API) inspectRuntime(ctx context.Context, id string) startupTool {
 	out := startupTool{
 		ID:        id,
@@ -128,7 +132,6 @@ func (a *API) inspectRuntime(ctx context.Context, id string) startupTool {
 		out.Message = err.Error()
 		return out
 	}
-
 	if !row.Found {
 		out.Message = row.Message
 		return out
@@ -142,6 +145,7 @@ func (a *API) inspectRuntime(ctx context.Context, id string) startupTool {
 	return out
 }
 
+// version 尝试执行 `<bin> --version` 读取工具版本。
 func version(ctx context.Context, path string) string {
 	sub, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
@@ -156,6 +160,7 @@ func version(ctx context.Context, path string) string {
 	return text
 }
 
+// label 将内部工具名映射为对用户更友好的展示名。
 func label(id string) string {
 	if id == "git" {
 		return "Git"
@@ -264,6 +269,7 @@ func (a *API) smartxLogsWatch(c *gin.Context) {
 	ok(c, out)
 }
 
+// queryInt 读取查询参数中的整数，缺失时返回默认值。
 func queryInt(c *gin.Context, key string, fallback int) (int, error) {
 	raw := strings.TrimSpace(c.Query(key))
 	if raw == "" {

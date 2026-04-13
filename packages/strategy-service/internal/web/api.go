@@ -47,7 +47,7 @@ func bad(c *gin.Context, err error) {
 	fail(c, http.StatusBadRequest, err.Error(), nil)
 }
 
-// NewAPI wires the HTTP handlers to the runtime services.
+// NewAPI 组装 API 所需的各类底层服务。
 func NewAPI(run *rt.Service, op *oprun.Manager, cfg *cfg.Store, sx *smartx.Service) *API {
 	return &API{
 		rt:  run,
@@ -59,7 +59,7 @@ func NewAPI(run *rt.Service, op *oprun.Manager, cfg *cfg.Store, sx *smartx.Servi
 	}
 }
 
-// Register mounts all API routes onto the provided engine.
+// Register 将所有 HTTP 路由挂载到 gin 引擎上。
 func (a *API) Register(r *gin.Engine) {
 	api := r.Group("/api")
 	api.GET("/health", a.health)

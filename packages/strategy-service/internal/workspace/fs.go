@@ -25,6 +25,7 @@ var skip = map[string]bool{
 	"node_modules": true,
 }
 
+// base 返回 smartx 默认插件目录，并确保目录存在。
 func base() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -39,6 +40,7 @@ func base() (string, error) {
 	return dir, nil
 }
 
+// root 返回用户工作区根目录，并确保目录存在。
 func root() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -53,6 +55,7 @@ func root() (string, error) {
 	return dir, nil
 }
 
+// safe 校验目标路径是否仍位于工作区根目录之内。
 func safe(root string, path string) (string, error) {
 	if strings.TrimSpace(path) == "" {
 		return "", errors.New("path is required")
@@ -72,6 +75,7 @@ func safe(root string, path string) (string, error) {
 	return full, nil
 }
 
+// valid 校验新建工作区名称是否合法。
 func valid(name string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -86,6 +90,7 @@ func valid(name string) error {
 	return nil
 }
 
+// listDirs 列出根目录下的一级子目录，并转换为工作区记录。
 func listDirs(root string) ([]Local, error) {
 	items, err := os.ReadDir(root)
 	if err != nil {
@@ -109,6 +114,7 @@ func listDirs(root string) ([]Local, error) {
 	return out, nil
 }
 
+// listFiles 递归列出工作区内可浏览的文件。
 func listFiles(root string) ([]File, error) {
 	files := []File{}
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
@@ -142,6 +148,7 @@ func listFiles(root string) ([]File, error) {
 	return files, nil
 }
 
+// read 读取文件内容，并按预览上限做截断。
 func read(path string) ([]byte, int64, bool, error) {
 	info, err := os.Stat(path)
 	if err != nil {
@@ -166,6 +173,7 @@ func read(path string) ([]byte, int64, bool, error) {
 	return body, info.Size(), info.Size() > limit, nil
 }
 
+// text 粗略判断一段内容是否可按文本方式预览。
 func text(body []byte) bool {
 	if len(body) == 0 {
 		return true

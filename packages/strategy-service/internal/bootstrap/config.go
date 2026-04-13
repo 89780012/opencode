@@ -10,29 +10,30 @@ import (
 )
 
 type Config struct {
-	Host     string			//策略服务监听地址
-	Port     string			//策略服务监听端口
-	Dist     string			//策略前端静态资源目录
-	Runtime  string			//策略运行目录, root目录
-	Opencode OpencodeConfig //opencode配置
-	Platform string //平台
-	Account  string //账号
-	WindowId string //smartX 客户端实例
-	LogDir   string //策略日志目录
+	Host     string
+	Port     string
+	Dist     string
+	Runtime  string
+	Opencode OpencodeConfig
+	Platform string
+	Account  string
+	WindowId string
+	LogDir   string
 }
 
 type OpencodeConfig struct {
-	Enabled      bool		//是否开启
-	Startup      string	    //启动方式
-	Bin          string     //opencode二进制文件
-	GitBin       string     //git二进制文件
-	GitSource    string     //git源码
-	Host         string     //opencode服务监听地址
-	Port         int        //opencode服务监听端口
-	Cwd          string		//opencode运行目录
-	StartTimeout time.Duration //启动超时时间
+	Enabled      bool
+	Startup      string
+	Bin          string
+	GitBin       string
+	GitSource    string
+	Host         string
+	Port         int
+	Cwd          string
+	StartTimeout time.Duration
 }
 
+// LoadConfig 从环境变量装配服务启动配置。
 func LoadConfig() Config {
 	host := text("HOST", "127.0.0.1")
 	port := text("PORT", "5000")
@@ -49,23 +50,25 @@ func LoadConfig() Config {
 		Platform: platform,
 		LogDir:   logDir,
 		Opencode: OpencodeConfig{
-			Enabled:      truth("STRATEGY_OPENCODE_ENABLED", true),  //是否开启
-			Startup:      text("STRATEGY_OPENCODE_STARTUP", "auto"), //启动方式
-			Bin:          text("STRATEGY_OPENCODE_BIN", "opencode"), //opencode二进制文件
-			Host:         text("STRATEGY_OPENCODE_HOST", "127.0.0.1"), //opencode服务监听地址
-			Port:         number("STRATEGY_OPENCODE_PORT", 4096), //opencode服务监听端口
-			Cwd:          text("STRATEGY_OPENCODE_CWD", ""), //opencode运行目录
-			StartTimeout: span("STRATEGY_OPENCODE_START_TIMEOUT", 30*time.Second), //opencode启动超时时间
+			Enabled:      truth("STRATEGY_OPENCODE_ENABLED", true),
+			Startup:      text("STRATEGY_OPENCODE_STARTUP", "auto"),
+			Bin:          text("STRATEGY_OPENCODE_BIN", "opencode"),
+			Host:         text("STRATEGY_OPENCODE_HOST", "127.0.0.1"),
+			Port:         number("STRATEGY_OPENCODE_PORT", 4096),
+			Cwd:          text("STRATEGY_OPENCODE_CWD", ""),
+			StartTimeout: span("STRATEGY_OPENCODE_START_TIMEOUT", 30*time.Second),
 		},
-		Account:  account, //账号
-		WindowId: windowId, //smartX 窗口实例ID
+		Account:  account,
+		WindowId: windowId,
 	}
 }
 
+// Addr 返回 HTTP 服务监听地址。
 func (c Config) Addr() string {
 	return c.Host + ":" + c.Port
 }
 
+// text 读取字符串环境变量，空值时回退到默认值。
 func text(key string, fallback string) string {
 	value := strings.TrimSpace(os.Getenv(key))
 	if value == "" {
@@ -74,6 +77,7 @@ func text(key string, fallback string) string {
 	return value
 }
 
+// truth 读取布尔环境变量，支持 1/true/yes/on。
 func truth(key string, fallback bool) bool {
 	value := strings.TrimSpace(strings.ToLower(os.Getenv(key)))
 	if value == "" {
@@ -82,33 +86,35 @@ func truth(key string, fallback bool) bool {
 	return value == "1" || value == "true" || value == "yes" || value == "on"
 }
 
+// number 读取正整数环境变量，非法值时使用默认值。
 func number(key string, fallback int) int {
 	value := strings.TrimSpace(os.Getenv(key))
 	if value == "" {
 		return fallback
 	}
 
-	out, err := strconv.Atoi(value) // Ascii to integer
+	out, err := strconv.Atoi(value)
 	if err != nil || out <= 0 {
 		return fallback
 	}
 	return out
 }
 
+// span 读取持续时间环境变量，非法值时使用默认值。
 func span(key string, fallback time.Duration) time.Duration {
 	value := strings.TrimSpace(os.Getenv(key))
 	if value == "" {
 		return fallback
 	}
 
-	out, err := time.ParseDuration(value) // 将字符串解析为一个持续时间
+	out, err := time.ParseDuration(value)
 	if err != nil || out <= 0 {
 		return fallback
 	}
 	return out
 }
 
-// 获取策略日志目录
+// smartxLog 返回 smartx 日志目录，允许通过环境变量覆盖。
 func smartxLog() string {
 	value := strings.TrimSpace(os.Getenv("STRATEGY_SMARTX_LOG_DIR"))
 	if value != "" {
