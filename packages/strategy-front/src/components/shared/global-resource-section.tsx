@@ -29,20 +29,38 @@ type CardProps = {
 }
 
 /**
+ * 根据统计项数量返回合适的网格布局。
+ */
+function grid(count: number) {
+  if (count >= 6) {
+    return "md:grid-cols-3 xl:grid-cols-6"
+  }
+
+  if (count === 5) {
+    return "md:grid-cols-2 xl:grid-cols-5"
+  }
+
+  if (count === 4) {
+    return "md:grid-cols-2 xl:grid-cols-4"
+  }
+
+  if (count === 3) {
+    return "md:grid-cols-3"
+  }
+
+  if (count === 2) {
+    return "md:grid-cols-2"
+  }
+
+  return "md:grid-cols-1"
+}
+
+/**
  * 渲染页面顶部的统计卡片区域。
  */
 export function StatCards(props: { items: Stat[] }) {
-  const grid =
-    props.items.length === 4
-      ? "md:grid-cols-4"
-      : props.items.length === 3
-        ? "md:grid-cols-3"
-        : props.items.length === 2
-          ? "md:grid-cols-2"
-          : "md:grid-cols-1"
-
   return (
-    <div className={`grid gap-4 py-6 ${grid}`}>
+    <div className={`grid gap-4 py-6 ${grid(props.items.length)}`}>
       {props.items.map((item) => (
         <div key={item.label} className="rounded-2xl border bg-muted/20 px-4 py-4">
           <div className="text-muted-foreground text-sm">{item.label}</div>
@@ -57,7 +75,11 @@ export function StatCards(props: { items: Stat[] }) {
  * 渲染页面中的说明提示条。
  */
 export function InfoBanner(props: { children: ReactNode }) {
-  return <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">{props.children}</div>
+  return (
+    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
+      {props.children}
+    </div>
+  )
 }
 
 /**
@@ -89,7 +111,9 @@ export function ResourceState(props: StateProps) {
   }
 
   if (props.empty) {
-    return <div className="text-muted-foreground rounded-xl border border-dashed px-4 py-6 text-sm">{props.empty_text}</div>
+    return (
+      <div className="text-muted-foreground rounded-xl border border-dashed px-4 py-6 text-sm">{props.empty_text}</div>
+    )
   }
 
   return <>{props.children}</>
