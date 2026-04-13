@@ -2,7 +2,6 @@ import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { FolderInput, LayoutGrid, Plus, RefreshCw, Search, X } from "lucide-react"
 import { toast } from "sonner"
-import { workspaceChatApi } from "@/api/modules"
 import { workspaceApi } from "@/api/modules/workspace"
 import { DeleteConfirmDialog } from "@/components/shared/delete-confirm-dialog"
 import { StrategyImportDialog } from "@/components/strategy/strategy-import-dialog"
@@ -51,19 +50,6 @@ export default function StrategiesPage() {
 
   const onSelect = (item: LocalWorkspace) => {
     nav(`/app/strategies/${encodeStrategyPath(item.path)}`)
-  }
-
-  const onWorkflow = async (item: LocalWorkspace) => {
-    try {
-      const box = await workspaceChatApi.getState(item.path)
-      if (!box.state.workflow_id) {
-        toast.error("当前策略还没有绑定工作流")
-        return
-      }
-      nav(`/app/strategies/${encodeStrategyPath(item.path)}/workflow-chat`)
-    } catch (err) {
-      toast.error(note(err, "加载固定工作流状态失败"))
-    }
   }
 
   const toggle = (item: LocalWorkspace) => {
@@ -118,7 +104,7 @@ export default function StrategiesPage() {
             <div className="min-w-0">
               <div className="mt-3 text-3xl font-semibold tracking-tight text-foreground">策略</div>
               <p className="mt-1.5 max-w-3xl text-sm leading-6 text-muted-foreground">
-                浏览所有已登记的策略工作区。你可以创建、导入、移除，或进入工作流对话。
+                浏览所有已登记的策略工作区。你可以创建、导入、移除，或直接进入策略对话。
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -219,7 +205,6 @@ export default function StrategiesPage() {
             onRetry={() => void refresh()}
             onSelect={onSelect}
             onDelete={setItem}
-            onWorkflow={onWorkflow}
             selecting={selecting}
             selected={selected}
             onToggle={toggle}

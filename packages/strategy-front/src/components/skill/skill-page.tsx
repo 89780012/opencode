@@ -53,7 +53,7 @@ description: describe when this skill should be used
 
 ## Overview
 
-Describe the workflow, constraints, and expected outcome for this skill.
+Describe the process, constraints, and expected outcome for this skill.
 `
 }
 

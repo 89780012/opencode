@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useReducer,
 import { agentApi, mcpApi, providerApi, skillApi, workspaceApi } from "@/api/modules"
 import { rankAgent } from "@/lib/chat-composer"
 import { latestModels, modelVisible, readModelVisibility } from "@/lib/model-catalog"
-import type { GlobalAgentCatalog, RuntimeAgent, WorkflowAgentRole } from "@/types/agent"
+import type { GlobalAgentCatalog, RuntimeAgent } from "@/types/agent"
 import type { ComposerModel, ProviderCatalogState } from "@/types/composer"
 import type { McpDoc, McpMap } from "@/types/mcp"
 import type { AuthMap, Config, List } from "@/types/provider"
@@ -224,50 +224,6 @@ function scope(value?: string) {
   return value?.trim().toLowerCase() || ""
 }
 
-function role(value?: unknown): WorkflowAgentRole | undefined {
-  if (typeof value !== "string") {
-    return
-  }
-  const text = value.trim().toLowerCase()
-  if (text === "router" || text === "route") {
-    return "router"
-  }
-  if (text === "responder" || text === "respond" || text === "reply" || text === "chat") {
-    return "responder"
-  }
-  if (text === "planner" || text === "plan") {
-    return "planner"
-  }
-  if (text === "executor" || text === "execute") {
-    return "executor"
-  }
-  if (text === "checker" || text === "check") {
-    return "checker"
-  }
-}
-
-function frontmatter(content?: string, key?: string) {
-  if (!content || !key) {
-    return
-  }
-  const hit = content.match(/^---\s*\r?\n([\s\S]*?)\r?\n---/)
-  if (!hit) {
-    return
-  }
-  for (const row of hit[1].split(/\r?\n/)) {
-    const pair = row.match(/^\s*([A-Za-z0-9_-]+)\s*:\s*(.+?)\s*$/)
-    if (!pair || pair[1] !== key) {
-      continue
-    }
-    return pair[2]
-  }
-}
-
-function agentRole(name: string, cfg: GlobalAgentCatalog) {
-  const item = cfg.agents.find((row) => row.name === name)
-  return role(item?.workflow_role) || role(frontmatter(item?.content, "workflow_role"))
-}
-
 function agentScope(name: string, cfg: GlobalAgentCatalog) {
   const item = cfg.agents.find((row) => row.name === name)
   if (item?.scope) {
@@ -334,18 +290,7 @@ function buildProvider(providers: List, config: Config, auth: AuthMap): Provider
 
 async function loadAgent(): Promise<Out<AgentData>> {
   const [run, cfg] = await Promise.allSettled([agentApi.listRuntime(), agentApi.listGlobal()])
-  const doc =
-    cfg.status === "fulfilled"
-      ? {
-          ...normAgentCfg(cfg.value),
-          agents: normAgentCfg(cfg.value).agents.map((item) => ({
-            ...item,
-            workflow_role:
-              role(item.workflow_role) ||
-              role(frontmatter(item.content, "workflow_role")),
-          })),
-        }
-      : emptyAgent.cfg
+  const doc = cfg.status === "fulfilled" ? normAgentCfg(cfg.value) : emptyAgent.cfg
 
   return {
     data: {
@@ -354,10 +299,6 @@ async function loadAgent(): Promise<Out<AgentData>> {
           ? run.value.map((item) => ({
               ...item,
               scope: agentScope(item.name, doc),
-              workflow_role:
-                role(item.workflow_role) ||
-                role(item.options?.workflow_role) ||
-                agentRole(item.name, doc),
             }))
           : [],
       cfg: doc,

@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ArrowLeft, PanelRightClose, PanelRightOpen, Plus, RefreshCw, Workflow } from "lucide-react"
-import { Link, useNavigate, useParams } from "react-router-dom"
+import { ArrowLeft, PanelRightClose, PanelRightOpen, Plus, RefreshCw } from "lucide-react"
+import { Link, useParams } from "react-router-dom"
 import { toast } from "sonner"
-import { workspaceChatApi } from "@/api/modules"
 import { StrategyChatPanel } from "@/components/strategy/strategy-chat-panel"
 import { Button } from "@/components/ui/button"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
@@ -11,13 +10,12 @@ import { WorkspaceDetailPane, type WorkspaceDetailTab } from "@/components/works
 import { useWorkspaceList } from "@/data/global-data-provider"
 import { useStrategyComposer } from "@/hooks/use-strategy-composer"
 import { useStrategySession } from "@/hooks/use-strategy-session"
-import { decodeStrategyPath, encodeStrategyPath } from "@/lib/strategy-path"
+import { decodeStrategyPath } from "@/lib/strategy-path"
 
 const ctrl =
   "rounded-md border border-black/8 bg-black/[0.03] text-xs shadow-none hover:bg-black/[0.05] dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.06]"
 
 export default function StrategyDetailPage() {
-  const nav = useNavigate()
   const params = useParams()
   const path = params.strategyID ? decodeStrategyPath(params.strategyID) : ""
   const { loading, refresh, select, workspaces } = useWorkspaceList()
@@ -66,21 +64,6 @@ export default function StrategyDetailPage() {
       setSpin(false)
     }
   }, [refresh])
-
-  const onWorkflow = useCallback(async () => {
-    if (!path) return
-    try {
-      const box = await workspaceChatApi.getState(path)
-      if (!box.state.workflow_id) {
-        toast.error("当前策略还没有绑定工作流")
-        return
-      }
-      nav(`/app/strategies/${encodeStrategyPath(path)}/workflow-chat`)
-    } catch (err) {
-      console.error("Failed to load workflow state", err)
-      toast.error("加载固定工作流状态失败")
-    }
-  }, [nav, path])
 
   if (loading && !workspace) {
     return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">正在加载策略...</div>
@@ -140,10 +123,6 @@ export default function StrategyDetailPage() {
             </Button>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className={ctrl} onClick={() => void onWorkflow()}>
-              <Workflow className="size-4" />
-              工作流对话
-            </Button>
             <Select
               value={chat.selectedSessionId ?? ""}
               onValueChange={chat.selectSession}
@@ -255,7 +234,7 @@ export default function StrategyDetailPage() {
           </ResizablePanel>
         </ResizablePanelGroup>
 
-        {(chat.sessionLoading || chat.detailLoading || chat.load) && (
+        {(chat.sessionLoading || chat.detailLoading) && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm dark:bg-background/30">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>

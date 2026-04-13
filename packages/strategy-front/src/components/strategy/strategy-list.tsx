@@ -1,4 +1,4 @@
-import { ArrowUpRight, Braces, CalendarClock, Check, Code2, RefreshCw, Sparkles, Trash2, Workflow } from "lucide-react"
+import { ArrowUpRight, Braces, CalendarClock, Check, Code2, RefreshCw, Sparkles, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
@@ -11,7 +11,6 @@ interface Props {
   onRetry: () => void
   onSelect: (item: LocalWorkspace) => void
   onDelete: (item: LocalWorkspace) => void
-  onWorkflow: (item: LocalWorkspace) => void
   selecting: boolean
   selected: string[]
   onToggle: (item: LocalWorkspace) => void
@@ -95,7 +94,6 @@ function Row(props: {
   item: LocalWorkspace
   onSelect: (item: LocalWorkspace) => void
   onDelete: (item: LocalWorkspace) => void
-  onWorkflow: (item: LocalWorkspace) => void
   selecting: boolean
   selected: boolean
   onToggle: (item: LocalWorkspace) => void
@@ -184,19 +182,6 @@ function Row(props: {
           </div>
 
           <div className="flex items-center gap-1">
-            {!props.selecting ? (
-              <button
-                type="button"
-                className="inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
-                onClick={(event) => {
-                  event.stopPropagation()
-                  props.onWorkflow(props.item)
-                }}
-              >
-                <Workflow className="size-3.5" />
-                工作流对话
-              </button>
-            ) : null}
             <button
               type="button"
               className="inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
@@ -254,7 +239,6 @@ export function StrategyList(props: Props) {
           item={item}
           onSelect={props.onSelect}
           onDelete={props.onDelete}
-          onWorkflow={props.onWorkflow}
           selecting={props.selecting}
           selected={props.selected.includes(item.path)}
           onToggle={props.onToggle}

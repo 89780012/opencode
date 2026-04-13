@@ -24,7 +24,6 @@ interface Props {
   err?: string
   loading?: boolean
   onOpenDiff?: (file: string) => void
-  hideWorkflowInternals?: boolean
   footer?: ReactNode
 }
 
@@ -83,12 +82,12 @@ function todoText(tool: string, state: ChatToolState) {
   }
   if (tool === "todowrite") {
     return list.active > 0
-      ? `Todo list updated · ${list.active} active / ${list.total} total`
-      : `Todo list updated · ${list.done} done`
+      ? `Todo list updated 路 ${list.active} active / ${list.total} total`
+      : `Todo list updated 路 ${list.done} done`
   }
   return list.active > 0
-    ? `Todo list loaded · ${list.active} active / ${list.total} total`
-    : `Todo list loaded · ${list.done} done`
+    ? `Todo list loaded 路 ${list.active} active / ${list.total} total`
+    : `Todo list loaded 路 ${list.done} done`
 }
 
 function renderTodoTool(part: ChatToolPart) {
@@ -161,7 +160,7 @@ function renderTool(part: ChatToolPart) {
   return (
     <Fold
       tone="bg-muted/30"
-      head={<div className="font-medium">工具调用:{part.tool}</div>}
+      head={<div className="font-medium">工具调用: {part.tool}</div>}
       side={<div className="text-muted-foreground text-xs">{state.status}</div>}
       body={
         <div className={pane}>
@@ -195,17 +194,6 @@ function renderPart(part: ChatPart, role: ChatMessageInfo["role"], onOpenDiff?: 
       )
     case "tool":
       return renderTool(part)
-    // case "step-start":
-    //   return <div className="rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">Step started</div>
-    // case "step-finish":
-    //   return (
-    //     <div className="rounded-lg border bg-muted/20 px-3 py-2 text-xs">
-    //       <div className="font-medium">Step finished: {part.reason}</div>
-    //       <div className="text-muted-foreground mt-1">
-    //         tokens in/out/reasoning: {part.tokens.input}/{part.tokens.output}/{part.tokens.reasoning}
-    //       </div>
-    //     </div>
-    //   )
     case "file":
       return (
         <div className="rounded-lg border px-3 py-2 text-xs">
@@ -270,73 +258,13 @@ function renderPart(part: ChatPart, role: ChatMessageInfo["role"], onOpenDiff?: 
   }
 }
 
-function workflowInput(info: ChatMessageInfo, parts: ChatPart[]) {
-  if (info.role !== "user") return false
-  const text = parts
-    .filter((part): part is Extract<ChatPart, { type: "text" }> => part.type === "text")
-    .map((part) => part.text)
-    .join("\n")
-    .trim()
-  if (!text) return false
-  const marks = [
-    "User objective:\n",
-    "Workflow handoff:\n",
-    "Upstream summary:\n",
-    "Workflow feedback:\n",
-    "Review feedback:\n",
-    "Workflow node:\n",
-    "Node instructions:\n",
-    "Structured output contract:\n",
-    "Workflow:\n",
-  ]
-  const hit = marks.filter((item) => text.includes(item))
-  if (hit.length < 2) return false
-  if (!text.startsWith("User objective:")) return null
-
-  const head = "User objective:\n"
-  const body = text.slice(head.length)
-  const tags = [
-    "\n\nWorkflow handoff:\n",
-    "\n\nUpstream summary:\n",
-    "\n\nWorkflow feedback:\n",
-    "\n\nReview feedback:\n",
-    "\n\nWorkflow node:\n",
-    "\n\nRequested skills:\n",
-    "\n\nNode instructions:\n",
-    "\n\nStructured output contract:\n",
-    "\n\nWorkflow:\n",
-  ]
-  const cut = tags
-    .map((item) => body.indexOf(item))
-    .filter((item) => item >= 0)
-    .sort((a, b) => a - b)[0]
-  const input = (cut === undefined ? body : body.slice(0, cut)).trim()
-  return input || null
-}
-
 const ChatMessageItem = memo(function ChatMessageItem(props: {
   info: ChatMessageInfo
   onOpenDiff?: (file: string) => void
-  hideWorkflowInternals?: boolean
 }) {
   const parts = useAppSelector((state) => state.chatSession.parts[props.info.id] ?? empty)
   const body = parts.length > 0 ? parts : empty
   const err = props.info.role === "assistant" ? errorText(props.info.error) : undefined
-  const input = props.hideWorkflowInternals ? workflowInput(props.info, body) : false
-
-  if (input === null) {
-    return null
-  }
-
-  if (typeof input === "string") {
-    return (
-      <Message from={props.info.role}>
-        <MessageContent>
-          <div className="whitespace-pre-wrap break-words">{input}</div>
-        </MessageContent>
-      </Message>
-    )
-  }
 
   if (body.length === 0 && !err) {
     return null
@@ -361,12 +289,7 @@ export const ChatMessageList = memo(function ChatMessageList(props: Props) {
     <Conversation className="custom-scrollbar-2 h-full min-w-0 flex-1">
       <ConversationContent className="mx-auto min-w-0 w-full max-w-[776px]">
         {props.messages.map((info) => (
-          <ChatMessageItem
-            key={info.id}
-            info={info}
-            onOpenDiff={props.onOpenDiff}
-            hideWorkflowInternals={props.hideWorkflowInternals}
-          />
+          <ChatMessageItem key={info.id} info={info} onOpenDiff={props.onOpenDiff} />
         ))}
         {props.footer}
         {props.err ? (

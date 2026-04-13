@@ -9,7 +9,6 @@ import (
 	"strategy-service/internal/oprun"
 	rt "strategy-service/internal/runtime"
 	"strategy-service/internal/smartx"
-	"strategy-service/internal/workflow"
 	"strategy-service/internal/workspace"
 )
 
@@ -20,7 +19,6 @@ type API struct {
 	cfg *cfg.Store
 	sx  *smartx.Service
 	log *logs.Hub
-	wf  *workflow.Service
 }
 
 type envelope struct {
@@ -58,7 +56,6 @@ func NewAPI(run *rt.Service, op *oprun.Manager, cfg *cfg.Store, sx *smartx.Servi
 		cfg: cfg,
 		sx:  sx,
 		log: logs.New(),
-		wf:  workflow.New(op),
 	}
 }
 
@@ -87,10 +84,6 @@ func (a *API) Register(r *gin.Engine) {
 	ws.GET("/files", a.workspaceFiles)
 	ws.GET("/file-content", a.workspaceFileGet)
 	ws.PUT("/file-content", a.workspaceFilePut)
-	ws.GET("/chat-state", a.workspaceChatState)
-	ws.POST("/chat-state/bind", a.workspaceChatBind)
-	ws.POST("/chat-state/dispatch", a.workspaceChatDispatch)
-	ws.POST("/chat-state/interrupt", a.workspaceChatInterrupt)
 
 	sys := api.Group("/system")
 	sys.GET("/startup", a.startup)
@@ -109,23 +102,6 @@ func (a *API) Register(r *gin.Engine) {
 	log := api.Group("/logs")
 	log.GET("/sources", a.logSources)
 	log.GET("/tail", a.logTail)
-
-	flow := api.Group("/workflow")
-	flow.GET("", a.workflowList)
-	flow.GET("/:id", a.workflowGet)
-	flow.GET("/:id/summary", a.workflowSummary)
-	flow.POST("", a.workflowSave)
-	flow.PUT("/:id", a.workflowSave)
-	flow.DELETE("/:id", a.workflowDelete)
-	flow.POST("/:id/start", a.workflowStart)
-
-	run := api.Group("/workflow-runs")
-	run.GET("", a.workflowRuns)
-	run.GET("/:id", a.workflowRunGet)
-	run.GET("/:id/nodes", a.workflowRunNodes)
-	run.GET("/:id/steps", a.workflowRunSteps)
-	run.GET("/:id/waits", a.workflowRunWaits)
-	run.POST("/:id/replies", a.workflowRunReply)
 
 	r.POST("/mcp", a.mcpPost)
 	r.GET("/mcp", a.mcpGet)

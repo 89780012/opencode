@@ -1,207 +1,56 @@
 ---
 name: strategy-service
-description: 由 strategy-service 预置的领域技能，用于在 SmartX Python 组件工作区内编写、修改、检查并启动策略。
+description: Domain guidance for SmartX Python component workspaces.
 ---
 
 # Strategy Service
 
-这个 skill 是当前策略工作区的领域能力包。
-它负责 SmartX Python 组件 SDK 相关的知识、约束、工作流和运行闭环，不负责主 agent 的通用身份描述。
+Use this skill when working inside a SmartX Python component workspace.
+It provides SDK-specific guidance, project constraints, and verification habits.
 
-当用户希望在这个工作区里编写、修改、排查、评审、回放、启动策略时，使用这个 skill。
+First steps:
+- Read `README.md` before changing code.
+- Confirm the project goal, run mode, template assumptions, and validation method.
+- If the docs and the actual code disagree, note the gap before proceeding.
 
-进入项目后的第一步：
+Default assumptions:
+- The target runtime is the SmartX Python component SDK.
+- Existing files, templates, and local conventions take priority.
+- Work should follow a simple process: understand rules, implement, verify, then run or debug if needed.
 
-- 先加载并阅读项目的 `README.md`
-- 先从 `README.md` 理解策略项目目标、运行方式、模板约定、依赖前提和验证方式
-- 如果 `README.md` 与模板结构、脚本命令或实际实现不一致，先标出差异，再继续分析
+Reference priority:
+1. The local workspace files
+2. The SmartX API docs
+3. The example docs
 
-## 适用前提
+SmartX SDK rules:
+1. Put SDK initialization under `smart.on_init(init)`.
+2. Do not subscribe, read accounts, or place orders before `init()` runs.
+3. Prefer `smart.current_account` unless multi-account support is required.
+4. Prefer callback-driven state updates such as `on_order`, `on_trade`, `on_assets`, and `on_position`.
+5. Prefer keyword arguments and the `code` or `codes` style when both old and new forms exist.
+6. Prefer subscriptions and callbacks over polling loops for market-driven logic.
+7. Prefer `smart.query_bar(...)` for historical warmup data.
+8. Treat `insert_order(..., callback=...)` as submit confirmation only, and read order status from `on_order`.
+9. Do not assume unsupported SDK shortcuts unless the workspace already proves they are available.
+10. Do not introduce third-party backtest or trading frameworks unless the user asks for them or the workspace already depends on them.
 
-- 默认目标运行时是 SmartX Python 组件 SDK
-- 默认以工作区现有文件、模板和本地约定为准
-- 默认把策略开发视为“理解规则 -> 实现 -> 验证 -> 启动/排查”的连续流程
+Project reading order for the common template:
+1. `package.json`
+2. `start.py`
+3. `src/index.js`
+4. `src/js/App.vue`
+5. `build.js` and `webpack.config.js`
 
-需要精确确认 API 或 SDK 行为时，优先使用以下文档：
+Implementation checklist:
+- Define the task clearly before coding.
+- Separate fixed rules from configurable parameters.
+- Map the logic onto the current project structure.
+- Implement in small layers that are easy to verify.
+- Validate behavior with the most direct checks available.
 
-- API 文档：`https://smarttest.ztqft.com/sdkDoc/python/1.0.0/api/pythonApi.html`
-- 示例文档：`https://smarttest.ztqft.com/sdkDoc/python/1.0.0/example/pythonApiExample.html`
-
-## SmartX SDK 规则
-
-这些规则优先于通用策略开发习惯。
-
-1. 所有依赖 SDK 的初始化逻辑都必须挂在 `smart.on_init(init)` 下。
-2. 在 `init()` 执行前，不要做订阅、账户读取、下单等操作。
-3. 单账户优先使用 `smart.current_account`；只有明确需要多账户时才用 `smart.account_map`。
-4. 账户状态更新优先使用 `on_order`、`on_trade`、`on_assets`、`on_position`。
-5. 若新旧调用形式都可用，优先使用关键字参数以及 `code` / `codes` 风格。
-6. 行情驱动优先使用订阅和事件回调，不要改成自造轮询。
-7. 历史预热优先使用 `smart.query_bar(...)`。
-8. `insert_order(..., callback=...)` 只用于确认提交是否成功；订单状态仍以 `on_order` 为准。
-9. 默认 SDK `1.0.0` 不支持 `strategy.insert_order`、`strategy.subscribe` 这类策略级快捷接口，除非工作区已有明确证据。
-10. 除非工作区已经依赖或用户明确要求，不要引入第三方回测或交易框架。
-
-当你对字段名、回调名、枚举值、参数顺序或参数结构不确定时：
-
-- 先查 API 文档
-- 再查示例
-- 先确认 SDK 用法无误，再改业务逻辑
-
-## 模板型工作区理解顺序
-
-如果工作区来自内置 `plugin_python` 模板，优先按这个顺序理解项目：
-
-1. `package.json`：插件元数据、脚本、工作区身份
-2. `start.py`：Python 策略入口和 Smart 生命周期
-3. `src/index.js`：前端启动路径
-4. `src/js/App.vue`：默认界面结构
-5. `build.js` 和 `webpack.config.js`：打包流程
-
-默认把根目录 `index.js` 和 `index.html` 视为生成产物或运行时产物。
-除非用户明确要求，否则优先修改 `src/` 下的源码和 Python 入口。
-
-第一次进入模板型工作区时，先总结：
-
-- 目标运行环境
-- Python 执行流程
-- 前端执行流程
-- 打包路径
-- 哪些文件是源码，哪些更接近产物
-
-## 标准策略工作流
-
-### 1. 定义交易问题
-
-收集或推断：
-
-- 市场
-- 标的集合
-- 周期
-- 运行环境
-- 执行方式
-- 交易方向
-
-如果关键输入缺失，先标出缺失项；能安全推断时，明确写出假设。
-
-### 2. 把规则写清楚
-
-在编码前先明确：
-
-- 入场条件
-- 加仓条件
-- 出场条件
-- 止损条件
-- 止盈条件
-- 冷却或重入规则
-- 资金分配规则
-
-没有规则定义清楚前，不要直接跳到最终代码。
-
-### 3. 定义参数集合
-
-把固定规则和可调参数拆开。
-优先把可调参数放到独立配置文件，而不是硬编码在 Python 文件里。
-
-### 4. 映射代码结构
-
-编码前先定位：
-
-- 策略逻辑放在哪
-- 指标或关键价位在哪计算
-- 订单在哪生成
-- 状态放在哪
-- Smart 回调在哪注册
-- 历史数据在哪查询
-- 配置从哪里加载
-
-优先扩展现有结构，不要另起一个迷你框架。
-
-### 5. 分层实现
-
-建议顺序：
-
-1. 配置和参数
-2. 行情输入
-3. 指标或关键价位计算
-4. 信号生成
-5. 仓位控制
-6. 下单逻辑
-7. 风控逻辑
-8. 状态持久化（如有必要）
-9. 回测或运行接线
-
-### 6. 验证行为
-
-至少检查：
-
-- 能否运行
-- 是否真的产生交易或信号
-- 进出场规则是否符合描述
-- Smart 回调是否注册正确
-- 是否使用了不支持的 SDK API
-- 是否考虑费用、滑点和仓位限制
-
-### 7. 总结结果
-
-结束时至少说明：
-
-- 实现了什么
-- 关键假设
-- 核心参数
-- 主要风险
-- 下一步还要验证什么
-
-## Python 网格策略补充流程
-
-如果用户要求写 Python 网格策略，按这个固定流程补充：
-
-1. 先明确网格类型：现货/期货、做多/做空/中性、等差/等比、静态/动态区间
-2. 再收集必要参数：标的、周期、上下边界、网格数量、总资金、单格规则、费率
-3. 编码前先用自然语言定义网格逻辑
-4. 再设计状态、订单规划、回调绑定和执行适配
-5. 最后验证震荡、单边、越界、重复成交、状态同步等场景
-
-如果用户只说“写个 Python 网格策略”，默认值为：
-
-- 现货
-- 偏中性的做多网格
-- 等差网格
-- 固定价格区间
-
-这些默认值必须显式说明。
-
-## 运行闭环
-
-如果用户要求“写完并运行”，或者上下文明确要求直接启动，则这部分属于交付流程。
-
-优先使用：
-
-- `smartx_start`
-- `smartx_logs`
-
-要求如下：
-
-1. 不手工拼 HTTP 请求，优先走现有工具
-2. 调用 `smartx_start` 前，确认 `name`
-3. 启动成功后，立即调用 `smartx_logs` 查看最新日志
-4. 如果日志仍有错误，继续执行“修复 -> 启动 -> 看日志”
-5. 只有遇到明确外部阻塞时才允许停止
-
-## 输出要求
-
-处理策略任务时，输出至少应说明：
-
-- 改动了什么
-- 涉及哪些文件
-- 增加或修改了哪些 Smart 回调、订阅或配置
-- 如何运行、验证、回放或启动
-- 哪些部分还没验证
-
-## 不要这样做
-
-- 不要把假设写成用户已确认的规则
-- 不要跳过风控
-- 不要仅凭代码阅读就宣称策略能盈利
-- 不要无故绕开现有项目结构
-- 不要把回调驱动逻辑改成 `while True` 轮询，除非用户明确要求
+Final response should cover:
+- What changed
+- Which files were touched
+- How to run or verify the result
+- What has not been verified yet

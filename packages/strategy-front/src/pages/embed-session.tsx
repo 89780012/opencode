@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useState, type ReactNode } from "react"
 import { Cog, PanelRightClose, PanelRightOpen, Plus, RefreshCw } from "lucide-react"
 import { useSearchParams } from "react-router-dom"
 import { toast } from "sonner"
@@ -83,11 +83,6 @@ export default function EmbedSessionPage() {
       setSpin(false)
     }
   }, [chat, entry])
-
-  const title = useMemo(() => {
-    if (!workspace) return ""
-    return workspace.name || workspace.path
-  }, [workspace])
 
   if (!path) {
     return <Status title="Missing path" desc="Open this page with /embed/session?path=<workspace-directory>." />

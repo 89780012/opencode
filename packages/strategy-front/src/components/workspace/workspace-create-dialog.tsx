@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react"
+import { useMemo, useState, type ReactNode } from "react"
 import { ChevronRight, Code2, Cpu, FileText, RefreshCw, Target } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
-import { chatApi, workspaceApi, workflowApi, workspaceChatApi } from "@/api/modules"
+import { chatApi, workspaceApi } from "@/api/modules"
 import { AutoResizeTextarea } from "@/components/ui/AutoResizeTextarea"
 import { Button } from "@/components/ui/button"
 import {
@@ -22,7 +22,6 @@ import { useProjectComposer } from "@/hooks/use-project-composer"
 import { resolveComposer } from "@/lib/chat-composer"
 import { buildStrategyPrompt, buildTemplatePrompt, createGuide, type StrategyType } from "@/lib/strategy-guide"
 import { encodeStrategyPath } from "@/lib/strategy-path"
-import type { WorkflowRuntimeDetail } from "@/types/workflow"
 
 interface Props {
   open: boolean
@@ -59,14 +58,14 @@ const cards: Record<StrategyType, { title: string; desc: string; template: strin
   },
   python: {
     title: "Python 策略",
-    desc: "适合研究、回测与快速迭代, 不依赖SmartX。",
+    desc: "适合研究、回测与快速迭代，不依赖 SmartX。",
     template: "python_basic",
     icon: <Cpu className="size-4" />,
     root: "~/.strategy-service/workspaces",
   },
   js: {
     title: "JS 策略",
-    desc: "适合脚手架、信号实验与服务集成,不依赖SmartX。",
+    desc: "适合脚手架、信号实验与服务集成，不依赖 SmartX。",
     template: "js_basic",
     icon: <Code2 className="size-4" />,
     root: "~/.strategy-service/workspaces",
@@ -95,16 +94,6 @@ function tail() {
 
 function text(list: string[]) {
   return list.length > 0 ? list.join(" / ") : "-"
-}
-
-function ref(value: string) {
-  const [pid, ...rest] = value.split("/")
-  const mid = rest.join("/").trim()
-  if (!pid?.trim() || !mid) return
-  return {
-    default_model_provider_id: pid.trim(),
-    default_model_id: mid,
-  }
 }
 
 function Chip(props: { active: boolean; text: string; onClick: () => void }) {
@@ -163,7 +152,6 @@ function Dot(props: { active: boolean; done: boolean; text: string; step: number
 export function WorkspaceCreateDialog(props: Props) {
   const nav = useNavigate()
   const { refresh, select } = useWorkspaceList()
-  const [mode, setMode] = useState<"plain" | "workflow">("plain")
   const [kind, setKind] = useState<StrategyType>("smartx")
   const ags = useAgentList(kind)
   const catalog = useProviderList()
@@ -180,17 +168,12 @@ export function WorkspaceCreateDialog(props: Props) {
   const [brief, setBrief] = useState("")
   const [prompt, setPrompt] = useState("")
   const [busy, setBusy] = useState(false)
-  const [flows, setFlows] = useState<WorkflowRuntimeDetail[]>([])
-  const [fid, setFid] = useState("")
-  const [fload, setFload] = useState(false)
   const model = composer.model ? `${composer.model.providerID}/${composer.model.modelID}` : ""
   const card = cards[kind]
   const full = name.trim() ? `${name.trim()}-${tailname.trim()}` : ""
   const rich = kind !== "other"
-  const pick = useMemo(() => flows.find((item) => item.id === fid) ?? null, [fid, flows])
 
   const reset = () => {
-    setMode("plain")
     setStep(0)
     setPanel("market")
     setKind("smartx")
@@ -199,26 +182,7 @@ export function WorkspaceCreateDialog(props: Props) {
     setGuide(createGuide())
     setBrief("")
     setPrompt("")
-    setFid("")
   }
-
-  const pullFlows = async () => {
-    setFload(true)
-    try {
-      const data = await workflowApi.list()
-      setFlows(data.items || [])
-    } catch (err) {
-      console.error("Failed to load workflows", err)
-      toast.error("加载工作流列表失败")
-    } finally {
-      setFload(false)
-    }
-  }
-
-  useEffect(() => {
-    if (!props.open || mode !== "workflow") return
-    void pullFlows()
-  }, [mode, props.open])
 
   const setAgent = (value: string) => {
     if (!ags.ags.some((item) => item.name === value)) return
@@ -248,11 +212,9 @@ export function WorkspaceCreateDialog(props: Props) {
       toast.error("请输入策略名称")
       return
     }
-    if (step === 1 && mode === "workflow" && !fid) {
-      toast.error("请选择工作流")
-      return
+    if (step === 1) {
+      setPrompt(buildPrompt())
     }
-    if (step === 1) setPrompt(buildPrompt())
     setStep((prev) => Math.min(prev + 1, steps.length - 1))
   }
 
@@ -261,46 +223,19 @@ export function WorkspaceCreateDialog(props: Props) {
       toast.error("请输入策略名称")
       return
     }
-    if (mode === "workflow" && !pick) {
-      toast.error("请选择工作流")
-      return
-    }
-    if (mode === "workflow" && !composer.model) {
-      toast.error("请先为工作流选择默认模型")
-      return
-    }
-    if (mode === "plain" && (!composer.agent || !composer.model)) {
-      toast.error("当前没有可用的模型或模式，无法自动发起引导会话")
+    if (!composer.agent || !composer.model) {
+      toast.error("当前没有可用的智能体或模型，无法自动发起引导会话")
       return
     }
     setBusy(true)
     try {
-      const pickModel = ref(model)
       const data = await workspaceApi.createWorkspace(full, kind, card.template)
       await refresh()
       select(data.workspace)
-      if (mode === "workflow" && pick) {
-        await workspaceChatApi.bind({
-          workspace_path: data.workspace.path,
-          workflow_id: pick.id,
-          ...pickModel,
-          default_variant: pickModel ? (composer.variant ?? undefined) : undefined,
-        })
-        await workspaceChatApi.dispatch({
-          workspace_path: data.workspace.path,
-          input: prompt || buildPrompt(),
-        })
-        props.onDone?.()
-        props.onOpenChange(false)
-        reset()
-        toast.success(`策略已创建并绑定工作流：${data.workspace.name}`)
-        nav(`/app/strategies/${encodeStrategyPath(data.workspace.path)}/workflow-chat`)
-        return
-      }
       const session = await chatApi.createSession(data.workspace.path)
       await chatApi.sendPrompt(data.workspace.path, session.id, {
-        agent: composer.agent!.name,
-        model: composer.model!,
+        agent: composer.agent.name,
+        model: composer.model,
         variant: composer.variant,
         parts: [{ type: "text", text: prompt || buildPrompt() }],
       })
@@ -351,31 +286,6 @@ export function WorkspaceCreateDialog(props: Props) {
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           {step === 0 ? (
             <div className="space-y-4">
-              <Block title="创建方式" hint="普通创建会自动发起引导会话，工作流创建会绑定固定工作流">
-                <div className="grid gap-3 md:grid-cols-2">
-                  <button
-                    type="button"
-                    className={`rounded-md border px-4 py-4 text-left transition-all ${mode === "plain" ? "border-emerald-300 bg-emerald-50/70 ring-1 ring-emerald-100 dark:border-[#4d6f62] dark:bg-[#15201c]" : "border-slate-200/80 bg-white/90 hover:border-emerald-200 hover:bg-emerald-50/50 dark:border-[#26302c] dark:bg-[#141918]"}`}
-                    onClick={() => setMode("plain")}
-                  >
-                    <div className="text-sm font-semibold text-slate-900 dark:text-[#eef5f1]">普通创建</div>
-                    <div className="mt-2 text-xs leading-5 text-slate-600 dark:text-[#93a39c]">
-                      创建后进入普通策略对话，由首轮消息引导生成方案与代码。
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    className={`rounded-md border px-4 py-4 text-left transition-all ${mode === "workflow" ? "border-emerald-300 bg-emerald-50/70 ring-1 ring-emerald-100 dark:border-[#4d6f62] dark:bg-[#15201c]" : "border-slate-200/80 bg-white/90 hover:border-emerald-200 hover:bg-emerald-50/50 dark:border-[#26302c] dark:bg-[#141918]"}`}
-                    onClick={() => setMode("workflow")}
-                  >
-                    <div className="text-sm font-semibold text-slate-900 dark:text-[#eef5f1]">工作流创建</div>
-                    <div className="mt-2 text-xs leading-5 text-slate-600 dark:text-[#93a39c]">
-                      创建后绑定一个固定工作流，并进入工作流对话页按既定步骤执行。
-                    </div>
-                  </button>
-                </div>
-              </Block>
-
               <Block title="策略名称" hint="用于工作区目录和默认会话标题">
                 <Label htmlFor="workspace-name">策略名称</Label>
                 <div className="mt-2 grid gap-2 md:grid-cols-[minmax(0,1fr)_180px_auto]">
@@ -421,244 +331,92 @@ export function WorkspaceCreateDialog(props: Props) {
                         {item.title}
                       </div>
                       <div className="text-xs leading-5 text-slate-600 dark:text-[#93a39c]">{item.desc}</div>
-                      <div className="mt-3 text-[11px] text-slate-500 dark:text-[#809088]">模板：{item.template}</div>
+                      <div className="mt-3 text-[11px] text-slate-500 dark:text-[#809088]">{item.root}</div>
                     </button>
                   ))}
                 </div>
               </Block>
-
-              <div className="grid gap-3 md:grid-cols-[1.2fr_0.8fr]">
-                <div className="rounded-md border border-emerald-200/70 bg-[linear-gradient(180deg,rgba(236,253,245,0.9),rgba(255,255,255,0.8))] px-4 py-3 text-sm leading-6 text-emerald-950/80 dark:border-[#29443b] dark:bg-[linear-gradient(180deg,rgba(20,33,28,0.95),rgba(17,22,21,0.95))] dark:text-[#a7c3b8]">
-                  Python、JS 和 SmartX 现在共用一套详细策略画像表单，默认市场是股票。
-                </div>
-                <div className="rounded-md border border-slate-200/80 bg-white/80 px-4 py-3 text-xs leading-6 text-slate-500 dark:border-[#26302c] dark:bg-[#141918] dark:text-[#83928c]">
-                  工作区目录
-                  <div className="truncate text-sm font-medium text-slate-900 dark:text-[#eef5f1]">{card.root}</div>
-                </div>
-              </div>
             </div>
           ) : null}
 
           {step === 1 ? (
-            mode === "workflow" ? (
-              <div className="space-y-4">
-                <Block title="选择工作流" hint="创建后会复制所选工作流，并绑定到这个新策略">
-                  <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-                    <div className="min-w-0 space-y-2">
-                      <Label>工作流</Label>
-                      <Select value={fid} onValueChange={setFid}>
-                        <SelectTrigger className="h-10 w-full rounded-md border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2d3733]">
-                          <SelectValue
-                            placeholder={fload ? "加载中..." : flows.length === 0 ? "暂无可选工作流" : "请选择工作流"}
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {flows.map((item) => (
-                            <SelectItem key={item.id} value={item.id}>
-                              {item.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="min-w-0 space-y-2">
-                      <Label>Default model</Label>
-                      <Select value={model} onValueChange={setModel}>
-                        <SelectTrigger className="h-10 w-full rounded-md border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2d3733]">
-                          <SelectValue placeholder="Select default model" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {catalog.visibleModels.map((item) => {
-                            const value = `${item.provider.id}/${item.id}`
-                            return (
-                              <SelectItem key={value} value={value}>
-                                {value}
-                              </SelectItem>
-                            )
-                          })}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="mt-7 h-10 rounded-md border-slate-200/80 bg-white/90 px-3 shadow-none dark:border-[#2c3532] dark:bg-[#151918]"
-                      onClick={() => {
-                        void pullFlows()
-                      }}
-                      disabled={fload}
-                    >
-                      <RefreshCw className={`size-4 ${fload ? "animate-spin" : ""}`} />
-                    </Button>
-                  </div>
-                  <div className="mt-3 text-xs leading-6 text-slate-500 dark:text-[#809088]">
-                    这里会读取现有工作流模板列表。选中后，系统会把当前引导结果作为该工作流的首轮输入，在固定聊天页里执行。
-                  </div>
-                </Block>
-
-                <Block title="绑定说明" hint="绑定后，这个策略会优先从固定工作流入口运行">
-                  <div className="space-y-2 text-sm text-slate-600 dark:text-[#93a39c]">
-                    <div>策略模板：{card.title}</div>
-                    <div>工作区目录：{card.root}</div>
-                    <div>已选工作流：{pick?.name || "-"}</div>
-                    <div>默认模型：{model || "-"}</div>
-                    <div>节点数量：{pick?.nodes.length || 0}</div>
-                  </div>
-                </Block>
-              </div>
-            ) : rich ? (
+            rich ? (
               <Tabs value={panel} onValueChange={setPanel} className="space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-slate-200/70 bg-white/80 px-4 py-3 dark:border-[#26302c] dark:bg-[#141918]">
-                  <div>
-                    <div className="text-sm font-semibold text-slate-900 dark:text-[#eef5f1]">补齐策略画像</div>
-                    <div className="text-xs text-slate-500 dark:text-[#809088]">
-                      统一描述市场、指标、交易规则、风控和输出要求。
-                    </div>
-                  </div>
-                  <div className="rounded-full border border-emerald-200/80 bg-emerald-50/80 px-3 py-1 text-xs font-medium text-emerald-900 dark:border-[#355145] dark:bg-[#17211d] dark:text-[#a8c6bb]">
-                    {guide.kind} / {guide.market} / {guide.tf}
-                  </div>
-                </div>
-                <TabsList className="grid h-12 w-full grid-cols-4 rounded-[22px] border border-slate-200/80 bg-gradient-to-b from-white via-slate-50 to-slate-100/90 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_16px_35px_-28px_rgba(15,23,42,0.35)] dark:border-[#27332e] dark:bg-[linear-gradient(180deg,#1d2522_0%,#161c1a_100%)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                  <TabsTrigger
-                    value="market"
-                    className="rounded-2xl px-3 text-sm font-medium text-slate-500 transition-all hover:text-slate-900 data-[state=active]:border-slate-200/80 data-[state=active]:bg-white data-[state=active]:text-slate-950 data-[state=active]:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.45)] dark:text-[#7f938a] dark:hover:text-[#eef5f1] dark:data-[state=active]:border-[#31413a] dark:data-[state=active]:bg-[#22302b] dark:data-[state=active]:text-[#f4fbf7] dark:data-[state=active]:shadow-[0_12px_26px_-18px_rgba(0,0,0,0.7)]"
-                  >
-                    市场
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="logic"
-                    className="rounded-2xl px-3 text-sm font-medium text-slate-500 transition-all hover:text-slate-900 data-[state=active]:border-slate-200/80 data-[state=active]:bg-white data-[state=active]:text-slate-950 data-[state=active]:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.45)] dark:text-[#7f938a] dark:hover:text-[#eef5f1] dark:data-[state=active]:border-[#31413a] dark:data-[state=active]:bg-[#22302b] dark:data-[state=active]:text-[#f4fbf7] dark:data-[state=active]:shadow-[0_12px_26px_-18px_rgba(0,0,0,0.7)]"
-                  >
-                    逻辑
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="risk"
-                    className="rounded-2xl px-3 text-sm font-medium text-slate-500 transition-all hover:text-slate-900 data-[state=active]:border-slate-200/80 data-[state=active]:bg-white data-[state=active]:text-slate-950 data-[state=active]:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.45)] dark:text-[#7f938a] dark:hover:text-[#eef5f1] dark:data-[state=active]:border-[#31413a] dark:data-[state=active]:bg-[#22302b] dark:data-[state=active]:text-[#f4fbf7] dark:data-[state=active]:shadow-[0_12px_26px_-18px_rgba(0,0,0,0.7)]"
-                  >
-                    风控
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="output"
-                    className="rounded-2xl px-3 text-sm font-medium text-slate-500 transition-all hover:text-slate-900 data-[state=active]:border-slate-200/80 data-[state=active]:bg-white data-[state=active]:text-slate-950 data-[state=active]:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.45)] dark:text-[#7f938a] dark:hover:text-[#eef5f1] dark:data-[state=active]:border-[#31413a] dark:data-[state=active]:bg-[#22302b] dark:data-[state=active]:text-[#f4fbf7] dark:data-[state=active]:shadow-[0_12px_26px_-18px_rgba(0,0,0,0.7)]"
-                  >
-                    输出
-                  </TabsTrigger>
+                <TabsList className="grid w-full grid-cols-4 rounded-2xl bg-slate-100/80 p-1 dark:bg-[#161d1b]">
+                  <TabsTrigger value="market">市场</TabsTrigger>
+                  <TabsTrigger value="logic">逻辑</TabsTrigger>
+                  <TabsTrigger value="risk">风控</TabsTrigger>
+                  <TabsTrigger value="output">输出</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="market" className="space-y-4">
-                  <Block title="策略框架">
-                    <div className="flex flex-wrap gap-2">
-                      {kinds.map((item) => (
-                        <Chip
-                          key={item}
-                          text={item}
-                          active={guide.kind === item}
-                          onClick={() => setGuide((prev) => ({ ...prev, kind: item }))}
-                        />
-                      ))}
-                    </div>
-                  </Block>
                   <div className="grid gap-4 xl:grid-cols-3">
+                    <Block title="策略类型">
+                      <div className="flex flex-wrap gap-2">
+                        {kinds.map((item) => (
+                          <Chip key={item} text={item} active={guide.kind === item} onClick={() => setGuide((prev) => ({ ...prev, kind: item }))} />
+                        ))}
+                      </div>
+                    </Block>
                     <Block title="市场">
                       <div className="flex flex-wrap gap-2">
                         {markets.map((item) => (
-                          <Chip
-                            key={item}
-                            text={item}
-                            active={guide.market === item}
-                            onClick={() => setGuide((prev) => ({ ...prev, market: item }))}
-                          />
+                          <Chip key={item} text={item} active={guide.market === item} onClick={() => setGuide((prev) => ({ ...prev, market: item }))} />
                         ))}
                       </div>
                     </Block>
                     <Block title="标的池">
                       <div className="flex flex-wrap gap-2">
                         {pools.map((item) => (
-                          <Chip
-                            key={item}
-                            text={item}
-                            active={guide.pool === item}
-                            onClick={() => setGuide((prev) => ({ ...prev, pool: item }))}
-                          />
-                        ))}
-                      </div>
-                    </Block>
-                    <Block title="周期">
-                      <div className="flex flex-wrap gap-2">
-                        {tfs.map((item) => (
-                          <Chip
-                            key={item}
-                            text={item}
-                            active={guide.tf === item}
-                            onClick={() => setGuide((prev) => ({ ...prev, tf: item }))}
-                          />
+                          <Chip key={item} text={item} active={guide.pool === item} onClick={() => setGuide((prev) => ({ ...prev, pool: item }))} />
                         ))}
                       </div>
                     </Block>
                   </div>
                   <div className="grid gap-4 xl:grid-cols-3">
+                    <Block title="周期">
+                      <div className="flex flex-wrap gap-2">
+                        {tfs.map((item) => (
+                          <Chip key={item} text={item} active={guide.tf === item} onClick={() => setGuide((prev) => ({ ...prev, tf: item }))} />
+                        ))}
+                      </div>
+                    </Block>
                     <Block title="方向">
                       <div className="flex flex-wrap gap-2">
                         {sides.map((item) => (
-                          <Chip
-                            key={item}
-                            text={item}
-                            active={guide.side === item}
-                            onClick={() => setGuide((prev) => ({ ...prev, side: item }))}
-                          />
+                          <Chip key={item} text={item} active={guide.side === item} onClick={() => setGuide((prev) => ({ ...prev, side: item }))} />
                         ))}
                       </div>
                     </Block>
                     <Block title="持仓周期">
                       <div className="flex flex-wrap gap-2">
                         {holds.map((item) => (
-                          <Chip
-                            key={item}
-                            text={item}
-                            active={guide.hold === item}
-                            onClick={() => setGuide((prev) => ({ ...prev, hold: item }))}
-                          />
-                        ))}
-                      </div>
-                    </Block>
-                    <Block title="开发风格">
-                      <div className="flex flex-wrap gap-2">
-                        {styles.map((item) => (
-                          <Chip
-                            key={item}
-                            text={item}
-                            active={guide.style === item}
-                            onClick={() => setGuide((prev) => ({ ...prev, style: item }))}
-                          />
+                          <Chip key={item} text={item} active={guide.hold === item} onClick={() => setGuide((prev) => ({ ...prev, hold: item }))} />
                         ))}
                       </div>
                     </Block>
                   </div>
+                  <Block title="开发风格">
+                    <div className="flex flex-wrap gap-2">
+                      {styles.map((item) => (
+                        <Chip key={item} text={item} active={guide.style === item} onClick={() => setGuide((prev) => ({ ...prev, style: item }))} />
+                      ))}
+                    </div>
+                  </Block>
                 </TabsContent>
 
                 <TabsContent value="logic" className="space-y-4">
                   <Block title="信号来源">
                     <div className="flex flex-wrap gap-2">
                       {sources.map((item) => (
-                        <Chip
-                          key={item}
-                          text={item}
-                          active={guide.source.includes(item)}
-                          onClick={() => setGuide((prev) => ({ ...prev, source: toggle(prev.source, item) }))}
-                        />
+                        <Chip key={item} text={item} active={guide.source.includes(item)} onClick={() => setGuide((prev) => ({ ...prev, source: toggle(prev.source, item) }))} />
                       ))}
                     </div>
                   </Block>
                   <Block title="指标与因子" hint="建议至少选择 1 到 3 项">
                     <div className="flex flex-wrap gap-2">
                       {factors.map((item) => (
-                        <Chip
-                          key={item}
-                          text={item}
-                          active={guide.factor.includes(item)}
-                          onClick={() => setGuide((prev) => ({ ...prev, factor: toggle(prev.factor, item) }))}
-                        />
+                        <Chip key={item} text={item} active={guide.factor.includes(item)} onClick={() => setGuide((prev) => ({ ...prev, factor: toggle(prev.factor, item) }))} />
                       ))}
                     </div>
                   </Block>
@@ -666,36 +424,21 @@ export function WorkspaceCreateDialog(props: Props) {
                     <Block title="过滤条件">
                       <div className="flex flex-wrap gap-2">
                         {filters.map((item) => (
-                          <Chip
-                            key={item}
-                            text={item}
-                            active={guide.filter.includes(item)}
-                            onClick={() => setGuide((prev) => ({ ...prev, filter: toggle(prev.filter, item) }))}
-                          />
+                          <Chip key={item} text={item} active={guide.filter.includes(item)} onClick={() => setGuide((prev) => ({ ...prev, filter: toggle(prev.filter, item) }))} />
                         ))}
                       </div>
                     </Block>
                     <Block title="入场规则">
                       <div className="flex flex-wrap gap-2">
                         {entries.map((item) => (
-                          <Chip
-                            key={item}
-                            text={item}
-                            active={guide.entry.includes(item)}
-                            onClick={() => setGuide((prev) => ({ ...prev, entry: toggle(prev.entry, item) }))}
-                          />
+                          <Chip key={item} text={item} active={guide.entry.includes(item)} onClick={() => setGuide((prev) => ({ ...prev, entry: toggle(prev.entry, item) }))} />
                         ))}
                       </div>
                     </Block>
-                    <Block title="出场规则">
+                    <Block title="离场规则">
                       <div className="flex flex-wrap gap-2">
                         {exits.map((item) => (
-                          <Chip
-                            key={item}
-                            text={item}
-                            active={guide.exit.includes(item)}
-                            onClick={() => setGuide((prev) => ({ ...prev, exit: toggle(prev.exit, item) }))}
-                          />
+                          <Chip key={item} text={item} active={guide.exit.includes(item)} onClick={() => setGuide((prev) => ({ ...prev, exit: toggle(prev.exit, item) }))} />
                         ))}
                       </div>
                     </Block>
@@ -706,12 +449,7 @@ export function WorkspaceCreateDialog(props: Props) {
                   <Block title="风控重点">
                     <div className="flex flex-wrap gap-2">
                       {risks.map((item) => (
-                        <Chip
-                          key={item}
-                          text={item}
-                          active={guide.risk.includes(item)}
-                          onClick={() => setGuide((prev) => ({ ...prev, risk: toggle(prev.risk, item) }))}
-                        />
+                        <Chip key={item} text={item} active={guide.risk.includes(item)} onClick={() => setGuide((prev) => ({ ...prev, risk: toggle(prev.risk, item) }))} />
                       ))}
                     </div>
                   </Block>
@@ -719,36 +457,21 @@ export function WorkspaceCreateDialog(props: Props) {
                     <Block title="止盈止损">
                       <div className="flex flex-wrap gap-2">
                         {stops.map((item) => (
-                          <Chip
-                            key={item}
-                            text={item}
-                            active={guide.stop.includes(item)}
-                            onClick={() => setGuide((prev) => ({ ...prev, stop: toggle(prev.stop, item) }))}
-                          />
+                          <Chip key={item} text={item} active={guide.stop.includes(item)} onClick={() => setGuide((prev) => ({ ...prev, stop: toggle(prev.stop, item) }))} />
                         ))}
                       </div>
                     </Block>
                     <Block title="仓位方式">
                       <div className="flex flex-wrap gap-2">
                         {poses.map((item) => (
-                          <Chip
-                            key={item}
-                            text={item}
-                            active={guide.pos === item}
-                            onClick={() => setGuide((prev) => ({ ...prev, pos: item }))}
-                          />
+                          <Chip key={item} text={item} active={guide.pos === item} onClick={() => setGuide((prev) => ({ ...prev, pos: item }))} />
                         ))}
                       </div>
                     </Block>
                     <Block title="交易约束">
                       <div className="flex flex-wrap gap-2">
                         {limits.map((item) => (
-                          <Chip
-                            key={item}
-                            text={item}
-                            active={guide.limit.includes(item)}
-                            onClick={() => setGuide((prev) => ({ ...prev, limit: toggle(prev.limit, item) }))}
-                          />
+                          <Chip key={item} text={item} active={guide.limit.includes(item)} onClick={() => setGuide((prev) => ({ ...prev, limit: toggle(prev.limit, item) }))} />
                         ))}
                       </div>
                     </Block>
@@ -759,33 +482,18 @@ export function WorkspaceCreateDialog(props: Props) {
                   <Block title="输出要求">
                     <div className="flex flex-wrap gap-2">
                       {outputs.map((item) => (
-                        <Chip
-                          key={item}
-                          text={item}
-                          active={guide.output.includes(item)}
-                          onClick={() => setGuide((prev) => ({ ...prev, output: toggle(prev.output, item) }))}
-                        />
+                        <Chip key={item} text={item} active={guide.output.includes(item)} onClick={() => setGuide((prev) => ({ ...prev, output: toggle(prev.output, item) }))} />
                       ))}
                     </div>
                   </Block>
                   <Block title="核心目标">
                     <div className="rounded-md bg-white/90 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]">
-                      <AutoResizeTextarea
-                        value={guide.target}
-                        onChange={(value) => setGuide((prev) => ({ ...prev, target: value }))}
-                        height={110}
-                        placeholder="例如：先给出适合股票日线趋势策略的完整框架，再输出可回测的初版代码。"
-                      />
+                      <AutoResizeTextarea value={guide.target} onChange={(value) => setGuide((prev) => ({ ...prev, target: value }))} height={110} placeholder="先给出完整策略框架，再输出可回测的初版代码。" />
                     </div>
                   </Block>
                   <Block title="补充说明">
                     <div className="rounded-md bg-white/90 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]">
-                      <AutoResizeTextarea
-                        value={guide.note}
-                        onChange={(value) => setGuide((prev) => ({ ...prev, note: value }))}
-                        height={130}
-                        placeholder="例如：优先考虑股票市场，默认日线级别，不追求高频；代码要清晰，方便后续继续调参。"
-                      />
+                      <AutoResizeTextarea value={guide.note} onChange={(value) => setGuide((prev) => ({ ...prev, note: value }))} height={130} placeholder="例如：优先考虑股票市场，默认日线级别，不追求高频；代码要清晰，方便后续继续调参。" />
                     </div>
                   </Block>
                   <Block title="额外落地要求">
@@ -810,12 +518,7 @@ export function WorkspaceCreateDialog(props: Props) {
               <div className="space-y-4">
                 <Block title="补充说明">
                   <div className="rounded-md bg-white/92 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]">
-                    <AutoResizeTextarea
-                      value={brief}
-                      onChange={setBrief}
-                      height={220}
-                      placeholder="例如：帮我生成一个简单的网格策略"
-                    />
+                    <AutoResizeTextarea value={brief} onChange={setBrief} height={220} placeholder="例如：帮我生成一个简单的网格策略。" />
                   </div>
                 </Block>
               </div>
@@ -826,57 +529,48 @@ export function WorkspaceCreateDialog(props: Props) {
             <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
               <div className="space-y-4">
                 <Block title="当前创建配置">
-                  {mode === "plain" ? (
-                    <div className="mb-4 grid gap-3">
-                      <div className="space-y-2">
-                        <Label>使用模式</Label>
-                        <Select value={composer.agent?.name} onValueChange={setAgent}>
-                          <SelectTrigger className="h-10 w-full rounded-md border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2d3733]">
-                            <SelectValue placeholder="选择模式" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {ags.ags.map((item) => (
-                              <SelectItem key={item.name} value={item.name}>
-                                {item.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>使用模型</Label>
-                        <Select value={model} onValueChange={setModel}>
-                          <SelectTrigger className="h-10 w-full rounded-md border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2d3733]">
-                            <SelectValue placeholder="选择模型" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {catalog.visibleModels.map((item) => {
-                              const value = `${item.provider.id}/${item.id}`
-                              return (
-                                <SelectItem key={value} value={value}>
-                                  {value}
-                                </SelectItem>
-                              )
-                            })}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                  <div className="mb-4 grid gap-3">
+                    <div className="space-y-2">
+                      <Label>使用智能体</Label>
+                      <Select value={composer.agent?.name} onValueChange={setAgent}>
+                        <SelectTrigger className="h-10 w-full rounded-md border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2d3733]">
+                          <SelectValue placeholder="选择智能体" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ags.ags.map((item) => (
+                            <SelectItem key={item.name} value={item.name}>
+                              {item.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-                  ) : null}
+                    <div className="space-y-2">
+                      <Label>使用模型</Label>
+                      <Select value={model} onValueChange={setModel}>
+                        <SelectTrigger className="h-10 w-full rounded-md border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2d3733]">
+                          <SelectValue placeholder="选择模型" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {catalog.visibleModels.map((item) => {
+                            const value = `${item.provider.id}/${item.id}`
+                            return (
+                              <SelectItem key={value} value={value}>
+                                {value}
+                              </SelectItem>
+                            )
+                          })}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                   <div className="space-y-2 text-sm text-slate-600 dark:text-[#9aaba4]">
-                    <div>创建方式：{mode === "workflow" ? "工作流创建" : "普通创建"}</div>
+                    <div>创建方式：普通创建</div>
                     <div>类型：{card.title}</div>
                     <div>模板：{card.template}</div>
                     <div>名称：{full || "-"}</div>
                     <div>目录：{card.root}</div>
-                    {mode === "workflow" ? (
-                      <>
-                        <div>工作流：{pick?.name || "-"}</div>
-                        <div>默认模型：{model || "-"}</div>
-                        <div>节点数：{pick?.nodes.length || 0}</div>
-                      </>
-                    ) : null}
-                    {mode === "plain" && rich ? (
+                    {rich ? (
                       <>
                         <div>市场：{guide.market}</div>
                         <div>标的池：{guide.pool}</div>
@@ -888,34 +582,11 @@ export function WorkspaceCreateDialog(props: Props) {
                   </div>
                 </Block>
               </div>
-              {mode === "workflow" ? (
-                <div className="space-y-4">
-                  <Block title="创建后动作" hint="不会发送普通引导消息，而是直接进入固定工作流聊天">
-                    <div className="text-sm leading-6 text-slate-600 dark:text-[#93a39c]">
-                      创建完成后，会把当前策略工作区绑定到所选工作流，并立即以这份引导结果发起第一轮工作流执行。
-                      后续你在聊天窗口中的每条自然语言消息，都会在同一个共享会话里触发一轮新的工作流运行。
-                    </div>
-                  </Block>
-                  <Block title="首轮工作流输入" hint="这段内容会直接作为工作流第一轮输入提交">
-                    <div className="rounded-md bg-white/92 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]">
-                      <AutoResizeTextarea
-                        value={prompt}
-                        onChange={setPrompt}
-                        height={320}
-                        placeholder="这里会使用引导式配置生成首轮工作流输入。"
-                      />
-                    </div>
-                  </Block>
-                </div>
-              ) : rich ? (
+
+              {rich ? (
                 <Block title="首条引导消息" hint="创建后会自动发送到首个会话">
                   <div className="rounded-md bg-white/92 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]">
-                    <AutoResizeTextarea
-                      value={prompt}
-                      onChange={setPrompt}
-                      height={420}
-                      placeholder="这里会自动生成引导消息，你也可以继续调整。"
-                    />
+                    <AutoResizeTextarea value={prompt} onChange={setPrompt} height={420} placeholder="这里会自动生成引导消息，你也可以继续调整。" />
                   </div>
                 </Block>
               ) : (
@@ -924,7 +595,7 @@ export function WorkspaceCreateDialog(props: Props) {
                     其他类型会直接创建通用工作区。
                     {brief.trim()
                       ? " 你填写的补充说明会在创建后作为首条消息发送。"
-                      : " 如果没有补充说明，就只创建工作区，不自动填充引导消息。"}
+                      : " 如果没有补充说明，就只创建工作区，不自动发送引导消息。"}
                   </div>
                 </Block>
               )}
@@ -955,7 +626,7 @@ export function WorkspaceCreateDialog(props: Props) {
               onClick={() => void create()}
               disabled={busy}
             >
-              {busy ? "创建中..." : mode === "workflow" ? "创建并进入工作流页" : "创建并进入策略页"}
+              {busy ? "创建中..." : "创建并进入策略页"}
             </Button>
           )}
         </DialogFooter>
