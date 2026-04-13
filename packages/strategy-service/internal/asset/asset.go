@@ -9,12 +9,12 @@ import (
 	"strings"
 )
 
-// raw stores the staged frontend bundle and builtin workspace assets.
+// raw 保存已打包的前端资源和内置工作区模板资源。
 //
 //go:embed frontend/** all:workspace/**
 var raw embed.FS
 
-// Site returns the embedded frontend bundle when a staged build is available.
+// Site 返回内嵌的前端静态资源。
 func Site() fs.FS {
 	site, err := fs.Sub(raw, "frontend/dist")
 	if err != nil {
@@ -49,7 +49,7 @@ func EnsureWorkspace(dir string) error {
 	return sync(filepath.Join(dir, ".opencode"), "workspace/.opencode", false)
 }
 
-// EnsureMCP writes the strategy-service remote MCP entry into the user's global opencode config.
+// EnsureMCP 将 strategy-service 的远程 MCP 配置写入用户全局 opencode 配置。
 func EnsureMCP(url string) error {
 	root, err := configRoot()
 	if err != nil {
@@ -89,7 +89,7 @@ func EnsureMCP(url string) error {
 	return os.WriteFile(path, body, 0o644)
 }
 
-// SeedWorkspace copies the builtin workspace template into a new workspace.
+// SeedWorkspace 将内置工作区模板写入新的工作区目录。
 func SeedWorkspace(dir string, item Template) error {
 	err := sync(dir, item.Root, false)
 	if err != nil {

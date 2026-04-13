@@ -16,9 +16,7 @@ var (
 	L      *slog.Logger
 )
 
-// Init initializes the global logger.
-// Logs are written to ~/.strategy-service/logs/strategy-service.log
-// with rotation (50MB), compression, and 30-day retention.
+// Init 初始化全局日志器，并把日志写入 strategy-service 的统一日志目录。
 func Init() error {
 	path, err := logs.ServicePath()
 	if err != nil {
@@ -26,12 +24,12 @@ func Init() error {
 	}
 
 	writer = &lumberjack.Logger{
-    Filename:  path,    // 日志文件路径
-    MaxSize:   50,      // 单个日志文件最大50MB
-    MaxAge:    30,      // 日志文件最多保留30天
-    Compress:  true,    // 超过大小或时间的日志文件会自动压缩
-    LocalTime: true,    // 使用本地时间而非UTC时间进行日志轮转
-}
+		Filename:  path, // 日志文件路径。
+		MaxSize:   50,   // 单个日志文件最大 50MB。
+		MaxAge:    30,   // 最多保留 30 天历史日志。
+		Compress:  true, // 轮转后的日志自动压缩。
+		LocalTime: true, // 轮转时间使用本地时区。
+	}
 	level := parseLevel(os.Getenv("STRATEGY_LOG_LEVEL"))
 
 	multi := io.MultiWriter(os.Stdout, writer)
@@ -42,7 +40,7 @@ func Init() error {
 	return nil
 }
 
-// Shutdown closes the log file writer.
+// Shutdown 关闭日志文件写入器。
 func Shutdown() {
 	if writer != nil {
 		_ = writer.Close()

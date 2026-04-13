@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 )
@@ -28,19 +27,20 @@ type SkillList struct {
 	List []SkillDoc `json:"skills"`
 }
 
+// skillRoot 返回 opencode skills 根目录，并确保目录存在。
 func skillRoot() (string, error) {
 	dir, err := configDir()
 	if err != nil {
 		return "", err
 	}
 	root := filepath.Join(dir, "skills")
-	err = os.MkdirAll(root, 0o755)
-	if err != nil {
+	if err := os.MkdirAll(root, 0o755); err != nil {
 		return "", err
 	}
 	return root, nil
 }
 
+// validSkill 校验并规范化 skill 名称。
 func validSkill(name string) (string, error) {
 	name = strings.TrimSpace(strings.ToLower(name))
 	if !skillName.MatchString(name) {
@@ -52,6 +52,7 @@ func validSkill(name string) (string, error) {
 	return name, nil
 }
 
+// skillPath 返回指定 skill 对应的文档路径。
 func skillPath(name string) (string, error) {
 	root, err := skillRoot()
 	if err != nil {
@@ -64,6 +65,7 @@ func skillPath(name string) (string, error) {
 	return filepath.Join(root, name, "SKILL.md"), nil
 }
 
+// parseSkill 将磁盘上的 SKILL.md 解析为结构化文档。
 func parseSkill(path string, body []byte, mod time.Time) (SkillDoc, error) {
 	text := strings.ToValidUTF8(string(body), "")
 	meta := frontmatter(text)
@@ -85,126 +87,62 @@ func parseSkill(path string, body []byte, mod time.Time) (SkillDoc, error) {
 	}, nil
 }
 
-// ListSkills returns the configured opencode skills on disk.
+// ListSkills 返回磁盘上的 opencode skills 列表。
 func ListSkills() (SkillList, error) {
-	root, err := skillRoot()
+	root, rows, err := list(
+		skillRoot,
+		func(root string, item os.DirEntry) (string, bool) {
+			if !item.IsDir() {
+				return "", false
+			}
+			return filepath.Join(root, item.Name(), "SKILL.md"), true
+		},
+		parseSkill,
+		func(a SkillDoc, b SkillDoc) bool {
+			return a.Name < b.Name
+		},
+	)
 	if err != nil {
 		return SkillList{}, err
 	}
-
-	items, err := os.ReadDir(root)
-	if err != nil {
-		return SkillList{}, err
-	}
-
-	list := []SkillDoc{}
-	for _, item := range items {
-		if !item.IsDir() {
-			continue
-		}
-
-		path := filepath.Join(root, item.Name(), "SKILL.md")
-		body, err := os.ReadFile(path)
-		if os.IsNotExist(err) {
-			continue
-		}
-		if err != nil {
-			return SkillList{}, err
-		}
-
-		info, err := os.Stat(path)
-		if err != nil {
-			return SkillList{}, err
-		}
-
-		doc, err := parseSkill(path, body, info.ModTime())
-		if err != nil {
-			return SkillList{}, err
-		}
-		list = append(list, doc)
-	}
-
-	sort.Slice(list, func(i int, j int) bool {
-		return list[i].Name < list[j].Name
-	})
 
 	return SkillList{
 		Root: root,
-		List: list,
+		List: rows,
 	}, nil
 }
 
-// CreateSkill writes a new skill document.
+// CreateSkill 创建一份新的 skill 文档。
 func CreateSkill(name string, content string) (SkillDoc, error) {
-	path, err := skillPath(name)
-	if err != nil {
-		return SkillDoc{}, err
-	}
-	_, err = os.Stat(path)
-	if err == nil {
-		return SkillDoc{}, os.ErrExist
-	}
-	if !os.IsNotExist(err) {
-		return SkillDoc{}, err
-	}
-	return writeSkill(path, content)
+	return create(skillPath, writeSkill, name, content)
 }
 
-// UpdateSkill overwrites an existing skill document.
+// UpdateSkill 覆盖已有的 skill 文档。
 func UpdateSkill(name string, content string) (SkillDoc, error) {
-	path, err := skillPath(name)
-	if err != nil {
-		return SkillDoc{}, err
-	}
-	_, err = os.Stat(path)
-	if err != nil {
-		return SkillDoc{}, err
-	}
-	return writeSkill(path, content)
+	return update(skillPath, writeSkill, name, content)
 }
 
-// DeleteSkill removes a skill directory from disk.
+// DeleteSkill 从磁盘删除对应的 skill 目录。
 func DeleteSkill(name string) error {
-	path, err := skillPath(name)
-	if err != nil {
-		return err
-	}
-
-	dir := filepath.Dir(path)
-	_, err = os.Stat(path)
-	if err != nil {
-		return err
-	}
-	return os.RemoveAll(dir)
+	return remove(skillPath, func(path string) error {
+		return os.RemoveAll(filepath.Dir(path))
+	}, name)
 }
 
-func writeSkill(path string, content string) (SkillDoc, error) {
-	content = strings.TrimSpace(strings.ReplaceAll(content, "\r\n", "\n"))
-	if content == "" {
-		return SkillDoc{}, errors.New("skill content is required")
-	}
-	if !strings.HasSuffix(content, "\n") {
-		content += "\n"
-	}
-
+// checkSkill 校验写入前的 frontmatter 与路径是否一致。
+func checkSkill(path string, meta map[string]string) error {
 	name := filepath.Base(filepath.Dir(path))
-	meta := frontmatter(content)
 	if meta["name"] != "" && strings.ToLower(strings.TrimSpace(meta["name"])) != name {
-		return SkillDoc{}, fmt.Errorf("frontmatter name must match skill name %q", name)
+		return fmt.Errorf("frontmatter name must match skill name %q", name)
 	}
+	return nil
+}
 
-	err := os.MkdirAll(filepath.Dir(path), 0o755)
+// writeSkill 规范化内容后写回 skill 文档。
+func writeSkill(path string, input string) (SkillDoc, error) {
+	text, meta, err := body(input, "skill")
 	if err != nil {
 		return SkillDoc{}, err
 	}
-	err = os.WriteFile(path, []byte(content), 0o644)
-	if err != nil {
-		return SkillDoc{}, err
-	}
-
-	info, err := os.Stat(path)
-	if err != nil {
-		return SkillDoc{}, err
-	}
-	return parseSkill(path, []byte(content), info.ModTime())
+	return save(path, text, meta, checkSkill, parseSkill)
 }

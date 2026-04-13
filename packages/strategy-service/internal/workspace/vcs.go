@@ -25,7 +25,7 @@ type VCS interface {
 	Target() *url.URL
 }
 
-// Enrich attaches VCS metadata to local workspaces when opencode is reachable.
+// Enrich 在 opencode 可访问时为工作区补齐 VCS 元数据。
 func Enrich(ctx context.Context, items []Local, src VCS) []Local {
 	if len(items) == 0 || src == nil {
 		return items

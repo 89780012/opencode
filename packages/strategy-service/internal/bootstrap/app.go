@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"strategy-service/internal/asset"
 	conf "strategy-service/internal/config"
+	oc "strategy-service/internal/opencode"
 	"strategy-service/internal/oprun"
 	rt "strategy-service/internal/runtime"
 	"strategy-service/internal/smartx"
@@ -22,7 +23,7 @@ import (
 type Service struct {
 	cfg Config
 	srv *http.Server
-	op  *oprun.Manager
+	op  *oc.Service
 }
 
 // New 根据配置创建完整的 HTTP 服务。
@@ -56,7 +57,8 @@ func New(cfg Config) (*Service, error) {
 	cfg = resolveOpencode(run, cfg)
 	cfg = resolveGit(run, cfg)
 
-	op := oprun.New(oprun.Config(cfg.Opencode))
+	mgr := oprun.New(oprun.Config(cfg.Opencode))
+	op := oc.New(run, mgr)
 	api := web.NewAPI(run, op, &conf.Store{}, smartx.New(smartx.Config{
 		Platform: cfg.Platform,
 		Account:  cfg.Account,
@@ -155,7 +157,7 @@ func (s *Service) Shutdown(ctx context.Context) error {
 	if err != nil {
 		slog.Error("http server shutdown error", "error", err)
 	}
-	_ = s.op.Stop(context.Background())
+	_, _ = s.op.Stop(context.Background())
 	slog.Info("service shutdown complete")
 	return err
 }
@@ -169,7 +171,7 @@ func (s *Service) activate(addr string) {
 	if err := asset.EnsureMCP(url); err != nil {
 		slog.Error("failed to inject strategy-service mcp config", "url", url, "error", err)
 	}
-	if !s.op.Enabled() || s.op.Startup() != "auto" {
+	if !s.op.Enabled() || s.op.StartupMode() != "auto" {
 		return
 	}
 

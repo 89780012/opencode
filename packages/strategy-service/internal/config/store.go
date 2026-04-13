@@ -23,7 +23,7 @@ type Logs struct {
 
 type Store struct{}
 
-// Default returns the default user configuration.
+// Default 返回默认用户配置。
 func Default() Config {
 	return Config{
 		Theme: Theme{
@@ -36,7 +36,7 @@ func Default() Config {
 	}
 }
 
-// Root returns the strategy-service state directory.
+// Root 返回 strategy-service 状态目录。
 func Root() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -51,7 +51,7 @@ func Root() (string, error) {
 	return dir, nil
 }
 
-// Path returns the config file path under the service state directory.
+// Path 返回状态目录下的配置文件路径。
 func Path() (string, error) {
 	dir, err := Root()
 	if err != nil {
@@ -60,7 +60,7 @@ func Path() (string, error) {
 	return filepath.Join(dir, "config.json"), nil
 }
 
-// Load reads the persisted user configuration.
+// Load 读取持久化的用户配置。
 func (s *Store) Load() (Config, error) {
 	path, err := Path()
 	if err != nil {
@@ -83,7 +83,7 @@ func (s *Store) Load() (Config, error) {
 	return clean(cfg), nil
 }
 
-// Save persists the user configuration after normalization.
+// Save 在规范化后保存用户配置。
 func (s *Store) Save(cfg Config) (Config, error) {
 	path, err := Path()
 	if err != nil {

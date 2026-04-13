@@ -1,17 +1,17 @@
 package web
 
 import (
-	"errors"
 	"net/http"
 	"net/http/httputil"
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"strategy-service/internal/oprun"
+	oc "strategy-service/internal/opencode"
 )
 
-func NewOpencodeProxy(mgr *oprun.Manager) gin.HandlerFunc {
-	target := mgr.Target()
+// NewOpencodeProxy 创建指向 opencode 的反向代理，并在转发前确保服务已就绪。
+func NewOpencodeProxy(op *oc.Service) gin.HandlerFunc {
+	target := op.Target()
 	proxy := httputil.NewSingleHostReverseProxy(target)
 	proxy.FlushInterval = -1
 	proxy.ErrorHandler = func(w http.ResponseWriter, _ *http.Request, err error) {
@@ -29,10 +29,10 @@ func NewOpencodeProxy(mgr *oprun.Manager) gin.HandlerFunc {
 	}
 
 	return func(c *gin.Context) {
-		err := mgr.Ensure(c.Request.Context())
+		err := op.Ensure(c.Request.Context())
 		if err != nil {
 			code := http.StatusServiceUnavailable
-			if errors.Is(err, oprun.ErrDisabled()) {
+			if oc.Disabled(err) {
 				code = http.StatusNotImplemented
 			}
 			c.String(code, err.Error())
@@ -42,6 +42,7 @@ func NewOpencodeProxy(mgr *oprun.Manager) gin.HandlerFunc {
 	}
 }
 
+// route 去掉 strategy-service 暴露的 /opencode 前缀。
 func route(path string) string {
 	out := strings.TrimPrefix(path, "/opencode")
 	if out == "" {

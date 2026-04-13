@@ -6,16 +6,15 @@ import (
 	"github.com/gin-gonic/gin"
 	cfg "strategy-service/internal/config"
 	"strategy-service/internal/logs"
-	"strategy-service/internal/oprun"
+	oc "strategy-service/internal/opencode"
 	rt "strategy-service/internal/runtime"
 	"strategy-service/internal/smartx"
 	"strategy-service/internal/workspace"
 )
 
 type API struct {
-	rt  *rt.Service
 	ws  *workspace.Service
-	op  *oprun.Manager
+	op  *oc.Service
 	cfg *cfg.Store
 	sx  *smartx.Service
 	log *logs.Hub
@@ -48,9 +47,8 @@ func bad(c *gin.Context, err error) {
 }
 
 // NewAPI 组装 API 所需的各类底层服务。
-func NewAPI(run *rt.Service, op *oprun.Manager, cfg *cfg.Store, sx *smartx.Service) *API {
+func NewAPI(run *rt.Service, op *oc.Service, cfg *cfg.Store, sx *smartx.Service) *API {
 	return &API{
-		rt:  run,
 		ws:  workspace.NewService(run),
 		op:  op,
 		cfg: cfg,

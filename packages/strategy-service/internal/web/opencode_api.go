@@ -2,153 +2,135 @@ package web
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"strategy-service/internal/opdoc"
 	"strategy-service/internal/oprun"
 )
 
-func (a *API) opencodeSkillsList(c *gin.Context) {
-	data, err := opdoc.ListSkills()
+type named struct {
+	Name    string `json:"name"`
+	Content string `json:"content"`
+}
+
+type content struct {
+	Content string `json:"content"`
+}
+
+// list 统一处理 skill 和 agent 的列表接口。
+func list[T any](c *gin.Context, kind string, fn func() (T, error)) {
+	data, err := fn()
 	if err != nil {
-		slog.Error("opencode skill list failed", "error", err)
+		slog.Error("opencode "+kind+" list failed", "error", err)
 		bad(c, err)
 		return
 	}
 	ok(c, data)
+}
+
+// create 统一处理 skill 和 agent 的创建接口。
+func create[T any](c *gin.Context, kind string, key string, fn func(string, string) (T, error)) {
+	body := named{}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		bad(c, err)
+		return
+	}
+
+	item, err := fn(body.Name, body.Content)
+	if err != nil {
+		slog.Error("opencode "+kind+" create failed", "name", body.Name, "error", err)
+		bad(c, err)
+		return
+	}
+	ok(c, map[string]any{
+		key:               item,
+		"reload_required": true,
+	})
+}
+
+// update 统一处理 skill 和 agent 的更新接口。
+func update[T any](c *gin.Context, kind string, key string, fn func(string, string) (T, error)) {
+	body := content{}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		bad(c, err)
+		return
+	}
+
+	name := c.Param("name")
+	item, err := fn(name, body.Content)
+	if err != nil {
+		slog.Error("opencode "+kind+" update failed", "name", name, "error", err)
+		bad(c, err)
+		return
+	}
+	ok(c, map[string]any{
+		key:               item,
+		"reload_required": true,
+	})
+}
+
+// del 统一处理 skill 和 agent 的删除接口。
+func del(c *gin.Context, kind string, fn func(string) error) {
+	name := c.Param("name")
+	if err := fn(name); err != nil {
+		slog.Error("opencode "+kind+" delete failed", "name", name, "error", err)
+		bad(c, err)
+		return
+	}
+	ok(c, map[string]any{
+		"name":            name,
+		"reload_required": true,
+	})
+}
+
+// run 统一处理 opencode 运行态接口。
+func run(c *gin.Context, act string, fn func(context.Context) (oprun.State, error)) {
+	slog.Info("opencode " + act + " request via API")
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 45*time.Second)
+	defer cancel()
+
+	state, err := fn(ctx)
+	if err != nil {
+		slog.Error("opencode "+act+" failed via API", "error", err)
+		fail(c, 503, err.Error(), state)
+		return
+	}
+
+	slog.Info("opencode " + act + " completed via API")
+	ok(c, state)
+}
+
+func (a *API) opencodeSkillsList(c *gin.Context) {
+	list(c, "skill", a.op.ListSkills)
 }
 
 func (a *API) opencodeSkillsCreate(c *gin.Context) {
-	body := struct {
-		Name    string `json:"name"`
-		Content string `json:"content"`
-	}{}
-	if err := c.ShouldBindJSON(&body); err != nil {
-		bad(c, err)
-		return
-	}
-
-	item, err := opdoc.CreateSkill(body.Name, body.Content)
-	if err != nil {
-		slog.Error("opencode skill create failed", "name", body.Name, "error", err)
-		bad(c, err)
-		return
-	}
-
-	ok(c, map[string]any{
-		"skill":           item,
-		"reload_required": true,
-	})
+	create(c, "skill", "skill", a.op.CreateSkill)
 }
 
 func (a *API) opencodeAgentsList(c *gin.Context) {
-	data, err := opdoc.ListAgents()
-	if err != nil {
-		slog.Error("opencode agent list failed", "error", err)
-		bad(c, err)
-		return
-	}
-	ok(c, data)
+	list(c, "agent", a.op.ListAgents)
 }
 
 func (a *API) opencodeAgentsCreate(c *gin.Context) {
-	body := struct {
-		Name    string `json:"name"`
-		Content string `json:"content"`
-	}{}
-	if err := c.ShouldBindJSON(&body); err != nil {
-		bad(c, err)
-		return
-	}
-
-	item, err := opdoc.CreateAgent(body.Name, body.Content)
-	if err != nil {
-		slog.Error("opencode agent create failed", "name", body.Name, "error", err)
-		bad(c, err)
-		return
-	}
-
-	ok(c, map[string]any{
-		"agent":           item,
-		"reload_required": true,
-	})
+	create(c, "agent", "agent", a.op.CreateAgent)
 }
 
 func (a *API) opencodeSkillUpdate(c *gin.Context) {
-	body := struct {
-		Content string `json:"content"`
-	}{}
-	if err := c.ShouldBindJSON(&body); err != nil {
-		bad(c, err)
-		return
-	}
-
-	name := c.Param("name")
-	item, err := opdoc.UpdateSkill(name, body.Content)
-	if err != nil {
-		slog.Error("opencode skill update failed", "name", name, "error", err)
-		bad(c, err)
-		return
-	}
-
-	ok(c, map[string]any{
-		"skill":           item,
-		"reload_required": true,
-	})
+	update(c, "skill", "skill", a.op.UpdateSkill)
 }
 
 func (a *API) opencodeSkillDelete(c *gin.Context) {
-	name := c.Param("name")
-	if err := opdoc.DeleteSkill(name); err != nil {
-		slog.Error("opencode skill delete failed", "name", name, "error", err)
-		bad(c, err)
-		return
-	}
-
-	ok(c, map[string]any{
-		"name":            name,
-		"reload_required": true,
-	})
+	del(c, "skill", a.op.DeleteSkill)
 }
 
 func (a *API) opencodeAgentUpdate(c *gin.Context) {
-	body := struct {
-		Content string `json:"content"`
-	}{}
-	if err := c.ShouldBindJSON(&body); err != nil {
-		bad(c, err)
-		return
-	}
-
-	name := c.Param("name")
-	item, err := opdoc.UpdateAgent(name, body.Content)
-	if err != nil {
-		slog.Error("opencode agent update failed", "name", name, "error", err)
-		bad(c, err)
-		return
-	}
-
-	ok(c, map[string]any{
-		"agent":           item,
-		"reload_required": true,
-	})
+	update(c, "agent", "agent", a.op.UpdateAgent)
 }
 
 func (a *API) opencodeAgentDelete(c *gin.Context) {
-	name := c.Param("name")
-	if err := opdoc.DeleteAgent(name); err != nil {
-		slog.Error("opencode agent delete failed", "name", name, "error", err)
-		bad(c, err)
-		return
-	}
-
-	ok(c, map[string]any{
-		"name":            name,
-		"reload_required": true,
-	})
+	del(c, "agent", a.op.DeleteAgent)
 }
 
 func (a *API) opencodeStatus(c *gin.Context) {
@@ -156,47 +138,13 @@ func (a *API) opencodeStatus(c *gin.Context) {
 }
 
 func (a *API) opencodeStart(c *gin.Context) {
-	slog.Info("opencode start request via API")
-	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-	defer cancel()
-
-	if err := a.op.Ensure(ctx); err != nil {
-		slog.Error("opencode start failed via API", "error", err)
-		fail(c, 503, err.Error(), a.op.State())
-		return
-	}
-
-	slog.Info("opencode started via API")
-	ok(c, a.op.State())
+	run(c, "start", a.op.Start)
 }
 
 func (a *API) opencodeRestart(c *gin.Context) {
-	slog.Info("opencode restart request via API")
-	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-	defer cancel()
-
-	if err := a.op.Restart(ctx); err != nil {
-		slog.Error("opencode restart failed via API", "error", err)
-		fail(c, 503, err.Error(), a.op.State())
-		return
-	}
-
-	slog.Info("opencode restarted via API")
-	ok(c, a.op.State())
+	run(c, "restart", a.op.Restart)
 }
 
 func (a *API) opencodeStop(c *gin.Context) {
-	slog.Info("opencode stop request via API")
-	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-	defer cancel()
-
-	err := a.op.Stop(ctx)
-	if err != nil && !errors.Is(err, oprun.ErrExternal()) {
-		slog.Error("opencode stop failed via API", "error", err)
-		fail(c, 503, err.Error(), a.op.State())
-		return
-	}
-
-	slog.Info("opencode stopped via API")
-	ok(c, a.op.State())
+	run(c, "stop", a.op.Stop)
 }

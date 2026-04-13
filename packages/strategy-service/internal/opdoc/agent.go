@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -34,19 +33,20 @@ type AgentList struct {
 	Agents []AgentDoc `json:"agents"`
 }
 
+// agentRoot 返回 opencode agents 根目录，并确保目录存在。
 func agentRoot() (string, error) {
 	dir, err := configDir()
 	if err != nil {
 		return "", err
 	}
 	root := filepath.Join(dir, "agents")
-	err = os.MkdirAll(root, 0o755)
-	if err != nil {
+	if err := os.MkdirAll(root, 0o755); err != nil {
 		return "", err
 	}
 	return root, nil
 }
 
+// validAgent 校验并规范化 agent 名称。
 func validAgent(name string) (string, error) {
 	name = strings.TrimSpace(strings.ToLower(name))
 	if !agentName.MatchString(name) {
@@ -58,6 +58,7 @@ func validAgent(name string) (string, error) {
 	return name, nil
 }
 
+// agentPath 返回指定 agent 对应的文档路径。
 func agentPath(name string) (string, error) {
 	root, err := agentRoot()
 	if err != nil {
@@ -70,6 +71,7 @@ func agentPath(name string) (string, error) {
 	return filepath.Join(root, name+".md"), nil
 }
 
+// parseBool 解析 frontmatter 中的布尔值。
 func parseBool(input string) bool {
 	switch strings.ToLower(strings.TrimSpace(input)) {
 	case "true", "yes", "on":
@@ -79,6 +81,7 @@ func parseBool(input string) bool {
 	}
 }
 
+// parseMode 解析并校验 agent 模式。
 func parseMode(input string) (string, error) {
 	mode := strings.ToLower(strings.TrimSpace(input))
 	if mode == "" {
@@ -92,6 +95,7 @@ func parseMode(input string) (string, error) {
 	}
 }
 
+// parseSteps 解析并校验 steps 配置。
 func parseSteps(input string) (int, error) {
 	text := strings.TrimSpace(input)
 	if text == "" {
@@ -107,6 +111,7 @@ func parseSteps(input string) (int, error) {
 	return out, nil
 }
 
+// parseAgent 将磁盘上的 agent 文档解析为结构化结果。
 func parseAgent(path string, body []byte, mod time.Time) (AgentDoc, error) {
 	text := strings.ToValidUTF8(string(body), "")
 	meta := frontmatter(text)
@@ -141,130 +146,66 @@ func parseAgent(path string, body []byte, mod time.Time) (AgentDoc, error) {
 	}, nil
 }
 
-// ListAgents returns the configured opencode agents on disk.
+// ListAgents 返回磁盘上的 opencode agents 列表。
 func ListAgents() (AgentList, error) {
-	root, err := agentRoot()
+	root, rows, err := list(
+		agentRoot,
+		func(root string, item os.DirEntry) (string, bool) {
+			if item.IsDir() || filepath.Ext(item.Name()) != ".md" {
+				return "", false
+			}
+			return filepath.Join(root, item.Name()), true
+		},
+		parseAgent,
+		func(a AgentDoc, b AgentDoc) bool {
+			return a.Name < b.Name
+		},
+	)
 	if err != nil {
 		return AgentList{}, err
 	}
-
-	items, err := os.ReadDir(root)
-	if err != nil {
-		return AgentList{}, err
-	}
-
-	list := []AgentDoc{}
-	for _, item := range items {
-		if item.IsDir() {
-			continue
-		}
-		if filepath.Ext(item.Name()) != ".md" {
-			continue
-		}
-
-		path := filepath.Join(root, item.Name())
-		body, err := os.ReadFile(path)
-		if err != nil {
-			return AgentList{}, err
-		}
-
-		info, err := os.Stat(path)
-		if err != nil {
-			return AgentList{}, err
-		}
-
-		doc, err := parseAgent(path, body, info.ModTime())
-		if err != nil {
-			return AgentList{}, err
-		}
-		list = append(list, doc)
-	}
-
-	sort.Slice(list, func(i int, j int) bool {
-		return list[i].Name < list[j].Name
-	})
 
 	return AgentList{
 		Root:   root,
-		Agents: list,
+		Agents: rows,
 	}, nil
 }
 
-// CreateAgent writes a new agent document.
+// CreateAgent 创建一份新的 agent 文档。
 func CreateAgent(name string, content string) (AgentDoc, error) {
-	path, err := agentPath(name)
-	if err != nil {
-		return AgentDoc{}, err
-	}
-	_, err = os.Stat(path)
-	if err == nil {
-		return AgentDoc{}, os.ErrExist
-	}
-	if !os.IsNotExist(err) {
-		return AgentDoc{}, err
-	}
-	return writeAgent(path, content)
+	return create(agentPath, writeAgent, name, content)
 }
 
-// UpdateAgent overwrites an existing agent document.
+// UpdateAgent 覆盖已有的 agent 文档。
 func UpdateAgent(name string, content string) (AgentDoc, error) {
-	path, err := agentPath(name)
-	if err != nil {
-		return AgentDoc{}, err
-	}
-	_, err = os.Stat(path)
-	if err != nil {
-		return AgentDoc{}, err
-	}
-	return writeAgent(path, content)
+	return update(agentPath, writeAgent, name, content)
 }
 
-// DeleteAgent removes an agent document from disk.
+// DeleteAgent 从磁盘删除对应的 agent 文档。
 func DeleteAgent(name string) error {
-	path, err := agentPath(name)
-	if err != nil {
-		return err
-	}
-	_, err = os.Stat(path)
-	if err != nil {
-		return err
-	}
-	return os.Remove(path)
+	return remove(agentPath, os.Remove, name)
 }
 
-func writeAgent(path string, content string) (AgentDoc, error) {
-	content = strings.TrimSpace(strings.ReplaceAll(content, "\r\n", "\n"))
-	if content == "" {
-		return AgentDoc{}, errors.New("agent content is required")
-	}
-	if !strings.HasSuffix(content, "\n") {
-		content += "\n"
-	}
-
+// checkAgent 校验写入前的 frontmatter 与路径是否一致。
+func checkAgent(path string, meta map[string]string) error {
 	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-	meta := frontmatter(content)
 	if meta["name"] != "" && strings.ToLower(strings.TrimSpace(meta["name"])) != name {
-		return AgentDoc{}, fmt.Errorf("frontmatter name must match agent name %q", name)
+		return fmt.Errorf("frontmatter name must match agent name %q", name)
 	}
 	if _, err := parseMode(meta["mode"]); err != nil {
-		return AgentDoc{}, err
+		return err
 	}
 	if _, err := parseSteps(meta["steps"]); err != nil {
-		return AgentDoc{}, err
+		return err
 	}
+	return nil
+}
 
-	err := os.MkdirAll(filepath.Dir(path), 0o755)
+// writeAgent 规范化内容后写回 agent 文档。
+func writeAgent(path string, input string) (AgentDoc, error) {
+	text, meta, err := body(input, "agent")
 	if err != nil {
 		return AgentDoc{}, err
 	}
-	err = os.WriteFile(path, []byte(content), 0o644)
-	if err != nil {
-		return AgentDoc{}, err
-	}
-
-	info, err := os.Stat(path)
-	if err != nil {
-		return AgentDoc{}, err
-	}
-	return parseAgent(path, []byte(content), info.ModTime())
+	return save(path, text, meta, checkAgent, parseAgent)
 }

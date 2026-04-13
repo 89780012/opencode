@@ -21,7 +21,7 @@ type writer struct {
 	buf bytes.Buffer
 }
 
-// 写入日志
+// Write 按行写入 opencode 运行日志，避免半行内容直接落盘。
 func (w *writer) Write(p []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -50,7 +50,7 @@ func (w *writer) Write(p []byte) (int, error) {
 	}
 }
 
-// 日志级别
+// level 把环境变量中的日志级别转换成 slog 可识别的枚举值。
 func level(s string) slog.Level {
 	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "debug":

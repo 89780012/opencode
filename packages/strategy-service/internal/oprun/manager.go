@@ -23,12 +23,12 @@ import (
 var errDisabled = errors.New("opencode is disabled")
 var errExternal = errors.New("opencode is not managed by strategy-service")
 
-// ErrDisabled reports that managed opencode startup is disabled.
+// ErrDisabled 表示当前禁用了由 strategy-service 托管启动 opencode。
 func ErrDisabled() error {
 	return errDisabled
 }
 
-// ErrExternal reports that opencode is reachable but not owned by this service.
+// ErrExternal 表示 opencode 可访问，但并非由当前服务托管。
 func ErrExternal() error {
 	return errExternal
 }
@@ -47,7 +47,7 @@ type Manager struct {
 	lastErr error
 }
 
-// New builds a managed opencode runtime controller.
+// New 创建 opencode 托管控制器。
 func New(cfg Config) *Manager {
 	target := &url.URL{
 		Scheme: "http",
