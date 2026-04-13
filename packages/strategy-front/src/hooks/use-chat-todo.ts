@@ -10,6 +10,10 @@ function done(list: { status: string }[]) {
   return list.length > 0 && list.every((item) => item.status === "completed" || item.status === "cancelled");
 }
 
+function active(list: { status: string }[]) {
+  return list.filter((item) => item.status !== "completed" && item.status !== "cancelled");
+}
+
 function pick(list: { content: string; status: string }[]) {
   return (
     list.find((item) => item.status === "in_progress") ??
@@ -56,6 +60,7 @@ export function useChatTodo(
   }, [data, dispatch, sessionId, workspacePath]);
 
   const complete = useMemo(() => done(list), [list]);
+  const items = useMemo(() => active(list), [list]);
   const item = useMemo(() => pick(list), [list]);
 
   return useMemo(
@@ -63,10 +68,10 @@ export function useChatTodo(
       todos: list,
       loading: !!workspacePath && !!sessionId && data === undefined,
       done: complete,
-      visible: list.length > 0,
+      visible: items.length > 0,
       collapsed: !live || complete,
       preview: item?.content ?? "",
     }),
-    [complete, data, item?.content, list, live, sessionId, workspacePath],
+    [complete, data, item?.content, items.length, list, live, sessionId, workspacePath],
   );
 }

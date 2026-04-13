@@ -2,6 +2,7 @@ import { toast } from "sonner"
 import { ChatMessageList } from "@/components/chat-message-list"
 import { ChatEmptyState } from "@/components/chat/chat-empty-state"
 import { PromptBar } from "@/components/chat/prompt-bar"
+import { StrategyStarterRow } from "@/components/strategy/strategy-starter-row"
 import { TodoPanel } from "@/components/chat/todo-panel"
 import { WaitPanel } from "@/components/workflow/wait-panel"
 import { useChatTodo } from "@/hooks/use-chat-todo"
@@ -41,11 +42,15 @@ export function StrategyWorkflowPanel(props: Props) {
   const files = useSessionFiles(props.workspace.path, props.chat.selectedSessionId)
   const todo = useChatTodo(props.workspace.path, props.chat.selectedSessionId, props.chat.busy || !!props.chat.openWait)
   const bound = !!props.chat.state?.workflow_id && !!props.chat.flow
+  const last = props.chat.messages[props.chat.messages.length - 1]
   const row = current(props.chat.rows, props.chat.run?.current_node_id)
   const node = props.chat.flow?.nodes.find((item) => item.id === (row?.node_id || props.chat.run?.current_node_id)) ?? null
   const source = node?.model_provider_id && node?.model_id ? "node override" : "workspace default"
 
-  const submit = async () => {
+  const send = async (text = draft.text) => {
+    const body = text.trim()
+    if (!body) return
+
     if (files.files.length > 0) {
       toast.error("固定工作流会话暂不支持图片输入。")
       return
@@ -53,7 +58,7 @@ export function StrategyWorkflowPanel(props: Props) {
 
     try {
       await props.chat.submit({
-        text: draft.text,
+        text: body,
         files: [],
       })
       draft.clear()
@@ -65,6 +70,15 @@ export function StrategyWorkflowPanel(props: Props) {
   }
 
   const empty = !props.chat.sessionLoading && !props.chat.detailLoading && props.chat.messages.length === 0 && !props.chat.eventErr
+  const suggest =
+    bound &&
+    !empty &&
+    !props.load &&
+    !props.chat.err &&
+    !props.chat.eventErr &&
+    !props.chat.openWait &&
+    props.chat.status.type === "idle" &&
+    last?.role === "assistant"
 
   return (
     <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-transparent">
@@ -78,6 +92,15 @@ export function StrategyWorkflowPanel(props: Props) {
             status={props.chat.status}
             onOpenDiff={props.onOpenDiff}
             hideWorkflowInternals
+            footer={
+              suggest ? (
+                <StrategyStarterRow
+                  onRun={(text) => {
+                    void send(text)
+                  }}
+                />
+              ) : null
+            }
           />
           {empty ? (
             bound ? (
@@ -140,7 +163,7 @@ export function StrategyWorkflowPanel(props: Props) {
               onFilesChange={files.setFiles}
               onModel={props.onModel}
               onSubmit={() => {
-                void submit()
+                void send()
               }}
               onValueChange={draft.setText}
               onVariant={props.onVariant}

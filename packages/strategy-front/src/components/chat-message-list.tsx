@@ -26,6 +26,7 @@ interface Props {
   loading?: boolean
   onOpenDiff?: (file: string) => void
   hideWorkflowInternals?: boolean
+  footer?: ReactNode
 }
 
 function errorText(err?: ChatError) {
@@ -371,6 +372,7 @@ export const ChatMessageList = memo(function ChatMessageList(props: Props) {
             hideWorkflowInternals={props.hideWorkflowInternals}
           />
         ))}
+        {props.footer}
         {props.err ? (
           <Message from="assistant">
             <MessageContent>

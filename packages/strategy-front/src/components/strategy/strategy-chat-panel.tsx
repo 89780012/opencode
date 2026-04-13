@@ -5,6 +5,7 @@ import { ChatMessageList } from "@/components/chat-message-list"
 import { PermissionPanel } from "@/components/chat/permission-panel"
 import { PromptBar } from "@/components/chat/prompt-bar"
 import { QuestionPanel } from "@/components/chat/question-panel"
+import { StrategyStarterRow } from "@/components/strategy/strategy-starter-row"
 import { TodoPanel } from "@/components/chat/todo-panel"
 import { useChatEvents } from "@/hooks/use-chat-events"
 import { useChatPermission } from "@/hooks/use-chat-permission"
@@ -54,6 +55,7 @@ export function StrategyChatPanel(props: Props) {
   const busy = props.busy ?? (!!props.selectedSessionId && props.status.type !== "idle")
   const live = busy || !!permission.req || !!question.req
   const todo = useChatTodo(props.workspace.path, props.selectedSessionId, live)
+  const last = props.messages[props.messages.length - 1]
   const ref = useMemo(() => {
     if (!props.model) return
     const [providerID, ...rest] = props.model.split("/")
@@ -101,6 +103,16 @@ export function StrategyChatPanel(props: Props) {
   }
 
   const empty = !props.sessionLoading && !props.detailLoading && props.messages.length === 0 && !props.eventErr
+  const suggest =
+    !empty &&
+    !props.eventErr &&
+    !permission.req &&
+    !question.req &&
+    props.status.type === "idle" &&
+    last?.role === "assistant" &&
+    !!props.agent &&
+    !!ref &&
+    !props.load
 
   return (
     <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-transparent">
@@ -113,6 +125,18 @@ export function StrategyChatPanel(props: Props) {
             loading={props.detailLoading && !!props.selectedSessionId}
             status={props.status}
             onOpenDiff={props.onOpenDiff}
+            footer={
+              suggest ? (
+                <StrategyStarterRow
+                  onRun={(text) => {
+                    void onSubmit({
+                      text,
+                      files: [],
+                    })
+                  }}
+                />
+              ) : null
+            }
           />
           {empty ? (
             <ChatEmptyState
