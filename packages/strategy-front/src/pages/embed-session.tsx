@@ -15,12 +15,6 @@ import { useStrategySession } from "@/hooks/use-strategy-session"
 const ctrl =
   "rounded-md border border-black/8 bg-black/[0.03] text-xs shadow-none hover:bg-black/[0.05] dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.06]"
 
-function gitText(repo?: boolean, initialized?: boolean) {
-  if (!repo) return "Git pending"
-  if (initialized) return "Git initialized"
-  return "Git ready"
-}
-
 function Status(props: { title: string; desc: string; action?: ReactNode }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
@@ -122,15 +116,7 @@ export default function EmbedSessionPage() {
     <div className="flex h-full min-h-0 flex-col bg-background dark:bg-[#0f1111]">
       <div className="border-b bg-background/96 px-5 py-3 backdrop-blur dark:border-white/8 dark:bg-[#101313]/92">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="truncate text-base font-semibold text-foreground">{title}</div>
-              <span className="rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground">
-                {gitText(entry.git?.repo, entry.git?.initialized)}
-              </span>
-            </div>
-            <div className="mt-1 truncate text-xs text-muted-foreground">{workspace.path}</div>
-          </div>
+          <div className="min-w-0 flex-1"></div>
 
           <div className="flex items-center gap-2">
             <Select
@@ -139,7 +125,7 @@ export default function EmbedSessionPage() {
               disabled={chat.sessions.length === 0}
             >
               <SelectTrigger className={`h-8 w-[190px] ${ctrl}`}>
-                <SelectValue placeholder={chat.sessions.length === 0 ? "No session" : "Choose session"} />
+                <SelectValue placeholder={chat.sessions.length === 0 ? "没有会话" : "选择一个会话"} />
               </SelectTrigger>
               <SelectContent>
                 {chat.sessions.map((item) => (
@@ -149,9 +135,15 @@ export default function EmbedSessionPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" size="sm" className={ctrl} onClick={() => void onCreate()} disabled={chat.creating}>
+            <Button
+              variant="outline"
+              size="sm"
+              className={ctrl}
+              onClick={() => void onCreate()}
+              disabled={chat.creating}
+            >
               <Plus className="size-4" />
-              New session
+              创建会话
             </Button>
             <Button
               variant="outline"
@@ -164,11 +156,17 @@ export default function EmbedSessionPage() {
               }}
             >
               {open ? <PanelRightClose className="size-4" /> : <PanelRightOpen className="size-4" />}
-              {open ? "Hide code" : "Show code"}
+              {open ? "隐藏代码区" : "显示代码区"}
             </Button>
-            <Button variant="outline" size="sm" className={ctrl} onClick={() => setSettings(true)} disabled={composer.load}>
+            <Button
+              variant="outline"
+              size="sm"
+              className={ctrl}
+              onClick={() => setSettings(true)}
+              disabled={composer.load}
+            >
               <Cog className="size-4" />
-              Settings
+              设置
             </Button>
             <Button variant="outline" size="sm" className={ctrl} onClick={() => void onRefresh()} disabled={spin}>
               <RefreshCw className={`size-4 ${spin ? "animate-spin" : ""}`} />

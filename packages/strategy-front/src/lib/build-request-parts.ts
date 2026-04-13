@@ -1,24 +1,13 @@
-import type { ChatInputPart, PromptInputMessage } from "@/types/chat";
+import type { ChatInputPart, PromptInputMessage } from "@/types/chat"
 
 export function buildRequestParts(input: PromptInputMessage): ChatInputPart[] {
-  const text = input.text.trim();
-  const parts: ChatInputPart[] = [];
+  const text = input.text.trim()
+  if (!text) return []
 
-  if (text) {
-    parts.push({
+  return [
+    {
       type: "text",
       text,
-    });
-  }
-
-  input.files.forEach((file) => {
-    parts.push({
-      type: "file",
-      mime: file.mime,
-      url: file.url,
-      filename: file.filename,
-    });
-  });
-
-  return parts;
+    },
+  ]
 }

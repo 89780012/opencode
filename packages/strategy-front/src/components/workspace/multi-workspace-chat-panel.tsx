@@ -18,8 +18,6 @@ import { useStrategySession } from "@/hooks/use-strategy-session"
 import { useChatTodo } from "@/hooks/use-chat-todo"
 import { usePromptSubmit } from "@/hooks/use-prompt-submit"
 import { useSessionDraft } from "@/hooks/use-session-draft"
-import { useSessionFiles } from "@/hooks/use-session-files"
-import { imageModel } from "@/lib/attachment"
 import type { PromptInputMessage } from "@/types/chat"
 import type { ComposerModel } from "@/types/composer"
 import type { LocalWorkspace } from "@/types/workspace"
@@ -49,7 +47,6 @@ export function MultiWorkspaceChatPanel(props: Props) {
   const [tab, setTab] = useState<WorkspaceDetailTab>("files")
   const chat = useStrategySession(props.workspace.path)
   const draft = useSessionDraft(props.workspace.path, chat.selectedSessionId)
-  const files = useSessionFiles(props.workspace.path, chat.selectedSessionId)
   const permission = useChatPermission(props.workspace.path, chat.selectedSessionId)
   const question = useChatQuestion(props.workspace.path, chat.selectedSessionId)
   const live = chat.busy || !!permission.req || !!question.req
@@ -62,11 +59,6 @@ export function MultiWorkspaceChatPanel(props: Props) {
       modelID: rest.join("/"),
     }
   }, [props.model])
-  const entry = useMemo(
-    () => props.models.find((item) => `${item.provider.id}/${item.id}` === props.model),
-    [props.model, props.models],
-  )
-  const canImage = imageModel(entry)
   const { submitting, submit } = usePromptSubmit({
     workspacePath: props.workspace.path,
     sessionId: chat.selectedSessionId,
@@ -77,7 +69,6 @@ export function MultiWorkspaceChatPanel(props: Props) {
     selectSession: chat.selectSession,
     onSubmitted: () => {
       draft.clear()
-      files.clear()
     },
   })
 
@@ -87,12 +78,7 @@ export function MultiWorkspaceChatPanel(props: Props) {
 
   const onSubmit = async (msg: PromptInputMessage) => {
     if (!props.agent || !ref) {
-      toast.error("请先选择模式和模型")
-      return
-    }
-
-    if (msg.files.length > 0 && !canImage) {
-      toast.error("当前模型不支持图片输入.")
+      toast.error("请先选择智能体和模型。")
       return
     }
 
@@ -197,11 +183,11 @@ export function MultiWorkspaceChatPanel(props: Props) {
           />
           {empty ? (
             <ChatEmptyState
-              title="这一屏还没有对话"
-              desc="可以把这一屏当成一个独立策略位，直接描述当前要研究的方向，让 AI 并行推进不同策略。"
+              title="这一栏还没有对话"
+              desc="可以把这一栏当成一个独立的策略位，直接描述当前要研究的方向，让 AI 并行推进不同策略。"
               tips={[
-                "例如：这一屏专门做趋势策略，重点处理入场和加仓。",
-                "例如：这一屏负责均值回归版本，并和其它屏形成不同思路对比。",
+                "例如：这一栏专门做趋势策略，重点处理入场和加仓。",
+                "例如：这一栏负责均值回归版本，并和其它栏形成不同思路对比。",
               ]}
             />
           ) : null}
@@ -243,17 +229,14 @@ export function MultiWorkspaceChatPanel(props: Props) {
                 agent={props.agent}
                 agents={props.agents}
                 busy={chat.busy}
-                canImage={canImage}
                 compact
                 disabled={props.load}
-                files={files.files}
                 model={props.model}
                 models={props.models}
                 onAgent={props.onAgent}
                 onAbort={() => {
                   void onAbort()
                 }}
-                onFilesChange={files.setFiles}
                 onModel={props.onModel}
                 onSubmit={(value) => {
                   void onSubmit(value)

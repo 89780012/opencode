@@ -7,7 +7,6 @@ import { TodoPanel } from "@/components/chat/todo-panel"
 import { WaitPanel } from "@/components/workflow/wait-panel"
 import { useChatTodo } from "@/hooks/use-chat-todo"
 import { useSessionDraft } from "@/hooks/use-session-draft"
-import { useSessionFiles } from "@/hooks/use-session-files"
 import { useStrategyWorkflowChat } from "@/hooks/use-strategy-workflow-chat"
 import type { ChatMessageInfo } from "@/types/chat"
 import type { ComposerModel } from "@/types/composer"
@@ -49,7 +48,6 @@ function done(msg?: ChatMessageInfo) {
 
 export function StrategyWorkflowPanel(props: Props) {
   const draft = useSessionDraft(props.workspace.path, props.chat.selectedSessionId)
-  const files = useSessionFiles(props.workspace.path, props.chat.selectedSessionId)
   const todo = useChatTodo(props.workspace.path, props.chat.selectedSessionId, props.chat.busy || !!props.chat.openWait)
   const bound = !!props.chat.state?.workflow_id && !!props.chat.flow
   const last = props.chat.messages[props.chat.messages.length - 1]
@@ -61,18 +59,9 @@ export function StrategyWorkflowPanel(props: Props) {
     const body = text.trim()
     if (!body) return
 
-    if (files.files.length > 0) {
-      toast.error("固定工作流会话暂不支持图片输入。")
-      return
-    }
-
     try {
-      await props.chat.submit({
-        text: body,
-        files: [],
-      })
+      await props.chat.submit({ text: body })
       draft.clear()
-      files.clear()
     } catch (err) {
       console.error("提交工作流输入失败", err)
       toast.error("提交工作流输入失败。")
@@ -168,16 +157,13 @@ export function StrategyWorkflowPanel(props: Props) {
             <PromptBar
               agents={[]}
               busy={props.chat.busy || props.chat.interrupting}
-              canImage={false}
               disabled={props.load || !bound}
-              files={files.files}
               model={props.model}
               models={props.models}
               onAgent={() => {}}
               onAbort={() => {
                 void props.chat.interrupt()
               }}
-              onFilesChange={files.setFiles}
               onModel={props.onModel}
               onSubmit={() => {
                 void send()

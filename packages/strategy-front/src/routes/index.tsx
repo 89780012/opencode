@@ -1,7 +1,6 @@
 import { Suspense, lazy } from "react"
 import { createBrowserRouter, Navigate, RouterProvider, useLocation } from "react-router-dom"
 
-const StartupPage = lazy(() => import("@/pages/startup"))
 const AppShellPage = lazy(() => import("@/pages/app-shell"))
 const EmbedShellPage = lazy(() => import("@/pages/embed-shell"))
 const IndexPage = lazy(() => import("@/pages/index"))
@@ -32,7 +31,17 @@ function LegacyPage() {
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <StartupPage />,
+    element: <Navigate to="/app/strategies" replace />,
+  },
+  {
+    path: "/app/embed",
+    element: <EmbedShellPage />,
+    children: [
+      {
+        path: "session",
+        element: <EmbedSessionPage />,
+      },
+    ],
   },
   {
     path: "/app",
@@ -174,7 +183,7 @@ const router = createBrowserRouter([
   },
   {
     path: "*",
-    element: <Navigate to="/" replace />,
+    element: <Navigate to="/app/strategies" replace />,
   },
 ])
 

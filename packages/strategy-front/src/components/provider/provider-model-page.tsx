@@ -8,8 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { useProviderList } from "@/data/global-data-provider"
-import { imageModel } from "@/lib/attachment"
-import { readModelImage, writeModelCatalog, type Img } from "@/lib/model-catalog"
+import { writeModelCatalog } from "@/lib/model-catalog"
 import type { Model, Provider } from "@/types/provider"
 import { popular, text } from "./utils"
 
@@ -72,7 +71,6 @@ export function ProviderModelPage() {
   const prv = useProviderList()
   const [q, setQ] = useState("")
   const [user, setUser] = useState<Record<string, Vis>>(() => read())
-  const [image, setImage] = useState<Record<string, Img>>(() => readModelImage())
   const [now] = useState(() => Date.now())
   const sync = useRef(prv.sync)
   const dq = useDeferredValue(q.trim().toLowerCase())
@@ -86,9 +84,9 @@ export function ProviderModelPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return
-    writeModelCatalog({ user, image })
+    writeModelCatalog({ user })
     sync.current()
-  }, [image, user])
+  }, [user])
 
   const rows = useMemo(() => {
     const ids = new Set(providers.connected)
@@ -151,18 +149,6 @@ export function ProviderModelPage() {
     setUser((prev) => ({ ...prev, [id]: on ? "show" : "hide" }))
   }
 
-  const vision = (row: Row) => {
-    const cur = image[key({ providerID: row.provider.id, modelID: row.id })]
-    if (cur === "on") return true
-    if (cur === "off") return false
-    return imageModel(row)
-  }
-
-  const setVision = (input: Key, on: boolean) => {
-    const id = key(input)
-    setImage((prev) => ({ ...prev, [id]: on ? "on" : "off" }))
-  }
-
   const groups = useMemo(() => {
     const map = new Map<string, Row[]>()
     const name = new Map<string, string>()
@@ -196,12 +182,7 @@ export function ProviderModelPage() {
 
   const clear = () => {
     setUser({})
-    writeModelCatalog({ user: {}, image })
-  }
-
-  const clearImage = () => {
-    setImage({})
-    writeModelCatalog({ user, image: {} })
+    writeModelCatalog({ user: {} })
   }
 
   return (
@@ -222,10 +203,6 @@ export function ProviderModelPage() {
                 <Button variant="outline" onClick={clear} disabled={load || Object.keys(user).length === 0}>
                   <RotateCcw className="size-4" />
                   重置显示状态
-                </Button>
-                <Button variant="outline" onClick={clearImage} disabled={load || Object.keys(image).length === 0}>
-                  <RotateCcw className="size-4" />
-                  重置 Vision
                 </Button>
               </div>
             </div>
@@ -346,29 +323,14 @@ export function ProviderModelPage() {
                                     免费
                                   </span>
                                 ) : null}
-                                {vision(item) ? (
-                                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
-                                    Vision
-                                  </span>
-                                ) : null}
                               </div>
                               <div className="text-muted-foreground flex flex-wrap gap-3 text-sm">
                                 <span>上下文 {item.limit.context.toLocaleString()}</span>
                                 <span>{item.capabilities?.reasoning ? "支持推理" : "不支持推理"}</span>
                                 <span>{item.capabilities?.toolcall ? "支持工具" : "不支持工具"}</span>
-                                <span>{vision(item) ? "支持图片" : "不支持图片"}</span>
                               </div>
                             </div>
                             <div className="flex flex-col items-end gap-3">
-                              <div className="flex items-center gap-3">
-                                <span className="text-muted-foreground text-sm">{vision(item) ? "Vision 已开启" : "Vision 已关闭"}</span>
-                                <Switch
-                                  checked={vision(item)}
-                                  onCheckedChange={(next) =>
-                                    setVision({ providerID: item.provider.id, modelID: item.id }, next)
-                                  }
-                                />
-                              </div>
                               <div className="flex items-center gap-3">
                                 <span className="text-muted-foreground text-sm">{on ? "显示中" : "已隐藏"}</span>
                                 <Switch

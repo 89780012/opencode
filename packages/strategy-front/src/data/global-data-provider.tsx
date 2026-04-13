@@ -1,8 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react"
 import { agentApi, mcpApi, providerApi, skillApi, workspaceApi } from "@/api/modules"
-import { imageModel } from "@/lib/attachment"
 import { rankAgent } from "@/lib/chat-composer"
-import { latestModels, modelKey, modelVisible, readModelImage, readModelVisibility } from "@/lib/model-catalog"
+import { latestModels, modelVisible, readModelVisibility } from "@/lib/model-catalog"
 import type { GlobalAgentCatalog, RuntimeAgent, WorkflowAgentRole } from "@/types/agent"
 import type { ComposerModel, ProviderCatalogState } from "@/types/composer"
 import type { McpDoc, McpMap } from "@/types/mcp"
@@ -302,7 +301,6 @@ function allow(item?: string, current?: string) {
 
 function buildProvider(providers: List, config: Config, auth: AuthMap): ProviderData {
   const user = readModelVisibility()
-  const image = readModelImage()
   const connected = new Set(providers.connected)
   const connectedModels = providers.all
     .filter((item) => connected.has(item.id))
@@ -311,9 +309,6 @@ function buildProvider(providers: List, config: Config, auth: AuthMap): Provider
         (model) =>
           ({
             ...model,
-            vision: image[modelKey({ providerID: provider.id, modelID: model.id })]
-              ? image[modelKey({ providerID: provider.id, modelID: model.id })] === "on"
-              : imageModel(model),
             provider,
           }) satisfies ComposerModel,
       ),

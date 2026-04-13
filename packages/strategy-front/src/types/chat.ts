@@ -402,16 +402,8 @@ export interface ChatFileInput {
   filename?: string;
 }
 
-export interface ChatImageInput {
-  id: string;
-  filename: string;
-  mime: string;
-  url: string;
-}
-
 export interface PromptInputMessage {
   text: string;
-  files: ChatImageInput[];
 }
 
 export type ChatInputPart = ChatTextInput | ChatFileInput;

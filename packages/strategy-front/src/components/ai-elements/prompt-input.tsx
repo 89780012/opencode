@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { CornerDownLeftIcon, Loader2Icon, SquareIcon, XIcon } from "lucide-react"
-import type { ChatImageInput, PromptInputMessage } from "@/types/chat"
+import type { PromptInputMessage } from "@/types/chat"
 import {
   type ChangeEvent,
   type ComponentProps,
@@ -21,9 +21,7 @@ export type PromptInputStatus = "ready" | "submitted" | "streaming" | "error"
 
 type PromptInputContextValue = {
   value: string
-  files: ChatImageInput[]
   onValueChange: (value: string) => void
-  onFilesChange: (files: ChatImageInput[]) => void
 }
 
 const PromptInputContext = createContext<PromptInputContextValue | null>(null)
@@ -38,35 +36,18 @@ const usePromptInputContext = () => {
 
 export type PromptInputProps = Omit<ComponentProps<"form">, "onSubmit"> & {
   value: string
-  files: ChatImageInput[]
   onValueChange: (value: string) => void
-  onFilesChange: (files: ChatImageInput[]) => void
   onSubmit: (message: PromptInputMessage, event: FormEvent<HTMLFormElement>) => void
 }
 
-export const PromptInput = ({
-  className,
-  children,
-  value,
-  files,
-  onValueChange,
-  onFilesChange,
-  onSubmit,
-  ...props
-}: PromptInputProps) => {
+export const PromptInput = ({ className, children, value, onValueChange, onSubmit, ...props }: PromptInputProps) => {
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    onSubmit(
-      {
-        text: value,
-        files,
-      },
-      event,
-    )
+    onSubmit({ text: value }, event)
   }
 
   return (
-    <PromptInputContext.Provider value={{ value, files, onValueChange, onFilesChange }}>
+    <PromptInputContext.Provider value={{ value, onValueChange }}>
       <form
         className={cn(
           "w-full rounded-[28px] bg-background/92 shadow-sm ring-1 ring-black/8 backdrop-blur-sm dark:bg-[#111515]/96 dark:ring-white/10",
@@ -96,7 +77,7 @@ export const PromptInputTextarea = ({
   className,
   maxHeight = 65,
   minHeight = 65,
-  placeholder = "输入你想执行的策略需求...",
+  placeholder = "输入你的消息...",
   onKeyDown,
   ...props
 }: PromptInputTextareaProps) => {
@@ -105,9 +86,7 @@ export const PromptInputTextarea = ({
   const [compose, setCompose] = useState(false)
 
   useEffect(() => {
-    if (!ref.current) {
-      return
-    }
+    if (!ref.current) return
     ref.current.style.height = "auto"
     ref.current.style.height = `${ref.current.scrollHeight}px`
   }, [value])

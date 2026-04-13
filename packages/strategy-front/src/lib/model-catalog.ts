@@ -1,7 +1,6 @@
 import type { Model, Provider } from "@/types/provider"
 
 export type Vis = "show" | "hide"
-export type Img = "on" | "off"
 export type ModelKey = {
   providerID: string
   modelID: string
@@ -30,27 +29,14 @@ export function readModelVisibility() {
   }
 }
 
-export function readModelImage() {
-  if (typeof window === "undefined") return {}
-
-  try {
-    const raw = window.localStorage.getItem(modelStoreKey)
-    if (!raw) return {}
-    const data = JSON.parse(raw) as { image?: Record<string, Img> }
-    return data.image ?? {}
-  } catch {
-    return {}
-  }
-}
-
-export function writeModelCatalog(input: { user?: Record<string, Vis>; image?: Record<string, Img> }) {
+export function writeModelCatalog(input: { user?: Record<string, Vis> }) {
   if (typeof window === "undefined") return
 
   const cur = (() => {
     try {
       const raw = window.localStorage.getItem(modelStoreKey)
       if (!raw) return {}
-      return JSON.parse(raw) as { user?: Record<string, Vis>; image?: Record<string, Img> }
+      return JSON.parse(raw) as { user?: Record<string, Vis> }
     } catch {
       return {}
     }
@@ -60,7 +46,6 @@ export function writeModelCatalog(input: { user?: Record<string, Vis>; image?: R
     modelStoreKey,
     JSON.stringify({
       user: input.user ?? cur.user ?? {},
-      image: input.image ?? cur.image ?? {},
     }),
   )
 }
