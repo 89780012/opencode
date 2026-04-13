@@ -88,7 +88,6 @@ func (a *API) Register(r *gin.Engine) {
 	sys.POST("/startup/prepare", a.startupPrepare)
 	sys.GET("/config", a.configGet)
 	sys.PUT("/config", a.configPut)
-	sys.GET("/version", a.version)
 	sys.GET("/smartx/logs/meta", a.smartxLogsMeta)
 	sys.GET("/smartx/logs/watch", a.smartxLogsWatch)
 	sys.POST("/smartx/startExtension", a.smartxStart)

@@ -10,7 +10,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	cfg "strategy-service/internal/config"
-	"strategy-service/internal/meta"
 	"strategy-service/internal/smartx"
 )
 
@@ -53,10 +52,6 @@ func (a *API) configPut(c *gin.Context) {
 		return
 	}
 	ok(c, cfg)
-}
-
-func (a *API) version(c *gin.Context) {
-	ok(c, meta.Current())
 }
 
 func (a *API) logSources(c *gin.Context) {

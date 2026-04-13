@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"strategy-service/internal/meta"
 	"strategy-service/internal/smartx"
 )
 
@@ -63,8 +62,7 @@ func (a *API) mcpPost(c *gin.Context) {
 				"tools": map[string]any{},
 			},
 			"serverInfo": map[string]any{
-				"name":    "strategy-service",
-				"version": meta.Current().Current.Version,
+				"name": "strategy-service",
 			},
 			"instructions": "Use start to launch SmartX strategies and logs to inspect recent strategy logs.",
 		})

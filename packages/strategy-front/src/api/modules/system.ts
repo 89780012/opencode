@@ -5,7 +5,6 @@ import type {
   OpencodeState,
   StartupState,
   SystemConfig,
-  SystemVersion,
 } from "@/types/system"
 
 export const systemApi = {
@@ -19,10 +18,6 @@ export const systemApi = {
 
   config() {
     return request.get<SystemConfig>("/system/config")
-  },
-
-  version() {
-    return request.get<SystemVersion>("/system/version")
   },
 
   saveConfig(cfg: SystemConfig) {

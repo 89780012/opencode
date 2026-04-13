@@ -6,7 +6,6 @@ import fs from "fs/promises"
 import path from "path"
 import { fileURLToPath } from "url"
 import { front } from "./front"
-import { flags, meta } from "./meta"
 
 const self = fileURLToPath(import.meta.url)
 const dir = path.dirname(self)
@@ -41,7 +40,6 @@ if (!jobs.length) {
 console.log(`targets: ${jobs.map((item) => item.id).join(", ")}`)
 
 await front(root, skip)
-const row = await meta()
 
 console.log("building strategy-service")
 if (clean) {
@@ -59,7 +57,7 @@ for (const item of jobs) {
   await fs.rm(dir, { force: true, recursive: true })
   await fs.mkdir(dir, { recursive: true })
   console.log(`go build ${item.id}`)
-  await $`go build -ldflags ${flags(row)} -o ${bin} ./cmd/service`.cwd(root).env({
+  await $`go build -o ${bin} ./cmd/service`.cwd(root).env({
     ...process.env,
     CGO_ENABLED: "0",
     GOCACHE: process.env.GOCACHE || cache,
@@ -84,11 +82,6 @@ await fs.writeFile(
   path.join(out, "manifest.json"),
   JSON.stringify(
     {
-      version: row.version,
-      channel: row.channel,
-      commit: row.commit,
-      dirty: row.dirty,
-      built_at: row.built_at,
       targets: built,
     },
     null,

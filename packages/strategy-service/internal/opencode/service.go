@@ -5,13 +5,10 @@ import (
 	"errors"
 	"log/slog"
 	"net/url"
-	"os/exec"
-	"strings"
 	"time"
 
 	"strategy-service/internal/opdoc"
 	"strategy-service/internal/oprun"
-	"strategy-service/internal/proc"
 	rt "strategy-service/internal/runtime"
 )
 
@@ -22,7 +19,6 @@ type Tool struct {
 	Status    string    `json:"status"`
 	Source    string    `json:"source,omitempty"`
 	Path      string    `json:"path,omitempty"`
-	Version   string    `json:"version,omitempty"`
 	Message   string    `json:"message,omitempty"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -172,7 +168,7 @@ func (s *Service) act(ctx context.Context, fn func(context.Context) error) (opru
 	return s.mgr.State(), err
 }
 
-// inspect 读取单个工具的安装状态和版本信息。
+// inspect 读取单个工具的安装状态。
 func (s *Service) inspect(ctx context.Context, id string) Tool {
 	out := Tool{
 		ID:        id,
@@ -196,7 +192,6 @@ func (s *Service) inspect(ctx context.Context, id string) Tool {
 	out.Status = "installed"
 	out.Source = string(row.Source)
 	out.Path = row.Path
-	out.Version = version(ctx, row.Path)
 	return out
 }
 
@@ -223,19 +218,4 @@ func label(id string) string {
 		return "OpenCode"
 	}
 	return id
-}
-
-// version 读取工具版本号，失败时返回原始输出。
-func version(ctx context.Context, path string) string {
-	sub, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(sub, path, "--version")
-	proc.Hide(cmd)
-	out, err := cmd.CombinedOutput()
-	text := strings.TrimSpace(string(out))
-	if err != nil {
-		return text
-	}
-	return text
 }
