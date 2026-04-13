@@ -14,15 +14,11 @@ import {
 } from "@/components/ui/dialog"
 import { SidebarContent, SidebarGroup, SidebarGroupContent, SidebarHeader } from "@/components/ui/sidebar"
 import { useWorkspaceList } from "@/data/global-data-provider"
+import { log, note } from "@/lib/error"
 import type { LocalWorkspace } from "@/types/workspace"
 
 interface Props {
   onPick?: () => void
-}
-
-function note(err: unknown, text: string) {
-  if (err instanceof Error && err.message) return err.message
-  return text
 }
 
 export function LocalWorkspaceTab(props: Props) {
@@ -40,7 +36,7 @@ export function LocalWorkspaceTab(props: Props) {
       setOpenOpen(false)
       props.onPick?.()
     } catch (err) {
-      console.error("Failed to open workspace", err)
+      log("打开工作区失败", err)
       toast.error(note(err, "打开工作区失败"))
     }
   }

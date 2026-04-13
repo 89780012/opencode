@@ -29,7 +29,7 @@ const PromptInputContext = createContext<PromptInputContextValue | null>(null)
 const usePromptInputContext = () => {
   const ctx = useContext(PromptInputContext)
   if (!ctx) {
-    throw new Error("PromptInput components must be used inside PromptInput")
+    throw new Error("PromptInput 相关组件必须在 PromptInput 内使用")
   }
   return ctx
 }

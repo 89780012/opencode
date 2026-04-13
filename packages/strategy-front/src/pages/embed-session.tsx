@@ -11,6 +11,7 @@ import { WorkspaceDetailPane, type WorkspaceDetailTab } from "@/components/works
 import { useEmbedComposer } from "@/hooks/use-embed-composer"
 import { useEmbedEntry } from "@/hooks/use-embed-entry"
 import { useStrategySession } from "@/hooks/use-strategy-session"
+import { log } from "@/lib/error"
 
 const ctrl =
   "rounded-md border border-black/8 bg-black/[0.03] text-xs shadow-none hover:bg-black/[0.05] dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.06]"
@@ -45,8 +46,8 @@ export default function EmbedSessionPage() {
     if (chat.sessionLoading || chat.creating) return
     if (chat.sessions.length > 0) return
     void chat.createSession().catch((err) => {
-      console.error("Failed to auto create session", err)
-      toast.error("Failed to auto create session")
+      log("自动创建会话失败", err)
+      toast.error("自动创建会话失败")
     })
   }, [chat, workspace?.path])
 
@@ -54,8 +55,8 @@ export default function EmbedSessionPage() {
     try {
       await chat.abortSession()
     } catch (err) {
-      console.error("Failed to abort prompt", err)
-      toast.error("Failed to stop session")
+      log("停止嵌入会话失败", err)
+      toast.error("停止会话失败")
     }
   }, [chat])
 
@@ -63,8 +64,8 @@ export default function EmbedSessionPage() {
     try {
       await chat.createSession()
     } catch (err) {
-      console.error("Failed to create session", err)
-      toast.error("Failed to create session")
+      log("创建嵌入会话失败", err)
+      toast.error("创建会话失败")
     }
   }, [chat])
 
@@ -77,30 +78,30 @@ export default function EmbedSessionPage() {
         await chat.refresh(chat.selectedSessionId)
       }
     } catch (err) {
-      console.error("Failed to refresh embed page", err)
-      toast.error("Failed to refresh")
+      log("刷新嵌入页失败", err)
+      toast.error("刷新失败")
     } finally {
       setSpin(false)
     }
   }, [chat, entry])
 
   if (!path) {
-    return <Status title="Missing path" desc="Open this page with /embed/session?path=<workspace-directory>." />
+    return <Status title="缺少路径参数" desc="请使用 /embed/session?path=<工作区目录> 打开当前页面。" />
   }
 
   if (entry.load && !workspace) {
-    return <Status title="Preparing workspace" desc="Checking the directory, Git state, and chat runtime." />
+    return <Status title="正在准备工作区" desc="正在检查目录、Git 状态和会话运行环境。" />
   }
 
   if (entry.err || !workspace) {
     return (
       <Status
-        title="Workspace setup failed"
-        desc={entry.err || "The target workspace could not be loaded."}
+        title="工作区准备失败"
+        desc={entry.err || "目标工作区加载失败。"}
         action={
           <Button variant="outline" onClick={() => void entry.refresh()} disabled={entry.load}>
             <RefreshCw className={`size-4 ${entry.load ? "animate-spin" : ""}`} />
-            Retry
+            重试
           </Button>
         }
       />
@@ -120,12 +121,12 @@ export default function EmbedSessionPage() {
               disabled={chat.sessions.length === 0}
             >
               <SelectTrigger className={`h-8 w-[190px] ${ctrl}`}>
-                <SelectValue placeholder={chat.sessions.length === 0 ? "没有会话" : "选择一个会话"} />
+                <SelectValue placeholder={chat.sessions.length === 0 ? "暂无会话" : "选择会话"} />
               </SelectTrigger>
               <SelectContent>
                 {chat.sessions.map((item) => (
                   <SelectItem key={item.id} value={item.id}>
-                    {item.title || "Untitled session"}
+                    {item.title || "未命名会话"}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -165,7 +166,7 @@ export default function EmbedSessionPage() {
             </Button>
             <Button variant="outline" size="sm" className={ctrl} onClick={() => void onRefresh()} disabled={spin}>
               <RefreshCw className={`size-4 ${spin ? "animate-spin" : ""}`} />
-              {spin ? "Refreshing..." : "Refresh"}
+              {spin ? "刷新中..." : "刷新"}
             </Button>
           </div>
         </div>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { chatApi, permissionApi, questionApi } from "@/api/modules"
 import { toast } from "sonner"
 import { buildRequestParts } from "@/lib/build-request-parts"
+import { log } from "@/lib/error"
 import {
   selectPermissionLoaded,
   selectQuestionLoaded,
@@ -441,7 +442,7 @@ export function useChatRuntime(input: Input) {
   const submit = useCallback(
     async (msg: PromptInputMessage) => {
       if (!input.agent || !model) {
-        toast.error("Pick an agent and model first")
+        toast.error("请先选择智能体和模型")
         return false
       }
 
@@ -449,8 +450,8 @@ export function useChatRuntime(input: Input) {
         await prompt.submit(msg)
         return true
       } catch (err) {
-        console.error("Failed to submit prompt", err)
-        toast.error("Failed to submit prompt")
+        log("提交会话消息失败", err)
+        toast.error("发送消息失败")
         return false
       }
     },

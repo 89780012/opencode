@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { chatApi } from "@/api/modules"
+import { log } from "@/lib/error"
 import { hydrateSessionDiff } from "@/store/chat-session-slice"
 import { selectSessionDiffs, useAppDispatch, useAppSelector } from "@/store"
 
@@ -37,8 +38,8 @@ export function useChatReview(workspacePath?: string | null, sessionId?: string 
       const data = await chatApi.getSessionDiff(sessionId)
       dispatch(hydrateSessionDiff({ sessionId, diffs: data }))
     } catch (error) {
-      console.error("failed to load session diff", error)
-      setErr("Failed to load code changes")
+      log("加载会话代码变更失败", error)
+      setErr("加载代码变更失败")
     } finally {
       setLoading(false)
     }

@@ -30,7 +30,7 @@ const Context = createContext<{
 function useConversation() {
   const ctx = useContext(Context)
   if (!ctx) {
-    throw new Error("Conversation components must be used inside Conversation")
+    throw new Error("Conversation 相关组件必须在 Conversation 内使用")
   }
   return ctx
 }

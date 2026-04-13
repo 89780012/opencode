@@ -1,8 +1,5 @@
-import { useMemo, useState, type ReactNode } from "react"
-import { ChevronRight, Code2, Cpu, FileText, RefreshCw, Target } from "lucide-react"
-import { useNavigate } from "react-router-dom"
-import { toast } from "sonner"
-import { chatApi, workspaceApi } from "@/api/modules"
+import type { ReactNode } from "react"
+import { ChevronRight, RefreshCw } from "lucide-react"
 import { AutoResizeTextarea } from "@/components/ui/AutoResizeTextarea"
 import { Button } from "@/components/ui/button"
 import {
@@ -17,85 +14,19 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useAgentList, useProviderList, useWorkspaceList } from "@/data/global-data-provider"
-import { useProjectComposer } from "@/hooks/use-project-composer"
-import { resolveComposer } from "@/lib/chat-composer"
-import { buildStrategyPrompt, buildTemplatePrompt, createGuide, type StrategyType } from "@/lib/strategy-guide"
-import { encodeStrategyPath } from "@/lib/strategy-path"
+import { useWorkspaceCreate } from "@/hooks/use-workspace-create"
+import { cards, flip, picks, text } from "@/lib/strategy-create"
+import type { StrategyType } from "@/lib/strategy-guide"
 
-interface Props {
+type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
   onDone?: () => void
 }
 
-const kinds = ["趋势", "均值回归", "突破", "轮动", "网格", "配对", "事件驱动", "自定义"]
-const markets = ["股票", "ETF", "期货", "外汇", "加密"]
-const pools = ["全市场", "沪深 300", "中证 500", "创业板", "ETF 池", "自选池"]
-const tfs = ["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w"]
-const sides = ["做多", "做空", "双向"]
-const holds = ["日内", "隔夜", "波段", "中长线"]
-const sources = ["价格行为", "成交量", "技术指标", "多因子", "基本面", "盘口结构"]
-const factors = ["MA", "EMA", "MACD", "RSI", "KDJ", "Bollinger", "ATR", "VWAP", "Donchian", "ADX"]
-const filters = ["成交量过滤", "波动率过滤", "大盘趋势过滤", "时间窗口过滤", "财报日过滤", "流动性过滤"]
-const entries = ["均线金叉", "突破近期高点", "RSI 超卖反弹", "放量确认", "多条件共振", "回踩支撑入场"]
-const exits = ["固定止盈", "固定止损", "移动止损", "反向信号离场", "跌破慢线离场", "持仓超时退出"]
-const risks = ["控制回撤", "明确止损", "仓位管理", "减少频繁交易", "限制单日亏损", "限制连亏"]
-const stops = ["固定止损", "移动止损", "分批止盈", "时间止损", "盈亏比约束"]
-const poses = ["固定资金仓位", "固定风险仓位", "波动率仓位", "分批建仓", "金字塔加仓"]
-const limits = ["手续费", "滑点", "股票 T+1", "涨跌停约束", "最小成交量", "避免集合竞价"]
-const outputs = ["策略说明", "可执行代码", "回测建议", "参数优化建议", "风险说明", "README", "代码注释"]
-const styles = ["保守", "平衡", "激进"]
-const steps = ["类型", "配置", "确认"]
-
-const cards: Record<StrategyType, { title: string; desc: string; template: string; icon: ReactNode; root: string }> = {
-  smartx: {
-    title: "SmartX 策略",
-    desc: "适合直接落地成可运行策略工程。",
-    template: "smartx_plugin_python",
-    icon: <Target className="size-4" />,
-    root: "~/.xtp-smart/plugins",
-  },
-  python: {
-    title: "Python 策略",
-    desc: "适合研究、回测与快速迭代，不依赖 SmartX。",
-    template: "python_basic",
-    icon: <Cpu className="size-4" />,
-    root: "~/.strategy-service/workspaces",
-  },
-  js: {
-    title: "JS 策略",
-    desc: "适合脚手架、信号实验与服务集成，不依赖 SmartX。",
-    template: "js_basic",
-    icon: <Code2 className="size-4" />,
-    root: "~/.strategy-service/workspaces",
-  },
-  other: {
-    title: "其他",
-    desc: "空白项目目录",
-    template: "other_basic",
-    icon: <FileText className="size-4" />,
-    root: "~/.strategy-service/workspaces",
-  },
-}
-
-function note(err: unknown, fallback: string) {
-  if (err instanceof Error && err.message) return err.message
-  return fallback
-}
-
-function toggle(list: string[], value: string) {
-  return list.includes(value) ? list.filter((item) => item !== value) : [...list, value]
-}
-
-function tail() {
-  return Math.random().toString(36).slice(2, 8)
-}
-
-function text(list: string[]) {
-  return list.length > 0 ? list.join(" / ") : "-"
-}
-
+/**
+ * 标签按钮，仅负责渲染单个可切换选项。
+ */
 function Chip(props: { active: boolean; text: string; onClick: () => void }) {
   return (
     <button
@@ -112,6 +43,9 @@ function Chip(props: { active: boolean; text: string; onClick: () => void }) {
   )
 }
 
+/**
+ * 创建弹窗中的分组容器。
+ */
 function Block(props: { title: string; hint?: string; children: ReactNode }) {
   return (
     <section className="rounded-md border border-slate-200/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.92))] p-4 dark:border-[#26302c] dark:bg-[linear-gradient(180deg,rgba(21,26,25,0.98),rgba(17,22,21,0.94))]">
@@ -124,6 +58,9 @@ function Block(props: { title: string; hint?: string; children: ReactNode }) {
   )
 }
 
+/**
+ * 向导顶部的步骤圆点。
+ */
 function Dot(props: { active: boolean; done: boolean; text: string; step: number }) {
   return (
     <div className="flex items-center gap-2">
@@ -149,115 +86,22 @@ function Dot(props: { active: boolean; done: boolean; text: string; step: number
   )
 }
 
+/**
+ * 新建策略弹窗，主要负责渲染向导界面。
+ */
 export function WorkspaceCreateDialog(props: Props) {
-  const nav = useNavigate()
-  const { refresh, select } = useWorkspaceList()
-  const [kind, setKind] = useState<StrategyType>("smartx")
-  const ags = useAgentList(kind)
-  const catalog = useProviderList()
-  const project = useProjectComposer(kind)
-  const composer = useMemo(
-    () => resolveComposer({ agents: ags.ags, catalog, state: project.state }),
-    [ags.ags, catalog, project.state],
-  )
-  const [step, setStep] = useState(0)
-  const [panel, setPanel] = useState("market")
-  const [name, setName] = useState("")
-  const [tailname, setTailname] = useState(() => tail())
-  const [guide, setGuide] = useState(createGuide)
-  const [brief, setBrief] = useState("")
-  const [prompt, setPrompt] = useState("")
-  const [busy, setBusy] = useState(false)
-  const model = composer.model ? `${composer.model.providerID}/${composer.model.modelID}` : ""
-  const card = cards[kind]
-  const full = name.trim() ? `${name.trim()}-${tailname.trim()}` : ""
-  const rich = kind !== "other"
-
-  const reset = () => {
-    setStep(0)
-    setPanel("market")
-    setKind("smartx")
-    setName("")
-    setTailname(tail())
-    setGuide(createGuide())
-    setBrief("")
-    setPrompt("")
-  }
-
-  const setAgent = (value: string) => {
-    if (!ags.ags.some((item) => item.name === value)) return
-    project.setAgent(value)
-  }
-
-  const setModel = (value: string) => {
-    const [providerID, ...rest] = value.split("/")
-    const modelID = rest.join("/")
-    if (!catalog.connectedModels.some((item) => item.provider.id === providerID && item.id === modelID)) return
-    project.setModel({ providerID, modelID })
-  }
-
-  const buildPrompt = () => {
-    if (kind === "other") {
-      return brief.trim() ? `补充说明：${brief.trim()}` : ""
-    }
-    if (kind === "smartx") {
-      const base = buildStrategyPrompt({ name: full, guide, type: "smartx" })
-      return brief.trim() ? `${base}\n额外要求：${brief.trim()}` : base
-    }
-    return buildTemplatePrompt({ name: full, type: kind, guide, brief })
-  }
-
-  const next = () => {
-    if (!name.trim()) {
-      toast.error("请输入策略名称")
-      return
-    }
-    if (step === 1) {
-      setPrompt(buildPrompt())
-    }
-    setStep((prev) => Math.min(prev + 1, steps.length - 1))
-  }
-
-  const create = async () => {
-    if (!full) {
-      toast.error("请输入策略名称")
-      return
-    }
-    if (!composer.agent || !composer.model) {
-      toast.error("当前没有可用的智能体或模型，无法自动发起引导会话")
-      return
-    }
-    setBusy(true)
-    try {
-      const data = await workspaceApi.createWorkspace(full, kind, card.template)
-      await refresh()
-      select(data.workspace)
-      const session = await chatApi.createSession(data.workspace.path)
-      await chatApi.sendPrompt(data.workspace.path, session.id, {
-        agent: composer.agent.name,
-        model: composer.model,
-        variant: composer.variant,
-        parts: [{ type: "text", text: prompt || buildPrompt() }],
-      })
-      props.onDone?.()
-      props.onOpenChange(false)
-      reset()
-      toast.success(`策略已创建并发起引导：${data.workspace.name}`)
-      nav(`/app/strategies/${encodeStrategyPath(data.workspace.path)}`)
-    } catch (err) {
-      console.error("Failed to create workspace", err)
-      toast.error(note(err, "创建策略失败"))
-    } finally {
-      setBusy(false)
-    }
-  }
+  const form = useWorkspaceCreate(props)
+  const state = form.state
+  const guide = state.guide
 
   return (
     <Dialog
       open={props.open}
       onOpenChange={(open) => {
         props.onOpenChange(open)
-        if (!open) reset()
+        if (!open) {
+          form.reset()
+        }
       }}
     >
       <DialogContent className="flex h-[min(760px,calc(100dvh-32px))] max-h-[calc(100dvh-32px)] w-[min(820px,calc(100vw-24px))] max-w-[1240px] flex-col gap-0 overflow-hidden rounded-[30px] border border-slate-200/80 bg-[#fcfcfa] p-0 shadow-[0_28px_90px_rgba(15,23,42,0.14)] dark:border-[#252e2b] dark:bg-[#101514]">
@@ -274,32 +118,32 @@ export function WorkspaceCreateDialog(props: Props) {
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-wrap items-center gap-2">
-            {steps.map((item, i) => (
+            {form.steps.map((item, i) => (
               <div key={item} className="flex items-center gap-2">
-                <Dot active={i === step} done={i < step} text={item} step={i + 1} />
-                {i < steps.length - 1 ? <ChevronRight className="size-4 text-slate-300 dark:text-[#31403b]" /> : null}
+                <Dot active={i === state.step} done={i < state.step} text={item} step={i + 1} />
+                {i < form.steps.length - 1 ? <ChevronRight className="size-4 text-slate-300 dark:text-[#31403b]" /> : null}
               </div>
             ))}
           </div>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          {step === 0 ? (
+          {state.step === 0 ? (
             <div className="space-y-4">
               <Block title="策略名称" hint="用于工作区目录和默认会话标题">
                 <Label htmlFor="workspace-name">策略名称</Label>
                 <div className="mt-2 grid gap-2 md:grid-cols-[minmax(0,1fr)_180px_auto]">
                   <Input
                     id="workspace-name"
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
+                    value={state.name}
+                    onChange={(event) => form.setName(event.target.value)}
                     placeholder="例如：stock-trend"
                     className="h-8 rounded-md border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80"
                   />
                   <Input
                     id="workspace-tail"
-                    value={tailname}
-                    onChange={(event) => setTailname(event.target.value)}
+                    value={state.tail}
+                    onChange={(event) => form.setTail(event.target.value)}
                     placeholder="随机后缀"
                     className="h-8 rounded-md border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80"
                   />
@@ -307,13 +151,13 @@ export function WorkspaceCreateDialog(props: Props) {
                     type="button"
                     variant="outline"
                     className="h-8 rounded-md border-slate-200/80 bg-white/90 px-3 shadow-none dark:border-[#2c3532] dark:bg-[#151918]"
-                    onClick={() => setTailname(tail())}
+                    onClick={form.refreshTail}
                   >
                     <RefreshCw className="size-4" />
                   </Button>
                 </div>
                 <div className="mt-2 text-xs text-slate-500 dark:text-[#809088]">
-                  {full ? `创建目录将使用：${full}` : "请填写策略名称，后缀可修改或刷新"}
+                  {form.full ? `创建目录将使用：${form.full}` : "请填写策略名称，后缀可修改或刷新"}
                 </div>
               </Block>
 
@@ -323,8 +167,8 @@ export function WorkspaceCreateDialog(props: Props) {
                     <button
                       key={key}
                       type="button"
-                      className={`rounded-md border px-4 py-4 text-left transition-all ${kind === key ? "border-emerald-300 bg-emerald-50/70 ring-1 ring-emerald-100 dark:border-[#4d6f62] dark:bg-[#15201c]" : "border-slate-200/80 bg-white/90 hover:border-emerald-200 hover:bg-emerald-50/50 dark:border-[#26302c] dark:bg-[#141918]"}`}
-                      onClick={() => setKind(key as StrategyType)}
+                      className={`rounded-md border px-4 py-4 text-left transition-all ${state.kind === key ? "border-emerald-300 bg-emerald-50/70 ring-1 ring-emerald-100 dark:border-[#4d6f62] dark:bg-[#15201c]" : "border-slate-200/80 bg-white/90 hover:border-emerald-200 hover:bg-emerald-50/50 dark:border-[#26302c] dark:bg-[#141918]"}`}
+                      onClick={() => form.setKind(key as StrategyType)}
                     >
                       <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-[#eef5f1]">
                         {item.icon}
@@ -339,9 +183,13 @@ export function WorkspaceCreateDialog(props: Props) {
             </div>
           ) : null}
 
-          {step === 1 ? (
-            rich ? (
-              <Tabs value={panel} onValueChange={setPanel} className="space-y-4">
+          {state.step === 1 ? (
+            form.rich ? (
+              <Tabs
+                value={form.panel}
+                onValueChange={(value) => form.setPanel(value as (typeof picks.panels)[number])}
+                className="space-y-4"
+              >
                 <TabsList className="grid w-full grid-cols-4 rounded-2xl bg-slate-100/80 p-1 dark:bg-[#161d1b]">
                   <TabsTrigger value="market">市场</TabsTrigger>
                   <TabsTrigger value="logic">逻辑</TabsTrigger>
@@ -353,22 +201,22 @@ export function WorkspaceCreateDialog(props: Props) {
                   <div className="grid gap-4 xl:grid-cols-3">
                     <Block title="策略类型">
                       <div className="flex flex-wrap gap-2">
-                        {kinds.map((item) => (
-                          <Chip key={item} text={item} active={guide.kind === item} onClick={() => setGuide((prev) => ({ ...prev, kind: item }))} />
+                        {picks.kinds.map((item) => (
+                          <Chip key={item} text={item} active={guide.kind === item} onClick={() => form.setGuide((prev) => ({ ...prev, kind: item }))} />
                         ))}
                       </div>
                     </Block>
                     <Block title="市场">
                       <div className="flex flex-wrap gap-2">
-                        {markets.map((item) => (
-                          <Chip key={item} text={item} active={guide.market === item} onClick={() => setGuide((prev) => ({ ...prev, market: item }))} />
+                        {picks.markets.map((item) => (
+                          <Chip key={item} text={item} active={guide.market === item} onClick={() => form.setGuide((prev) => ({ ...prev, market: item }))} />
                         ))}
                       </div>
                     </Block>
                     <Block title="标的池">
                       <div className="flex flex-wrap gap-2">
-                        {pools.map((item) => (
-                          <Chip key={item} text={item} active={guide.pool === item} onClick={() => setGuide((prev) => ({ ...prev, pool: item }))} />
+                        {picks.pools.map((item) => (
+                          <Chip key={item} text={item} active={guide.pool === item} onClick={() => form.setGuide((prev) => ({ ...prev, pool: item }))} />
                         ))}
                       </div>
                     </Block>
@@ -376,30 +224,30 @@ export function WorkspaceCreateDialog(props: Props) {
                   <div className="grid gap-4 xl:grid-cols-3">
                     <Block title="周期">
                       <div className="flex flex-wrap gap-2">
-                        {tfs.map((item) => (
-                          <Chip key={item} text={item} active={guide.tf === item} onClick={() => setGuide((prev) => ({ ...prev, tf: item }))} />
+                        {picks.tfs.map((item) => (
+                          <Chip key={item} text={item} active={guide.tf === item} onClick={() => form.setGuide((prev) => ({ ...prev, tf: item }))} />
                         ))}
                       </div>
                     </Block>
                     <Block title="方向">
                       <div className="flex flex-wrap gap-2">
-                        {sides.map((item) => (
-                          <Chip key={item} text={item} active={guide.side === item} onClick={() => setGuide((prev) => ({ ...prev, side: item }))} />
+                        {picks.sides.map((item) => (
+                          <Chip key={item} text={item} active={guide.side === item} onClick={() => form.setGuide((prev) => ({ ...prev, side: item }))} />
                         ))}
                       </div>
                     </Block>
                     <Block title="持仓周期">
                       <div className="flex flex-wrap gap-2">
-                        {holds.map((item) => (
-                          <Chip key={item} text={item} active={guide.hold === item} onClick={() => setGuide((prev) => ({ ...prev, hold: item }))} />
+                        {picks.holds.map((item) => (
+                          <Chip key={item} text={item} active={guide.hold === item} onClick={() => form.setGuide((prev) => ({ ...prev, hold: item }))} />
                         ))}
                       </div>
                     </Block>
                   </div>
                   <Block title="开发风格">
                     <div className="flex flex-wrap gap-2">
-                      {styles.map((item) => (
-                        <Chip key={item} text={item} active={guide.style === item} onClick={() => setGuide((prev) => ({ ...prev, style: item }))} />
+                      {picks.styles.map((item) => (
+                        <Chip key={item} text={item} active={guide.style === item} onClick={() => form.setGuide((prev) => ({ ...prev, style: item }))} />
                       ))}
                     </div>
                   </Block>
@@ -408,37 +256,37 @@ export function WorkspaceCreateDialog(props: Props) {
                 <TabsContent value="logic" className="space-y-4">
                   <Block title="信号来源">
                     <div className="flex flex-wrap gap-2">
-                      {sources.map((item) => (
-                        <Chip key={item} text={item} active={guide.source.includes(item)} onClick={() => setGuide((prev) => ({ ...prev, source: toggle(prev.source, item) }))} />
+                      {picks.sources.map((item) => (
+                        <Chip key={item} text={item} active={guide.source.includes(item)} onClick={() => form.setGuide((prev) => ({ ...prev, source: flip(prev.source, item) }))} />
                       ))}
                     </div>
                   </Block>
                   <Block title="指标与因子" hint="建议至少选择 1 到 3 项">
                     <div className="flex flex-wrap gap-2">
-                      {factors.map((item) => (
-                        <Chip key={item} text={item} active={guide.factor.includes(item)} onClick={() => setGuide((prev) => ({ ...prev, factor: toggle(prev.factor, item) }))} />
+                      {picks.factors.map((item) => (
+                        <Chip key={item} text={item} active={guide.factor.includes(item)} onClick={() => form.setGuide((prev) => ({ ...prev, factor: flip(prev.factor, item) }))} />
                       ))}
                     </div>
                   </Block>
                   <div className="grid gap-4 xl:grid-cols-3">
                     <Block title="过滤条件">
                       <div className="flex flex-wrap gap-2">
-                        {filters.map((item) => (
-                          <Chip key={item} text={item} active={guide.filter.includes(item)} onClick={() => setGuide((prev) => ({ ...prev, filter: toggle(prev.filter, item) }))} />
+                        {picks.filters.map((item) => (
+                          <Chip key={item} text={item} active={guide.filter.includes(item)} onClick={() => form.setGuide((prev) => ({ ...prev, filter: flip(prev.filter, item) }))} />
                         ))}
                       </div>
                     </Block>
                     <Block title="入场规则">
                       <div className="flex flex-wrap gap-2">
-                        {entries.map((item) => (
-                          <Chip key={item} text={item} active={guide.entry.includes(item)} onClick={() => setGuide((prev) => ({ ...prev, entry: toggle(prev.entry, item) }))} />
+                        {picks.entries.map((item) => (
+                          <Chip key={item} text={item} active={guide.entry.includes(item)} onClick={() => form.setGuide((prev) => ({ ...prev, entry: flip(prev.entry, item) }))} />
                         ))}
                       </div>
                     </Block>
                     <Block title="离场规则">
                       <div className="flex flex-wrap gap-2">
-                        {exits.map((item) => (
-                          <Chip key={item} text={item} active={guide.exit.includes(item)} onClick={() => setGuide((prev) => ({ ...prev, exit: toggle(prev.exit, item) }))} />
+                        {picks.exits.map((item) => (
+                          <Chip key={item} text={item} active={guide.exit.includes(item)} onClick={() => form.setGuide((prev) => ({ ...prev, exit: flip(prev.exit, item) }))} />
                         ))}
                       </div>
                     </Block>
@@ -448,30 +296,30 @@ export function WorkspaceCreateDialog(props: Props) {
                 <TabsContent value="risk" className="space-y-4">
                   <Block title="风控重点">
                     <div className="flex flex-wrap gap-2">
-                      {risks.map((item) => (
-                        <Chip key={item} text={item} active={guide.risk.includes(item)} onClick={() => setGuide((prev) => ({ ...prev, risk: toggle(prev.risk, item) }))} />
+                      {picks.risks.map((item) => (
+                        <Chip key={item} text={item} active={guide.risk.includes(item)} onClick={() => form.setGuide((prev) => ({ ...prev, risk: flip(prev.risk, item) }))} />
                       ))}
                     </div>
                   </Block>
                   <div className="grid gap-4 xl:grid-cols-[1fr_1fr_1.1fr]">
                     <Block title="止盈止损">
                       <div className="flex flex-wrap gap-2">
-                        {stops.map((item) => (
-                          <Chip key={item} text={item} active={guide.stop.includes(item)} onClick={() => setGuide((prev) => ({ ...prev, stop: toggle(prev.stop, item) }))} />
+                        {picks.stops.map((item) => (
+                          <Chip key={item} text={item} active={guide.stop.includes(item)} onClick={() => form.setGuide((prev) => ({ ...prev, stop: flip(prev.stop, item) }))} />
                         ))}
                       </div>
                     </Block>
                     <Block title="仓位方式">
                       <div className="flex flex-wrap gap-2">
-                        {poses.map((item) => (
-                          <Chip key={item} text={item} active={guide.pos === item} onClick={() => setGuide((prev) => ({ ...prev, pos: item }))} />
+                        {picks.poses.map((item) => (
+                          <Chip key={item} text={item} active={guide.pos === item} onClick={() => form.setGuide((prev) => ({ ...prev, pos: item }))} />
                         ))}
                       </div>
                     </Block>
                     <Block title="交易约束">
                       <div className="flex flex-wrap gap-2">
-                        {limits.map((item) => (
-                          <Chip key={item} text={item} active={guide.limit.includes(item)} onClick={() => setGuide((prev) => ({ ...prev, limit: toggle(prev.limit, item) }))} />
+                        {picks.limits.map((item) => (
+                          <Chip key={item} text={item} active={guide.limit.includes(item)} onClick={() => form.setGuide((prev) => ({ ...prev, limit: flip(prev.limit, item) }))} />
                         ))}
                       </div>
                     </Block>
@@ -481,31 +329,41 @@ export function WorkspaceCreateDialog(props: Props) {
                 <TabsContent value="output" className="space-y-4">
                   <Block title="输出要求">
                     <div className="flex flex-wrap gap-2">
-                      {outputs.map((item) => (
-                        <Chip key={item} text={item} active={guide.output.includes(item)} onClick={() => setGuide((prev) => ({ ...prev, output: toggle(prev.output, item) }))} />
+                      {picks.outputs.map((item) => (
+                        <Chip key={item} text={item} active={guide.output.includes(item)} onClick={() => form.setGuide((prev) => ({ ...prev, output: flip(prev.output, item) }))} />
                       ))}
                     </div>
                   </Block>
                   <Block title="核心目标">
                     <div className="rounded-md bg-white/90 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]">
-                      <AutoResizeTextarea value={guide.target} onChange={(value) => setGuide((prev) => ({ ...prev, target: value }))} height={110} placeholder="先给出完整策略框架，再输出可回测的初版代码。" />
+                      <AutoResizeTextarea
+                        value={guide.target}
+                        onChange={(value) => form.setGuide((prev) => ({ ...prev, target: value }))}
+                        height={110}
+                        placeholder="先给出完整策略框架，再输出可回测的初版代码。"
+                      />
                     </div>
                   </Block>
                   <Block title="补充说明">
                     <div className="rounded-md bg-white/90 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]">
-                      <AutoResizeTextarea value={guide.note} onChange={(value) => setGuide((prev) => ({ ...prev, note: value }))} height={130} placeholder="例如：优先考虑股票市场，默认日线级别，不追求高频；代码要清晰，方便后续继续调参。" />
+                      <AutoResizeTextarea
+                        value={guide.note}
+                        onChange={(value) => form.setGuide((prev) => ({ ...prev, note: value }))}
+                        height={130}
+                        placeholder="例如：优先考虑股票市场，默认日线级别，不追求高频；代码要清晰，方便后续继续调参。"
+                      />
                     </div>
                   </Block>
                   <Block title="额外落地要求">
                     <div className="rounded-md bg-white/90 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]">
                       <AutoResizeTextarea
-                        value={brief}
-                        onChange={setBrief}
+                        value={state.brief}
+                        onChange={form.setBrief}
                         height={110}
                         placeholder={
-                          kind === "python"
+                          state.kind === "python"
                             ? "例如：拆出 indicators、signals、risk、backtest 四个模块。"
-                            : kind === "js"
+                            : state.kind === "js"
                               ? "例如：拆出指标、信号、执行入口与配置文件。"
                               : "例如：代码先按 SmartX 工程方式组织，关键参数集中管理。"
                         }
@@ -518,26 +376,26 @@ export function WorkspaceCreateDialog(props: Props) {
               <div className="space-y-4">
                 <Block title="补充说明">
                   <div className="rounded-md bg-white/92 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]">
-                    <AutoResizeTextarea value={brief} onChange={setBrief} height={220} placeholder="例如：帮我生成一个简单的网格策略。" />
+                    <AutoResizeTextarea value={state.brief} onChange={form.setBrief} height={220} placeholder="例如：帮我生成一个简单的网格策略。" />
                   </div>
                 </Block>
               </div>
             )
           ) : null}
 
-          {step === 2 ? (
+          {state.step === 2 ? (
             <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
               <div className="space-y-4">
                 <Block title="当前创建配置">
                   <div className="mb-4 grid gap-3">
                     <div className="space-y-2">
                       <Label>使用智能体</Label>
-                      <Select value={composer.agent?.name} onValueChange={setAgent}>
+                      <Select value={form.composer.agent?.name} onValueChange={form.setAgent}>
                         <SelectTrigger className="h-10 w-full rounded-md border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2d3733]">
                           <SelectValue placeholder="选择智能体" />
                         </SelectTrigger>
                         <SelectContent>
-                          {ags.ags.map((item) => (
+                          {form.ags.ags.map((item) => (
                             <SelectItem key={item.name} value={item.name}>
                               {item.name}
                             </SelectItem>
@@ -547,12 +405,12 @@ export function WorkspaceCreateDialog(props: Props) {
                     </div>
                     <div className="space-y-2">
                       <Label>使用模型</Label>
-                      <Select value={model} onValueChange={setModel}>
+                      <Select value={form.model} onValueChange={form.setModel}>
                         <SelectTrigger className="h-10 w-full rounded-md border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2d3733]">
                           <SelectValue placeholder="选择模型" />
                         </SelectTrigger>
                         <SelectContent>
-                          {catalog.visibleModels.map((item) => {
+                          {form.models.map((item) => {
                             const value = `${item.provider.id}/${item.id}`
                             return (
                               <SelectItem key={value} value={value}>
@@ -566,11 +424,11 @@ export function WorkspaceCreateDialog(props: Props) {
                   </div>
                   <div className="space-y-2 text-sm text-slate-600 dark:text-[#9aaba4]">
                     <div>创建方式：普通创建</div>
-                    <div>类型：{card.title}</div>
-                    <div>模板：{card.template}</div>
-                    <div>名称：{full || "-"}</div>
-                    <div>目录：{card.root}</div>
-                    {rich ? (
+                    <div>类型：{form.card.title}</div>
+                    <div>模板：{form.card.template}</div>
+                    <div>名称：{form.full || "-"}</div>
+                    <div>目录：{form.card.root}</div>
+                    {form.rich ? (
                       <>
                         <div>市场：{guide.market}</div>
                         <div>标的池：{guide.pool}</div>
@@ -583,17 +441,22 @@ export function WorkspaceCreateDialog(props: Props) {
                 </Block>
               </div>
 
-              {rich ? (
+              {form.rich ? (
                 <Block title="首条引导消息" hint="创建后会自动发送到首个会话">
                   <div className="rounded-md bg-white/92 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]">
-                    <AutoResizeTextarea value={prompt} onChange={setPrompt} height={420} placeholder="这里会自动生成引导消息，你也可以继续调整。" />
+                    <AutoResizeTextarea
+                      value={state.prompt}
+                      onChange={form.setPrompt}
+                      height={420}
+                      placeholder="这里会自动生成引导消息，你也可以继续调整。"
+                    />
                   </div>
                 </Block>
               ) : (
                 <Block title="确认创建" hint="通用工作区不会预填策略引导">
                   <div className="text-sm leading-6 text-slate-600 dark:text-[#93a39c]">
                     其他类型会直接创建通用工作区。
-                    {brief.trim()
+                    {state.brief.trim()
                       ? " 你填写的补充说明会在创建后作为首条消息发送。"
                       : " 如果没有补充说明，就只创建工作区，不自动发送引导消息。"}
                   </div>
@@ -607,26 +470,26 @@ export function WorkspaceCreateDialog(props: Props) {
           <Button
             variant="outline"
             className="rounded-md border-slate-200/80 bg-white/90 shadow-none dark:border-[#2c3532] dark:bg-[#151918]"
-            onClick={() => (step === 0 ? props.onOpenChange(false) : setStep((prev) => prev - 1))}
-            disabled={busy}
+            onClick={form.prev}
+            disabled={form.busy}
           >
-            {step === 0 ? "取消" : "上一步"}
+            {state.step === 0 ? "取消" : "上一步"}
           </Button>
-          {step < 2 ? (
+          {state.step < 2 ? (
             <Button
               className="rounded-md bg-slate-900 text-white hover:bg-slate-800 dark:bg-[#7aa590] dark:text-[#08110e] dark:hover:bg-[#8bb09f]"
-              onClick={next}
-              disabled={busy}
+              onClick={form.next}
+              disabled={form.busy}
             >
               下一步
             </Button>
           ) : (
             <Button
               className="rounded-md bg-slate-900 text-white hover:bg-slate-800 dark:bg-[#7aa590] dark:text-[#08110e] dark:hover:bg-[#8bb09f]"
-              onClick={() => void create()}
-              disabled={busy}
+              onClick={() => void form.create()}
+              disabled={form.busy}
             >
-              {busy ? "创建中..." : "创建并进入策略页"}
+              {form.busy ? "创建中..." : "创建并进入策略页"}
             </Button>
           )}
         </DialogFooter>

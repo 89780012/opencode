@@ -1,47 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
-import { FileCode2, Loader2, Pencil, Plus, RefreshCcw, RotateCcw, Trash2 } from "lucide-react"
-import { toast } from "sonner"
-import { agentApi, systemApi } from "@/api/modules"
+import { useMemo } from "react"
+import { Pencil, Plus, RefreshCcw, RotateCcw, Trash2 } from "lucide-react"
+import { agentApi } from "@/api/modules"
+import { InfoBanner, ResourceCard, ResourceSection, ResourceState, StatCards } from "@/components/shared/global-resource-section"
+import { MarkdownEditorDialog } from "@/components/shared/markdown-editor-dialog"
 import { useGlobalData } from "@/data/global-data-provider"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
+import { useGlobalMarkdown } from "@/hooks/use-global-markdown"
+import { stamp } from "@/lib/global-markdown"
 import type { GlobalAgent, RuntimeAgent } from "@/types/agent"
 
-type Dlg = {
-  open: boolean
-  mode: "create" | "edit"
-  item?: GlobalAgent
-}
-
-const rule = /^[a-z0-9][a-z0-9_-]*$/
-const digit = /^\d+$/
-
-function note(err: unknown, fallback: string) {
-  if (err instanceof Error && err.message) {
-    return err.message
-  }
-
-  return fallback
-}
-
-function stamp(value: string) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return value
-  }
-
-  return date.toLocaleString()
-}
-
+/**
+ * 生成新的 agent 模板内容。
+ */
 function temp(name: string) {
   const id = name.trim() || "my-agent"
   return `---
@@ -56,28 +27,33 @@ mode: all
 `
 }
 
-function wait(ms: number) {
-  return new Promise((done) => window.setTimeout(done, ms))
-}
-
+/**
+ * 将运行时 agent 标记为内置或自定义。
+ */
 function tag(item: RuntimeAgent) {
   if (item.native) {
-    return "builtin"
+    return "内置"
   }
 
-  return "custom"
+  return "自定义"
 }
 
+/**
+ * 格式化运行模式文案。
+ */
 function modeText(mode: RuntimeAgent["mode"]) {
   if (mode === "primary") {
-    return "primary"
+    return "主智能体"
   }
   if (mode === "subagent") {
-    return "subagent"
+    return "子智能体"
   }
-  return "all"
+  return "通用"
 }
 
+/**
+ * 将模型对象整理为可读字符串。
+ */
 function modelText(model?: RuntimeAgent["model"] | string) {
   if (!model) {
     return ""
@@ -89,155 +65,32 @@ function modelText(model?: RuntimeAgent["model"] | string) {
 }
 
 export function AgentPage() {
-  const { agent, ensure, refresh, refreshMany } = useGlobalData()
-  const [busy, setBusy] = useState("")
-  const [dlg, setDlg] = useState<Dlg>({
-    open: false,
-    mode: "create",
+  const { agent, refresh } = useGlobalData()
+  const form = useGlobalMarkdown<GlobalAgent>({
+    key: "agent",
+    temp,
+    create: agentApi.createGlobal,
+    update: agentApi.updateGlobal,
+    remove: agentApi.removeGlobal,
+    reload: ["provider", "mcp", "skill"],
+    text: {
+      title: "Agent",
+      label: "agent ",
+      content: "请先填写 agent Markdown 内容",
+      create_ok: "已创建全局 agent，请重启 opencode 服务重新加载",
+      update_ok: "已更新全局 agent，请重启 opencode 服务重新加载",
+      save_err: "保存 agent 失败",
+      remove_ok: (name) => `已删除 ${name}，请重启 opencode 服务重新加载`,
+      remove_err: (name) => `删除 ${name} 失败`,
+      restart_ok: "opencode 已重启",
+      restart_err: "重启 opencode 失败",
+    },
   })
-  const [name, setName] = useState("")
-  const [body, setBody] = useState(temp(""))
   const run = agent.data.run
   const cfg = agent.data.cfg
   const load = agent.load
   const err = agent.err
-  const cur = dlg.item
-
-  useEffect(() => {
-    void ensure("agent")
-  }, [ensure])
-
-  const sync = useCallback(async () => {
-    for (const _ of Array.from({ length: 8 })) {
-      const next = await refresh("agent")
-      if (!next.err) {
-        return true
-      }
-      await wait(500)
-    }
-
-    return false
-  }, [refresh])
-
-  const open = useCallback((item?: GlobalAgent) => {
-    if (item) {
-      setDlg({
-        open: true,
-        mode: "edit",
-        item,
-      })
-      setName(item.name)
-      setBody(item.content)
-      return
-    }
-
-    setDlg({
-      open: true,
-      mode: "create",
-    })
-    setName("")
-    setBody(temp(""))
-  }, [])
-
-  const close = useCallback(() => {
-    setDlg({
-      open: false,
-      mode: "create",
-    })
-    setName("")
-    setBody(temp(""))
-  }, [])
-
-  const rename = useCallback(
-    (next: string) => {
-      setName(next)
-      if (dlg.mode !== "create") {
-        return
-      }
-
-      if (body !== temp(name)) {
-        return
-      }
-
-      setBody(temp(next))
-    },
-    [body, dlg.mode, name],
-  )
-
-  const save = useCallback(async () => {
-    const id = name.trim().toLowerCase()
-    if (!id) {
-      toast.error("请输入 agent 名称")
-      return
-    }
-
-    if (!rule.test(id)) {
-      toast.error("agent 名称只能包含小写字母、数字、- 和 _")
-      return
-    }
-
-    if (digit.test(id)) {
-      toast.error("agent 名称不能是纯数字")
-      return
-    }
-
-    if (!body.trim()) {
-      toast.error("请先填写 agent Markdown 内容")
-      return
-    }
-
-    setBusy("save")
-    try {
-      if (dlg.mode === "create") {
-        await agentApi.createGlobal({
-          name: id,
-          content: body,
-        })
-        toast.success("已创建全局 agent，请重启 opencode 服务重新加载")
-      } else {
-        await agentApi.updateGlobal(id, {
-          content: body,
-        })
-        toast.success("已更新全局 agent，请重启 opencode 服务重新加载")
-      }
-      close()
-      await refresh("agent")
-    } catch (err) {
-      toast.error(note(err, "保存 agent 失败"))
-    } finally {
-      setBusy("")
-    }
-  }, [body, close, dlg.mode, name, refresh])
-
-  const drop = useCallback(
-    async (item: GlobalAgent) => {
-      setBusy(`drop:${item.name}`)
-      try {
-        await agentApi.removeGlobal(item.name)
-        toast.success(`已删除 ${item.name}，请重启 opencode 服务重新加载`)
-        await refresh("agent")
-      } catch (err) {
-        toast.error(note(err, `删除 ${item.name} 失败`))
-      } finally {
-        setBusy("")
-      }
-    },
-    [refresh],
-  )
-
-  const restart = useCallback(async () => {
-    setBusy("restart")
-    try {
-      await systemApi.opencodeRestart()
-      await sync()
-      await refreshMany(["provider", "mcp", "skill"])
-      toast.success("opencode 已重启")
-    } catch (err) {
-      toast.error(note(err, "重启opencode失败"))
-    } finally {
-      setBusy("")
-    }
-  }, [refreshMany, sync])
+  const cur = form.dlg.item
 
   const stat = useMemo(
     () => ({
@@ -264,42 +117,34 @@ export function AgentPage() {
                 </CardDescription>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <Button variant="outline" onClick={() => void refresh("agent")} disabled={load || busy === "restart"}>
+                <Button variant="outline" onClick={() => void refresh("agent")} disabled={load || form.busy === "restart"}>
                   <RefreshCcw className={load ? "size-4 animate-spin" : "size-4"} />
                   刷新
                 </Button>
-                <Button variant="outline" onClick={() => void restart()} disabled={busy === "restart"}>
-                  <RotateCcw className={busy === "restart" ? "size-4 animate-spin" : "size-4"} />
+                <Button variant="outline" onClick={() => void form.restart()} disabled={form.busy === "restart"}>
+                  <RotateCcw className={form.busy === "restart" ? "size-4 animate-spin" : "size-4"} />
                   重启 opencode
                 </Button>
-                <Button onClick={() => open()}>
+                <Button onClick={() => form.open()}>
                   <Plus className="size-4" />
                   新建 Agent
                 </Button>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="grid gap-4 py-6 md:grid-cols-4">
-            <div className="rounded-2xl border bg-muted/20 px-4 py-4">
-              <div className="text-muted-foreground text-sm">运行时总数</div>
-              <div className="mt-2 text-3xl font-semibold">{stat.run}</div>
-            </div>
-            <div className="rounded-2xl border bg-muted/20 px-4 py-4">
-              <div className="text-muted-foreground text-sm">全局自定义</div>
-              <div className="mt-2 text-3xl font-semibold">{stat.cfg}</div>
-            </div>
-            <div className="rounded-2xl border bg-muted/20 px-4 py-4">
-              <div className="text-muted-foreground text-sm">Primary</div>
-              <div className="mt-2 text-3xl font-semibold">{stat.primary}</div>
-            </div>
-            <div className="rounded-2xl border bg-muted/20 px-4 py-4">
-              <div className="text-muted-foreground text-sm">Subagent</div>
-              <div className="mt-2 text-3xl font-semibold">{stat.sub}</div>
-            </div>
+          <CardContent>
+            <StatCards
+              items={[
+                { label: "运行时总数", value: stat.run },
+                { label: "全局自定义", value: stat.cfg },
+                { label: "主智能体", value: stat.primary },
+                { label: "子智能体", value: stat.sub },
+              ]}
+            />
           </CardContent>
         </Card>
 
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
+        <InfoBanner>
           <div>
             全局 agent 文件路径：<code>{cfg.root || "~/.config/opencode/agents"}</code>
           </div>
@@ -308,173 +153,99 @@ export function AgentPage() {
             <code>{` <name>.md`}</code>。
           </div>
           <div>保存后不会自动刷新全局可用列表，请重启 opencode 服务重新加载。</div>
-        </div>
+        </InfoBanner>
 
         {err ? (
           <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{err}</div>
         ) : null}
 
-        <section className="space-y-4">
-          <div>
-            <h2 className="text-lg font-semibold">全局自定义 Agent</h2>
-            <p className="text-muted-foreground mt-1 text-sm">这里仅管理写入全局配置目录的 Markdown agent 文件。</p>
-          </div>
-          {load ? (
-            <div className="text-muted-foreground flex items-center gap-2 text-sm">
-              <Loader2 className="size-4 animate-spin" />
-              正在加载全局 agent 文件...
-            </div>
-          ) : cfg.agents.length === 0 ? (
-            <div className="text-muted-foreground rounded-xl border border-dashed px-4 py-6 text-sm">
-              还没有自定义全局 agent。
-            </div>
-          ) : (
+        <ResourceSection title="全局自定义 Agent" desc="这里仅管理写入全局配置目录的 Markdown agent 文件。">
+          <ResourceState loading={load} empty={cfg.agents.length === 0} loading_text="正在加载全局 agent 文件..." empty_text="还没有自定义全局 agent。">
             <div className="space-y-3">
               {cfg.agents.map((item) => {
-                const lock = busy === `drop:${item.name}`
+                const lock = form.busy === `drop:${item.name}`
                 return (
-                  <div key={item.path} className="bg-background rounded-2xl border px-5 py-4 shadow-xs">
-                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                      <div className="min-w-0 flex-1 space-y-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <div className="text-base font-semibold">{item.name}</div>
-                          <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
-                            {item.mode}
-                          </span>
-                          {item.hidden ? (
-                            <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
-                              hidden
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="text-muted-foreground text-sm leading-6">
-                          {item.description || "未提供描述"}
-                        </div>
-                        {item.model ? <div className="text-muted-foreground text-xs">模型： {item.model}</div> : null}
-                        <div className="text-muted-foreground break-all text-xs">{item.path}</div>
-                        <div className="text-muted-foreground text-xs">更新于： {stamp(item.updated_at)}</div>
-                      </div>
-                      <div className="flex shrink-0 flex-wrap items-center gap-2">
-                        <Button variant="outline" onClick={() => open(item)} disabled={lock}>
+                  <ResourceCard
+                    key={item.path}
+                    title={item.name}
+                    badges={[item.mode, ...(item.hidden ? ["隐藏"] : [])]}
+                    desc={item.description || "未提供描述"}
+                    meta={[
+                      ...(item.model ? [<>模型：{item.model}</>] : []),
+                      <>{item.path}</>,
+                      <>更新于： {stamp(item.updated_at)}</>,
+                    ]}
+                    actions={
+                      <>
+                        <Button variant="outline" onClick={() => form.open(item)} disabled={lock}>
                           <Pencil className="size-4" />
                           编辑
                         </Button>
-                        <Button variant="destructive" onClick={() => void drop(item)} disabled={lock}>
+                        <Button variant="destructive" onClick={() => void form.drop(item)} disabled={lock}>
                           <Trash2 className="size-4" />
                           删除
                         </Button>
-                      </div>
-                    </div>
-                  </div>
+                      </>
+                    }
+                  />
                 )
               })}
             </div>
-          )}
-        </section>
+          </ResourceState>
+        </ResourceSection>
 
-        <section className="space-y-4">
-          <div>
-            <h2 className="text-lg font-semibold">全局可用 Agent 列表</h2>
-            <p className="text-muted-foreground mt-1 text-sm">
+        <ResourceSection
+          title="全局可用 Agent 列表"
+          desc={
+            <>
               这里直接展示 opencode <code>/agent</code> 返回的当前服务运行时结果，对所有工作区一致可用。
-            </p>
-          </div>
-          {load ? (
-            <div className="text-muted-foreground flex items-center gap-2 text-sm">
-              <Loader2 className="size-4 animate-spin" />
-              正在加载全局可用 agent 列表...
-            </div>
-          ) : run.length === 0 ? (
-            <div className="text-muted-foreground rounded-xl border border-dashed px-4 py-6 text-sm">
-              当前没有可用 agent。
-            </div>
-          ) : (
+            </>
+          }
+        >
+          <ResourceState loading={load} empty={run.length === 0} loading_text="正在加载全局可用 agent 列表..." empty_text="当前没有可用 agent。">
             <div className="space-y-3">
               {run.map((item) => (
-                <div key={item.name} className="bg-background rounded-2xl border px-5 py-4 shadow-xs">
-                  <div className="flex flex-col gap-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="text-base font-semibold">{item.name}</div>
-                      <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
-                        {modeText(item.mode)}
-                      </span>
-                      <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
-                        {tag(item)}
-                      </span>
-                      {item.hidden ? (
-                        <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">隐藏</span>
-                      ) : null}
-                    </div>
-                    <div className="text-muted-foreground text-sm leading-6">{item.description || "未提供描述"}</div>
-                    {modelText(item.model) ? (
-                      <div className="text-muted-foreground text-xs">模型： {modelText(item.model)}</div>
-                    ) : null}
-                    {item.color ? <div className="text-muted-foreground text-xs">颜色： {item.color}</div> : null}
-                    {item.steps ? <div className="text-muted-foreground text-xs">最大步数：{item.steps}</div> : null}
-                  </div>
-                </div>
+                <ResourceCard
+                  key={item.name}
+                  title={item.name}
+                  badges={[modeText(item.mode), tag(item), ...(item.hidden ? ["隐藏"] : [])]}
+                  desc={item.description || "未提供描述"}
+                  meta={[
+                    ...(modelText(item.model) ? [<>模型： {modelText(item.model)}</>] : []),
+                    ...(item.color ? [<>颜色： {item.color}</>] : []),
+                    ...(item.steps ? [<>最大步数：{item.steps}</>] : []),
+                  ]}
+                />
               ))}
             </div>
-          )}
-        </section>
+          </ResourceState>
+        </ResourceSection>
       </div>
 
-      <Dialog open={dlg.open} onOpenChange={(open) => !open && close()}>
-        <DialogContent className="sm:max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>{dlg.mode === "create" ? "新建全局 Agent" : `编辑 ${cur?.name}`}</DialogTitle>
-            <DialogDescription>
-              这里直接编辑目标 Markdown agent 文件。保存后请重启 opencode 服务重新加载。
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="grid gap-4">
-            <div className="grid gap-2">
-              <div className="text-sm font-medium">Agent 名称</div>
-              <Input
-                value={name}
-                onChange={(event) => rename(event.target.value)}
-                placeholder="例如：task-router"
-                disabled={dlg.mode === "edit"}
-              />
-              <div className="text-muted-foreground text-xs leading-5">
-                将写入 <code>{`~/.config/opencode/agents/${name || "<name>"}.md`}</code>
-              </div>
-            </div>
-
-            <div className="grid gap-2">
-              <div className="flex items-center gap-2 text-sm font-medium">
-                <FileCode2 className="size-4" />
-                Agent Markdown
-              </div>
-              <textarea
-                value={body}
-                onChange={(event) => setBody(event.target.value)}
-                className="min-h-[420px] w-full rounded-md border bg-transparent px-3 py-3 font-mono text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                spellCheck={false}
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={close} disabled={busy === "save"}>
-              取消
-            </Button>
-            <Button type="button" onClick={() => void save()} disabled={busy === "save"}>
-              {busy === "save" ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" />
-                  保存中...
-                </>
-              ) : dlg.mode === "create" ? (
-                "创建"
-              ) : (
-                "保存"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <MarkdownEditorDialog
+        open={form.dlg.open}
+        busy={form.busy === "save"}
+        mode={form.dlg.mode}
+        title={form.dlg.mode === "create" ? "新建全局 Agent" : `编辑 ${cur?.name}`}
+        name_title="Agent 名称"
+        name={form.name}
+        body_title="Agent Markdown"
+        body={form.body}
+        placeholder="例如：task-router"
+        hint={`将写入 ~/.config/opencode/agents/${form.name || "<name>"}.md`}
+        desc="这里直接编辑目标 Markdown agent 文件。保存后请重启 opencode 服务重新加载。"
+        onOpenChange={(open) => {
+          if (!open) {
+            form.close()
+          }
+        }}
+        onName={form.rename}
+        onBody={form.setBody}
+        onClose={form.close}
+        onSave={() => {
+          void form.save()
+        }}
+      />
     </div>
   )
 }

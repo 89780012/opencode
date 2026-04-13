@@ -123,7 +123,7 @@ export function SystemProvider(props: { children: ReactNode }) {
 export function useSystem() {
   const ctx = useContext(Ctx)
   if (!ctx) {
-    throw new Error("SystemProvider is missing")
+    throw new Error("缺少 SystemProvider 上下文")
   }
   return ctx
 }

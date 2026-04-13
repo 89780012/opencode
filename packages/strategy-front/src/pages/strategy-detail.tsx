@@ -10,6 +10,7 @@ import { WorkspaceDetailPane, type WorkspaceDetailTab } from "@/components/works
 import { useWorkspaceList } from "@/data/global-data-provider"
 import { useStrategyComposer } from "@/hooks/use-strategy-composer"
 import { useStrategySession } from "@/hooks/use-strategy-session"
+import { log } from "@/lib/error"
 import { decodeStrategyPath } from "@/lib/strategy-path"
 
 const ctrl =
@@ -39,7 +40,7 @@ export default function StrategyDetailPage() {
     try {
       await chat.abortSession()
     } catch (err) {
-      console.error("Failed to abort prompt", err)
+      log("停止会话失败", err)
       toast.error("停止会话失败")
     }
   }, [chat])
@@ -48,7 +49,7 @@ export default function StrategyDetailPage() {
     try {
       await chat.createSession()
     } catch (err) {
-      console.error("Failed to create session", err)
+      log("创建会话失败", err)
       toast.error("创建会话失败")
     }
   }, [chat])
@@ -58,7 +59,7 @@ export default function StrategyDetailPage() {
     try {
       await refresh()
     } catch (err) {
-      console.error("Failed to refresh", err)
+      log("刷新策略详情失败", err)
       toast.error("刷新失败")
     } finally {
       setSpin(false)

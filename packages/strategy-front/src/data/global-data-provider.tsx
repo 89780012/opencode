@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react"
 import { agentApi, mcpApi, providerApi, skillApi, workspaceApi } from "@/api/modules"
 import { rankAgent } from "@/lib/chat-composer"
+import { note } from "@/lib/error"
 import { latestModels, modelVisible, readModelVisibility } from "@/lib/model-catalog"
 import type { GlobalAgentCatalog, RuntimeAgent } from "@/types/agent"
 import type { ComposerModel, ProviderCatalogState } from "@/types/composer"
@@ -171,18 +172,6 @@ function reduce(state: State, action: Action): State {
   }
 }
 
-function note(err: unknown, fallback: string) {
-  if (err instanceof Error && err.message) {
-    return err.message
-  }
-
-  if (typeof err === "string" && err) {
-    return err
-  }
-
-  return fallback
-}
-
 function normAgentCfg(input?: Partial<GlobalAgentCatalog> | null): GlobalAgentCatalog {
   return {
     root: typeof input?.root === "string" ? input.root : "",
@@ -304,8 +293,8 @@ async function loadAgent(): Promise<Out<AgentData>> {
       cfg: doc,
     },
     err: [
-      ...(run.status === "rejected" ? [note(run.reason, "Failed to load agent runtime")] : []),
-      ...(cfg.status === "rejected" ? [note(cfg.reason, "Failed to load agent config")] : []),
+      ...(run.status === "rejected" ? [note(run.reason, "加载 agent 运行时列表失败")] : []),
+      ...(cfg.status === "rejected" ? [note(cfg.reason, "加载 agent 配置失败")] : []),
     ]
       .filter(Boolean)
       .join("; "),
@@ -326,9 +315,9 @@ async function loadProvider(): Promise<Out<ProviderData>> {
   return {
     data: buildProvider(list, cfg, map),
     err: [
-      ...(providers.status === "rejected" ? [note(providers.reason, "Failed to load provider list")] : []),
-      ...(config.status === "rejected" ? [note(config.reason, "Failed to load provider config")] : []),
-      ...(auth.status === "rejected" ? [note(auth.reason, "Failed to load provider auth")] : []),
+      ...(providers.status === "rejected" ? [note(providers.reason, "加载提供商列表失败")] : []),
+      ...(config.status === "rejected" ? [note(config.reason, "加载提供商配置失败")] : []),
+      ...(auth.status === "rejected" ? [note(auth.reason, "加载提供商认证信息失败")] : []),
     ]
       .filter(Boolean)
       .join("; "),
@@ -344,8 +333,8 @@ async function loadMcp(): Promise<Out<McpData>> {
       map: map.status === "fulfilled" ? map.value : emptyMcp.map,
     },
     err: [
-      ...(doc.status === "rejected" ? [note(doc.reason, "Failed to load MCP config")] : []),
-      ...(map.status === "rejected" ? [note(map.reason, "Failed to load MCP status")] : []),
+      ...(doc.status === "rejected" ? [note(doc.reason, "加载 MCP 配置失败")] : []),
+      ...(map.status === "rejected" ? [note(map.reason, "加载 MCP 状态失败")] : []),
     ]
       .filter(Boolean)
       .join("; "),
@@ -368,8 +357,8 @@ async function loadSkill(): Promise<Out<SkillData>> {
       cfg: doc,
     },
     err: [
-      ...(run.status === "rejected" ? [note(run.reason, "Failed to load skill runtime")] : []),
-      ...(cfg.status === "rejected" ? [note(cfg.reason, "Failed to load skill config")] : []),
+      ...(run.status === "rejected" ? [note(run.reason, "加载 skill 运行时列表失败")] : []),
+      ...(cfg.status === "rejected" ? [note(cfg.reason, "加载 skill 配置失败")] : []),
     ]
       .filter(Boolean)
       .join("; "),
@@ -389,7 +378,7 @@ async function loadWorkspace(): Promise<Out<WorkspaceData>> {
   } catch (err) {
     return {
       data: emptyWorkspace,
-      err: note(err, "Failed to load workspaces"),
+      err: note(err, "加载工作区失败"),
     }
   }
 }
@@ -451,7 +440,7 @@ export function GlobalDataProvider(props: { children: ReactNode }) {
         const prev = ref.current[key] as Box<DataMap[K]>
         const next = {
           ...prev,
-          err: note(err, `Failed to load ${key}`),
+          err: note(err, `加载 ${key} 数据失败`),
           load: false,
           ready: true,
           stale: false,
@@ -582,7 +571,7 @@ export function GlobalDataProvider(props: { children: ReactNode }) {
 export function useGlobalData() {
   const ctx = useContext(Ctx)
   if (!ctx) {
-    throw new Error("GlobalDataProvider is missing")
+    throw new Error("缺少 GlobalDataProvider 上下文")
   }
   return ctx
 }

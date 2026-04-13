@@ -130,7 +130,7 @@ export function ProjectComposerProvider(props: { children: ReactNode }) {
 export function useProjectComposerValue(scope?: string) {
   const ctx = useContext(Ctx)
   if (!ctx) {
-    throw new Error("ProjectComposerProvider is missing")
+    throw new Error("缺少 ProjectComposerProvider 上下文")
   }
   return {
     ready: ctx.ready,

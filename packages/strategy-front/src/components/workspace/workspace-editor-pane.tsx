@@ -1,14 +1,12 @@
 import type { ReactNode } from "react"
-import { useCallback, useEffect, useMemo, useReducer, useRef } from "react"
+import { useEffect, useMemo } from "react"
 import { RefreshCw, Save } from "lucide-react"
-import { toast } from "sonner"
-import { workspaceApi } from "@/api/modules/workspace"
 import { Button } from "@/components/ui/button"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { WorkspaceCodeEditor } from "@/components/workspace/workspace-code-editor"
 import { WorkspaceFileTabs } from "@/components/workspace/workspace-file-tabs"
 import { WorkspaceFileTree } from "@/components/workspace/workspace-file-tree"
-import { init, reduce } from "@/lib/workspace-editor-reducer"
+import { useWorkspaceEditor } from "@/hooks/use-workspace-editor"
 import type { LocalWorkspace } from "@/types/workspace"
 
 interface Props {
@@ -20,147 +18,26 @@ interface Props {
 }
 
 export function WorkspaceEditorPane(props: Props) {
-  const [state, dispatch] = useReducer(reduce, props.workspace.path, init)
-  const cur = useRef(props.workspace.path)
-  const last = useRef(props.workspace.path)
-
-  useEffect(() => {
-    cur.current = props.workspace.path
-  }, [props.workspace.path])
-
-  const load = useCallback(
-    async (force?: boolean) => {
-      const ws = props.workspace.path
-      const reset = last.current !== ws
-      dispatch({ type: "load_start", ws, reset })
-
-      try {
-        const data = await workspaceApi.getWorkspaceFiles(ws)
-        if (cur.current !== ws) {
-          return
-        }
-        const paths = (data.files ?? []).map((item) => item.path).sort()
-        const seen = new Set(paths)
-        const active = reset ? (props.path && seen.has(props.path) ? props.path : (paths[0] ?? null)) : null
-        dispatch({ type: "files_loaded", ws, paths, active, force: !!force })
-        last.current = ws
-      } catch (err) {
-        console.error("failed to load workspace files", err)
-        if (cur.current === ws) {
-          dispatch({ type: "load_failed", ws, error: "加载工作区文件失败" })
-          last.current = ws
-        }
-      }
-    },
-    [props.path, props.workspace.path],
-  )
-
-  useEffect(() => {
-    void load()
-  }, [load])
+  const editor = useWorkspaceEditor({
+    workspace: props.workspace,
+    path: props.path,
+    readonly: props.readonly,
+  })
 
   const tree = useMemo(() => {
     if (!props.paths || props.paths.length === 0) {
-      return state.paths
+      return editor.paths
     }
     const seen = new Set(props.paths)
-    return state.paths.filter((item) => seen.has(item))
-  }, [props.paths, state.paths])
+    return editor.paths.filter((item) => seen.has(item))
+  }, [editor.paths, props.paths])
 
   useEffect(() => {
-    if (!props.path || !tree.includes(props.path)) {
+    if (!editor.active || tree.includes(editor.active)) {
       return
     }
-    dispatch({ type: "tab_opened", path: props.path })
-  }, [props.path, tree])
-
-  useEffect(() => {
-    if (!state.active || tree.includes(state.active)) {
-      return
-    }
-    dispatch({ type: "active_set", path: tree[0] ?? null })
-  }, [state.active, tree])
-
-  const read = useCallback(
-    async (path: string, force?: boolean) => {
-      if (state.busy[path] || (state.files[path] && !force)) {
-        return
-      }
-
-      const ws = props.workspace.path
-      dispatch({ type: "file_load_started", path })
-
-      try {
-        const data = await workspaceApi.getWorkspaceFileContent(ws, path)
-        if (cur.current !== ws) {
-          return
-        }
-        dispatch({ type: "file_load_succeeded", path, data })
-      } catch (err) {
-        console.error("failed to load workspace file content", err)
-        if (cur.current === ws) {
-          dispatch({ type: "file_load_failed", path, error: "这个文件暂不支持预览" })
-        }
-      }
-    },
-    [props.workspace.path, state.busy, state.files],
-  )
-
-  useEffect(() => {
-    if (!state.active || state.files[state.active] || state.busy[state.active]) {
-      return
-    }
-    void read(state.active)
-  }, [read, state.active, state.busy, state.files])
-
-  const change = useCallback(
-    (value: string) => {
-      if (!state.active) {
-        return
-      }
-      dispatch({ type: "draft_changed", path: state.active, value })
-    },
-    [state.active],
-  )
-
-  const save = useCallback(async () => {
-    if (!state.active || props.readonly) {
-      return
-    }
-
-    const file = state.files[state.active]
-    if (!file?.previewable || file.binary || file.truncated || !state.dirty[state.active]) {
-      return
-    }
-
-    const path = state.active
-    const body = state.drafts[path] ?? file.content
-    const ws = props.workspace.path
-    dispatch({ type: "save_started", path })
-
-    try {
-      const data = await workspaceApi.saveWorkspaceFileContent(ws, path, body)
-      if (cur.current !== ws) {
-        return
-      }
-      dispatch({ type: "save_succeeded", path, data })
-      toast.success(`已保存 ${path}`)
-    } catch (err) {
-      console.error("failed to save workspace file content", err)
-      if (cur.current === ws) {
-        dispatch({ type: "save_failed", path, error: "保存文件失败" })
-      }
-      toast.error("保存文件失败")
-    }
-  }, [props.readonly, props.workspace.path, state.active, state.dirty, state.drafts, state.files])
-
-  const file = state.active ? (state.files[state.active] ?? null) : null
-  const fileError = state.active ? (state.errs[state.active] ?? null) : null
-  const fileLoading = state.active ? (state.busy[state.active] ?? false) : false
-  const fileSaving = state.active ? (state.saving[state.active] ?? false) : false
-  const value = state.active ? (state.drafts[state.active] ?? state.files[state.active]?.content ?? "") : ""
-  const lock = !!props.readonly || !!file?.truncated || (!file?.previewable && !fileLoading)
-  const count = useMemo(() => Object.values(state.dirty).filter(Boolean).length, [state.dirty])
+    editor.setActive(tree[0] ?? null)
+  }, [editor.active, editor.setActive, tree])
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col bg-background">
@@ -172,43 +49,43 @@ export function WorkspaceEditorPane(props: Props) {
         <ResizablePanel defaultSize={76} minSize={420} className="min-h-0 min-w-0">
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <WorkspaceFileTabs
-              open={state.open}
-              active={state.active}
-              onPick={(path) => dispatch({ type: "active_set", path })}
-              onClose={(path) => dispatch({ type: "tab_closed", path })}
+              open={editor.open}
+              active={editor.active}
+              onPick={editor.setActive}
+              onClose={editor.close}
               side={
                 <>
-                  {count > 0 ? (
+                  {editor.dirtyCount > 0 ? (
                     <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-amber-700">
-                      {count} 未保存
+                      {editor.dirtyCount} 未保存
                     </span>
                   ) : null}
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => void save()}
-                    disabled={lock || !state.active || !state.dirty[state.active] || fileSaving}
+                    onClick={() => void editor.save()}
+                    disabled={editor.lock || !editor.active || !editor.dirty[editor.active] || editor.fileSaving}
                   >
                     <Save className="size-4" />
-                    {fileSaving ? "保存中..." : "保存"}
+                    {editor.fileSaving ? "保存中..." : "保存"}
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => void load(true)} disabled={state.loading}>
-                    <RefreshCw className={`size-4 ${state.loading ? "animate-spin" : ""}`} />
-                    {state.loading ? "刷新中..." : "刷新"}
+                  <Button size="sm" variant="outline" onClick={() => void editor.load(true)} disabled={editor.loading}>
+                    <RefreshCw className={`size-4 ${editor.loading ? "animate-spin" : ""}`} />
+                    {editor.loading ? "刷新中..." : "刷新"}
                   </Button>
                 </>
               }
             />
             <WorkspaceCodeEditor
-              loading={state.loading || fileLoading}
-              error={state.error || fileError}
-              activeFilePath={state.active}
-              file={file}
-              value={value}
-              readonly={lock}
-              onChange={change}
+              loading={editor.loading || editor.fileLoading}
+              error={editor.error || editor.fileError}
+              activeFilePath={editor.active}
+              file={editor.file}
+              value={editor.value}
+              readonly={editor.lock}
+              onChange={editor.change}
               onSave={() => {
-                void save()
+                void editor.save()
               }}
             />
           </div>
@@ -225,8 +102,8 @@ export function WorkspaceEditorPane(props: Props) {
             </div>
             <WorkspaceFileTree
               filePaths={tree}
-              activeFilePath={state.active}
-              onSelectFile={(path) => dispatch({ type: "tab_opened", path })}
+              activeFilePath={editor.active}
+              onSelectFile={editor.show}
             />
           </div>
         </ResizablePanel>
