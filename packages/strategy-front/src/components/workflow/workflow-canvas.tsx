@@ -19,6 +19,7 @@ import { Boxes, Trash2 } from "lucide-react"
 import "@xyflow/react/dist/style.css"
 import { WorkflowMiniToolbar } from "@/components/workflow/workflow-mini-toolbar"
 import { workflowNodeTypes } from "@/components/workflow/workflow-node"
+import { edgeCond } from "@/lib/workflow-runtime"
 import { makeNode } from "@/types/workflow"
 import type { WorkflowDetail, WorkflowFlowEdge, WorkflowFlowNode, WorkflowKind, WorkflowSeed } from "@/types/workflow"
 
@@ -33,7 +34,7 @@ const tone = (active = false) => ({
 function edgeStyle(edge: WorkflowFlowEdge, active = false) {
   return {
     ...edge,
-    type: "smoothstep" as const,
+    type: "straight" as const,
     animated: false,
     selected: active,
     style: tone(active),
@@ -74,6 +75,10 @@ function decorate(edge: WorkflowFlowEdge, active = false) {
     },
     active,
   )
+}
+
+function cond(nodes: WorkflowFlowNode[], id?: string | null) {
+  return edgeCond(nodes.find((item) => item.id === id)?.data.kind)
 }
 
 export function WorkflowCanvas(props: {
@@ -181,7 +186,7 @@ export function WorkflowCanvas(props: {
         elevateEdgesOnSelect
         edgesReconnectable
         defaultEdgeOptions={{
-          type: "smoothstep",
+          type: "straight",
           style: tone(),
           interactionWidth: 32,
           markerEnd: {
@@ -214,10 +219,10 @@ export function WorkflowCanvas(props: {
                 ...conn,
                 animated: false,
                 label: undefined,
-                data: { cond: "always" },
+                data: { cond: cond(nodes, conn.source) },
               },
               prev,
-            ).map((item) => decorate(item))
+            ).map((item) => decorate(item)),
           )
         }
         onReconnect={(old, conn) =>

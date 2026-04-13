@@ -27,12 +27,22 @@ interface Props {
 const chip =
   "rounded-full border border-black/8 bg-black/[0.03] px-2.5 py-1 text-[11px] text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]"
 
+function current(rows: Props["chat"]["rows"], id?: string) {
+  return (
+    rows.find((item) => item.status === "running" || item.status === "waiting") ||
+    rows.find((item) => item.node_id === id) ||
+    rows[0] ||
+    null
+  )
+}
+
 export function StrategyWorkflowPanel(props: Props) {
   const draft = useSessionDraft(props.workspace.path, props.chat.selectedSessionId)
   const files = useSessionFiles(props.workspace.path, props.chat.selectedSessionId)
   const todo = useChatTodo(props.workspace.path, props.chat.selectedSessionId, props.chat.busy || !!props.chat.openWait)
   const bound = !!props.chat.state?.workflow_id && !!props.chat.flow
-  const node = props.chat.flow?.nodes.find((item) => item.id === props.chat.run?.current_node_id) ?? null
+  const row = current(props.chat.rows, props.chat.run?.current_node_id)
+  const node = props.chat.flow?.nodes.find((item) => item.id === (row?.node_id || props.chat.run?.current_node_id)) ?? null
   const source = node?.model_provider_id && node?.model_id ? "node override" : "workspace default"
 
   const submit = async () => {
