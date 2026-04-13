@@ -1,5 +1,7 @@
 import { request } from "@/api/client";
 import type {
+  AttachWorkspaceRequest,
+  AttachWorkspaceResponse,
   CreateWorkspaceRequest,
   CreateWorkspaceResponse,
   ImportWorkspaceRequest,
@@ -34,6 +36,16 @@ export const workspaceApi = {
     return request.post<OpenWorkspaceResponse, OpenWorkspaceRequest>(
       "/workspace/open",
       { path, git: true },
+    );
+  },
+
+  attachWorkspace(path: string, type?: "smartx" | "python" | "js" | "other") {
+    return request.post<AttachWorkspaceResponse, AttachWorkspaceRequest>(
+      "/workspace/attach",
+      { path, type },
+      {
+        timeout: 45000,
+      },
     );
   },
 

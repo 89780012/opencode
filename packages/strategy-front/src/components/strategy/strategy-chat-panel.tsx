@@ -45,6 +45,8 @@ interface Props {
   variants: string[]
   creating: boolean
   load?: boolean
+  showAgent?: boolean
+  showModel?: boolean
   onCreate: () => Promise<string>
   onSelectSession: (value: string | null) => void
   onAgent: (value: string) => void
@@ -209,6 +211,8 @@ export function StrategyChatPanel(props: Props) {
               }}
               onValueChange={draft.setText}
               onVariant={props.onVariant}
+              showAgent={props.showAgent}
+              showModel={props.showModel}
               submitting={submitting || props.creating || props.sessionLoading}
               value={draft.text}
               variant={props.variant}

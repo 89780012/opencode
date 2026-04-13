@@ -169,6 +169,65 @@ func (s *Service) initGit(ctx context.Context, dir string) error {
 	return err
 }
 
+func git(dir string) bool {
+	_, err := os.Stat(filepath.Join(dir, ".git"))
+	return err == nil
+}
+
+func (s *Service) resolveGit(ctx context.Context) (rt.Result, error) {
+	if s.rt != nil {
+		return s.rt.Resolve(ctx, "git")
+	}
+
+	path, err := exec.LookPath("git")
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			return rt.Result{
+				ID:      "git",
+				Message: "command not found",
+			}, nil
+		}
+		return rt.Result{}, err
+	}
+
+	return rt.Result{
+		ID:     "git",
+		Found:  true,
+		Source: rt.SourceSystem,
+		Path:   path,
+		Dir:    filepath.Dir(path),
+	}, nil
+}
+
+func (s *Service) ensureGit(ctx context.Context, dir string) (GitState, error) {
+	row, err := s.resolveGit(ctx)
+	if err != nil {
+		return GitState{}, err
+	}
+
+	out := GitState{
+		Repo:      git(dir),
+		Available: row.Found,
+	}
+	if row.Found {
+		out.Source = string(row.Source)
+	}
+	if out.Repo {
+		return out, nil
+	}
+	if !row.Found {
+		return out, os.ErrNotExist
+	}
+
+	if err := s.initGit(ctx, dir); err != nil {
+		return out, err
+	}
+
+	out.Repo = true
+	out.Initialized = true
+	return out, nil
+}
+
 func gitEnv(env []string, row rt.Result) []string {
 	if row.Source != rt.SourceBuiltin {
 		return env
@@ -333,7 +392,7 @@ func (s *Service) Create(name string, kind string, template string, git bool) (C
 	}
 
 	if git {
-		err = s.initGit(context.Background(), path)
+		_, err = s.ensureGit(context.Background(), path)
 		if err != nil {
 			slog.Error("workspace create: git init failed", "path", path, "error", err)
 			_ = os.RemoveAll(path)
@@ -366,7 +425,7 @@ func (s *Service) Open(path string, git bool) (OpenResult, error) {
 	}
 
 	if git {
-		err = s.initGit(context.Background(), dir)
+		_, err = s.ensureGit(context.Background(), dir)
 		if err != nil {
 			slog.Error("workspace open: git init failed", "dir", dir, "error", err)
 			return OpenResult{}, err
@@ -406,7 +465,7 @@ func (s *Service) Import(path string, typ string, git bool) (OpenResult, error) 
 	}
 
 	if git {
-		err = s.initGit(context.Background(), dir)
+		_, err = s.ensureGit(context.Background(), dir)
 		if err != nil {
 			return OpenResult{}, err
 		}
@@ -442,6 +501,58 @@ func (s *Service) Import(path string, typ string, git bool) (OpenResult, error) 
 	return OpenResult{
 		BasePath:  dir,
 		Workspace: row,
+	}, nil
+}
+
+func (s *Service) Attach(ctx context.Context, path string, typ string) (AttachResult, error) {
+	slog.Info("workspace attach", "path", path, "type", typ)
+	dir := filepath.Clean(strings.TrimSpace(path))
+	if dir == "" {
+		return AttachResult{}, errors.New("path is required")
+	}
+
+	info, err := os.Stat(dir)
+	if err != nil {
+		return AttachResult{}, err
+	}
+	if !info.IsDir() {
+		return AttachResult{}, os.ErrInvalid
+	}
+
+	state, err := s.ensureGit(ctx, dir)
+	if err != nil {
+		return AttachResult{}, err
+	}
+
+	row := local(dir)
+	if row.Type == "" {
+		row.Type = kind(typ)
+	}
+	if row.Type == "" {
+		row.Type = "other"
+	}
+	if len(row.Keywords) == 0 {
+		row.Keywords = uniq([]string{row.Name, row.Type})
+	}
+
+	old, err := s.pick(dir)
+	if err == nil {
+		row.ID = old.ID
+		row.Source = old.Source
+		row.Managed = old.Managed
+	} else {
+		row.ID = next()
+		row.Source = "external"
+		row.Managed = false
+	}
+
+	if err := s.put(row); err != nil {
+		return AttachResult{}, err
+	}
+
+	return AttachResult{
+		Workspace: row,
+		Git:       state,
 	}, nil
 }
 

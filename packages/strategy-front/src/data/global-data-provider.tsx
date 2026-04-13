@@ -209,7 +209,10 @@ function normWorkspace(item: LocalWorkspace): LocalWorkspace {
     entry_file: typeof item.entry_file === "string" ? item.entry_file : undefined,
     keywords: item.keywords ?? [],
     source:
-      item.source === "default_plugin" || item.source === "user_created" || item.source === "imported"
+      item.source === "default_plugin" ||
+      item.source === "user_created" ||
+      item.source === "imported" ||
+      item.source === "external"
         ? item.source
         : undefined,
     managed: !!item.managed,

@@ -15,6 +15,17 @@ type Local struct {
 	UpdatedAt int64    `json:"updated_at"`
 }
 
+type GitState struct {
+	Repo        bool   `json:"repo"`
+	Initialized bool   `json:"initialized"`
+	Available   bool   `json:"available"`
+	Source      string `json:"source,omitempty"`
+}
+
+type RuntimeState struct {
+	OpencodeReady bool `json:"opencode_ready"`
+}
+
 type ListResult struct {
 	BasePath   string  `json:"base_path"`
 	Workspaces []Local `json:"workspaces"`
@@ -28,6 +39,12 @@ type CreateResult struct {
 type OpenResult struct {
 	BasePath  string `json:"base_path"`
 	Workspace Local  `json:"workspace"`
+}
+
+type AttachResult struct {
+	Workspace Local        `json:"workspace"`
+	Git       GitState     `json:"git"`
+	Runtime   RuntimeState `json:"runtime"`
 }
 
 type File struct {

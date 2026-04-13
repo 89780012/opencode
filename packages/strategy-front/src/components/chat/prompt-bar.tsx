@@ -25,6 +25,7 @@ interface Props {
   canImage?: boolean
   submitting?: boolean
   showAgent?: boolean
+  showModel?: boolean
   agents: string[]
   models: ComposerModel[]
   agent?: string
@@ -48,6 +49,7 @@ const menu = "custom-scrollbar max-h-[240px] overflow-y-auto rounded-md border-b
 export function PromptBar(props: Props) {
   const { model, models, onModel } = props
   const showAgent = props.showAgent !== false
+  const showModel = props.showModel !== false
   const pick = models.some((item) => `${item.provider.id}/${item.id}` === model)
     ? (model ?? "")
     : models[0]
@@ -68,7 +70,7 @@ export function PromptBar(props: Props) {
   const vision = (on: boolean) =>
     on ? (
       <span className="shrink-0 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-500/12 dark:text-emerald-300">
-        识图
+        璇嗗浘
       </span>
     ) : null
 
@@ -84,21 +86,21 @@ export function PromptBar(props: Props) {
 
   const add = async (list: FileList | File[]) => {
     if (!props.canImage) {
-      fail("当前模型不支持图片输入。")
+      fail("褰撳墠妯″瀷涓嶆敮鎸佸浘鐗囪緭鍏ャ€?")
       return
     }
 
     const next = [...props.files]
     for (const file of Array.from(list)) {
       if (next.length >= imageCount) {
-        fail(`最多只能上传 ${imageCount} 张图片。`)
+        fail(`鏈€澶氬彧鑳戒笂浼?${imageCount} 寮犲浘鐗囥€俙`)
         break
       }
       const out = await imagePart(file)
       if ("err" in out) {
-        if (out.err === "type") fail("仅支持 PNG、JPEG、GIF 和 WEBP 图片。")
-        if (out.err === "size") fail("每张图片必须小于等于 10MB。")
-        if (out.err === "read") fail("读取所选图片失败。")
+        if (out.err === "type") fail("浠呮敮鎸?PNG銆丣PEG銆丟IF 鍜?WEBP 鍥剧墖銆?")
+        if (out.err === "size") fail("姣忓紶鍥剧墖蹇呴』灏忎簬绛変簬 10MB銆?")
+        if (out.err === "read") fail("璇诲彇鎵€閫夊浘鐗囧け璐ゃ€?")
         continue
       }
       next.push(out.part)
@@ -148,14 +150,14 @@ export function PromptBar(props: Props) {
         />
         {!props.canImage && props.files.length > 0 ? (
           <div className="mb-2 rounded-xl border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-200">
-            发送图片前请切换到其他模型
+            鍙戦€佸浘鐗囧墠璇峰垏鎹㈠埌鍏朵粬妯″瀷
           </div>
         ) : null}
         <PromptInputTextarea
           className={tone}
           maxHeight={max}
           minHeight={area}
-          placeholder="输入你的消息..."
+          placeholder="杈撳叆浣犵殑娑堟伅..."
           onPaste={(event) => {
             const files = Array.from(event.clipboardData?.files ?? [])
             if (files.length === 0) return
@@ -173,7 +175,7 @@ export function PromptBar(props: Props) {
               value={props.agent ?? ""}
             >
               <SelectTrigger className={`${ctrl} ${item} ${agent} px-2.5`}>
-                <SelectValue placeholder="选择智能体" />
+                <SelectValue placeholder="閫夋嫨鏅鸿兘浣?" />
               </SelectTrigger>
               <SelectContent align="start" className={menu} position="popper">
                 {props.agents.map((item) => (
@@ -184,35 +186,37 @@ export function PromptBar(props: Props) {
               </SelectContent>
             </Select>
           ) : null}
-          <Select disabled={props.disabled || models.length === 0} onValueChange={props.onModel} value={pick}>
-            <SelectTrigger className={`${ctrl} ${item} ${modelw} px-2`}>
-              {cur ? (
-                <div className="flex min-w-0 items-center gap-1.5">
-                  <span className="truncate">{`${cur.id} (${cur.provider.id})`}</span>
-                  {vision(imageModel(cur))}
-                </div>
-              ) : (
-                <SelectValue placeholder="选择模型" />
-              )}
-            </SelectTrigger>
-            <SelectContent align="start" className={menu} position="popper">
-              {models.map((item) => (
-                <SelectItem key={`${item.provider.id}/${item.id}`} value={`${item.provider.id}/${item.id}`}>
+          {showModel ? (
+            <Select disabled={props.disabled || models.length === 0} onValueChange={props.onModel} value={pick}>
+              <SelectTrigger className={`${ctrl} ${item} ${modelw} px-2`}>
+                {cur ? (
                   <div className="flex min-w-0 items-center gap-1.5">
-                    <span className="truncate">{`${item.id} (${item.provider.id})`}</span>
-                    {vision(imageModel(item))}
+                    <span className="truncate">{`${cur.id} (${cur.provider.id})`}</span>
+                    {vision(imageModel(cur))}
                   </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+                ) : (
+                  <SelectValue placeholder="閫夋嫨妯″瀷" />
+                )}
+              </SelectTrigger>
+              <SelectContent align="start" className={menu} position="popper">
+                {models.map((item) => (
+                  <SelectItem key={`${item.provider.id}/${item.id}`} value={`${item.provider.id}/${item.id}`}>
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <span className="truncate">{`${item.id} (${item.provider.id})`}</span>
+                      {vision(imageModel(item))}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : null}
           <PromptInputButton
             className={`${upload} rounded-md p-0`}
             disabled={props.disabled}
-            aria-label="上传图片"
+            aria-label="涓婁紶鍥剧墖"
             onClick={() => {
               if (!props.canImage) {
-                fail("当前模型不支持图片输入。")
+                fail("褰撳墠妯″瀷涓嶆敮鎸佸浘鐗囪緭鍏ャ€?")
                 return
               }
               ref.current?.click()

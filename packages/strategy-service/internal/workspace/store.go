@@ -157,7 +157,7 @@ func kind(value string) string {
 
 func source(value string) string {
 	value = strings.ToLower(strings.TrimSpace(value))
-	if value == "default_plugin" || value == "user_created" || value == "imported" {
+	if value == "default_plugin" || value == "user_created" || value == "imported" || value == "external" {
 		return value
 	}
 	return ""

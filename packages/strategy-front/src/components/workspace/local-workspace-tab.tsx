@@ -28,6 +28,7 @@ function note(err: unknown, text: string) {
 export function LocalWorkspaceTab(props: Props) {
   const { basePath, error, loading, refresh, select, selected, workspaces } = useWorkspaceList()
   const selectedPath = selected?.path ?? null
+  const list = workspaces.filter((item) => item.source !== "external")
   const [createOpen, setCreateOpen] = useState(false)
   const [openOpen, setOpenOpen] = useState(false)
 
@@ -82,7 +83,7 @@ export function LocalWorkspaceTab(props: Props) {
               loading={loading}
               error={error}
               basePath={basePath}
-              workspaces={workspaces}
+              workspaces={list}
               selectedPath={selectedPath}
               onRetry={() => {
                 void onRefresh()
@@ -118,7 +119,7 @@ export function LocalWorkspaceTab(props: Props) {
                 loading={loading}
                 error={error}
                 basePath={basePath}
-                workspaces={workspaces}
+                workspaces={list}
                 selectedPath={selectedPath}
                 onRetry={() => {
                   void onRefresh()

@@ -52,6 +52,7 @@ export function useStrategySession(path?: string | null) {
       detailLoading: detail.loading,
       sessionLoading: chat.loading,
       ensure: chat.ensureSessions,
+      reloadSessions: chat.refreshSessions,
     }),
     [abortSession, busy, chat, detail, room.err, room.load, room.phase, room.state],
   )

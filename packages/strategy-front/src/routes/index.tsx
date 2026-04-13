@@ -3,7 +3,9 @@ import { createBrowserRouter, Navigate, RouterProvider, useLocation } from "reac
 
 const StartupPage = lazy(() => import("@/pages/startup"))
 const AppShellPage = lazy(() => import("@/pages/app-shell"))
+const EmbedShellPage = lazy(() => import("@/pages/embed-shell"))
 const IndexPage = lazy(() => import("@/pages/index"))
+const EmbedSessionPage = lazy(() => import("@/pages/embed-session"))
 const StrategiesPage = lazy(() => import("@/pages/strategies"))
 const StrategyDetailPage = lazy(() => import("@/pages/strategy-detail"))
 const StrategyWorkflowChatPage = lazy(() => import("@/pages/strategy-workflow-chat"))
@@ -129,6 +131,16 @@ const router = createBrowserRouter([
       {
         path: "skills",
         element: <SkillPage />,
+      },
+    ],
+  },
+  {
+    path: "/embed",
+    element: <EmbedShellPage />,
+    children: [
+      {
+        path: "session",
+        element: <EmbedSessionPage />,
       },
     ],
   },

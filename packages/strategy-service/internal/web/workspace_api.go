@@ -1,7 +1,10 @@
 package web
 
 import (
+	"context"
 	"log/slog"
+	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -63,6 +66,38 @@ func (a *API) workspaceOpen(c *gin.Context) {
 		return
 	}
 
+	ok(c, data)
+}
+
+func (a *API) workspaceAttach(c *gin.Context) {
+	body := struct {
+		Path string `json:"path"`
+		Type string `json:"type"`
+	}{}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		slog.Warn("workspace attach bad request", "error", err)
+		bad(c, err)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 45*time.Second)
+	defer cancel()
+
+	slog.Info("workspace attach", "path", body.Path, "type", body.Type)
+	if err := a.op.Ensure(ctx); err != nil {
+		slog.Error("workspace attach: opencode unavailable", "path", body.Path, "error", err)
+		fail(c, http.StatusServiceUnavailable, err.Error(), nil)
+		return
+	}
+
+	data, err := a.ws.Attach(ctx, body.Path, body.Type)
+	if err != nil {
+		slog.Error("workspace attach failed", "path", body.Path, "error", err)
+		bad(c, err)
+		return
+	}
+
+	data.Runtime.OpencodeReady = true
 	ok(c, data)
 }
 

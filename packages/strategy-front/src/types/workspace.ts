@@ -7,7 +7,7 @@ export interface LocalWorkspace {
   entry_file?: string;
   keywords: string[];
   vcs?: "git";
-  source?: "default_plugin" | "user_created" | "imported";
+  source?: "default_plugin" | "user_created" | "imported" | "external";
   managed?: boolean;
   missing?: boolean;
   updated_at?: number;
@@ -44,6 +44,28 @@ export interface ImportWorkspaceRequest {
 export interface OpenWorkspaceResponse {
   base_path: string;
   workspace: LocalWorkspace;
+}
+
+export interface AttachWorkspaceRequest {
+  path: string;
+  type?: "smartx" | "python" | "js" | "other";
+}
+
+export interface AttachWorkspaceGitState {
+  repo: boolean;
+  initialized: boolean;
+  available: boolean;
+  source?: "config" | "builtin" | "system";
+}
+
+export interface AttachWorkspaceRuntimeState {
+  opencode_ready: boolean;
+}
+
+export interface AttachWorkspaceResponse {
+  workspace: LocalWorkspace;
+  git: AttachWorkspaceGitState;
+  runtime: AttachWorkspaceRuntimeState;
 }
 
 export interface WorkspaceFile {

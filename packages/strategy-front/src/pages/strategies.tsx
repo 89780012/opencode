@@ -35,7 +35,9 @@ export default function StrategiesPage() {
 
   const list = useMemo(() => {
     const key = q.trim().toLowerCase()
-    const base = [...workspaces].sort((a, b) => (b.updated_at ?? 0) - (a.updated_at ?? 0))
+    const base = workspaces
+      .filter((item) => item.source !== "external")
+      .sort((a, b) => (b.updated_at ?? 0) - (a.updated_at ?? 0))
     return base.filter((item) => {
       if (!key) return true
       return (

@@ -80,6 +80,7 @@ func (a *API) Register(r *gin.Engine) {
 	ws := api.Group("/workspace")
 	ws.GET("/list", a.workspaceList)
 	ws.POST("/create", a.workspaceCreate)
+	ws.POST("/attach", a.workspaceAttach)
 	ws.POST("/import", a.workspaceImport)
 	ws.POST("/delete", a.workspaceDelete)
 	ws.POST("/open", a.workspaceOpen)
