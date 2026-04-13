@@ -6,7 +6,6 @@ export interface LocalWorkspace {
   template?: string;
   entry_file?: string;
   keywords: string[];
-  vcs?: "git";
   source?: "default_plugin" | "user_created" | "imported" | "external";
   managed?: boolean;
   missing?: boolean;

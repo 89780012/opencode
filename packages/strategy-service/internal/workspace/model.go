@@ -8,7 +8,6 @@ type Local struct {
 	Template  string   `json:"template,omitempty"`
 	EntryFile string   `json:"entry_file,omitempty"`
 	Keywords  []string `json:"keywords"`
-	VCS       string   `json:"vcs,omitempty"`
 	Source    string   `json:"source,omitempty"`
 	Managed   bool     `json:"managed,omitempty"`
 	Missing   bool     `json:"missing,omitempty"`

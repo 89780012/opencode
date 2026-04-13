@@ -142,7 +142,7 @@ func (s *Service) remember(row Local, src string, managed bool) Local {
 
 // List 返回当前已登记的工作区列表。
 func (s *Service) List() (ListResult, error) {
-	base, err := base()
+	base, err := pluginDir()
 	if err != nil {
 		slog.Error("workspace list: base path error", "error", err)
 		return ListResult{}, err
@@ -273,9 +273,9 @@ func (s *Service) ensureGit(ctx context.Context, dir string) (GitState, error) {
 // workspaceRoot 根据类型选择默认落盘目录。
 func workspaceRoot(kind string) (string, error) {
 	if strings.EqualFold(strings.TrimSpace(kind), "smartx") {
-		return base()
+		return pluginDir()
 	}
-	return root()
+	return workspaceDir()
 }
 
 // put 将工作区记录按路径写回索引文件。
@@ -347,7 +347,7 @@ func (s *Service) Create(name string, kind string, template string, git bool) (C
 		return CreateResult{}, err
 	}
 
-	err = valid(name)
+	err = validPath(name)
 	if err != nil {
 		slog.Warn("workspace create: invalid name", "name", name, "error", err)
 		return CreateResult{}, err
@@ -543,7 +543,7 @@ func (s *Service) Content(path string, file string) (FileContentResult, error) {
 		return FileContentResult{}, err
 	}
 
-	target, err := safe(dir, filepath.Join(dir, file))
+	target, err := fullPath(dir, filepath.Join(dir, file))
 	if err != nil {
 		slog.Error("workspace content: safe file error", "file", file, "error", err)
 		return FileContentResult{}, err
@@ -592,7 +592,7 @@ func (s *Service) Write(path string, file string, body string) (FileContentResul
 		return FileContentResult{}, err
 	}
 
-	target, err := safe(dir, filepath.Join(dir, file))
+	target, err := fullPath(dir, filepath.Join(dir, file))
 	if err != nil {
 		slog.Error("workspace write: safe file error", "file", file, "error", err)
 		return FileContentResult{}, err

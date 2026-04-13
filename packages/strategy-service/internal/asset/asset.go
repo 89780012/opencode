@@ -41,14 +41,6 @@ func EnsureBuiltins() error {
 	return nil
 }
 
-func EnsureWorkspace(dir string) error {
-	dir = strings.TrimSpace(dir)
-	if dir == "" {
-		return nil
-	}
-	return sync(filepath.Join(dir, ".opencode"), "workspace/.opencode", false)
-}
-
 // EnsureMCP 将 strategy-service 的远程 MCP 配置写入用户全局 opencode 配置。
 func EnsureMCP(url string) error {
 	root, err := configRoot()

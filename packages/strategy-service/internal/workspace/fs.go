@@ -26,7 +26,7 @@ var skip = map[string]bool{
 }
 
 // base 返回 smartx 默认插件目录，并确保目录存在。
-func base() (string, error) {
+func pluginDir() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
@@ -41,7 +41,7 @@ func base() (string, error) {
 }
 
 // root 返回用户工作区根目录，并确保目录存在。
-func root() (string, error) {
+func workspaceDir() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
@@ -56,13 +56,13 @@ func root() (string, error) {
 }
 
 // safe 校验目标路径是否仍位于工作区根目录之内。
-func safe(root string, path string) (string, error) {
+func fullPath(root string, path string) (string, error) {
 	if strings.TrimSpace(path) == "" {
 		return "", errors.New("path is required")
 	}
 
-	full := filepath.Clean(path)
-	rel, err := filepath.Rel(root, full)
+	full := filepath.Clean(path)  //全路径
+	rel, err := filepath.Rel(root, full)  //相对路径
 	if err != nil {
 		return "", err
 	}
@@ -70,13 +70,13 @@ func safe(root string, path string) (string, error) {
 		return full, nil
 	}
 	if strings.HasPrefix(rel, "..") {
-		return "", errors.New("path is outside workspace root")
+		return "", errors.New("路径不在工作区内")
 	}
 	return full, nil
 }
 
 // valid 校验新建工作区名称是否合法。
-func valid(name string) error {
+func validPath(name string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return errors.New("workspace name is required")

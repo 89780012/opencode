@@ -81,12 +81,12 @@ func (s *store) save(rows []Local) error {
 
 // seed 扫描默认插件和用户工作区，生成初始索引。
 func (s *store) seed() ([]Local, error) {
-	smartx, err := base()
+	smartx, err := pluginDir()
 	if err != nil {
 		return nil, err
 	}
 
-	user, err := root()
+	user, err := workspaceDir()
 	if err != nil {
 		return nil, err
 	}
