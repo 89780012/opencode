@@ -116,8 +116,7 @@ func resolveGit(run *rt.Service, cfg Config) Config {
 	}
 
 	cfg.Opencode.GitBin = row.Path
-	cfg.Opencode.GitSource = string(row.Source)
-	slog.Info("opencode git resolved", "bin", row.Path, "source", row.Source)
+	slog.Info("opencode git resolved", "bin", row.Path)
 	return cfg
 }
 

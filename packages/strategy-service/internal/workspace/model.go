@@ -15,10 +15,9 @@ type Local struct {
 }
 
 type GitState struct {
-	Repo        bool   `json:"repo"`
-	Initialized bool   `json:"initialized"`
-	Available   bool   `json:"available"`
-	Source      string `json:"source,omitempty"`
+	Repo        bool `json:"repo"`
+	Initialized bool `json:"initialized"`
+	Available   bool `json:"available"`
 }
 
 type RuntimeState struct {

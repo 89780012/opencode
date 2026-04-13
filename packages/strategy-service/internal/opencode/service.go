@@ -17,7 +17,6 @@ type Tool struct {
 	Label     string    `json:"label"`
 	Installed bool      `json:"installed"`
 	Status    string    `json:"status"`
-	Source    string    `json:"source,omitempty"`
 	Path      string    `json:"path,omitempty"`
 	Message   string    `json:"message,omitempty"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -190,7 +189,6 @@ func (s *Service) inspect(ctx context.Context, id string) Tool {
 
 	out.Installed = true
 	out.Status = "installed"
-	out.Source = string(row.Source)
 	out.Path = row.Path
 	return out
 }
@@ -200,16 +198,12 @@ func summary(op Tool, git Tool) string {
 	if !op.Installed {
 		return "系统会优先准备 OpenCode，确保 AI 策略研发环境可以直接进入。"
 	}
-	if git.Source == string(rt.SourceBuiltin) {
-		return "启动 OpenCode 时会自动注入内置 Git。"
-	}
 	if !git.Installed {
-		return "OpenCode 已准备，但尚未激活内置 Git。"
+		return "OpenCode 已准备，但 Git 还未就绪。"
 	}
 	return "AI 策略研发环境已准备完成。"
 }
 
-// label 将内部工具名映射为更适合展示的名称。
 func label(id string) string {
 	if id == "git" {
 		return "Git"

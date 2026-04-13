@@ -26,7 +26,6 @@ type OpencodeConfig struct {
 	Startup      string
 	Bin          string
 	GitBin       string
-	GitSource    string
 	Host         string
 	Port         int
 	Cwd          string

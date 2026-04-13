@@ -170,26 +170,17 @@ func (s *Service) List() (ListResult, error) {
 
 // initGit 在目标目录中执行一次 git init。
 func (s *Service) initGit(ctx context.Context, dir string) error {
-	bin := "git"
-	src := "system"
-	env := os.Environ()
-	if s.rt != nil {
-		row, err := s.rt.Resolve(ctx, "git")
-		if err != nil {
-			return err
-		}
-		if !row.Found {
-			return os.ErrNotExist
-		}
-		bin = row.Path
-		src = string(row.Source)
-		if row.Source == rt.SourceBuiltin {
-			env = gitenv.Apply(env, row.Path, false)
-		}
+	row, err := s.resolveGit(ctx)
+	if err != nil {
+		return err
 	}
+	if !row.Found {
+		return os.ErrNotExist
+	}
+	env := gitenv.Apply(os.Environ(), row.Path, false)
 
-	slog.Info("workspace git init", "bin", bin, "dir", dir, "source", src)
-	cmd := exec.CommandContext(ctx, bin, "init", "--quiet")
+	slog.Info("workspace git init", "bin", row.Path, "dir", dir)
+	cmd := exec.CommandContext(ctx, row.Path, "init", "--quiet")
 	cmd.Dir = dir
 	cmd.Env = env
 	proc.Hide(cmd)
@@ -202,7 +193,7 @@ func (s *Service) initGit(ctx context.Context, dir string) error {
 		return nil
 	}
 	if text != "" {
-		slog.Error("workspace git init output", "bin", bin, "dir", dir, "source", src, "output", text)
+		slog.Error("workspace git init output", "bin", row.Path, "dir", dir, "output", text)
 		return errors.New(text)
 	}
 	return err
@@ -235,9 +226,6 @@ func (s *Service) ensureGit(ctx context.Context, dir string) (GitState, error) {
 	out := GitState{
 		Repo:      git(dir),
 		Available: row.Found,
-	}
-	if row.Found {
-		out.Source = string(row.Source)
 	}
 	if out.Repo {
 		return out, nil

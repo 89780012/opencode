@@ -8,7 +8,6 @@ export interface StartupTool {
   installed: boolean
   status: "installed" | "missing" | "failed"
   path?: string
-  source?: "config" | "builtin" | "system"
   message?: string
   updated_at: string
 }

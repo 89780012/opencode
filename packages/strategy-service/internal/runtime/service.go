@@ -14,6 +14,7 @@ type Service struct{}
 
 func New() *Service { return &Service{} }
 
+// 获取opencode、git路径
 func (s *Service) Resolve(_ context.Context, id string) (Result, error) {
 	id = strings.TrimSpace(id)
 	if id == "" {
@@ -120,13 +121,12 @@ func (s *Service) Own(id string, path string) bool {
 	return false
 }
 
-func found(id string, src Source, path string) Result {
+func found(id string, path string) Result {
 	return Result{
-		ID:     id,
-		Found:  true,
-		Source: src,
-		Path:   path,
-		Dir:    filepath.Dir(path),
+		ID:    id,
+		Found: true,
+		Path:  path,
+		Dir:   filepath.Dir(path),
 	}
 }
 
@@ -139,7 +139,7 @@ func (s *Service) local(id string) (Result, bool) {
 	for _, item := range bins(id) {
 		path := filepath.Join(base, id, item)
 		if _, err := os.Stat(path); err == nil {
-			return found(id, SourceBuiltin, path), true
+			return found(id, path), true
 		}
 	}
 	return Result{}, false
@@ -152,7 +152,6 @@ func (s *Service) pkg(id string) (Result, error) {
 			return Result{
 				ID:      id,
 				Found:   true,
-				Source:  SourceBuiltin,
 				Archive: arc,
 			}, nil
 		}
@@ -161,7 +160,7 @@ func (s *Service) pkg(id string) (Result, error) {
 		for _, item := range bins(id) {
 			path := filepath.Join(dir, item)
 			if _, err := os.Stat(path); err == nil {
-				out := found(id, SourceBuiltin, path)
+				out := found(id, path)
 				out.Dir = dir
 				return out, nil
 			}

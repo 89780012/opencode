@@ -54,7 +54,6 @@ export interface AttachWorkspaceGitState {
   repo: boolean;
   initialized: boolean;
   available: boolean;
-  source?: "config" | "builtin" | "system";
 }
 
 export interface AttachWorkspaceRuntimeState {

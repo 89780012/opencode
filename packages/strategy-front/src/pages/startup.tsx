@@ -29,13 +29,6 @@ function note(err: unknown, text: string) {
   return text
 }
 
-function source(text?: StartupTool["source"]) {
-  if (text === "builtin") return "内置"
-  if (text === "config") return "配置"
-  if (text === "system") return "系统"
-  return "-"
-}
-
 function badge(item: StartupTool) {
   if (item.status === "installed") {
     return {
@@ -61,14 +54,12 @@ function badge(item: StartupTool) {
 }
 
 function body(item: StartupTool) {
-  if (item.id === "git") {
-    if (item.source === "system") return "系统 Git"
-    if (item.source === "builtin") return "内置 Git"
-    return "等待 Git"
+  if (item.status === "failed") return "检测异常"
+  if (item.status === "installed") {
+    if (item.id === "git") return "Git 已就绪"
+    return "OpenCode 已就绪"
   }
-
-  if (item.source === "system") return "系统 OpenCode"
-  if (item.source === "builtin") return "内置 OpenCode"
+  if (item.id === "git") return "等待 Git"
   return "等待 OpenCode"
 }
 
@@ -197,7 +188,7 @@ export default function Page() {
                 <div className="min-w-0">
                   <div className="text-muted-foreground text-xs uppercase tracking-[0.22em]">环境监测</div>
                   <div className="text-muted-foreground mt-2 text-sm leading-6 lg:text-base">
-                    {err || state.summary || "系统环境监测中..."}
+                    {err || state.summary || "系统环境检测中..."}
                   </div>
                 </div>
 
@@ -223,7 +214,6 @@ export default function Page() {
                         >
                           {view.text}
                         </span>
-                        <span className="text-muted-foreground shrink-0 text-xs">{source(item.source)}</span>
                       </div>
                     )
                   })}
