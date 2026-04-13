@@ -8,6 +8,7 @@ import { WorkflowLibrary } from "@/components/workflow/workflow-library"
 import { WorkflowSidepanel } from "@/components/workflow/workflow-sidepanel"
 import { WorkflowTopbar } from "@/components/workflow/workflow-topbar"
 import { Button } from "@/components/ui/button"
+import { audit } from "@/lib/workflow-audit"
 import { fromFlow, runtimeDetail } from "@/lib/workflow-runtime"
 import type {
   WorkflowDetail,
@@ -175,22 +176,39 @@ export function WorkflowShell(props: { item: WorkflowRuntimeDetail; onRefresh?: 
     [nodeID],
   )
 
-  const persist = async () => {
-    const next = fromFlow(item, flow.nodes, flow.edges)
+  const persist = async (next: WorkflowRuntimeDetail) => {
     const data = item.id ? await workflowApi.update(item.id, next) : await workflowApi.save(next)
     setItem(data)
     return data
   }
 
   const onSave = async () => {
+    const next = fromFlow(item, flow.nodes, flow.edges)
+    const hit = audit(next)
+    if (hit) {
+      if (hit.kind === "edge") {
+        setEdgeID(hit.id)
+        setNodeID("")
+      } else {
+        setNodeID(hit.id)
+        setEdgeID("")
+      }
+      toast.error(hit.text, {
+        description: hit.tip,
+      })
+      return
+    }
+
     setBusy(true)
     try {
-      const data = await persist()
+      const data = await persist(next)
       setFlow(runtimeDetail(data))
       toast.success("工作流已保存")
     } catch (err) {
       console.error(err)
-      toast.error("保存工作流失败")
+      toast.error(err instanceof Error ? err.message : "Save workflow failed", {
+        description: "Fix the selected node or edge in the right panel, then try saving again.",
+      })
     } finally {
       setBusy(false)
     }
