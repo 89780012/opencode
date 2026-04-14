@@ -3,8 +3,8 @@ import { ChatMessageList } from "@/components/chat-message-list"
 import { PermissionPanel } from "@/components/chat/permission-panel"
 import { PromptBar } from "@/components/chat/prompt-bar"
 import { QuestionPanel } from "@/components/chat/question-panel"
-import { StrategyStarterRow } from "@/components/strategy/strategy-starter-row"
 import { TodoPanel } from "@/components/chat/todo-panel"
+import { StrategyStarterRow } from "@/components/strategy/strategy-starter-row"
 import { useChatRuntime } from "@/hooks/use-chat-runtime"
 import type { ChatMessageInfo, ChatStatus } from "@/types/chat"
 import type { ComposerModel } from "@/types/composer"
@@ -62,6 +62,7 @@ export function StrategyChatPanel(props: Props) {
   const last = props.messages[props.messages.length - 1]
   const empty = !props.sessionLoading && !props.detailLoading && props.messages.length === 0 && !props.eventErr
   const ready = !chat.busy && !chat.submitting && !props.creating && !props.sessionLoading
+  const lock = chat.busy || chat.submitting || props.creating || props.load
   const suggest =
     !empty &&
     ready &&
@@ -80,10 +81,6 @@ export function StrategyChatPanel(props: Props) {
           <ChatMessageList
             key={`${props.workspace.path}:${props.selectedSessionId ?? "empty"}`}
             err={props.eventErr}
-            messages={props.messages}
-            loading={props.detailLoading && !!props.selectedSessionId}
-            status={props.status}
-            onOpenDiff={props.onOpenDiff}
             footer={
               suggest ? (
                 <StrategyStarterRow
@@ -93,14 +90,25 @@ export function StrategyChatPanel(props: Props) {
                 />
               ) : null
             }
+            loading={props.detailLoading && !!props.selectedSessionId}
+            messages={props.messages}
+            onOpenDiff={props.onOpenDiff}
+            status={props.status}
           />
           {empty ? (
             <ChatEmptyState
-              title="新会话已准备好"
-              desc="先用一句话说明你的策略目标、交易思路，或希望 AI 帮你完成的任务，下面输入后就会开始生成内容。"
+              disabled={lock}
+              onPick={(text) => {
+                void chat.submit({ text })
+              }}
+              title="想先研究哪类策略？"
               tips={[
-                "例如：帮我写一个 5 分钟级别的突破策略，并控制最大回撤。",
-                "例如：基于当前策略继续优化止盈止损，并解释修改原因。",
+                "帮我设计一个日内突破策略，包含进出场、止损和仓位控制",
+                "帮我生成一个基于 EMA 和 RSI 的趋势跟随策略",
+                "帮我调试当前策略，定位信号和风控问题",
+                "帮我回测这个策略，并总结收益、回撤和胜率",
+                "帮我分析这个策略的缺陷，并给出优化建议",
+                "帮我完善一个均值回归策略，补全过滤条件和风控规则",
               ]}
             />
           ) : null}
@@ -112,27 +120,27 @@ export function StrategyChatPanel(props: Props) {
           {chat.permission.req ? (
             <PermissionPanel
               key={chat.permission.req.id}
-              req={chat.permission.req}
-              sending={chat.permission.sending}
-              onReject={() => {
-                void chat.permission.allow("reject")
-              }}
               onAllow={(value) => {
                 void chat.permission.allow(value)
               }}
+              onReject={() => {
+                void chat.permission.allow("reject")
+              }}
+              req={chat.permission.req}
+              sending={chat.permission.sending}
             />
           ) : null}
           {chat.question.req ? (
             <QuestionPanel
               key={chat.question.req.id}
-              req={chat.question.req}
-              sending={chat.question.sending}
               onReject={() => {
                 void chat.question.reject()
               }}
               onReply={(answers) => {
                 void chat.question.reply(answers)
               }}
+              req={chat.question.req}
+              sending={chat.question.sending}
             />
           ) : null}
           {chat.todo.visible ? (
@@ -146,8 +154,8 @@ export function StrategyChatPanel(props: Props) {
               disabled={props.load}
               model={props.model}
               models={props.models}
-              onAgent={props.onAgent}
               onAbort={props.onAbort}
+              onAgent={props.onAgent}
               onModel={props.onModel}
               onSubmit={(value) => {
                 void chat.submit(value)

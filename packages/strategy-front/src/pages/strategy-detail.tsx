@@ -26,7 +26,7 @@ export default function StrategyDetailPage() {
   const [open, setOpen] = useState(false)
   const [file, setFile] = useState<string | null>(null)
   const [tab, setTab] = useState<WorkspaceDetailTab>("files")
-  const [spin, setSpin] = useState(false)
+  const [spin, setSpin] = useState(false) //刷新状态
 
   useEffect(() => {
     if (!workspace) {

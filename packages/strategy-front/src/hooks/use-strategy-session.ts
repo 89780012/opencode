@@ -25,6 +25,7 @@ import {
   hydrateSessionMessages,
 } from "@/store/chat-session-slice"
 
+// 本质上效果是去重,防止误点击等操作
 const loads = new Map<string, Promise<void>>()
 const creates = new Map<string, Promise<string>>()
 const details = new Map<string, Promise<void>>()
@@ -37,6 +38,7 @@ export function useChatSessions(path?: string | null) {
   const loading = useAppSelector((state) => selectWorkspaceSessionLoading(state, path))
   const creating = useAppSelector((state) => selectWorkspaceSessionCreating(state, path))
 
+  // 获取会话列表
   const refreshSessions = useCallback(async () => {
     if (!path) {
       return
@@ -75,6 +77,7 @@ export function useChatSessions(path?: string | null) {
     await refreshSessions()
   }, [loaded, path, refreshSessions])
 
+  // 创建会话
   const createSession = useCallback(async () => {
     if (!path) {
       throw new Error("需要工作区路径")
@@ -130,7 +133,17 @@ export function useChatSessions(path?: string | null) {
       createSession,
       selectSession,
     }),
-    [createSession, creating, ensureSessions, loaded, loading, refreshSessions, selectSession, selectedSessionId, sessions],
+    [
+      createSession,
+      creating,
+      ensureSessions,
+      loaded,
+      loading,
+      refreshSessions,
+      selectSession,
+      selectedSessionId,
+      sessions,
+    ],
   )
 }
 

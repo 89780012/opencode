@@ -1,29 +1,32 @@
-import { MessageSquareText, Sparkles } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface Props {
   title: string
-  desc: string
   tips: string[]
+  disabled?: boolean
+  onPick?: (text: string) => void
 }
 
 export function ChatEmptyState(props: Props) {
   return (
     <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-6 py-10">
-      <div className="w-full max-w-xl rounded-[28px] border border-black/6 bg-black/[0.02] p-6 text-center shadow-sm dark:border-white/8 dark:bg-white/[0.03] dark:shadow-none">
-        <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-white text-slate-700 shadow-sm dark:bg-[#171d1b] dark:text-[#dbe6e0] dark:shadow-none">
-          <Sparkles className="size-5" />
-        </div>
-        <div className="mt-4 text-base font-semibold text-foreground">{props.title}</div>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">{props.desc}</p>
-        <div className="mt-4 space-y-2 text-left">
+      <div className="pointer-events-auto flex w-full max-w-5xl flex-col items-center">
+        <div className="text-center text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">{props.title}</div>
+        <div className="mt-7 flex flex-wrap justify-center gap-2.5">
           {props.tips.map((item) => (
-            <div
+            <button
               key={item}
-              className="flex items-start gap-2 rounded-2xl bg-white/90 px-3 py-2 text-sm text-slate-600 dark:bg-[#141918] dark:text-[#a8b4af]"
+              className={cn(
+                "max-w-full rounded-full bg-black/[0.04] px-4 py-2.5 text-left text-[13px] leading-5 text-foreground/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] transition",
+                "hover:-translate-y-0.5 hover:bg-black/[0.06] hover:text-foreground dark:bg-white/[0.06] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] dark:hover:bg-white/[0.09]",
+                "disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60",
+              )}
+              disabled={props.disabled}
+              onClick={() => props.onPick?.(item)}
+              type="button"
             >
-              <MessageSquareText className="mt-0.5 size-4 shrink-0 text-slate-400 dark:text-[#7e8b86]" />
-              <span>{item}</span>
-            </div>
+              <span className="break-words">{item}</span>
+            </button>
           ))}
         </div>
       </div>
