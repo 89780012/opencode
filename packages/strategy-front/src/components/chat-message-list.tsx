@@ -242,13 +242,13 @@ function renderPart(part: ChatPart, role: ChatMessageInfo["role"], onOpenDiff?: 
     case "retry":
       return (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-          Retry #{part.attempt}: {String(part.error.data.message ?? part.error.name)}
+          重试 #{part.attempt}: {String(part.error.data.message ?? part.error.name)}
         </div>
       )
     case "compaction":
       return (
         <div className="rounded-lg border px-3 py-2 text-xs text-muted-foreground">
-          Context compacted{part.overflow ? " due to overflow" : ""}
+          上下文压缩{part.overflow ? " due to overflow" : ""}
         </div>
       )
   }
