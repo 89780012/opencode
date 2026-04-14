@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 import { chatApi, workspaceApi } from "@/api/modules"
 import { useAgentList, useProviderList, useWorkspaceList } from "@/data/global-data-provider"
-import { useProjectComposer } from "@/hooks/use-project-composer"
+import { useComposerPrefs } from "@/hooks/use-composer-prefs"
 import { resolveComposer } from "@/lib/chat-composer"
 import { log, note } from "@/lib/error"
 import { cards, picks, prompt, seed, tail, type Card } from "@/lib/strategy-create"
@@ -22,12 +22,12 @@ export function useWorkspaceCreate(props: Props) {
   const nav = useNavigate()
   const { refresh, select } = useWorkspaceList()
   const [state, setState] = useState(seed)
-  const ags = useAgentList(state.kind)
+  const ags = useAgentList()
   const catalog = useProviderList()
-  const project = useProjectComposer(state.kind)
+  const prefs = useComposerPrefs()
   const composer = useMemo(
-    () => resolveComposer({ agents: ags.ags, catalog, state: project.state }),
-    [ags.ags, catalog, project.state],
+    () => resolveComposer({ agents: ags.ags, catalog, state: prefs.state }),
+    [ags.ags, catalog, prefs.state],
   )
   const card = cards[state.kind]
   const rich = state.kind !== "other"
@@ -115,7 +115,7 @@ export function useWorkspaceCreate(props: Props) {
     if (!ags.ags.some((item) => item.name === value)) {
       return
     }
-    project.setAgent(value)
+    prefs.setAgent(value)
   }
 
   /**
@@ -127,7 +127,7 @@ export function useWorkspaceCreate(props: Props) {
     if (!catalog.connectedModels.some((item) => item.provider.id === providerID && item.id === modelID)) {
       return
     }
-    project.setModel({ providerID, modelID })
+    prefs.setModel({ providerID, modelID })
   }
 
   /**

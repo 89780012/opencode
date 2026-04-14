@@ -1,13 +1,13 @@
-import { ProjectComposerProvider } from "@/components/project/project-composer-provider"
+import { ComposerProvider } from "@/components/composer/composer-provider"
 import { GlobalDataProvider } from "@/data/global-data-provider"
 import LayoutPage from "@/pages/layout"
 
 export default function Page() {
   return (
-    <ProjectComposerProvider>
+    <ComposerProvider>
       <GlobalDataProvider>
         <LayoutPage />
       </GlobalDataProvider>
-    </ProjectComposerProvider>
+    </ComposerProvider>
   )
 }

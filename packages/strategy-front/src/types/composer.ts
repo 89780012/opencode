@@ -1,4 +1,4 @@
-import type { Agent, ComposerState } from "@/types/agent"
+import type { Agent } from "@/types/agent"
 import type { ChatModelRef } from "@/types/chat"
 import type { Config, List, Model, Provider } from "@/types/provider"
 
@@ -6,8 +6,10 @@ export type ComposerModel = Model & {
   provider: Provider
 }
 
-export type ProjectComposerState = ComposerState & {
-  recent?: ChatModelRef[]
+export interface ComposerPrefs {
+  agent?: string
+  model?: ChatModelRef
+  variant?: string | null
 }
 
 export interface ProviderCatalogState {

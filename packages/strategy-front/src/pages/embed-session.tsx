@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { WorkspaceDetailPane, type WorkspaceDetailTab } from "@/components/workspace/workspace-detail-pane"
-import { useEmbedComposer } from "@/hooks/use-embed-composer"
+import { useComposer } from "@/hooks/use-composer"
 import { useEmbedEntry } from "@/hooks/use-embed-entry"
 import { useStrategySession } from "@/hooks/use-strategy-session"
 import { log } from "@/lib/error"
@@ -33,7 +33,7 @@ export default function EmbedSessionPage() {
   const path = query.get("path")?.trim() ?? ""
   const entry = useEmbedEntry(path)
   const workspace = entry.workspace
-  const composer = useEmbedComposer(workspace?.path, workspace?.type ?? "smartx")
+  const composer = useComposer()
   const chat = useStrategySession(workspace?.path)
   const [open, setOpen] = useState(false)
   const [file, setFile] = useState<string | null>(null)

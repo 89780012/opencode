@@ -45,9 +45,3 @@ export interface AgentBody {
 }
 
 export type Agent = RuntimeAgent
-
-export interface ComposerState {
-  agent?: string
-  model?: ChatModelRef
-  variant?: string | null
-}

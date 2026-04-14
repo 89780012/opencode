@@ -8,7 +8,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { WorkspaceDetailPane, type WorkspaceDetailTab } from "@/components/workspace/workspace-detail-pane"
 import { useWorkspaceList } from "@/data/global-data-provider"
-import { useStrategyComposer } from "@/hooks/use-strategy-composer"
+import { useComposer } from "@/hooks/use-composer"
 import { useStrategySession } from "@/hooks/use-strategy-session"
 import { log } from "@/lib/error"
 import { decodeStrategyPath } from "@/lib/strategy-path"
@@ -21,8 +21,7 @@ export default function StrategyDetailPage() {
   const path = params.strategyID ? decodeStrategyPath(params.strategyID) : ""
   const { loading, refresh, select, workspaces } = useWorkspaceList()
   const workspace = useMemo(() => workspaces.find((item) => item.path === path) ?? null, [path, workspaces])
-  const kind = workspace?.type ?? "other"
-  const composer = useStrategyComposer(path, kind)
+  const composer = useComposer()
   const chat = useStrategySession(path)
   const [open, setOpen] = useState(false)
   const [file, setFile] = useState<string | null>(null)
