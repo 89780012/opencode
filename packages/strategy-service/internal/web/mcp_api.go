@@ -6,8 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"strategy-service/internal/smartx"
+
+	"github.com/gin-gonic/gin"
 )
 
 type rpcReq struct {
@@ -22,25 +23,6 @@ type rpcRes struct {
 	ID      any    `json:"id,omitempty"`
 	Result  any    `json:"result,omitempty"`
 	Error   any    `json:"error,omitempty"`
-}
-
-func (a *API) mcpGet(c *gin.Context) {
-	a.mcpMethodNotAllowed(c)
-}
-
-func (a *API) mcpDelete(c *gin.Context) {
-	a.mcpMethodNotAllowed(c)
-}
-
-func (a *API) mcpMethodNotAllowed(c *gin.Context) {
-	c.Header("Allow", "POST")
-	c.JSON(405, rpcRes{
-		JSONRPC: "2.0",
-		Error: map[string]any{
-			"code":    -32000,
-			"message": "Method not allowed",
-		},
-	})
 }
 
 func (a *API) mcpPost(c *gin.Context) {

@@ -3,13 +3,14 @@ package web
 import (
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	cfg "strategy-service/internal/config"
 	"strategy-service/internal/logs"
 	oc "strategy-service/internal/opencode"
 	rt "strategy-service/internal/runtime"
 	"strategy-service/internal/smartx"
 	"strategy-service/internal/workspace"
+
+	"github.com/gin-gonic/gin"
 )
 
 type API struct {
@@ -99,6 +100,4 @@ func (a *API) Register(r *gin.Engine) {
 	log.GET("/tail", a.logTail)
 
 	r.POST("/mcp", a.mcpPost)
-	r.GET("/mcp", a.mcpGet)
-	r.DELETE("/mcp", a.mcpDelete)
 }

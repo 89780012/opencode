@@ -53,7 +53,7 @@ func (s *Service) run(ctx context.Context, name string, account string, id strin
 		"is not recognized as an internal or external command",
 		"command not found",
 		"no such file or directory",
-		"\u4e0d\u662f\u5185\u90e8\u6216\u5916\u90e8\u547d\u4ee4",
+		"不是内部或外部命令",
 	}, "smartx cli timeout"); err != nil {
 		return "", err
 	}
@@ -62,7 +62,7 @@ func (s *Service) run(ctx context.Context, name string, account string, id strin
 		return "", err
 	}
 	if err := wait(ctx, buf, []string{"password:"}, []string{
-		"\u767b\u5f55\u5931\u8d25",
+		"登录失败",
 		"login failed",
 		"invalid account",
 	}, "smartx login timeout"); err != nil {
@@ -73,12 +73,12 @@ func (s *Service) run(ctx context.Context, name string, account string, id strin
 		return "", err
 	}
 	if err := wait(ctx, buf, []string{
-		"\u767b\u5f55\u6210\u529f",
+		"登录成功",
 		"login success",
 	}, []string{
-		"\u767b\u5f55\u5931\u8d25",
+		"登录失败",
 		"login failed",
-		"\u5bc6\u7801\u9519\u8bef",
+		"密码错误",
 		"incorrect password",
 	}, "smartx login timeout"); err != nil {
 		return "", err
@@ -93,7 +93,7 @@ func (s *Service) run(ctx context.Context, name string, account string, id strin
 		"statusExtension failed",
 		"not found",
 		"error",
-		"\u5931\u8d25",
+		"失败",
 	}, "smartx statusExtension timeout"); err != nil {
 		return "", err
 	}
@@ -108,7 +108,7 @@ func (s *Service) run(ctx context.Context, name string, account string, id strin
 			"closeExtension failed",
 			"not found",
 			"error",
-			"\u5931\u8d25",
+			"失败",
 		}, "smartx closeExtension timeout"); err != nil {
 			return "", err
 		}
@@ -123,7 +123,7 @@ func (s *Service) run(ctx context.Context, name string, account string, id strin
 		"startExtension failed",
 		"not found",
 		"error",
-		"\u5931\u8d25",
+		"失败",
 	}, "smartx startExtension timeout"); err != nil {
 		return "", err
 	}
