@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { CornerDownLeftIcon, Loader2Icon, SquareIcon, XIcon } from "lucide-react"
+import { ArrowUpIcon, Loader2Icon, SquareIcon, XIcon } from "lucide-react"
 import type { PromptInputMessage } from "@/types/chat"
 import {
   type ChangeEvent,
@@ -19,15 +19,15 @@ import {
 
 export type PromptInputStatus = "ready" | "submitted" | "streaming" | "error"
 
-type PromptInputContextValue = {
+type State = {
   value: string
   onValueChange: (value: string) => void
 }
 
-const PromptInputContext = createContext<PromptInputContextValue | null>(null)
+const Ctx = createContext<State | null>(null)
 
 const usePromptInputContext = () => {
-  const ctx = useContext(PromptInputContext)
+  const ctx = useContext(Ctx)
   if (!ctx) {
     throw new Error("PromptInput 相关组件必须在 PromptInput 内使用")
   }
@@ -47,10 +47,10 @@ export const PromptInput = ({ className, children, value, onValueChange, onSubmi
   }
 
   return (
-    <PromptInputContext.Provider value={{ value, onValueChange }}>
+    <Ctx.Provider value={{ value, onValueChange }}>
       <form
         className={cn(
-          "w-full rounded-[28px] bg-background/92 shadow-sm ring-1 ring-black/8 backdrop-blur-sm dark:bg-[#111515]/96 dark:ring-white/10",
+          "w-full rounded-[25px] border border-primary/35 bg-background/98 shadow-[0_0_0_1px_hsl(var(--primary)/0.04),0_8px_18px_-16px_hsl(var(--primary)/0.5)] transition-[border-color,box-shadow] focus-within:border-primary/55 focus-within:shadow-[0_0_0_1px_hsl(var(--primary)/0.08),0_10px_22px_-16px_hsl(var(--primary)/0.55)] dark:bg-background",
           className,
         )}
         onSubmit={submit}
@@ -58,14 +58,14 @@ export const PromptInput = ({ className, children, value, onValueChange, onSubmi
       >
         {children}
       </form>
-    </PromptInputContext.Provider>
+    </Ctx.Provider>
   )
 }
 
 export type PromptInputBodyProps = ComponentProps<"div">
 
 export const PromptInputBody = ({ className, ...props }: PromptInputBodyProps) => (
-  <div className={cn("px-3 pt-3", className)} {...props} />
+  <div className={cn("px-4 pt-2", className)} {...props} />
 )
 
 export type PromptInputTextareaProps = Omit<ComponentProps<"textarea">, "value" | "onChange"> & {
@@ -116,7 +116,7 @@ export const PromptInputTextarea = ({
     <textarea
       ref={ref}
       className={cn(
-        "txt w-full resize-none border-none bg-transparent px-1 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground",
+        "txt w-full resize-none border-none bg-transparent px-1 py-0 text-sm leading-6 text-foreground outline-none placeholder:text-muted-foreground/80",
         className,
       )}
       name="message"
@@ -140,7 +140,7 @@ export const PromptInputTextarea = ({
 export type PromptInputFooterProps = ComponentProps<"div">
 
 export const PromptInputFooter = ({ className, ...props }: PromptInputFooterProps) => (
-  <div className={cn("flex items-center justify-between px-3 pb-3 pt-2", className)} {...props} />
+  <div className={cn("flex items-center justify-between px-2.5 pb-2 pt-1", className)} {...props} />
 )
 
 export type PromptInputToolsProps = ComponentProps<"div">
@@ -170,14 +170,16 @@ export const PromptInputSubmit = ({
   variant = "default",
   ...props
 }: PromptInputSubmitProps) => {
-  let icon = <CornerDownLeftIcon className="size-4" />
+  let icon = <ArrowUpIcon className="size-3.5" />
 
   if (status === "submitted") {
-    icon = <Loader2Icon className="size-4 animate-spin" />
-  } else if (status === "streaming") {
-    icon = <SquareIcon className="size-4" />
-  } else if (status === "error") {
-    icon = <XIcon className="size-4" />
+    icon = <Loader2Icon className="size-3.5 animate-spin" />
+  }
+  if (status === "streaming") {
+    icon = <SquareIcon className="size-3.5" />
+  }
+  if (status === "error") {
+    icon = <XIcon className="size-3.5" />
   }
 
   return (

@@ -7,6 +7,7 @@ import {
   PromptInputTextarea,
 } from "@/components/ai-elements/prompt-input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { cn } from "@/lib/utils"
 import type { PromptInputMessage } from "@/types/chat"
 import type { ComposerModel } from "@/types/composer"
 
@@ -34,9 +35,9 @@ interface Props {
 }
 
 const item =
-  "min-w-0 rounded-md border border-black/10 bg-background text-xs text-foreground shadow-none dark:border-white/12 dark:bg-white/[0.04]"
+  "min-w-0 rounded-full border border-border/65 bg-background text-[12px] font-medium text-foreground/85 shadow-none transition-colors hover:border-border hover:bg-muted/45 hover:text-foreground dark:border-white/[0.09] dark:bg-white/[0.05] dark:text-white/85 dark:hover:bg-white/[0.08]"
 
-const menu = "custom-scrollbar max-h-[240px] overflow-y-auto rounded-md border-black/10 dark:border-white/12"
+const menu = "custom-scrollbar max-h-[240px] overflow-y-auto rounded-xl border-border/80"
 
 export function PromptBar(props: Props) {
   const { model, models, onModel } = props
@@ -48,13 +49,13 @@ export function PromptBar(props: Props) {
       ? `${models[0].provider.id}/${models[0].id}`
       : ""
   const stop = !!props.busy
-  const area = props.compact ? 48 : 64
-  const max = props.compact ? 144 : 200
-  const foot = props.compact ? "items-end gap-2 px-2.5 pb-2.5 pt-1.5" : "items-end gap-3"
-  const tone = props.compact ? "text-[13px]" : undefined
-  const ctrl = props.compact ? "h-7" : "h-8"
-  const agent = props.compact ? "w-[112px]" : "w-[124px]"
-  const modelw = props.compact ? "max-w-[190px]" : "max-w-[208px]"
+  const area = props.compact ? 38 : 42
+  const max = props.compact ? 120 : 144
+  const foot = props.compact ? "items-end gap-1.5 px-2.5 pb-2 pt-1" : "items-end gap-1.5 px-2.5 pb-2 pt-1"
+  const tone = props.compact ? "text-[13px]" : "text-[14px]"
+  const ctrl = props.compact ? "h-7" : "h-7"
+  const agent = props.compact ? "w-[112px]" : "w-[122px]"
+  const modelw = props.compact ? "max-w-[188px]" : "max-w-[214px]"
   const cur = models.find((item) => `${item.provider.id}/${item.id}` === pick)
 
   useEffect(() => {
@@ -76,19 +77,31 @@ export function PromptBar(props: Props) {
       onValueChange={props.onValueChange}
       value={props.value}
     >
-      <PromptInputBody className={props.compact ? "px-2.5 pt-2.5" : undefined}>
-        <PromptInputTextarea className={tone} maxHeight={max} minHeight={area} placeholder="输入你的消息..." />
+      <PromptInputBody className={props.compact ? "px-2.5 pt-2" : undefined}>
+        <PromptInputTextarea
+          className={tone}
+          maxHeight={max}
+          minHeight={area}
+          placeholder="输入你的策略想法、回测目标，或需要我协助的问题..."
+        />
       </PromptInputBody>
       <PromptInputFooter className={foot}>
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
           {showAgent ? (
             <Select
               disabled={props.disabled || props.agents.length === 0}
               onValueChange={props.onAgent}
               value={props.agent ?? ""}
             >
-              <SelectTrigger className={`${ctrl} ${item} ${agent} px-2.5`}>
-                <SelectValue placeholder="选择智能体" />
+              <SelectTrigger
+                className={cn(
+                  ctrl,
+                  item,
+                  agent,
+                  "px-2.5 focus-visible:border-primary/30 focus-visible:ring-2 focus-visible:ring-primary/10",
+                )}
+              >
+                <SelectValue placeholder="选择助手" />
               </SelectTrigger>
               <SelectContent align="start" className={menu} position="popper">
                 {props.agents.map((item) => (
@@ -101,7 +114,14 @@ export function PromptBar(props: Props) {
           ) : null}
           {showModel ? (
             <Select disabled={props.disabled || models.length === 0} onValueChange={props.onModel} value={pick}>
-              <SelectTrigger className={`${ctrl} ${item} ${modelw} px-2`}>
+              <SelectTrigger
+                className={cn(
+                  ctrl,
+                  item,
+                  modelw,
+                  "px-2.5 focus-visible:border-primary/30 focus-visible:ring-2 focus-visible:ring-primary/10",
+                )}
+              >
                 {cur ? (
                   <div className="min-w-0 truncate">{`${cur.id} (${cur.provider.id})`}</div>
                 ) : (
@@ -119,7 +139,10 @@ export function PromptBar(props: Props) {
           ) : null}
         </div>
         <PromptInputSubmit
-          className={props.compact ? "size-8" : undefined}
+          className={cn(
+            props.compact ? "size-7 rounded-full" : "size-7 rounded-full",
+            "shrink-0 bg-primary text-primary-foreground shadow-none hover:bg-primary/90",
+          )}
           disabled={props.disabled || (!stop && props.value.trim().length === 0)}
           status={stop ? "streaming" : props.submitting ? "submitted" : "ready"}
         />

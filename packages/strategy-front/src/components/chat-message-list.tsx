@@ -108,13 +108,7 @@ function renderTodoTool(part: ChatToolPart) {
   )
 }
 
-function Fold(props: {
-  head: ReactNode
-  side?: ReactNode
-  body: ReactNode
-  open?: boolean
-  tone?: string
-}) {
+function Fold(props: { head: ReactNode; side?: ReactNode; body: ReactNode; open?: boolean; tone?: string }) {
   const [open, setOpen] = useState(!!props.open)
 
   return (
@@ -214,7 +208,9 @@ function renderPart(part: ChatPart, role: ChatMessageInfo["role"], onOpenDiff?: 
         <Fold
           tone="bg-muted/20"
           head={<div className="font-medium">Snapshot</div>}
-          body={<pre className={cn(pane, "overflow-x-auto whitespace-pre-wrap break-words text-xs")}>{part.snapshot}</pre>}
+          body={
+            <pre className={cn(pane, "overflow-x-auto whitespace-pre-wrap break-words text-xs")}>{part.snapshot}</pre>
+          }
         />
       )
     case "patch":
@@ -291,7 +287,6 @@ export const ChatMessageList = memo(function ChatMessageList(props: Props) {
         {props.messages.map((info) => (
           <ChatMessageItem key={info.id} info={info} onOpenDiff={props.onOpenDiff} />
         ))}
-        {props.footer}
         {props.err ? (
           <Message from="assistant">
             <MessageContent>

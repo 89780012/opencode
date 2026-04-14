@@ -4,20 +4,10 @@ import { PermissionPanel } from "@/components/chat/permission-panel"
 import { PromptBar } from "@/components/chat/prompt-bar"
 import { QuestionPanel } from "@/components/chat/question-panel"
 import { TodoPanel } from "@/components/chat/todo-panel"
-import { StrategyStarterRow } from "@/components/strategy/strategy-starter-row"
 import { useChatRuntime } from "@/hooks/use-chat-runtime"
 import type { ChatMessageInfo, ChatStatus } from "@/types/chat"
 import type { ComposerModel } from "@/types/composer"
 import type { LocalWorkspace } from "@/types/workspace"
-
-function done(msg?: ChatMessageInfo) {
-  if (!msg || msg.role !== "assistant") return false
-  if (msg.finish?.toLowerCase().includes("abort")) return false
-  if (!msg.error) return true
-  const txt = msg.error.data?.message
-  if (typeof txt === "string" && txt.toLowerCase().includes("abort")) return false
-  return false
-}
 
 interface Props {
   workspace: LocalWorkspace
@@ -59,21 +49,8 @@ export function StrategyChatPanel(props: Props) {
     createSession: props.onCreate,
     selectSession: props.onSelectSession,
   })
-  const last = props.messages[props.messages.length - 1]
   const empty = !props.sessionLoading && !props.detailLoading && props.messages.length === 0 && !props.eventErr
-  const ready = !chat.busy && !chat.submitting && !props.creating && !props.sessionLoading
   const lock = chat.busy || chat.submitting || props.creating || props.load
-  const suggest =
-    !empty &&
-    ready &&
-    !props.eventErr &&
-    !chat.permission.req &&
-    !chat.question.req &&
-    done(last) &&
-    !!props.agent &&
-    !!props.model &&
-    !props.load
-
   return (
     <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-transparent">
       <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
@@ -81,15 +58,6 @@ export function StrategyChatPanel(props: Props) {
           <ChatMessageList
             key={`${props.workspace.path}:${props.selectedSessionId ?? "empty"}`}
             err={props.eventErr}
-            footer={
-              suggest ? (
-                <StrategyStarterRow
-                  onRun={(text) => {
-                    void chat.submit({ text })
-                  }}
-                />
-              ) : null
-            }
             loading={props.detailLoading && !!props.selectedSessionId}
             messages={props.messages}
             onOpenDiff={props.onOpenDiff}
