@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react"
 import { Cog, PanelRightClose, PanelRightOpen, Plus, RefreshCw } from "lucide-react"
 import { useSearchParams } from "react-router-dom"
 import { toast } from "sonner"
-import { ComposerSettingsDialog } from "@/components/chat/composer-settings-dialog"
+import { EmbedProviderSettingsDialog } from "@/components/chat/embed-provider-settings-dialog"
 import { StrategyChatPanel } from "@/components/strategy/strategy-chat-panel"
 import { Button } from "@/components/ui/button"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
@@ -110,7 +110,7 @@ export default function EmbedSessionPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background dark:bg-[#0f1111]">
-      <div className="border-b bg-background/96 px-5 py-3 backdrop-blur dark:border-white/8 dark:bg-[#101313]/92">
+      <div className="bg-background/96 px-5 py-1 backdrop-blur dark:border-white/8 dark:bg-[#101313]/92">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0 flex-1"></div>
 
@@ -172,12 +172,12 @@ export default function EmbedSessionPage() {
         </div>
       </div>
 
-      <div className="relative min-h-0 flex-1 px-4 pb-4 pt-3">
+      <div className="relative min-h-0 flex-1">
         <ResizablePanelGroup
           direction="horizontal"
           autoSaveId="strategy-front:embed-session-split:v1"
           collapsed={!open}
-          className="h-full min-h-0 rounded-[24px] border border-black/6 bg-background/80 shadow-[0_18px_60px_rgba(15,23,42,0.08)] dark:border-white/8 dark:bg-[#0f1111]"
+          className="h-full min-h-0 border border-black/6 bg-background/80 shadow-[0_18px_60px_rgba(15,23,42,0.08)] dark:border-white/8 dark:bg-[#0f1111]"
         >
           <ResizablePanel defaultSize={62} minSize={420} className="min-h-0 min-w-0">
             <StrategyChatPanel
@@ -198,7 +198,7 @@ export default function EmbedSessionPage() {
               creating={chat.creating}
               load={composer.load}
               showAgent={false}
-              showModel={false}
+              showModel={true}
               onCreate={chat.createSession}
               onSelectSession={chat.selectSession}
               onAgent={composer.setAgent}
@@ -245,10 +245,9 @@ export default function EmbedSessionPage() {
         )}
       </div>
 
-      <ComposerSettingsDialog
+      <EmbedProviderSettingsDialog
         open={settings}
         onOpenChange={setSettings}
-        agent={composer.agent}
         model={composer.model}
         models={composer.models}
         variant={composer.variant}
