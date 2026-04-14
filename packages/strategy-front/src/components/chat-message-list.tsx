@@ -17,6 +17,7 @@ import type {
 
 const pane = "custom-scrollbar mt-2 max-h-64 space-y-2 overflow-y-auto pr-1"
 const empty: ChatPart[] = []
+const fail = "border-red-200 bg-red-50 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300"
 
 interface Props {
   messages: ChatMessageInfo[]
@@ -96,7 +97,7 @@ function renderTodoTool(part: ChatToolPart) {
     <div
       className={cn(
         "flex items-center gap-2 rounded-xl border px-3 py-2 text-xs",
-        state.status === "error" ? "border-red-200 bg-red-50 text-red-700" : "bg-muted/20 text-muted-foreground",
+        state.status === "error" ? fail : "bg-muted/20 text-muted-foreground",
       )}
     >
       <div className="shrink-0">
@@ -164,7 +165,7 @@ function renderTool(part: ChatToolPart) {
           {"output" in state && state.output ? (
             <pre className="overflow-x-auto whitespace-pre-wrap break-words text-xs">{state.output}</pre>
           ) : null}
-          {"error" in state && state.error ? <div className="text-xs text-red-600">{state.error}</div> : null}
+          {"error" in state && state.error ? <div className="text-xs text-red-600 dark:text-red-300">{state.error}</div> : null}
         </div>
       }
     />
@@ -273,7 +274,7 @@ const ChatMessageItem = memo(function ChatMessageItem(props: {
           <div key={part.id}>{renderPart(part, props.info.role, props.onOpenDiff)}</div>
         ))}
         {err ? (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{err}</div>
+          <div className={cn("rounded-lg border px-3 py-2 text-sm", fail)}>{err}</div>
         ) : null}
       </MessageContent>
     </Message>
@@ -290,7 +291,7 @@ export const ChatMessageList = memo(function ChatMessageList(props: Props) {
         {props.err ? (
           <Message from="assistant">
             <MessageContent>
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              <div className={cn("rounded-lg border px-3 py-2 text-sm", fail)}>
                 {props.err}
               </div>
             </MessageContent>
