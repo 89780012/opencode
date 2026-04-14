@@ -106,7 +106,7 @@ func Append(kind string, line string) error {
 
 // 返回日志路径
 func root() (string, error) {
-	dir, err := config.Root()
+	dir, err := config.ServerRootDir()
 	if err != nil {
 		return "", err
 	}

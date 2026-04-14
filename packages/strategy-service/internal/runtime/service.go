@@ -31,12 +31,14 @@ func (s *Service) Resolve(_ context.Context, id string) (Result, error) {
 	}, nil
 }
 
+// 找到对应的目录
 func (s *Service) Ensure(_ context.Context, id string) (Result, error) {
 	id = strings.TrimSpace(id)
 	if id == "" {
 		return Result{}, errors.New("tool id is required")
 	}
 
+	//查找内置工具
 	if out, ok := s.local(id); ok {
 		return out, nil
 	}
@@ -46,7 +48,7 @@ func (s *Service) Ensure(_ context.Context, id string) (Result, error) {
 		return Result{}, err
 	}
 
-	base, err := s.base()
+	base, err := s.runtimeDir()
 	if err != nil {
 		return Result{}, err
 	}
@@ -83,7 +85,7 @@ func (s *Service) Remove(id string) error {
 		return errors.New("tool id is required")
 	}
 
-	base, err := s.base()
+	base, err := s.runtimeDir()
 	if err != nil {
 		return err
 	}
@@ -100,6 +102,7 @@ func (s *Service) Has(id string) bool {
 	return err == nil
 }
 
+// 检查是否是内置工具
 func (s *Service) Own(id string, path string) bool {
 	id = strings.TrimSpace(id)
 	path = strings.TrimSpace(path)
@@ -107,7 +110,7 @@ func (s *Service) Own(id string, path string) bool {
 		return false
 	}
 
-	base, err := s.base()
+	base, err := s.runtimeDir()
 	if err != nil {
 		return false
 	}
@@ -130,8 +133,9 @@ func found(id string, path string) Result {
 	}
 }
 
+// 查找本地bin
 func (s *Service) local(id string) (Result, bool) {
-	base, err := s.base()
+	base, err := s.runtimeDir()
 	if err != nil {
 		return Result{}, false
 	}
@@ -170,6 +174,7 @@ func (s *Service) pkg(id string) (Result, error) {
 	return Result{}, errors.New("builtin runtime not found")
 }
 
+// 获取所有候选目录
 func (s *Service) candidates() []string {
 	list := []string{}
 
@@ -248,7 +253,7 @@ func copydir(src string, dst string) error {
 	})
 }
 
-func (s *Service) base() (string, error) {
+func (s *Service) runtimeDir() (string, error) {
 	dir, err := os.UserCacheDir()
 	if err != nil {
 		dir = "."
@@ -275,6 +280,7 @@ func arch() string {
 	return runtime.GOARCH
 }
 
+// 返回可执行bin的可能path路径
 func bins(id string) []string {
 	ext := ""
 	if runtime.GOOS == "windows" {

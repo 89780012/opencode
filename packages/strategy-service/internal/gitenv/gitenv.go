@@ -7,6 +7,7 @@ import (
 )
 
 // Apply 为便携版 Git 补齐 PATH、模板目录和可执行目录。
+// all 是
 func Apply(all []string, bin string, exec bool) []string {
 	bin = strings.TrimSpace(bin)
 	if bin == "" {

@@ -8,9 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	cfg "strategy-service/internal/config"
 	"strategy-service/internal/smartx"
+
+	"github.com/gin-gonic/gin"
 )
 
 // startup 返回当前启动环境的检测结果。
@@ -30,7 +31,7 @@ func (a *API) startupPrepare(c *gin.Context) {
 
 // configGet 读取 strategy-service 的持久化配置。
 func (a *API) configGet(c *gin.Context) {
-	cfg, err := a.cfg.Load()
+	cfg, err := a.cfg.LoadUserConfig()
 	if err != nil {
 		bad(c, err)
 		return

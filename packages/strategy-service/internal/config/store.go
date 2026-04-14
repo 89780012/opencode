@@ -13,8 +13,8 @@ type Config struct {
 }
 
 type Theme struct {
-	Mode   string `json:"mode"`
-	Accent string `json:"accent"`
+	Mode   string `json:"mode"`   //模式
+	Accent string `json:"accent"` //主题色
 }
 
 type Logs struct {
@@ -37,7 +37,7 @@ func Default() Config {
 }
 
 // Root 返回 strategy-service 状态目录。
-func Root() (string, error) {
+func ServerRootDir() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
@@ -52,8 +52,8 @@ func Root() (string, error) {
 }
 
 // Path 返回状态目录下的配置文件路径。
-func Path() (string, error) {
-	dir, err := Root()
+func ConfigPath() (string, error) {
+	dir, err := ServerRootDir()
 	if err != nil {
 		return "", err
 	}
@@ -61,8 +61,8 @@ func Path() (string, error) {
 }
 
 // Load 读取持久化的用户配置。
-func (s *Store) Load() (Config, error) {
-	path, err := Path()
+func (s *Store) LoadUserConfig() (Config, error) {
+	path, err := ConfigPath()
 	if err != nil {
 		return Default(), err
 	}
@@ -85,7 +85,7 @@ func (s *Store) Load() (Config, error) {
 
 // Save 在规范化后保存用户配置。
 func (s *Store) Save(cfg Config) (Config, error) {
-	path, err := Path()
+	path, err := ConfigPath()
 	if err != nil {
 		return Default(), err
 	}

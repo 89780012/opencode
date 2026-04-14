@@ -18,7 +18,7 @@ type store struct{}
 
 // path 返回工作区索引文件的绝对路径。
 func (s *store) path() (string, error) {
-	dir, err := cfg.Root()
+	dir, err := cfg.ServerRootDir()
 	if err != nil {
 		return "", err
 	}
