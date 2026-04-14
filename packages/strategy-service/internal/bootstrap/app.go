@@ -54,7 +54,7 @@ func New(cfg Config) (*Service, error) {
 	cfg = resolveGit(run, cfg)
 
 	mgr := oprun.New(oprun.Config(cfg.Opencode))
-	op := oc.New(run, mgr)
+	op := oc.New(mgr)
 	api := web.NewAPI(run, op, &conf.Store{}, smartx.New(smartx.Config{
 		Platform: cfg.Platform,
 		Account:  cfg.Account,

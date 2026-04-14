@@ -3,19 +3,10 @@ import type {
   LogSources,
   LogTail,
   OpencodeState,
-  StartupState,
   SystemConfig,
 } from "@/types/system"
 
 export const systemApi = {
-  startup() {
-    return request.get<StartupState>("/system/startup")
-  },
-
-  startupPrepare() {
-    return request.post<StartupState>("/system/startup/prepare")
-  },
-
   config() {
     return request.get<SystemConfig>("/system/config")
   },

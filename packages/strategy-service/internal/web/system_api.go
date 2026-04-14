@@ -14,22 +14,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// startup 返回当前启动环境的检测结果。
-func (a *API) startup(c *gin.Context) {
-	ok(c, a.op.Startup(c.Request.Context()))
-}
-
-// startupPrepare 预激活内置 opencode，便于首次启动前完成准备。
-func (a *API) startupPrepare(c *gin.Context) {
-	state, err := a.op.Prepare(c.Request.Context())
-	if err != nil {
-		fail(c, 503, err.Error(), state)
-		return
-	}
-	ok(c, state)
-}
-
-// configGet 读取 strategy-service 的持久化配置。
 func (a *API) configGet(c *gin.Context) {
 	cfg, err := a.cfg.LoadUserConfig()
 	if err != nil {
@@ -39,7 +23,6 @@ func (a *API) configGet(c *gin.Context) {
 	ok(c, cfg)
 }
 
-// configPut 保存 strategy-service 的持久化配置。
 func (a *API) configPut(c *gin.Context) {
 	body := cfg.Config{}
 	if err := c.ShouldBindJSON(&body); err != nil {
@@ -149,7 +132,6 @@ func (a *API) smartxLogsWatch(c *gin.Context) {
 	ok(c, out)
 }
 
-// queryInt 读取查询参数中的整数，缺失时返回默认值。
 func queryInt(c *gin.Context, key string, fallback int) (int, error) {
 	raw := strings.TrimSpace(c.Query(key))
 	if raw == "" {

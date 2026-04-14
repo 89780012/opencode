@@ -3,43 +3,18 @@ package opencode
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"net/url"
-	"time"
 
 	"strategy-service/internal/opdoc"
 	"strategy-service/internal/oprun"
-	rt "strategy-service/internal/runtime"
 )
 
-type Tool struct {
-	ID        string    `json:"id"`
-	Label     string    `json:"label"`
-	Installed bool      `json:"installed"`
-	Status    string    `json:"status"`
-	Path      string    `json:"path,omitempty"`
-	Message   string    `json:"message,omitempty"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-type Startup struct {
-	Ready    bool   `json:"ready"`
-	Summary  string `json:"summary"`
-	Opencode Tool   `json:"opencode"`
-	Git      Tool   `json:"git"`
-}
-
 type Service struct {
-	run *rt.Service
 	mgr *oprun.Manager
 }
 
-// New 创建 opencode 统一入口，收口文档与运行时相关操作。
-func New(run *rt.Service, mgr *oprun.Manager) *Service {
-	return &Service{
-		run: run,
-		mgr: mgr,
-	}
+func New(mgr *oprun.Manager) *Service {
+	return &Service{mgr: mgr}
 }
 
 // Disabled 判断错误是否表示托管启动被禁用。
@@ -88,35 +63,6 @@ func (s *Service) Stop(ctx context.Context) (oprun.State, error) {
 	})
 }
 
-// Startup 返回当前 opencode 启动环境的检测结果。
-func (s *Service) Startup(ctx context.Context) Startup {
-	op := s.inspect(ctx, "opencode")
-	git := s.inspect(ctx, "git")
-	return Startup{
-		Ready:    op.Installed,
-		Summary:  summary(op, git),
-		Opencode: op,
-		Git:      git,
-	}
-}
-
-// Prepare 预激活内置 opencode，并返回最新检测结果。
-func (s *Service) Prepare(ctx context.Context) (Startup, error) {
-	state := s.Startup(ctx)
-	if state.Opencode.Installed {
-		return state, nil
-	}
-	if !s.run.Has("opencode") {
-		return state, errors.New("builtin opencode runtime not found")
-	}
-	if _, err := s.run.Ensure(ctx, "opencode"); err != nil {
-		slog.Error("startup prepare failed", "tool", "opencode", "error", err)
-		return s.Startup(ctx), err
-	}
-	return s.Startup(ctx), nil
-}
-
-// ListSkills 列出本地 opencode skills。
 func (s *Service) ListSkills() (opdoc.SkillList, error) {
 	return opdoc.ListSkills()
 }
@@ -160,51 +106,4 @@ func (s *Service) DeleteAgent(name string) error {
 func (s *Service) act(ctx context.Context, fn func(context.Context) error) (oprun.State, error) {
 	err := fn(ctx)
 	return s.mgr.State(), err
-}
-
-// inspect 读取单个工具的安装状态。
-func (s *Service) inspect(ctx context.Context, id string) Tool {
-	out := Tool{
-		ID:        id,
-		Label:     label(id),
-		Status:    "missing",
-		UpdatedAt: time.Now(),
-	}
-
-	row, err := s.run.Resolve(ctx, id)
-	if err != nil {
-		out.Status = "failed"
-		out.Message = err.Error()
-		return out
-	}
-	if !row.Found {
-		out.Message = row.Message
-		return out
-	}
-
-	out.Installed = true
-	out.Status = "installed"
-	out.Path = row.Path
-	return out
-}
-
-// summary 根据工具准备情况生成用户可读的提示语。
-func summary(op Tool, git Tool) string {
-	if !op.Installed {
-		return "系统会优先准备 OpenCode，确保 AI 策略研发环境可以直接进入。"
-	}
-	if !git.Installed {
-		return "OpenCode 已准备，但 Git 还未就绪。"
-	}
-	return "AI 策略研发环境已准备完成。"
-}
-
-func label(id string) string {
-	if id == "git" {
-		return "Git"
-	}
-	if id == "opencode" {
-		return "OpenCode"
-	}
-	return id
 }

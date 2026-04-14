@@ -2,23 +2,6 @@ export type ThemeMode = "system" | "light" | "dark"
 
 export type ThemeAccent = "ocean" | "forest" | "ember" | "rose" | "graphite"
 
-export interface StartupTool {
-  id: "git" | "opencode"
-  label: string
-  installed: boolean
-  status: "installed" | "missing" | "failed"
-  path?: string
-  message?: string
-  updated_at: string
-}
-
-export interface StartupState {
-  ready: boolean
-  summary: string
-  opencode: StartupTool
-  git: StartupTool
-}
-
 export interface SystemConfig {
   theme: {
     mode: ThemeMode

@@ -6,9 +6,7 @@ Cross-platform Go service for `strategy-front`, with Windows-first install flows
 
 - Serves the built `packages/strategy-front/dist` files with SPA fallback
 - Supports embedded frontend assets for single-binary builds
-- Exposes `/api/system/startup` for startup runtime detection
-- Exposes `/api/system/startup/prepare` for builtin runtime preparation
-- Keeps startup runtime selection focused on `opencode` and `git`
+- Keeps runtime selection focused on `opencode` and `git`
 
 ## Run
 
@@ -163,5 +161,5 @@ Pass `--clean` to remove the full `dist` directory before building.
 - Startup runtime management now targets only `git` and `opencode`.
 - The service first checks configured overrides, then activated builtin runtimes, then system `PATH`.
 - Builtin runtimes can be shipped as directories or `.zip` archives under `packages/strategy-service/runtime/<target>/`.
-- When a builtin package exists, startup preparation activates it into the user cache directory and uses that path directly.
+- When a builtin package exists, the service activates it into the user cache directory and uses that path directly.
 - `git` is treated as a dependency of `opencode`: system Git is preferred, otherwise builtin Git is injected at runtime.

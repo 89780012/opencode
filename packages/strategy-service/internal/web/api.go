@@ -84,8 +84,6 @@ func (a *API) Register(r *gin.Engine) {
 	ws.PUT("/file-content", a.workspaceFilePut)
 
 	sys := api.Group("/system")
-	sys.GET("/startup", a.startup)
-	sys.POST("/startup/prepare", a.startupPrepare)
 	sys.GET("/config", a.configGet)
 	sys.PUT("/config", a.configPut)
 	sys.GET("/smartx/logs/meta", a.smartxLogsMeta)
