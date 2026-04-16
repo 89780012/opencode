@@ -85,12 +85,23 @@ export default function EmbedSessionPage() {
     }
   }, [chat, entry])
 
+  const wait =
+    entry.phase === "init"
+      ? {
+          title: "正在初始化 Git 仓库",
+          desc: "检测到当前目录还不是 Git 仓库，正在自动执行初始化。",
+        }
+      : {
+          title: "正在准备工作区",
+          desc: "正在检查目录、Git 状态和会话运行环境。",
+        }
+
   if (!path) {
     return <Status title="缺少路径参数" desc="请使用 /embed/session?path=<工作区目录> 打开当前页面。" />
   }
 
   if (entry.load && !workspace) {
-    return <Status title="正在准备工作区" desc="正在检查目录、Git 状态和会话运行环境。" />
+    return <Status title={wait.title} desc={wait.desc} />
   }
 
   if (entry.err || !workspace) {

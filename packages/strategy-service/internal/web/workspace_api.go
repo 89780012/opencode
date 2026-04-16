@@ -73,6 +73,7 @@ func (a *API) workspaceAttach(c *gin.Context) {
 	body := struct {
 		Path string `json:"path"`
 		Type string `json:"type"`
+		Git  bool   `json:"git"`
 	}{}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		slog.Warn("workspace attach bad request", "error", err)
@@ -90,7 +91,7 @@ func (a *API) workspaceAttach(c *gin.Context) {
 		return
 	}
 
-	data, err := a.ws.Attach(ctx, body.Path, body.Type)
+	data, err := a.ws.Attach(ctx, body.Path, body.Type, body.Git)
 	if err != nil {
 		slog.Error("workspace attach failed", "path", body.Path, "error", err)
 		bad(c, err)

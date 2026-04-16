@@ -31,7 +31,9 @@ func EnsureBuiltins() error {
 	}
 
 	// 将workspace下的agents 和 skills copy到用户配置中
-	for _, item := range []string{"agents", "skills"} {
+	// 暂时去掉skills, 由smartx自己从华为云拉取包安装到opencode对应目录,自主升级
+	//for _, item := range []string{"agents", "skills"} {
+	for _, item := range []string{"agents"} {
 		err = sync(filepath.Join(root, item), "workspace/"+item, true)
 		if err != nil {
 			return err

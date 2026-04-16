@@ -48,6 +48,7 @@ export interface OpenWorkspaceResponse {
 export interface AttachWorkspaceRequest {
   path: string;
   type?: "smartx" | "python" | "js" | "other";
+  git?: boolean;
 }
 
 export interface AttachWorkspaceGitState {

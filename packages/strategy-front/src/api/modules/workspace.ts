@@ -39,10 +39,10 @@ export const workspaceApi = {
     );
   },
 
-  attachWorkspace(path: string, type?: "smartx" | "python" | "js" | "other") {
+  attachWorkspace(path: string, type?: "smartx" | "python" | "js" | "other", git?: boolean) {
     return request.post<AttachWorkspaceResponse, AttachWorkspaceRequest>(
       "/workspace/attach",
-      { path, type },
+      { path, type, git },
       {
         timeout: 45000,
       },

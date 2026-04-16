@@ -218,19 +218,14 @@ func (s *Service) resolveGit(ctx context.Context) (rt.Result, error) {
 
 // ensureGit 确保目标目录具备可用的 Git 仓库状态。
 func (s *Service) ensureGit(ctx context.Context, dir string) (GitState, error) {
-	row, err := s.resolveGit(ctx)
+	out, err := s.probeGit(ctx, dir)
 	if err != nil {
 		return GitState{}, err
-	}
-
-	out := GitState{
-		Repo:      git(dir),
-		Available: row.Found,
 	}
 	if out.Repo {
 		return out, nil
 	}
-	if !row.Found {
+	if !out.Available {
 		return out, os.ErrNotExist
 	}
 
@@ -241,6 +236,18 @@ func (s *Service) ensureGit(ctx context.Context, dir string) (GitState, error) {
 	out.Repo = true
 	out.Initialized = true
 	return out, nil
+}
+
+func (s *Service) probeGit(ctx context.Context, dir string) (GitState, error) {
+	row, err := s.resolveGit(ctx)
+	if err != nil {
+		return GitState{}, err
+	}
+
+	return GitState{
+		Repo:      git(dir),
+		Available: row.Found,
+	}, nil
 }
 
 // workspaceRoot 根据类型选择默认落盘目录。
@@ -452,7 +459,7 @@ func (s *Service) Import(path string, typ string, git bool) (OpenResult, error) 
 }
 
 // Attach 在 opencode 就绪后把现有目录接入工作区。
-func (s *Service) Attach(ctx context.Context, path string, typ string) (AttachResult, error) {
+func (s *Service) Attach(ctx context.Context, path string, typ string, git bool) (AttachResult, error) {
 	slog.Info("workspace attach", "path", path, "type", typ)
 	dir := filepath.Clean(strings.TrimSpace(path))
 	if dir == "" {
@@ -467,9 +474,15 @@ func (s *Service) Attach(ctx context.Context, path string, typ string) (AttachRe
 		return AttachResult{}, os.ErrInvalid
 	}
 
-	state, err := s.ensureGit(ctx, dir)
+	state, err := s.probeGit(ctx, dir)
 	if err != nil {
 		return AttachResult{}, err
+	}
+	if git && !state.Repo {
+		state, err = s.ensureGit(ctx, dir)
+		if err != nil {
+			return AttachResult{}, err
+		}
 	}
 
 	row := s.remember(draft(dir, typ), "external", false)

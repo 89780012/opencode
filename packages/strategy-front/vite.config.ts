@@ -8,6 +8,7 @@ export default defineConfig(({ command, mode }) => {
   const apiProxyTarget = env.VITE_API_PROXY_TARGET || "http://127.0.0.1:8000"
   const opencodeProxyTarget = env.VITE_OPENCODE_PROXY_TARGET || apiProxyTarget
   const isDevelopMode = mode === "development"
+  const compat = "es2019"
   const root = path.resolve(__dirname, "./node_modules")
   const reactRoot = path.resolve(root, "./react")
   const reactDom = path.resolve(root, "./react-dom")
@@ -15,6 +16,17 @@ export default defineConfig(({ command, mode }) => {
 
   return {
     plugins: [react(), tailwindcss()],
+    esbuild: {
+      target: compat,
+    },
+    build: {
+      target: compat,
+    },
+    optimizeDeps: {
+      esbuildOptions: {
+        target: compat,
+      },
+    },
     resolve: {
       alias: [
         { find: "@", replacement: path.resolve(__dirname, "./src") },

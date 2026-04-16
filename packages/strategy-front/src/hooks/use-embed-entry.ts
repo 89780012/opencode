@@ -13,6 +13,7 @@ export function useEmbedEntry(path?: string | null) {
   const [git, setGit] = useState<AttachWorkspaceGitState | null>(null)
   const [load, setLoad] = useState(false)
   const [err, setErr] = useState("")
+  const [phase, setPhase] = useState<"" | "check" | "init">("")
 
   const refresh = useCallback(async () => {
     const dir = path?.trim() ?? ""
@@ -20,13 +21,22 @@ export function useEmbedEntry(path?: string | null) {
       setWorkspace(null)
       setGit(null)
       setErr("")
+      setPhase("")
       return
     }
 
     setLoad(true)
     setErr("")
+    setPhase("check")
     try {
-      const data = await workspaceApi.attachWorkspace(dir, "smartx")
+      const data = await workspaceApi.attachWorkspace(dir, "smartx", false)
+      if (!data.git.repo) {
+        setPhase("init")
+        const next = await workspaceApi.attachWorkspace(dir, "smartx", true)
+        setWorkspace(next.workspace)
+        setGit(next.git)
+        return
+      }
       setWorkspace(data.workspace)
       setGit(data.git)
     } catch (err) {
@@ -34,6 +44,7 @@ export function useEmbedEntry(path?: string | null) {
       setGit(null)
       setErr(note(err, "工作区初始化失败"))
     } finally {
+      setPhase("")
       setLoad(false)
     }
   }, [path])
@@ -46,6 +57,7 @@ export function useEmbedEntry(path?: string | null) {
     workspace,
     git,
     load,
+    phase,
     err,
     ready: !!workspace && !load && !err,
     refresh,
