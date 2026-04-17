@@ -50,8 +50,8 @@ export interface OpencodeState {
 
 export const systemDefault: SystemConfig = {
   theme: {
-    mode: "system",
-    accent: "ocean",
+    mode: "dark",
+    accent: "graphite",
   },
   logs: {
     tail: 200,

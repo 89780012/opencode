@@ -84,11 +84,11 @@ export function WorkspaceDetailPane(props: Props) {
   const refreshing = filter === "changed" ? review.loading : editor.loading
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col bg-[linear-gradient(180deg,#fcfcfb,#f7f7f4)] dark:bg-[linear-gradient(180deg,#101514,#0f1211)]">
+    <div className="workspace-detail-pane flex h-full min-h-0 min-w-0 flex-col bg-[linear-gradient(180deg,#fcfcfb,#f7f7f4)] dark:bg-[linear-gradient(180deg,#101514,#0f1211)]">
       <div className="flex items-center justify-between border-b px-4 py-3">
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold">{props.workspace.name}</div>
-          <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="mt-1 flex items-center gap-2 text-xs text-slate-500 dark:text-[#8d9b94]">
             <span>{review.diffs.length} 变更</span>
             <span className="truncate">{props.workspace.path}</span>
           </div>
@@ -156,20 +156,26 @@ export function WorkspaceDetailPane(props: Props) {
         <ResizableHandle withHandle className="pointer" />
 
         <ResizablePanel defaultSize={24} minSize={260} className="min-h-0 min-w-0">
-          <div className="flex h-full min-h-0 min-w-0 flex-col border-l bg-muted/10">
+          <div className="workspace-sidepane flex h-full min-h-0 min-w-0 flex-col border-l border-slate-200 bg-slate-100 dark:border-[#2a312f] dark:bg-[#141918]">
             <div className="border-b px-3 py-2">
               <div className="flex items-center justify-between gap-2">
                 <Tabs
                   value={props.tab}
                   onValueChange={(value) => props.onTab(value as WorkspaceDetailTab)}
-                  className="gap-0"
+                  className="workspace-pane-tabs gap-0"
                 >
-                  <TabsList className="h-8 rounded-lg bg-muted/70 p-1">
-                    <TabsTrigger value="review" className="h-6 gap-1.5 rounded-md px-2.5 text-xs">
+                  <TabsList className="workspace-pane-tabs-list h-8 rounded-lg border border-slate-200 bg-slate-200 p-1 dark:border-[#2a312f] dark:bg-[#1c2321]">
+                    <TabsTrigger
+                      value="review"
+                      className="workspace-pane-tab h-6 gap-1.5 rounded-md px-2.5 text-xs text-slate-600 data-[state=active]:border-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900 dark:text-[#96a49d] dark:data-[state=active]:border-[#2d3532] dark:data-[state=active]:bg-[#121716] dark:data-[state=active]:text-[#eef5f1]"
+                    >
                       <GitCompare className="size-3.5" />
                       变更
                     </TabsTrigger>
-                    <TabsTrigger value="files" className="h-6 gap-1.5 rounded-md px-2.5 text-xs">
+                    <TabsTrigger
+                      value="files"
+                      className="workspace-pane-tab h-6 gap-1.5 rounded-md px-2.5 text-xs text-slate-600 data-[state=active]:border-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900 dark:text-[#96a49d] dark:data-[state=active]:border-[#2d3532] dark:data-[state=active]:bg-[#121716] dark:data-[state=active]:text-[#eef5f1]"
+                    >
                       <ChevronRight className="size-3.5" />
                       文件
                     </TabsTrigger>
@@ -183,20 +189,20 @@ export function WorkspaceDetailPane(props: Props) {
                 <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
                   <div className="flex min-w-0 items-baseline gap-2">
                     <div className="truncate text-sm font-medium">文件树</div>
-                    <div className="shrink-0 text-xs text-muted-foreground">{tree.length} 项</div>
+                    <div className="shrink-0 text-xs text-slate-500 dark:text-[#8d9b94]">{tree.length} 项</div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1 rounded-md border bg-background p-1">
+                    <div className="workspace-filter flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 p-1 dark:border-[#2a312f] dark:bg-[#111615]">
                       {(["all", "changed"] as const).map((item) => (
                         <button
                           key={item}
                           type="button"
                           onClick={() => setFilter(item)}
                           className={cn(
-                            "rounded px-2 py-1 text-[11px] font-medium transition-colors",
+                            "workspace-filter-option rounded px-2 py-1 text-[11px] font-medium transition-colors",
                             filter === item
-                              ? "bg-foreground text-background"
-                              : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                              ? "bg-slate-900 text-white dark:bg-[#e6eeea] dark:text-[#101514]"
+                              : "text-slate-500 hover:bg-slate-200 hover:text-slate-900 dark:text-[#8d9b94] dark:hover:bg-[#202725] dark:hover:text-[#eef5f1]",
                           )}
                         >
                           {item === "all" ? "所有文件" : "仅变更"}
@@ -208,7 +214,7 @@ export function WorkspaceDetailPane(props: Props) {
                       variant="outline"
                       onClick={() => void refresh()}
                       disabled={refreshing}
-                      className="h-7 px-2"
+                      className="workspace-pane-refresh h-7 px-2"
                     >
                       <RefreshCw className={cn("size-3.5", refreshing ? "animate-spin" : undefined)} />
                       刷新
@@ -237,7 +243,7 @@ export function WorkspaceDetailPane(props: Props) {
                 }}
                 onRefresh={review.refresh}
                 side={
-                  <div className="flex items-center gap-1 rounded-md border bg-background p-1">
+                  <div className="workspace-filter flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 p-1 dark:border-[#2a312f] dark:bg-[#111615]">
                     <Button
                       size="icon-xs"
                       variant={review.mode === "split" ? "secondary" : "ghost"}

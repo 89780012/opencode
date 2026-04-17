@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
+import { load, save } from "@/lib/store"
 import type { ChatModelRef } from "@/types/chat"
 import type { ComposerPrefs } from "@/types/composer"
 
@@ -20,7 +21,7 @@ function parse() {
   }
 
   try {
-    const raw = window.localStorage.getItem(key)
+    const raw = load(key)
     if (!raw) {
       return {} as ComposerPrefs
     }
@@ -35,7 +36,7 @@ function write(state: ComposerPrefs) {
   if (typeof window === "undefined") {
     return
   }
-  window.localStorage.setItem(key, JSON.stringify(state))
+  save(key, JSON.stringify(state))
 }
 
 export function ComposerProvider(props: { children: ReactNode }) {

@@ -54,7 +54,7 @@ export function ReviewFileList(props: Props) {
               onClick={() => props.onFile(item.file)}
               title={tip}
               className={cn(
-                "group relative mb-0.5 flex min-h-9 w-full items-center gap-1.5 rounded-sm px-2 py-1 text-left outline-hidden transition-colors focus-visible:ring-1 focus-visible:ring-ring",
+                "group relative mb-0.5 flex min-h-9 w-full items-center gap-1.5 rounded-sm px-2 py-1 text-left outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring",
                 active ? "bg-accent text-accent-foreground" : "text-foreground/80 hover:bg-accent/70 hover:text-accent-foreground",
               )}
             >

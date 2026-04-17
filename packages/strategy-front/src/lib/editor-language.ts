@@ -1,5 +1,6 @@
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api"
 import { loader } from "@monaco-editor/react"
+import "monaco-editor/esm/vs/base/browser/ui/codicons/codicon/codicon.css"
 import "monaco-editor/esm/vs/basic-languages/html/html.contribution"
 import "monaco-editor/esm/vs/basic-languages/python/python.contribution"
 import "monaco-editor/esm/vs/basic-languages/shell/shell.contribution"
@@ -34,25 +35,25 @@ monaco.editor.defineTheme("strategy-dark", {
   inherit: true,
   rules: [],
   colors: {
-    "editor.background": "#0f1412",
-    "editor.foreground": "#e5f0ea",
-    "editor.lineHighlightBackground": "#18201d",
-    "editorLineNumber.foreground": "#5f736a",
-    "editorLineNumber.activeForeground": "#d9e8e1",
-    "editor.selectionBackground": "#1f4b3d",
-    "editor.inactiveSelectionBackground": "#1a2c25",
-    "editorGutter.background": "#0f1412",
-    "editorWidget.background": "#121917",
-    "editorHoverWidget.background": "#121917",
-    "scrollbarSlider.background": "#35524866",
-    "scrollbarSlider.hoverBackground": "#4d726699",
-    "scrollbarSlider.activeBackground": "#6b9586cc",
-    "diffEditor.insertedTextBackground": "#1f4d36aa",
+    "editor.background": "#121212",
+    "editor.foreground": "#ffffff",
+    "editor.lineHighlightBackground": "#222224",
+    "editorLineNumber.foreground": "#565c65",
+    "editorLineNumber.activeForeground": "#ffffff",
+    "editor.selectionBackground": "#414143",
+    "editor.inactiveSelectionBackground": "#2a2a2c",
+    "editorGutter.background": "#121212",
+    "editorWidget.background": "#222224",
+    "editorHoverWidget.background": "#222224",
+    "scrollbarSlider.background": "#4e535b66",
+    "scrollbarSlider.hoverBackground": "#565c6599",
+    "scrollbarSlider.activeBackground": "#565c65cc",
+    "diffEditor.insertedTextBackground": "#2d4735aa",
     "diffEditor.removedTextBackground": "#5a232baa",
-    "diffEditor.insertedLineBackground": "#14291f",
+    "diffEditor.insertedLineBackground": "#1f2b24",
     "diffEditor.removedLineBackground": "#2a171c",
-    "diffEditor.diagonalFill": "#141a18",
-    "diffEditor.border": "#22312b",
+    "diffEditor.diagonalFill": "#1b1b1d",
+    "diffEditor.border": "#4e535b",
   },
 })
 

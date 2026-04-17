@@ -225,7 +225,7 @@ export function useStrategySession(path?: string | null) {
   }, [chat])
 
   useEffect(() => {
-    if (chat.selectedSessionId || chat.sessions.length === 0) {
+    if (!chat.loaded || chat.selectedSessionId || chat.sessions.length === 0) {
       return
     }
     chat.selectSession(chat.sessions[0].id)

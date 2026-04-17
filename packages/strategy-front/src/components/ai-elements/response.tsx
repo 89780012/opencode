@@ -17,7 +17,7 @@ export const Response = ({
 }: ResponseProps) => (
   <Streamdown
     className={cn(
-      "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
+      "response-body min-w-0 w-full text-sm leading-7",
       className,
     )}
     isAnimating={isStreaming}

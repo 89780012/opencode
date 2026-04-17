@@ -59,7 +59,7 @@ export function TodoPanel(props: Props) {
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-[22px] border border-black/8 bg-black/[0.02] backdrop-blur-sm transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] dark:border-white/10 dark:bg-white/[0.03]",
+        "overflow-hidden rounded-[22px] border border-black/8 bg-slate-50 transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] dark:border-white/10 dark:bg-[#151918]",
         collapsed ? "shadow-none" : "shadow-sm shadow-black/5 dark:shadow-black/20",
       )}
     >

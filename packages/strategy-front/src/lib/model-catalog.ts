@@ -1,4 +1,5 @@
 import type { Model, Provider } from "@/types/provider"
+import { load, save } from "@/lib/store"
 
 export type Vis = "show" | "hide"
 export type ModelKey = {
@@ -20,7 +21,7 @@ export function readModelVisibility() {
   if (typeof window === "undefined") return {}
 
   try {
-    const raw = window.localStorage.getItem(modelStoreKey)
+    const raw = load(modelStoreKey)
     if (!raw) return {}
     const data = JSON.parse(raw) as { user?: Record<string, Vis> }
     return data.user ?? {}
@@ -34,7 +35,7 @@ export function writeModelCatalog(input: { user?: Record<string, Vis> }) {
 
   const cur = (() => {
     try {
-      const raw = window.localStorage.getItem(modelStoreKey)
+      const raw = load(modelStoreKey)
       if (!raw) return {}
       return JSON.parse(raw) as { user?: Record<string, Vis> }
     } catch {
@@ -42,7 +43,7 @@ export function writeModelCatalog(input: { user?: Record<string, Vis> }) {
     }
   })()
 
-  window.localStorage.setItem(
+  save(
     modelStoreKey,
     JSON.stringify({
       user: input.user ?? cur.user ?? {},

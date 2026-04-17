@@ -27,8 +27,8 @@ type Store struct{}
 func Default() Config {
 	return Config{
 		Theme: Theme{
-			Mode:   "system",
-			Accent: "ocean",
+			Mode:   "dark",
+			Accent: "graphite",
 		},
 		Logs: Logs{
 			Tail: 200,

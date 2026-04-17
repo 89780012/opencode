@@ -33,13 +33,13 @@ export function WorkspaceFileTabs(props: Props) {
   const names = label(props.open)
 
   return (
-    <div className="flex min-w-0 items-end border-b bg-muted/15 pt-1">
+    <div className="workspace-tabs flex min-w-0 items-end border-b border-slate-200 bg-slate-50 pt-1 dark:border-[#2a312f] dark:bg-[#121716]">
       <div className="min-w-0 flex-1 overflow-hidden">
         <Scroll.Root className="relative min-w-0">
           <Scroll.Viewport className="w-full outline-none">
             <div className="flex min-w-max items-end">
               {props.open.length === 0 ? (
-                <div className="px-2 pb-2 text-xs text-muted-foreground">No open files</div>
+                <div className="px-2 pb-2 text-xs text-slate-500 dark:text-[#8d9b94]">No open files</div>
               ) : (
                 props.open.map((path) => {
                   const active = path === props.active
@@ -47,18 +47,19 @@ export function WorkspaceFileTabs(props: Props) {
                   return (
                     <div
                       key={path}
+                      data-active={active ? "" : undefined}
                       className={cn(
-                        "group -mb-px flex h-9 shrink-0 items-center gap-1 rounded-none border border-b-transparent pr-1 transition-[background-color,color,border-color]",
+                        "workspace-tab group -mb-px flex h-9 shrink-0 items-center gap-1 rounded-none border border-b-transparent pr-1 transition-[background-color,color,border-color]",
                         active
-                          ? "border-border bg-background text-foreground"
-                          : "border-border bg-muted/45 text-muted-foreground hover:bg-muted/65 hover:text-foreground",
+                          ? "border-slate-200 border-b-white bg-white text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] dark:border-[#2a312f] dark:border-b-[#121716] dark:bg-[#121716] dark:text-[#eef5f1] dark:shadow-none"
+                          : "border-slate-200 bg-slate-100 text-slate-600 hover:bg-white hover:text-slate-900 dark:border-[#2a312f] dark:bg-[#1d2422] dark:text-[#8f9d96] dark:hover:bg-[#242c29] dark:hover:text-[#eef5f1]",
                       )}
                     >
                       <button
                         type="button"
                         onClick={() => props.onPick(path)}
                         className={cn(
-                          "min-w-0 px-3 text-sm outline-none transition-colors",
+                          "min-w-0 bg-transparent px-3 text-sm outline-none transition-colors appearance-none",
                           active ? "font-medium" : "font-normal",
                         )}
                         title={path}
@@ -72,10 +73,10 @@ export function WorkspaceFileTabs(props: Props) {
                           props.onClose(path)
                         }}
                         className={cn(
-                          "rounded-none p-1 transition-[background-color,color,opacity] hover:bg-muted hover:text-foreground",
+                          "rounded-none bg-transparent p-1 transition-[background-color,color,opacity] appearance-none",
                           active
-                            ? "text-muted-foreground opacity-100"
-                            : "text-muted-foreground/70 opacity-70 group-hover:opacity-100",
+                            ? "text-slate-500 opacity-100 hover:bg-slate-100 hover:text-slate-800 dark:text-[#8f9d96] dark:hover:bg-[#202725] dark:hover:text-[#eef5f1]"
+                            : "text-slate-400 opacity-70 hover:bg-slate-100 hover:text-slate-700 group-hover:opacity-100 dark:text-[#6f7d76] dark:hover:bg-[#202725] dark:hover:text-[#dbe5e1]",
                         )}
                         aria-label={`Close ${names[path]}`}
                       >
@@ -91,13 +92,13 @@ export function WorkspaceFileTabs(props: Props) {
             orientation="horizontal"
             className="absolute right-0 bottom-0 left-0 z-10 flex h-1.5 touch-none p-0 select-none opacity-0 transition-opacity hover:opacity-100 data-[state=visible]:opacity-100"
           >
-            <Scroll.ScrollAreaThumb className="bg-border/75 hover:bg-border relative flex-1 rounded-full" />
+            <Scroll.ScrollAreaThumb className="relative flex-1 rounded-full bg-slate-300 hover:bg-slate-400 dark:bg-[#313b37] dark:hover:bg-[#445049]" />
           </Scroll.ScrollAreaScrollbar>
           <Scroll.Corner />
         </Scroll.Root>
       </div>
       {props.side ? (
-        <div className="flex shrink-0 items-center gap-2 border-l bg-background/95 pb-1 pl-3 pr-2 backdrop-blur-sm">
+        <div className="workspace-tabs-side flex shrink-0 items-center gap-2 border-l border-slate-200 bg-slate-50 pb-1 pl-3 pr-2 dark:border-[#2a312f] dark:bg-[#121716]">
           {props.side}
         </div>
       ) : null}

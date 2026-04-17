@@ -3,6 +3,7 @@ import { chatApi, permissionApi, questionApi } from "@/api/modules"
 import { toast } from "sonner"
 import { buildRequestParts } from "@/lib/build-request-parts"
 import { log } from "@/lib/error"
+import { load, save } from "@/lib/store"
 import {
   selectPermissionLoaded,
   selectQuestionLoaded,
@@ -90,7 +91,7 @@ function readDrafts() {
   if (typeof window === "undefined") return {}
 
   try {
-    const raw = window.localStorage.getItem(storageKey)
+    const raw = load(storageKey)
     if (!raw) return {}
 
     const data = JSON.parse(raw) as Record<string, LegacyDraftEntry>
@@ -110,7 +111,7 @@ function readDrafts() {
 
 function writeDrafts(store: Record<string, DraftEntry>) {
   if (typeof window === "undefined") return
-  window.localStorage.setItem(storageKey, JSON.stringify(store))
+  save(storageKey, JSON.stringify(store))
 }
 
 function done(list: { status: string }[]) {

@@ -73,6 +73,18 @@ func (s *Static) disk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if asset, ok := assetPath(name); ok {
+		file = filepath.Join(s.root, filepath.FromSlash(asset))
+		abs, err = filepath.Abs(file)
+		if err == nil && inside(s.root, abs) {
+			info, err = os.Stat(abs)
+			if err == nil && !info.IsDir() {
+				http.ServeFile(w, r, abs)
+				return
+			}
+		}
+	}
+
 	if filepath.Ext(name) != "" {
 		http.NotFound(w, r)
 		return
@@ -100,6 +112,15 @@ func (s *Static) embed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if asset, ok := assetPath(name); ok {
+		file = path.Join("www", asset)
+		info, err = fs.Stat(s.site, file)
+		if err == nil && !info.IsDir() {
+			http.ServeFileFS(w, r, s.site, file)
+			return
+		}
+	}
+
 	if path.Ext(name) != "" {
 		http.NotFound(w, r)
 		return
@@ -113,4 +134,18 @@ func inside(root string, path string) bool {
 		return true
 	}
 	return strings.HasPrefix(strings.ToLower(path), strings.ToLower(root+string(filepath.Separator)))
+}
+
+func assetPath(name string) (string, bool) {
+	parts := strings.FieldsFunc(name, func(r rune) bool {
+		return r == '/' || r == '\\'
+	})
+
+	for i, part := range parts {
+		if part == "assets" {
+			return strings.Join(parts[i:], "/"), true
+		}
+	}
+
+	return "", false
 }

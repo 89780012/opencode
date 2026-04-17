@@ -267,13 +267,14 @@ function buildProvider(providers: List, config: Config, auth: AuthMap): Provider
       model: { providerID: item.provider.id, modelID: item.id },
     }),
   )
+  const showAll = visibleModels.length === 0 && connectedModels.length > 0 && Object.keys(user).length === 0
 
   return {
     providers,
     config,
     auth,
     connectedModels,
-    visibleModels,
+    visibleModels: showAll ? connectedModels : visibleModels,
   }
 }
 

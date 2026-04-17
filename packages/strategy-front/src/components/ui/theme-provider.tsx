@@ -3,7 +3,7 @@ import { ThemeProvider as NextThemeProvider } from "next-themes"
 
 export function ThemeProvider(props: { children: ReactNode }) {
   return (
-    <NextThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+    <NextThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
       {props.children}
     </NextThemeProvider>
   )

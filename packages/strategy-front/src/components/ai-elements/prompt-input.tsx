@@ -50,7 +50,7 @@ export const PromptInput = ({ className, children, value, onValueChange, onSubmi
     <Ctx.Provider value={{ value, onValueChange }}>
       <form
         className={cn(
-          "w-full rounded-[25px] border border-primary/35 bg-background/98 shadow-[0_0_0_1px_hsl(var(--primary)/0.04),0_8px_18px_-16px_hsl(var(--primary)/0.5)] transition-[border-color,box-shadow] focus-within:border-primary/55 focus-within:shadow-[0_0_0_1px_hsl(var(--primary)/0.08),0_10px_22px_-16px_hsl(var(--primary)/0.55)] dark:bg-background",
+          "chat-prompt-shell w-full rounded-[25px] border border-slate-200 bg-white shadow-[0_18px_40px_-28px_rgba(15,23,42,0.28)] transition-[border-color,box-shadow] focus-within:border-primary/45 focus-within:shadow-[0_0_0_1px_rgb(var(--primary)/0.10),0_24px_44px_-30px_rgba(37,99,235,0.35)] dark:border-[#29302e] dark:bg-[#171b1a] dark:shadow-none",
           className,
         )}
         onSubmit={submit}
@@ -65,7 +65,7 @@ export const PromptInput = ({ className, children, value, onValueChange, onSubmi
 export type PromptInputBodyProps = ComponentProps<"div">
 
 export const PromptInputBody = ({ className, ...props }: PromptInputBodyProps) => (
-  <div className={cn("px-4 pt-2", className)} {...props} />
+  <div className={cn("chat-prompt-body px-4 pt-2", className)} {...props} />
 )
 
 export type PromptInputTextareaProps = Omit<ComponentProps<"textarea">, "value" | "onChange"> & {
@@ -116,7 +116,7 @@ export const PromptInputTextarea = ({
     <textarea
       ref={ref}
       className={cn(
-        "txt w-full resize-none border-none bg-transparent px-1 py-0 text-sm leading-6 text-foreground outline-none placeholder:text-muted-foreground/80",
+        "chat-prompt-textarea txt block w-full resize-none border-none bg-transparent px-1 py-1 text-sm leading-[1.6] text-slate-800 outline-none placeholder:text-slate-400 dark:text-[#f1f5f3] dark:placeholder:text-[#7f8b86]",
         className,
       )}
       name="message"
@@ -140,7 +140,7 @@ export const PromptInputTextarea = ({
 export type PromptInputFooterProps = ComponentProps<"div">
 
 export const PromptInputFooter = ({ className, ...props }: PromptInputFooterProps) => (
-  <div className={cn("flex items-center justify-between px-2.5 pb-2 pt-1", className)} {...props} />
+  <div className={cn("chat-prompt-footer flex items-center justify-between px-2.5 pb-2 pt-1", className)} {...props} />
 )
 
 export type PromptInputToolsProps = ComponentProps<"div">

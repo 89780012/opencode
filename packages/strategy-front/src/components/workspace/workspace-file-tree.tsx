@@ -74,7 +74,7 @@ const icon = (name: string): { Icon: LucideIcon; className: string } => {
     return { Icon: FileTerminal, className: "text-lime-600" };
   }
 
-  return { Icon: FileText, className: "text-muted-foreground" };
+  return { Icon: FileText, className: "text-slate-400 dark:text-[#6f7d76]" };
 };
 
 const tree = (filePaths: string[]) => {
@@ -164,7 +164,7 @@ export function WorkspaceFileTree(props: Props) {
   }, []);
 
   return (
-    <aside ref={ref} className="h-full min-w-0 bg-muted/10">
+    <aside ref={ref} className="workspace-tree h-full min-w-0 bg-slate-50 dark:bg-[#161b1a]">
       <Tree<Node>
         data={data}
         width="100%"
@@ -183,9 +183,10 @@ export function WorkspaceFileTree(props: Props) {
           const Icon = meta?.Icon;
 
           return (
-            <div style={style} className="px-1">
+            <div style={style} className="workspace-tree-item px-1">
               <button
                 type="button"
+                data-active={active ? "" : undefined}
                 onClick={() => {
                   if (file) {
                     props.onSelectFile(node.data.path);
@@ -194,8 +195,10 @@ export function WorkspaceFileTree(props: Props) {
                   node.toggle();
                 }}
                 className={cn(
-                  "flex h-8 w-full items-center gap-1.5 rounded px-2 text-sm transition-colors",
-                  active ? "bg-primary/15 text-foreground" : "hover:bg-muted/60 hover:text-foreground",
+                  "workspace-tree-row flex h-8 w-full items-center gap-1.5 rounded border px-2 text-sm text-slate-600 transition-colors dark:text-[#a8b4ae]",
+                  active
+                    ? "border-slate-200 bg-white text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] dark:border-[#2d3532] dark:bg-[#202725] dark:text-[#eef5f1] dark:shadow-none"
+                    : "border-transparent hover:border-slate-200 hover:bg-slate-200 hover:text-slate-900 dark:hover:border-[#2a312f] dark:hover:bg-[#202725] dark:hover:text-[#eef5f1]",
                 )}
                 style={{
                   paddingLeft: `${8 + node.level * 16}px`,

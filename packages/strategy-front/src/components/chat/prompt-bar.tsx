@@ -35,9 +35,9 @@ interface Props {
 }
 
 const item =
-  "min-w-0 rounded-full border border-border/65 bg-background text-[12px] font-medium text-foreground/85 shadow-none transition-colors hover:border-border hover:bg-muted/45 hover:text-foreground dark:border-white/[0.09] dark:bg-white/[0.05] dark:text-white/85 dark:hover:bg-white/[0.08]"
+  "min-w-0 rounded-full border border-slate-200 bg-white text-[12px] font-medium text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 dark:border-[#29302e] dark:bg-[#171b1a] dark:text-[#dbe5e1] dark:hover:border-[#33403b] dark:hover:bg-[#1d2221] dark:hover:text-white"
 
-const menu = "custom-scrollbar max-h-[240px] overflow-y-auto rounded-xl border-border/80"
+const menu = "custom-scrollbar max-h-[240px] overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl dark:border-[#29302e] dark:bg-[#151918]"
 
 export function PromptBar(props: Props) {
   const { model, models, onModel } = props

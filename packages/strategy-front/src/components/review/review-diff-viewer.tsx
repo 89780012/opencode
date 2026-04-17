@@ -48,7 +48,7 @@ export function ReviewDiffViewer(props: Props) {
   if (!props.diff) {
     return (
       <div className="flex h-full min-h-0 min-w-0 flex-1 items-center justify-center px-6 text-sm text-muted-foreground">
-        Select a file to inspect the diff
+        选择一个文件来检查diff
       </div>
     )
   }

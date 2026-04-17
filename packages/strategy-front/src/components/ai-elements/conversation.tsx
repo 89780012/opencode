@@ -42,6 +42,7 @@ export const Conversation = ({ children, className, onScroll, ...props }: Conver
   const wrap = useRef<HTMLDivElement>(null)
   const root = useRef<HTMLDivElement>(null)
   const frame = useRef(0)
+  const anim = useRef(0)
   const last = useRef(true)
   const [bot, setBot] = useState(true)
   const setBody = useCallback((node: HTMLDivElement | null) => {
@@ -56,15 +57,45 @@ export const Conversation = ({ children, className, onScroll, ...props }: Conver
     setBot((prev) => (prev === next ? prev : next))
   }, [])
 
+  const stop = useCallback(() => {
+    if (!anim.current) {
+      return
+    }
+    cancelAnimationFrame(anim.current)
+    anim.current = 0
+  }, [])
+
   const jump = useCallback((mode: ScrollBehavior = "auto") => {
     const node = root.current
     if (!node) return
+    stop()
     if (mode === "smooth") {
-      node.scrollTo({ top: node.scrollHeight, behavior: mode })
+      const from = node.scrollTop
+      const dist = node.scrollHeight - node.clientHeight - from
+      if (dist <= 4) {
+        node.scrollTop = node.scrollHeight
+        return
+      }
+      const span = Math.min(320, Math.max(160, dist * 0.18))
+      const start = performance.now()
+      const step = (now: number) => {
+        const p = Math.min(1, (now - start) / span)
+        const eased = 1 - Math.pow(1 - p, 3)
+        const top = node.scrollHeight - node.clientHeight
+        node.scrollTop = from + (top - from) * eased
+        if (p >= 1) {
+          anim.current = 0
+          node.scrollTop = node.scrollHeight
+          sync()
+          return
+        }
+        anim.current = requestAnimationFrame(step)
+      }
+      anim.current = requestAnimationFrame(step)
       return
     }
     node.scrollTop = node.scrollHeight
-  }, [])
+  }, [stop, sync])
 
   useLayoutEffect(() => {
     jump()
@@ -72,8 +103,26 @@ export const Conversation = ({ children, className, onScroll, ...props }: Conver
   }, [jump, sync])
 
   useEffect(() => {
+    return () => {
+      stop()
+    }
+  }, [stop])
+
+  useEffect(() => {
     const node = body.current
     if (!node) return
+    if (typeof ResizeObserver === "undefined") {
+      const onResize = () => {
+        if (last.current) {
+          jump()
+        }
+        sync()
+      }
+      window.addEventListener("resize", onResize)
+      return () => {
+        window.removeEventListener("resize", onResize)
+      }
+    }
     const obs = new ResizeObserver(() => {
       if (frame.current) {
         return
@@ -88,18 +137,19 @@ export const Conversation = ({ children, className, onScroll, ...props }: Conver
     })
     obs.observe(node)
     return () => {
+      stop()
       if (frame.current) {
         cancelAnimationFrame(frame.current)
       }
       obs.disconnect()
     }
-  }, [jump, sync])
+  }, [jump, stop, sync])
 
   return (
     <Context.Provider value={{ body, wrap, bot, jump, setBody }}>
-      <div className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col" ref={wrap}>
+      <div className="conversation-wrap relative flex h-full min-h-0 min-w-0 flex-1 flex-col" ref={wrap}>
         <div
-          className={cn("flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto", className)}
+          className={cn("conversation-scroll flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto", className)}
           ref={root}
           role="log"
           {...props}
@@ -125,7 +175,7 @@ export const ConversationContent = ({ className, ...props }: ConversationContent
     },
     [ctx],
   )
-  return <div className={cn("flex min-w-0 flex-col gap-4 p-4", className)} ref={ref} {...props} />
+  return <div className={cn("conversation-body min-w-0 space-y-4 p-4", className)} ref={ref} {...props} />
 }
 
 export type ConversationEmptyStateProps = ComponentProps<"div"> & {
@@ -176,16 +226,18 @@ export const ConversationScrollButton = ({ className, ...props }: ConversationSc
   }
 
   return createPortal(
-    <Button
-      className={cn("absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full", className)}
-      onClick={handleScrollToBottom}
-      size="icon"
-      type="button"
-      variant="outline"
-      {...props}
-    >
-      <ArrowDownIcon className="size-4" />
-    </Button>,
+    <div className="pointer-events-none absolute inset-x-0 bottom-4 z-10 flex justify-center">
+      <Button
+        className={cn("pointer-events-auto rounded-full shadow-sm", className)}
+        onClick={handleScrollToBottom}
+        size="icon"
+        type="button"
+        variant="outline"
+        {...props}
+      >
+        <ArrowDownIcon className="size-4" />
+      </Button>
+    </div>,
     wrap.current,
   )
 }

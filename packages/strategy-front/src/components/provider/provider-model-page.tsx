@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { useProviderList } from "@/data/global-data-provider"
 import { writeModelCatalog } from "@/lib/model-catalog"
+import { load } from "@/lib/store"
 import type { Model, Provider } from "@/types/provider"
 import { popular, text } from "./utils"
 
@@ -34,7 +35,7 @@ function read() {
   if (typeof window === "undefined") return {}
 
   try {
-    const raw = window.localStorage.getItem(storeKey)
+    const raw = load(storeKey)
     if (!raw) return {}
     const data = JSON.parse(raw) as { user?: Record<string, Vis> }
     return data.user ?? {}

@@ -1,5 +1,6 @@
 import * as React from "react"
 import { GripVertical } from "lucide-react"
+import { load, save } from "@/lib/store"
 import { cn } from "@/lib/utils"
 
 type PanelProps = {
@@ -29,7 +30,7 @@ function read(key?: string, fallback?: number) {
     return fallback ?? 50
   }
 
-  const raw = window.localStorage.getItem(key)
+  const raw = load(key)
   const num = Number(raw)
   if (Number.isFinite(num)) {
     return num
@@ -42,7 +43,7 @@ function write(key: string | undefined, value: number) {
     return
   }
 
-  window.localStorage.setItem(key, `${value}`)
+  save(key, `${value}`)
 }
 
 function clamp(
@@ -120,6 +121,13 @@ export function ResizablePanelGroup(props: GroupProps) {
     }
 
     sync()
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", sync)
+      return () => {
+        window.removeEventListener("resize", sync)
+      }
+    }
+
     const observer = new ResizeObserver(sync)
     observer.observe(node)
     return () => {

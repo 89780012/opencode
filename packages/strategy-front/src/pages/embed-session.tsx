@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { Cog, PanelRightClose, PanelRightOpen, Plus, RefreshCw } from "lucide-react"
 import { useSearchParams } from "react-router-dom"
 import { toast } from "sonner"
@@ -14,7 +14,7 @@ import { useStrategySession } from "@/hooks/use-strategy-session"
 import { log } from "@/lib/error"
 
 const ctrl =
-  "rounded-md border border-black/8 bg-black/[0.03] text-xs shadow-none hover:bg-black/[0.05] dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.06]"
+  "rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 dark:border-[#2a312f] dark:bg-[#151918] dark:text-[#e4ece8] dark:hover:border-[#35403c] dark:hover:bg-[#1a1f1e]"
 
 function Status(props: { title: string; desc: string; action?: ReactNode }) {
   return (
@@ -40,16 +40,46 @@ export default function EmbedSessionPage() {
   const [tab, setTab] = useState<WorkspaceDetailTab>("files")
   const [spin, setSpin] = useState(false)
   const [settings, setSettings] = useState(false)
+  const init = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (init.current === workspace?.path) {
+      return
+    }
+    init.current = null
+  }, [workspace?.path])
 
   useEffect(() => {
     if (!workspace?.path) return
+    if (!chat.loaded) return
     if (chat.sessionLoading || chat.creating) return
-    if (chat.sessions.length > 0) return
+    if (init.current === workspace.path) return
+
+    init.current = workspace.path
+
+    if (chat.sessions.length > 0) {
+      const item = chat.sessions[0]
+      if (item && chat.selectedSessionId !== item.id) {
+        chat.selectSession(item.id)
+      }
+      return
+    }
+
     void chat.createSession().catch((err) => {
+      init.current = null
       log("自动创建会话失败", err)
       toast.error("自动创建会话失败")
     })
-  }, [chat, workspace?.path])
+  }, [
+    chat.creating,
+    chat.createSession,
+    chat.loaded,
+    chat.selectedSessionId,
+    chat.selectSession,
+    chat.sessionLoading,
+    chat.sessions,
+    workspace?.path,
+  ])
 
   const onAbort = useCallback(async () => {
     try {
@@ -72,6 +102,7 @@ export default function EmbedSessionPage() {
   const onRefresh = useCallback(async () => {
     setSpin(true)
     try {
+      init.current = null
       await entry.refresh()
       await chat.reloadSessions?.()
       if (chat.selectedSessionId) {
@@ -120,10 +151,10 @@ export default function EmbedSessionPage() {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background dark:bg-[#0f1111]">
-      <div className="bg-background/96 px-5 py-1 backdrop-blur dark:border-white/8 dark:bg-[#101313]/92">
+    <div className="embed-session-shell flex h-full min-h-0 flex-col bg-[#f5f7fb] dark:bg-[#0f1111]">
+      <div className="embed-session-toolbar border border-slate-200 bg-white px-4 py-1 shadow-[0_14px_40px_rgba(15,23,42,0.06)] dark:border-[#222826] dark:bg-[#101313] dark:shadow-none">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0 flex-1"></div>
+          <div className="min-w-0 flex-1" />
 
           <div className="flex items-center gap-2">
             <Select
@@ -188,7 +219,7 @@ export default function EmbedSessionPage() {
           direction="horizontal"
           autoSaveId="strategy-front:embed-session-split:v1"
           collapsed={!open}
-          className="h-full min-h-0 border border-black/6 bg-background/80 shadow-[0_18px_60px_rgba(15,23,42,0.08)] dark:border-white/8 dark:bg-[#0f1111]"
+          className="embed-session-frame h-full min-h-0 overflow-hidden border border-slate-200 bg-white shadow-[0_22px_56px_rgba(15,23,42,0.08)] dark:border-[#222826] dark:bg-[#0f1111] dark:shadow-none"
         >
           <ResizablePanel defaultSize={62} minSize={420} className="min-h-0 min-w-0">
             <StrategyChatPanel
@@ -229,7 +260,7 @@ export default function EmbedSessionPage() {
           <ResizablePanel
             defaultSize={38}
             minSize={360}
-            className="min-h-0 min-w-0 border-l border-black/6 dark:border-white/8"
+            className="min-h-0 min-w-0 border-l border-slate-200 dark:border-[#222826]"
           >
             <WorkspaceDetailPane
               open={open}
@@ -250,7 +281,7 @@ export default function EmbedSessionPage() {
         </ResizablePanelGroup>
 
         {(chat.sessionLoading || chat.detailLoading || composer.load || entry.load) && (
-          <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm dark:bg-background/30">
+          <div className="embed-session-mask absolute inset-0 flex items-center justify-center bg-white/75 dark:bg-[#0f1111]/70">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>
         )}

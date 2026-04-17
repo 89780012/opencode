@@ -4,7 +4,139 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark light" />
     <title>front</title>
+    <script>
+      ;(function () {
+        var root = document.documentElement
+        var body = document.body
+        var theme = 'dark'
+
+        try {
+          var saved = localStorage.getItem('theme')
+          if (saved === 'light' || saved === 'dark') {
+            theme = saved
+          } else if (saved === 'system' && window.matchMedia) {
+            theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+          }
+        } catch {}
+
+        root.classList.remove('light', 'dark')
+        root.classList.add(theme)
+        root.style.colorScheme = theme
+        root.style.backgroundColor = theme === 'dark' ? '#121212' : '#ffffff'
+        if (body) {
+          body.style.backgroundColor = theme === 'dark' ? '#121212' : '#ffffff'
+        } else {
+          document.addEventListener(
+            'DOMContentLoaded',
+            function () {
+              document.body.style.backgroundColor = theme === 'dark' ? '#121212' : '#ffffff'
+            },
+            { once: true },
+          )
+        }
+      })()
+    </script>
+    <script>
+      ;(function () {
+        var g =
+          typeof globalThis !== 'undefined'
+            ? globalThis
+            : typeof self !== 'undefined'
+            ? self
+            : typeof window !== 'undefined'
+              ? window
+              : typeof global !== 'undefined'
+                ? global
+                : this
+        if (typeof globalThis === 'undefined') g.globalThis = g
+        if (typeof g.queueMicrotask !== 'function') {
+          g.queueMicrotask = function (fn) {
+            if (typeof Promise === 'function') {
+              Promise.resolve()
+                .then(fn)
+                .catch(function (err) {
+                  setTimeout(function () {
+                    throw err
+                  }, 0)
+                })
+              return
+            }
+            setTimeout(fn, 0)
+          }
+        }
+        if (typeof g.WeakRef !== 'function') {
+          g.WeakRef = function (value) {
+            this._value = value
+          }
+          g.WeakRef.prototype.deref = function () {
+            return this._value
+          }
+        }
+        if (typeof g.FinalizationRegistry !== 'function') {
+          g.FinalizationRegistry = function () {}
+          g.FinalizationRegistry.prototype.register = function () {}
+          g.FinalizationRegistry.prototype.unregister = function () {
+            return false
+          }
+        }
+        if (typeof Object.fromEntries !== 'function') {
+          Object.fromEntries = function (entries) {
+            var obj = {}
+            for (var it = entries[Symbol.iterator](), step = it.next(); !step.done; step = it.next()) {
+              var entry = step.value
+              if (Object(entry) !== entry) throw new TypeError('Iterator value ' + entry + ' is not an entry object')
+              obj[entry[0]] = entry[1]
+            }
+            return obj
+          }
+        }
+        var at = function (n) {
+          var i = Math.trunc(Number(n) || 0) || 0
+          var l = this.length >>> 0
+          if (i < 0) i += l
+          if (i < 0 || i >= l) return undefined
+          return this[i]
+        }
+        var def = function (target) {
+          if (target && typeof target.at !== 'function') {
+            Object.defineProperty(target, 'at', {
+              value: at,
+              configurable: true,
+              writable: true,
+            })
+          }
+        }
+        def(Array.prototype)
+        def(String.prototype)
+        def(typeof Int8Array !== 'undefined' && Int8Array.prototype)
+        def(typeof Uint8Array !== 'undefined' && Uint8Array.prototype)
+        def(typeof Uint8ClampedArray !== 'undefined' && Uint8ClampedArray.prototype)
+        def(typeof Int16Array !== 'undefined' && Int16Array.prototype)
+        def(typeof Uint16Array !== 'undefined' && Uint16Array.prototype)
+        def(typeof Int32Array !== 'undefined' && Int32Array.prototype)
+        def(typeof Uint32Array !== 'undefined' && Uint32Array.prototype)
+        def(typeof Float32Array !== 'undefined' && Float32Array.prototype)
+        def(typeof Float64Array !== 'undefined' && Float64Array.prototype)
+        def(typeof BigInt64Array !== 'undefined' && BigInt64Array.prototype)
+        def(typeof BigUint64Array !== 'undefined' && BigUint64Array.prototype)
+        if (typeof HTMLFormElement !== 'undefined' && HTMLFormElement.prototype && typeof HTMLFormElement.prototype.requestSubmit !== 'function') {
+          HTMLFormElement.prototype.requestSubmit = function (submitter) {
+            if (submitter) {
+              submitter.click()
+              return
+            }
+            var btn = this.querySelector('button[type="submit"],input[type="submit"]')
+            if (btn) {
+              btn.click()
+              return
+            }
+            this.submit()
+          }
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

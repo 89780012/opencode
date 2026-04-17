@@ -112,7 +112,7 @@ export default function StrategyDetailPage() {
   }
 
   return (
-    <div className="sticky flex h-full min-h-0 flex-col bg-background dark:bg-[#0f1111]">
+    <div className="strategy-detail-shell sticky flex h-full min-h-0 flex-col bg-background dark:bg-[#0f1111]">
       <div className="px-6 pb-1 pt-1 dark:bg-card">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
@@ -175,7 +175,7 @@ export default function StrategyDetailPage() {
           direction="horizontal"
           autoSaveId="strategy-front:strategy-detail-split:v1"
           collapsed={!open}
-          className="h-full min-h-0 rounded-[24px] border border-black/6 bg-background/80 shadow-[0_18px_60px_rgba(15,23,42,0.08)] dark:border-white/8 dark:bg-[#0f1111]"
+          className="strategy-detail-frame h-full min-h-0 rounded-[24px] border border-black/6 bg-background/80 shadow-[0_18px_60px_rgba(15,23,42,0.08)] dark:border-white/8 dark:bg-[#0f1111]"
         >
           <ResizablePanel defaultSize={62} minSize={420} className="min-h-0 min-w-0">
             <StrategyChatPanel
@@ -235,7 +235,7 @@ export default function StrategyDetailPage() {
         </ResizablePanelGroup>
 
         {(chat.sessionLoading || chat.detailLoading) && (
-          <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm dark:bg-background/30">
+          <div className="strategy-detail-mask absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm dark:bg-background/30">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>
         )}

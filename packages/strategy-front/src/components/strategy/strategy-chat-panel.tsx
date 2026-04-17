@@ -83,8 +83,8 @@ export function StrategyChatPanel(props: Props) {
         </div>
       </div>
 
-      <div className="shrink-0 px-2 pb-2 pt-1">
-        <div className="mx-auto flex max-w-[780px] flex-col gap-1.5">
+      <div className="shrink-0 px-3 pb-3 pt-2 md:px-4">
+        <div className="mx-auto flex max-w-[780px] flex-col gap-2">
           {chat.permission.req ? (
             <PermissionPanel
               key={chat.permission.req.id}

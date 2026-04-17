@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { chatApi } from "@/api/modules"
 import { log } from "@/lib/error"
+import { load, save } from "@/lib/store"
 import { hydrateSessionDiff } from "@/store/chat-session-slice"
 import { selectSessionDiffs, useAppDispatch, useAppSelector } from "@/store"
 
@@ -13,7 +14,7 @@ function readMode(): ReviewMode {
     return "split"
   }
 
-  const value = window.localStorage.getItem(modeKey)
+  const value = load(modeKey)
   return value === "unified" ? "unified" : "split"
 }
 
@@ -57,7 +58,7 @@ export function useChatReview(workspacePath?: string | null, sessionId?: string 
       return
     }
 
-    window.localStorage.setItem(modeKey, mode)
+    save(modeKey, mode)
   }, [mode])
 
   useEffect(() => {

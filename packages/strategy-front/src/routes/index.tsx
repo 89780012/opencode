@@ -160,7 +160,13 @@ const router = createBrowserRouter([
 
 export function AppRouter() {
   return (
-    <Suspense fallback={<div>加载中...</div>}>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-background px-6 text-sm text-muted-foreground">
+          加载中...
+        </div>
+      }
+    >
       <RouterProvider router={router} />
     </Suspense>
   )

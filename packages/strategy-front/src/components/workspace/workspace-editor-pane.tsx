@@ -92,11 +92,11 @@ export function WorkspaceEditorPane(props: Props) {
         </ResizablePanel>
         <ResizableHandle withHandle className="pointer" />
         <ResizablePanel defaultSize={24} minSize={240} className="min-h-0 min-w-0">
-          <div className="flex h-full min-h-0 min-w-0 flex-col border-l bg-muted/10">
+          <div className="workspace-sidepane flex h-full min-h-0 min-w-0 flex-col border-l border-slate-200 bg-slate-100 dark:border-[#2a312f] dark:bg-[#141918]">
             <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
               <div className="min-w-0">
                 <div className="text-sm font-medium">文件树</div>
-                <div className="text-xs text-muted-foreground">{tree.length} 项</div>
+                <div className="text-xs text-slate-500 dark:text-[#8d9b94]">{tree.length} 项</div>
               </div>
               {props.side}
             </div>

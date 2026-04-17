@@ -1,4 +1,4 @@
-import { memo, useState, type ReactNode } from "react"
+import { memo, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { CheckCircle2, ChevronDown, Circle, ListTodo, LoaderCircle, MinusCircle } from "lucide-react"
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation"
 import { Message, MessageContent } from "@/components/ai-elements/message"
@@ -18,6 +18,9 @@ import type {
 const pane = "custom-scrollbar mt-2 max-h-64 space-y-2 overflow-y-auto pr-1"
 const empty: ChatPart[] = []
 const fail = "border-red-200 bg-red-50 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300"
+const abort = "chat-abort border-slate-200 bg-slate-50 text-slate-600 dark:border-[#2a312f] dark:bg-[#171d1b] dark:text-[#aab6b0]"
+const card = "chat-inline-card border-slate-200 bg-slate-50 text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] dark:border-[#2a312f] dark:bg-[#171b1a] dark:text-[#dbe5e1] dark:shadow-none"
+const note = "text-slate-500 dark:text-[#93a29b]"
 
 interface Props {
   messages: ChatMessageInfo[]
@@ -34,6 +37,11 @@ function errorText(err?: ChatError) {
     return msg
   }
   return err?.name
+}
+
+function abortText(value?: string) {
+  if (!value) return false
+  return value.trim().toLowerCase() === "aborted"
 }
 
 function todos(state: ChatToolState) {
@@ -97,51 +105,101 @@ function renderTodoTool(part: ChatToolPart) {
     <div
       className={cn(
         "flex items-center gap-2 rounded-xl border px-3 py-2 text-xs",
-        state.status === "error" ? fail : "bg-muted/20 text-muted-foreground",
+        state.status === "error" ? fail : card,
       )}
     >
       <div className="shrink-0">
         {state.status === "completed" ? <ListTodo className="size-4 text-muted-foreground" /> : todoIcon(state.status)}
       </div>
       <div className="min-w-0 flex-1 truncate">{todoText(part.tool, state)}</div>
-      <div className="shrink-0 uppercase tracking-[0.08em] text-[10px]">{state.status}</div>
+      <div className={cn("shrink-0 uppercase tracking-[0.08em] text-[10px]", note)}>{state.status}</div>
     </div>
   )
 }
 
 function Fold(props: { head: ReactNode; side?: ReactNode; body: ReactNode; open?: boolean; tone?: string }) {
   const [open, setOpen] = useState(!!props.open)
+  const body = useRef<HTMLDivElement>(null)
+  const [height, setHeight] = useState(0)
+
+  useLayoutEffect(() => {
+    if (!body.current) {
+      return
+    }
+    setHeight(body.current.scrollHeight)
+  }, [open, props.body])
+
+  useEffect(() => {
+    if (!open || !body.current) {
+      return
+    }
+
+    if (typeof ResizeObserver === "undefined") {
+      const sync = () => {
+        if (!body.current) {
+          return
+        }
+        setHeight(body.current.scrollHeight)
+      }
+
+      window.addEventListener("resize", sync)
+      return () => {
+        window.removeEventListener("resize", sync)
+      }
+    }
+
+    const obs = new ResizeObserver(() => {
+      if (!body.current) {
+        return
+      }
+      setHeight(body.current.scrollHeight)
+    })
+
+    obs.observe(body.current)
+    return () => {
+      obs.disconnect()
+    }
+  }, [open])
 
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-lg border px-3 py-2 text-sm transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+        "chat-fold overflow-hidden rounded-xl border text-sm",
+        card,
         props.tone,
       )}
     >
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="flex w-full items-center justify-between gap-3 text-left"
+        className="chat-fold-trigger flex min-h-11 w-full items-center justify-between gap-3 bg-transparent px-3 py-2.5 text-left appearance-none"
       >
-        <div className="min-w-0 flex-1">{props.head}</div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="min-w-0 flex-1 leading-5">{props.head}</div>
+        <div className="chat-fold-side flex shrink-0 items-center self-center gap-2 leading-none">
           {props.side}
           <ChevronDown
             className={cn(
-              "size-4 text-muted-foreground transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+              "shrink-0 self-center size-4 transition-transform duration-200 ease-out",
+              note,
               open ? "rotate-180" : "",
             )}
           />
         </div>
       </button>
       <div
-        className={cn(
-          "grid overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
-          open ? "grid-rows-[1fr] pt-2 opacity-100" : "grid-rows-[0fr] pt-0 opacity-0",
-        )}
+        className="chat-fold-shell overflow-hidden"
+        style={{
+          maxHeight: open ? `${height}px` : "0px",
+          opacity: open ? 1 : 0,
+          transition: "max-height 180ms ease, opacity 160ms ease",
+        }}
       >
-        <div className="min-h-0">{props.body}</div>
+        <div
+          ref={body}
+          className="chat-fold-body border-t border-slate-200 px-3 pb-3 pt-2 dark:border-[#2a312f]"
+        >
+          {props.body}
+        </div>
       </div>
     </div>
   )
@@ -154,12 +212,12 @@ function renderTool(part: ChatToolPart) {
   }
   return (
     <Fold
-      tone="bg-muted/30"
+      tone=""
       head={<div className="font-medium">工具调用: {part.tool}</div>}
-      side={<div className="text-muted-foreground text-xs">{state.status}</div>}
+      side={<div className={cn("text-xs", note)}>{state.status}</div>}
       body={
         <div className={pane}>
-          <pre className="overflow-x-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">
+          <pre className={cn("overflow-x-auto whitespace-pre-wrap break-words text-xs", note)}>
             {JSON.stringify(state.input, null, 2)}
           </pre>
           {"output" in state && state.output ? (
@@ -182,9 +240,9 @@ function renderPart(part: ChatPart, role: ChatMessageInfo["role"], onOpenDiff?: 
     case "reasoning":
       return (
         <Fold
-          tone="bg-muted/20"
+          tone=""
           head={<div className="font-medium">思考中</div>}
-          body={<div className={cn(pane, "whitespace-pre-wrap break-words text-muted-foreground")}>{part.text}</div>}
+          body={<div className={cn(pane, "whitespace-pre-wrap break-words", note)}>{part.text}</div>}
         />
       )
     case "tool":
@@ -207,7 +265,7 @@ function renderPart(part: ChatPart, role: ChatMessageInfo["role"], onOpenDiff?: 
     case "snapshot":
       return (
         <Fold
-          tone="bg-muted/20"
+          tone=""
           head={<div className="font-medium">Snapshot</div>}
           body={
             <pre className={cn(pane, "overflow-x-auto whitespace-pre-wrap break-words text-xs")}>{part.snapshot}</pre>
@@ -262,6 +320,7 @@ const ChatMessageItem = memo(function ChatMessageItem(props: {
   const parts = useAppSelector((state) => selectSessionParts(state, props.info.id))
   const body = parts.length > 0 ? parts : empty
   const err = props.info.role === "assistant" ? errorText(props.info.error) : undefined
+  const tone = abortText(err) ? abort : fail
 
   if (body.length === 0 && !err) {
     return null
@@ -274,7 +333,7 @@ const ChatMessageItem = memo(function ChatMessageItem(props: {
           <div key={part.id}>{renderPart(part, props.info.role, props.onOpenDiff)}</div>
         ))}
         {err ? (
-          <div className={cn("rounded-lg border px-3 py-2 text-sm", fail)}>{err}</div>
+          <div className={cn("rounded-lg border px-3 py-2 text-sm", tone)}>{err}</div>
         ) : null}
       </MessageContent>
     </Message>
@@ -282,16 +341,18 @@ const ChatMessageItem = memo(function ChatMessageItem(props: {
 })
 
 export const ChatMessageList = memo(function ChatMessageList(props: Props) {
+  const tone = abortText(props.err) ? abort : fail
+
   return (
-    <Conversation className="custom-scrollbar-2 h-full min-w-0 flex-1">
-      <ConversationContent className="mx-auto min-w-0 w-full max-w-[776px]">
+    <Conversation className="chat-scroll custom-scrollbar-2 h-full min-w-0 flex-1">
+      <ConversationContent className="chat-body mx-auto min-w-0 w-full max-w-[776px]">
         {props.messages.map((info) => (
           <ChatMessageItem key={info.id} info={info} onOpenDiff={props.onOpenDiff} />
         ))}
         {props.err ? (
           <Message from="assistant">
             <MessageContent>
-              <div className={cn("rounded-lg border px-3 py-2 text-sm", fail)}>
+              <div className={cn("rounded-lg border px-3 py-2 text-sm", tone)}>
                 {props.err}
               </div>
             </MessageContent>
