@@ -99,5 +99,6 @@ func (a *API) Register(r *gin.Engine) {
 	log.GET("/sources", a.logSources)
 	log.GET("/tail", a.logTail)
 
+	r.GET("/mcp", a.mcpGet)
 	r.POST("/mcp", a.mcpPost)
 }

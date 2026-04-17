@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -25,6 +26,11 @@ type rpcRes struct {
 	Error   any    `json:"error,omitempty"`
 }
 
+func (a *API) mcpGet(c *gin.Context) {
+	c.Header("Allow", http.MethodPost)
+	c.Status(http.StatusMethodNotAllowed)
+}
+
 func (a *API) mcpPost(c *gin.Context) {
 	req := rpcReq{}
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -44,7 +50,8 @@ func (a *API) mcpPost(c *gin.Context) {
 				"tools": map[string]any{},
 			},
 			"serverInfo": map[string]any{
-				"name": "strategy-service",
+				"name":    "strategy-service",
+				"version": "dev",
 			},
 			"instructions": "Use start to launch SmartX strategies and logs to inspect recent strategy logs.",
 		})
