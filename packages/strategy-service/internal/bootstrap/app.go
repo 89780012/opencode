@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"strategy-service/internal/asset"
 	conf "strategy-service/internal/config"
 	oc "strategy-service/internal/opencode"
@@ -18,6 +17,8 @@ import (
 	rt "strategy-service/internal/runtime"
 	"strategy-service/internal/smartx"
 	web "strategy-service/internal/web"
+
+	"github.com/gin-gonic/gin"
 )
 
 type Service struct {
@@ -31,10 +32,11 @@ func New(cfg Config) (*Service, error) {
 	slog.Info("initializing service", "addr", cfg.Addr(), "opencode_enabled", cfg.Opencode.Enabled)
 
 	// 同步内置的 agent 和 skill 资源。
-	if err := asset.EnsureBuiltins(); err != nil {
-		slog.Error("builtin opencode asset provision failed", "error", err)
-		return nil, err
-	}
+	// 注释掉, 由smartx管理, 因为可以控制版本相关的内容, 且我不需要域名相关的配置
+	// if err := asset.EnsureBuiltins(); err != nil {
+	// 	slog.Error("builtin opencode asset provision failed", "error", err)
+	// 	return nil, err
+	// }
 
 	// 如果端口被占用，则自动探测下一个可用端口。
 	if cfg.Opencode.Enabled {
