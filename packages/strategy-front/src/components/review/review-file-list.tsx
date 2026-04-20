@@ -25,7 +25,7 @@ const mark = (status?: ChatFileDiff["status"]) => {
 
 export function ReviewFileList(props: Props) {
   return (
-    <div className="flex h-full min-h-0 w-full min-w-0 flex-col bg-muted/10">
+    <div className="review-file-list flex h-full min-h-0 w-full min-w-0 flex-col bg-muted/10">
       <div className="flex items-center justify-between gap-3 border-b px-3 py-2">
         <div className="flex min-w-0 items-baseline gap-2">
           <div className="truncate text-sm font-semibold">变更文件</div>
@@ -53,8 +53,9 @@ export function ReviewFileList(props: Props) {
               type="button"
               onClick={() => props.onFile(item.file)}
               title={tip}
+              data-active={active ? "true" : "false"}
               className={cn(
-                "group relative mb-0.5 flex min-h-9 w-full items-center gap-1.5 rounded-sm px-2 py-1 text-left outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring",
+                "review-file-row group relative mb-0.5 flex min-h-9 w-full appearance-none items-center gap-1.5 rounded-sm border border-transparent bg-transparent px-2 py-1 text-left shadow-none outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring",
                 active ? "bg-accent text-accent-foreground" : "text-foreground/80 hover:bg-accent/70 hover:text-accent-foreground",
               )}
             >

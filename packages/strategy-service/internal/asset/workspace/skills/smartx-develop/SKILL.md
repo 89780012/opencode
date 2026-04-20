@@ -1,53 +1,72 @@
 ---
 name: smartx-develop
-description: SmartX development guidance for analysis, implementation, debugging, and verification.
+description: 用于分析、实现、调试与验证的 SmartX 开发指引，必须严格依据本地 references 与工作区证据，不得伪造 SDK 用法。
 ---
 
-# SmartX Develop
+# SmartX 开发
 
-Use this skill when the user wants to analyze, implement, debug, review, or improve code in a SmartX workspace.
+这个技能的核心原则是：严格按文档和工作区证据开发，不补全、不脑补、不伪造。
+它只负责 SmartX 开发实现本身；任务路由、协作选择与全局调度由 `smartx-helper` 负责。
 
-Start here:
-- Read `README.md`.
-- Confirm the product goal, run mode, template assumptions, and verification path.
-- Call out mismatches between docs and the real code before coding.
+从这里开始：
+- 阅读 `README.md`。
+- 阅读 `references/` 下的文档，至少包括 `references/pythonApi.md` 和 `references/pythonGetDtaApi.md`。
+- 确认产品目标、运行模式、模板假设以及验证路径。
+- 在开始编码前，指出文档、references 与实际代码之间的不一致之处。
 
-Default assumptions:
-- The target environment is the SmartX Python component SDK.
-- Local files and existing conventions override generic habits.
-- Development should follow a simple process: understand the rules, plan briefly, implement, and verify.
+默认假设：
+- 目标环境是 SmartX Python 组件 SDK。
+- 本地文件和现有约定优先于通用习惯。
+- `references/` 是当前工作区默认应遵循的 SmartX 使用依据。
+- 开发应遵循简单流程：先理解规则，简要规划，再实现并验证。
 
-Reference order:
-1. Local workspace files
-2. SmartX API docs
-3. Example docs
+证据顺序：
+1. 当前任务相关代码、配置、README 与本地工作区文件
+2. 当前技能目录下的 `references/*.md`
+3. 工作区内已有 SmartX 示例或调用方式
+4. 其他补充文档
 
-SDK rules:
-1. Put SDK initialization under `smart.on_init(init)`.
-2. Avoid account access, subscriptions, or order placement before `init()` runs.
-3. Prefer `smart.current_account` unless multi-account support is needed.
-4. Prefer callback-driven state updates such as `on_order`, `on_trade`, `on_assets`, and `on_position`.
-5. Prefer supported keyword forms and current parameter names.
-6. Prefer subscriptions and callbacks over polling loops.
-7. Prefer `smart.query_bar(...)` for historical warmup.
-8. Treat `insert_order(..., callback=...)` as submit confirmation only.
-9. Do not assume unavailable SDK APIs without evidence in the workspace.
-10. Avoid adding third-party trading frameworks unless required.
+文档优先规则：
+1. 任何 SmartX API、事件、回调、参数名、字段名、返回结构、调用顺序，都必须先在 `references/` 或工作区现有代码中找到依据。
+2. 没有明确依据时，不要假设存在某个 SDK API、事件、属性、枚举值或回调行为。
+3. 不要把其他交易框架、其他语言 SDK、通用量化框架或模型记忆中的接口，套用到当前 SmartX 工作区。
+4. 如果 `references/` 中没有覆盖某个需求，先查工作区现有实现；仍无证据时，明确说明“文档未覆盖”，不要伪造实现。
+5. 如果文档与代码冲突，先指出冲突，再基于当前工作区实际约束谨慎实现，不要静默选择其一。
+6. 写代码时，优先复用文档中已经出现的调用模式、参数形式和生命周期顺序。
 
-Suggested implementation order:
-1. Configuration and parameters
-2. Market data input
-3. Indicators or core calculations
-4. Signal generation
-5. Position control
-6. Order placement
-7. Risk controls
-8. Persistence if needed
-9. Runtime integration
+SDK 规则：
+1. 将 SDK 初始化放在 `smart.on_init(init)` 下。
+2. 在 `init()` 执行前，避免访问账户、发起订阅或下单。
+3. 除非需要支持多账户，否则优先使用 `smart.current_account`。
+4. 优先使用回调驱动的状态更新，例如 `on_order`、`on_trade`、`on_assets` 和 `on_position`。
+5. 优先使用 references 中已支持的关键字形式和当前参数名。
+6. 优先使用订阅和回调，而不是轮询循环。
+7. 历史数据预热优先使用文档支持的查询接口，例如 `smart.query_bar(...)`。
+8. 将 `insert_order(..., callback=...)` 仅视为提交确认，不把它当成成交结果。
+9. 不要在没有证据时假设某个返回字段一定存在。
+10. 除非确有需要，否则避免引入第三方交易框架。
 
-Verification checklist:
-- The code runs
-- The callbacks are registered correctly
-- The implementation matches the intended rules
-- Unsupported SDK APIs are not used
-- Major constraints and risks are documented
+实现要求：
+1. 动手前，先确认本次会用到哪些 SmartX 接口，并在 `references/` 中核对对应说明。
+2. 若新增或修改下单、订阅、历史数据、账户、持仓、回调相关逻辑，必须以 reference 中的名称和签名为准。
+3. 若用户需求与文档能力不一致，优先收窄实现到文档支持范围，并明确说明限制。
+4. 若只能做推断，必须把推断标出来，且推断不能替代 SDK 事实。
+
+建议的实现顺序：
+1. 配置与参数
+2. 行情数据输入
+3. 指标或核心计算
+4. 信号生成
+5. 仓位控制
+6. 下单执行
+7. 风控措施
+8. 按需持久化
+9. 运行时集成
+
+验证清单：
+- 代码可以正常运行
+- 回调已正确注册
+- 实现符合 README、references 和既有约定
+- 未使用不受支持或无证据的 SDK API
+- 参数名、字段名和调用顺序与文档一致
+- 已记录主要约束、风险与文档缺口

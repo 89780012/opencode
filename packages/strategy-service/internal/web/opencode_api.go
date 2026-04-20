@@ -3,7 +3,10 @@ package web
 import (
 	"context"
 	"log/slog"
+	"strings"
 	"time"
+
+	"strategy-service/internal/asset"
 
 	"github.com/gin-gonic/gin"
 	"strategy-service/internal/oprun"
@@ -101,6 +104,34 @@ func run(c *gin.Context, act string, fn func(context.Context) (oprun.State, erro
 	ok(c, state)
 }
 
+func syncMCP(c *gin.Context) error {
+	url := origin(c)
+	if url == "" {
+		return nil
+	}
+	return asset.EnsureMCP(url)
+}
+
+func origin(c *gin.Context) string {
+	host := strings.TrimSpace(c.Request.Host)
+	if host == "" {
+		host = strings.TrimSpace(c.Request.URL.Host)
+	}
+	if host == "" {
+		return ""
+	}
+
+	proto := strings.TrimSpace(c.GetHeader("X-Forwarded-Proto"))
+	if proto == "" {
+		if c.Request.TLS != nil {
+			proto = "https"
+		} else {
+			proto = "http"
+		}
+	}
+	return proto + "://" + host
+}
+
 func (a *API) opencodeSkillsList(c *gin.Context) {
 	list(c, "skill", a.op.ListSkills)
 }
@@ -138,10 +169,20 @@ func (a *API) opencodeStatus(c *gin.Context) {
 }
 
 func (a *API) opencodeStart(c *gin.Context) {
+	if err := syncMCP(c); err != nil {
+		slog.Error("opencode start mcp sync failed", "error", err)
+		bad(c, err)
+		return
+	}
 	run(c, "start", a.op.Start)
 }
 
 func (a *API) opencodeRestart(c *gin.Context) {
+	if err := syncMCP(c); err != nil {
+		slog.Error("opencode restart mcp sync failed", "error", err)
+		bad(c, err)
+		return
+	}
 	run(c, "restart", a.op.Restart)
 }
 

@@ -34,6 +34,7 @@ export default function EmbedSessionPage() {
   const entry = useEmbedEntry(path)
   const workspace = entry.workspace
   const composer = useComposer()
+  const agent = "smartx-helper"
   const chat = useStrategySession(workspace?.path)
   const [open, setOpen] = useState(false)
   const [file, setFile] = useState<string | null>(null)
@@ -233,7 +234,7 @@ export default function EmbedSessionPage() {
               eventErr={chat.eventErr}
               agents={composer.agents}
               models={composer.models}
-              agent={composer.agent}
+              agent={agent}
               model={composer.model}
               variant={composer.variant}
               variants={composer.variants}
