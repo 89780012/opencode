@@ -18,8 +18,10 @@ import type {
 const pane = "custom-scrollbar mt-2 max-h-64 space-y-2 overflow-y-auto pr-1"
 const empty: ChatPart[] = []
 const fail = "border-red-200 bg-red-50 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300"
-const abort = "chat-abort border-slate-200 bg-slate-50 text-slate-600 dark:border-[#2a312f] dark:bg-[#171d1b] dark:text-[#aab6b0]"
-const card = "chat-inline-card border-slate-200 bg-slate-50 text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] dark:border-[#2a312f] dark:bg-[#171b1a] dark:text-[#dbe5e1] dark:shadow-none"
+const abort =
+  "chat-abort border-slate-200 bg-slate-50 text-slate-600 dark:border-[#2a312f] dark:bg-[#171d1b] dark:text-[#aab6b0]"
+const card =
+  "chat-inline-card border-slate-200 bg-slate-50 text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] dark:border-[#2a312f] dark:bg-[#171b1a] dark:text-[#dbe5e1] dark:shadow-none"
 const note = "text-slate-500 dark:text-[#93a29b]"
 
 interface Props {
@@ -162,13 +164,7 @@ function Fold(props: { head: ReactNode; side?: ReactNode; body: ReactNode; open?
   }, [open])
 
   return (
-    <div
-      className={cn(
-        "chat-fold overflow-hidden rounded-xl border text-sm",
-        card,
-        props.tone,
-      )}
-    >
+    <div className={cn("chat-fold overflow-hidden rounded-xl border text-sm", card, props.tone)}>
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
@@ -191,13 +187,9 @@ function Fold(props: { head: ReactNode; side?: ReactNode; body: ReactNode; open?
         style={{
           maxHeight: open ? `${height}px` : "0px",
           opacity: open ? 1 : 0,
-          transition: "max-height 180ms ease, opacity 160ms ease",
         }}
       >
-        <div
-          ref={body}
-          className="chat-fold-body border-t border-slate-200 px-3 pb-3 pt-2 dark:border-[#2a312f]"
-        >
+        <div ref={body} className="chat-fold-body border-t border-slate-200 px-3 pb-3 pt-2 dark:border-[#2a312f]">
           {props.body}
         </div>
       </div>
@@ -223,7 +215,9 @@ function renderTool(part: ChatToolPart) {
           {"output" in state && state.output ? (
             <pre className="overflow-x-auto whitespace-pre-wrap break-words text-xs">{state.output}</pre>
           ) : null}
-          {"error" in state && state.error ? <div className="text-xs text-red-600 dark:text-red-300">{state.error}</div> : null}
+          {"error" in state && state.error ? (
+            <div className="text-xs text-red-600 dark:text-red-300">{state.error}</div>
+          ) : null}
         </div>
       }
     />
@@ -332,9 +326,7 @@ const ChatMessageItem = memo(function ChatMessageItem(props: {
         {body.map((part) => (
           <div key={part.id}>{renderPart(part, props.info.role, props.onOpenDiff)}</div>
         ))}
-        {err ? (
-          <div className={cn("rounded-lg border px-3 py-2 text-sm", tone)}>{err}</div>
-        ) : null}
+        {err ? <div className={cn("rounded-lg border px-3 py-2 text-sm", tone)}>{err}</div> : null}
       </MessageContent>
     </Message>
   )
@@ -352,9 +344,7 @@ export const ChatMessageList = memo(function ChatMessageList(props: Props) {
         {props.err ? (
           <Message from="assistant">
             <MessageContent>
-              <div className={cn("rounded-lg border px-3 py-2 text-sm", tone)}>
-                {props.err}
-              </div>
+              <div className={cn("rounded-lg border px-3 py-2 text-sm", tone)}>{props.err}</div>
             </MessageContent>
           </Message>
         ) : null}

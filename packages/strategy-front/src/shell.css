@@ -697,7 +697,7 @@
 
 .embed-session-shell .chat-fold-shell {
   overflow: hidden !important;
-  transition: none !important;
+  transition: max-height 180ms ease, opacity 160ms ease !important;
 }
 
 .embed-session-shell .chat-fold-body {
