@@ -4,6 +4,7 @@ import (
 	"embed"
 	"encoding/json"
 	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -67,6 +68,8 @@ func EnsureMCP(url string) error {
 		mcp = next
 	}
 
+	log.Default().Println("MCP:", url)
+	
 	mcp["smartx"] = map[string]any{
 		"type":    "remote",
 		"url":     strings.TrimRight(url, "/") + "/mcp",

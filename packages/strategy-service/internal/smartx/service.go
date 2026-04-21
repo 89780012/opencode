@@ -75,8 +75,10 @@ func (s *Service) Start(ctx context.Context, in Input) (Result, error) {
 
 	account := strings.TrimSpace(s.cfg.Account)
 	id := strings.TrimSpace(s.cfg.WindowId)
-	pass := strings.TrimSpace(s.cfg.Password)
+	//pass := strings.TrimSpace(s.cfg.Password)
+	pass := "123456" //登录状态随便写密码
 
+	slog.Info("start strategy", "name", name, "account", account, "id", id, "pass", pass)
 	out, err := s.run(ctx, name, account, id, pass)
 	if err != nil {
 		return Result{}, err

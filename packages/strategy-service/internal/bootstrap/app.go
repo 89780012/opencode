@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"strategy-service/internal/asset"
 	conf "strategy-service/internal/config"
 	oc "strategy-service/internal/opencode"
 	"strategy-service/internal/oprun"
@@ -162,9 +161,10 @@ func (s *Service) activate(addr string) {
 	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
 		url = "http://" + addr
 	}
-	if err := asset.EnsureMCP(url); err != nil {
-		slog.Error("failed to inject strategy-service mcp config", "url", url, "error", err)
-	}
+	// 由smartx管理
+	// if err := asset.EnsureMCP(url); err != nil {
+	// 	slog.Error("failed to inject strategy-service mcp config", "url", url, "error", err)
+	// }
 	if !s.op.Enabled() {
 		return
 	}
