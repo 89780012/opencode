@@ -6,7 +6,6 @@ import type {
   ChatMessageRecord,
   ChatQuestionRequest,
   ChatSessionSummary,
-  ChatStatus,
   ChatTodo,
   PermissionRequest,
 } from "@/types/chat";
@@ -132,12 +131,6 @@ const slice = createSlice({
     ) {
       applyChatEvent(state, action.payload.workspace, action.payload.event);
     },
-    setSessionStatus(
-      state,
-      action: PayloadAction<{ sessionId: string; status: ChatStatus }>,
-    ) {
-      state.status[action.payload.sessionId] = action.payload.status;
-    },
     clearSessionEventError(
       state,
       action: PayloadAction<{ sessionId: string }>,
@@ -161,7 +154,6 @@ export const {
   setPendingQuestions,
   setPendingPermissions,
   applyWorkspaceEvent,
-  setSessionStatus,
   clearSessionEventError,
 } = slice.actions;
 

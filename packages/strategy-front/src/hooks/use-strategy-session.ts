@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo } from "react"
 import { chatApi } from "@/api/modules"
+import type { ChatStatus } from "@/types/chat"
 import {
   selectSelectedSessionId,
   selectSessionDetailLoading,
@@ -29,6 +30,23 @@ import {
 const loads = new Map<string, Promise<void>>()
 const creates = new Map<string, Promise<string>>()
 const details = new Map<string, Promise<void>>()
+
+function inferStatus(messages: ReturnType<typeof selectSessionMessages>, status: ChatStatus) {
+  if (status.type !== "idle") {
+    return status
+  }
+  const last = messages[messages.length - 1]
+  if (!last) {
+    return status
+  }
+  if (last.role === "user") {
+    return { type: "busy" } as const
+  }
+  if (!last.time.completed && !last.error) {
+    return { type: "busy" } as const
+  }
+  return status
+}
 
 export function useChatSessions(path?: string | null) {
   const dispatch = useAppDispatch()
@@ -218,7 +236,8 @@ export function useChatSessionDetail(path?: string | null, sessionId?: string | 
 export function useStrategySession(path?: string | null) {
   const chat = useChatSessions(path)
   const detail = useChatSessionDetail(path, chat.selectedSessionId)
-  const busy = !!chat.selectedSessionId && detail.status.type !== "idle"
+  const status = useMemo(() => inferStatus(detail.messages, detail.status), [detail.messages, detail.status])
+  const busy = !!chat.selectedSessionId && status.type !== "idle"
 
   useEffect(() => {
     void chat.ensureSessions()
@@ -242,6 +261,7 @@ export function useStrategySession(path?: string | null) {
     () => ({
       ...chat,
       ...detail,
+      status,
       busy,
       abortSession,
       detailLoading: detail.loading,
@@ -249,6 +269,6 @@ export function useStrategySession(path?: string | null) {
       ensure: chat.ensureSessions,
       reloadSessions: chat.refreshSessions,
     }),
-    [abortSession, busy, chat, detail],
+    [abortSession, busy, chat, detail, status],
   )
 }

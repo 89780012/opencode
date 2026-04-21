@@ -3,6 +3,7 @@ import { CheckCircle2, ChevronDown, Circle, ListTodo, LoaderCircle, MinusCircle 
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation"
 import { Message, MessageContent } from "@/components/ai-elements/message"
 import { Response } from "@/components/ai-elements/response"
+import { ChatRunningStatus } from "@/components/chat/chat-running-status"
 import { cn } from "@/lib/utils"
 import { selectSessionParts, useAppSelector } from "@/store"
 import type {
@@ -93,12 +94,12 @@ function todoText(tool: string, state: ChatToolState) {
   }
   if (tool === "todowrite") {
     return list.active > 0
-      ? `Todo list updated 路 ${list.active} active / ${list.total} total`
-      : `Todo list updated 路 ${list.done} done`
+      ? `Todo list updated  ${list.active} active / ${list.total} total`
+      : `Todo list updated  ${list.done} done`
   }
   return list.active > 0
-    ? `Todo list loaded 路 ${list.active} active / ${list.total} total`
-    : `Todo list loaded 路 ${list.done} done`
+    ? `Todo list loaded  ${list.active} active / ${list.total} total`
+    : `Todo list loaded  ${list.done} done`
 }
 
 function renderTodoTool(part: ChatToolPart) {
@@ -348,15 +349,7 @@ export const ChatMessageList = memo(function ChatMessageList(props: Props) {
             </MessageContent>
           </Message>
         ) : null}
-        {props.status?.type === "busy" ? (
-          <Message from="assistant">
-            <MessageContent>
-              <div className="flex py-2">
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              </div>
-            </MessageContent>
-          </Message>
-        ) : null}
+        <ChatRunningStatus messages={props.messages} status={props.status} />
         {props.status?.type === "retry" ? (
           <Message from="assistant">
             <MessageContent>
