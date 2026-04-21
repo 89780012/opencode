@@ -121,7 +121,9 @@ export function WorkspaceCreateDialog(props: Props) {
             {form.steps.map((item, i) => (
               <div key={item} className="flex items-center gap-2">
                 <Dot active={i === state.step} done={i < state.step} text={item} step={i + 1} />
-                {i < form.steps.length - 1 ? <ChevronRight className="size-4 text-slate-300 dark:text-[#31403b]" /> : null}
+                {i < form.steps.length - 1 ? (
+                  <ChevronRight className="size-4 text-slate-300 dark:text-[#31403b]" />
+                ) : null}
               </div>
             ))}
           </div>
@@ -150,7 +152,7 @@ export function WorkspaceCreateDialog(props: Props) {
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-8 rounded-md border-slate-200/80 bg-white/90 px-3 shadow-none dark:border-[#2c3532] dark:bg-[#151918]"
+                    className="h-8 rounded-md border-slate-200/80 bg-white/90 px-3 shadow-none dark:border-[#2c3532] dark:var(--shell-dark-bg)"
                     onClick={form.refreshTail}
                   >
                     <RefreshCw className="size-4" />
@@ -202,21 +204,36 @@ export function WorkspaceCreateDialog(props: Props) {
                     <Block title="策略类型">
                       <div className="flex flex-wrap gap-2">
                         {picks.kinds.map((item) => (
-                          <Chip key={item} text={item} active={guide.kind === item} onClick={() => form.setGuide((prev) => ({ ...prev, kind: item }))} />
+                          <Chip
+                            key={item}
+                            text={item}
+                            active={guide.kind === item}
+                            onClick={() => form.setGuide((prev) => ({ ...prev, kind: item }))}
+                          />
                         ))}
                       </div>
                     </Block>
                     <Block title="市场">
                       <div className="flex flex-wrap gap-2">
                         {picks.markets.map((item) => (
-                          <Chip key={item} text={item} active={guide.market === item} onClick={() => form.setGuide((prev) => ({ ...prev, market: item }))} />
+                          <Chip
+                            key={item}
+                            text={item}
+                            active={guide.market === item}
+                            onClick={() => form.setGuide((prev) => ({ ...prev, market: item }))}
+                          />
                         ))}
                       </div>
                     </Block>
                     <Block title="标的池">
                       <div className="flex flex-wrap gap-2">
                         {picks.pools.map((item) => (
-                          <Chip key={item} text={item} active={guide.pool === item} onClick={() => form.setGuide((prev) => ({ ...prev, pool: item }))} />
+                          <Chip
+                            key={item}
+                            text={item}
+                            active={guide.pool === item}
+                            onClick={() => form.setGuide((prev) => ({ ...prev, pool: item }))}
+                          />
                         ))}
                       </div>
                     </Block>
@@ -225,21 +242,36 @@ export function WorkspaceCreateDialog(props: Props) {
                     <Block title="周期">
                       <div className="flex flex-wrap gap-2">
                         {picks.tfs.map((item) => (
-                          <Chip key={item} text={item} active={guide.tf === item} onClick={() => form.setGuide((prev) => ({ ...prev, tf: item }))} />
+                          <Chip
+                            key={item}
+                            text={item}
+                            active={guide.tf === item}
+                            onClick={() => form.setGuide((prev) => ({ ...prev, tf: item }))}
+                          />
                         ))}
                       </div>
                     </Block>
                     <Block title="方向">
                       <div className="flex flex-wrap gap-2">
                         {picks.sides.map((item) => (
-                          <Chip key={item} text={item} active={guide.side === item} onClick={() => form.setGuide((prev) => ({ ...prev, side: item }))} />
+                          <Chip
+                            key={item}
+                            text={item}
+                            active={guide.side === item}
+                            onClick={() => form.setGuide((prev) => ({ ...prev, side: item }))}
+                          />
                         ))}
                       </div>
                     </Block>
                     <Block title="持仓周期">
                       <div className="flex flex-wrap gap-2">
                         {picks.holds.map((item) => (
-                          <Chip key={item} text={item} active={guide.hold === item} onClick={() => form.setGuide((prev) => ({ ...prev, hold: item }))} />
+                          <Chip
+                            key={item}
+                            text={item}
+                            active={guide.hold === item}
+                            onClick={() => form.setGuide((prev) => ({ ...prev, hold: item }))}
+                          />
                         ))}
                       </div>
                     </Block>
@@ -247,7 +279,12 @@ export function WorkspaceCreateDialog(props: Props) {
                   <Block title="开发风格">
                     <div className="flex flex-wrap gap-2">
                       {picks.styles.map((item) => (
-                        <Chip key={item} text={item} active={guide.style === item} onClick={() => form.setGuide((prev) => ({ ...prev, style: item }))} />
+                        <Chip
+                          key={item}
+                          text={item}
+                          active={guide.style === item}
+                          onClick={() => form.setGuide((prev) => ({ ...prev, style: item }))}
+                        />
                       ))}
                     </div>
                   </Block>
@@ -257,14 +294,24 @@ export function WorkspaceCreateDialog(props: Props) {
                   <Block title="信号来源">
                     <div className="flex flex-wrap gap-2">
                       {picks.sources.map((item) => (
-                        <Chip key={item} text={item} active={guide.source.includes(item)} onClick={() => form.setGuide((prev) => ({ ...prev, source: flip(prev.source, item) }))} />
+                        <Chip
+                          key={item}
+                          text={item}
+                          active={guide.source.includes(item)}
+                          onClick={() => form.setGuide((prev) => ({ ...prev, source: flip(prev.source, item) }))}
+                        />
                       ))}
                     </div>
                   </Block>
                   <Block title="指标与因子" hint="建议至少选择 1 到 3 项">
                     <div className="flex flex-wrap gap-2">
                       {picks.factors.map((item) => (
-                        <Chip key={item} text={item} active={guide.factor.includes(item)} onClick={() => form.setGuide((prev) => ({ ...prev, factor: flip(prev.factor, item) }))} />
+                        <Chip
+                          key={item}
+                          text={item}
+                          active={guide.factor.includes(item)}
+                          onClick={() => form.setGuide((prev) => ({ ...prev, factor: flip(prev.factor, item) }))}
+                        />
                       ))}
                     </div>
                   </Block>
@@ -272,21 +319,36 @@ export function WorkspaceCreateDialog(props: Props) {
                     <Block title="过滤条件">
                       <div className="flex flex-wrap gap-2">
                         {picks.filters.map((item) => (
-                          <Chip key={item} text={item} active={guide.filter.includes(item)} onClick={() => form.setGuide((prev) => ({ ...prev, filter: flip(prev.filter, item) }))} />
+                          <Chip
+                            key={item}
+                            text={item}
+                            active={guide.filter.includes(item)}
+                            onClick={() => form.setGuide((prev) => ({ ...prev, filter: flip(prev.filter, item) }))}
+                          />
                         ))}
                       </div>
                     </Block>
                     <Block title="入场规则">
                       <div className="flex flex-wrap gap-2">
                         {picks.entries.map((item) => (
-                          <Chip key={item} text={item} active={guide.entry.includes(item)} onClick={() => form.setGuide((prev) => ({ ...prev, entry: flip(prev.entry, item) }))} />
+                          <Chip
+                            key={item}
+                            text={item}
+                            active={guide.entry.includes(item)}
+                            onClick={() => form.setGuide((prev) => ({ ...prev, entry: flip(prev.entry, item) }))}
+                          />
                         ))}
                       </div>
                     </Block>
                     <Block title="离场规则">
                       <div className="flex flex-wrap gap-2">
                         {picks.exits.map((item) => (
-                          <Chip key={item} text={item} active={guide.exit.includes(item)} onClick={() => form.setGuide((prev) => ({ ...prev, exit: flip(prev.exit, item) }))} />
+                          <Chip
+                            key={item}
+                            text={item}
+                            active={guide.exit.includes(item)}
+                            onClick={() => form.setGuide((prev) => ({ ...prev, exit: flip(prev.exit, item) }))}
+                          />
                         ))}
                       </div>
                     </Block>
@@ -297,7 +359,12 @@ export function WorkspaceCreateDialog(props: Props) {
                   <Block title="风控重点">
                     <div className="flex flex-wrap gap-2">
                       {picks.risks.map((item) => (
-                        <Chip key={item} text={item} active={guide.risk.includes(item)} onClick={() => form.setGuide((prev) => ({ ...prev, risk: flip(prev.risk, item) }))} />
+                        <Chip
+                          key={item}
+                          text={item}
+                          active={guide.risk.includes(item)}
+                          onClick={() => form.setGuide((prev) => ({ ...prev, risk: flip(prev.risk, item) }))}
+                        />
                       ))}
                     </div>
                   </Block>
@@ -305,21 +372,36 @@ export function WorkspaceCreateDialog(props: Props) {
                     <Block title="止盈止损">
                       <div className="flex flex-wrap gap-2">
                         {picks.stops.map((item) => (
-                          <Chip key={item} text={item} active={guide.stop.includes(item)} onClick={() => form.setGuide((prev) => ({ ...prev, stop: flip(prev.stop, item) }))} />
+                          <Chip
+                            key={item}
+                            text={item}
+                            active={guide.stop.includes(item)}
+                            onClick={() => form.setGuide((prev) => ({ ...prev, stop: flip(prev.stop, item) }))}
+                          />
                         ))}
                       </div>
                     </Block>
                     <Block title="仓位方式">
                       <div className="flex flex-wrap gap-2">
                         {picks.poses.map((item) => (
-                          <Chip key={item} text={item} active={guide.pos === item} onClick={() => form.setGuide((prev) => ({ ...prev, pos: item }))} />
+                          <Chip
+                            key={item}
+                            text={item}
+                            active={guide.pos === item}
+                            onClick={() => form.setGuide((prev) => ({ ...prev, pos: item }))}
+                          />
                         ))}
                       </div>
                     </Block>
                     <Block title="交易约束">
                       <div className="flex flex-wrap gap-2">
                         {picks.limits.map((item) => (
-                          <Chip key={item} text={item} active={guide.limit.includes(item)} onClick={() => form.setGuide((prev) => ({ ...prev, limit: flip(prev.limit, item) }))} />
+                          <Chip
+                            key={item}
+                            text={item}
+                            active={guide.limit.includes(item)}
+                            onClick={() => form.setGuide((prev) => ({ ...prev, limit: flip(prev.limit, item) }))}
+                          />
                         ))}
                       </div>
                     </Block>
@@ -330,7 +412,12 @@ export function WorkspaceCreateDialog(props: Props) {
                   <Block title="输出要求">
                     <div className="flex flex-wrap gap-2">
                       {picks.outputs.map((item) => (
-                        <Chip key={item} text={item} active={guide.output.includes(item)} onClick={() => form.setGuide((prev) => ({ ...prev, output: flip(prev.output, item) }))} />
+                        <Chip
+                          key={item}
+                          text={item}
+                          active={guide.output.includes(item)}
+                          onClick={() => form.setGuide((prev) => ({ ...prev, output: flip(prev.output, item) }))}
+                        />
                       ))}
                     </div>
                   </Block>
@@ -376,7 +463,12 @@ export function WorkspaceCreateDialog(props: Props) {
               <div className="space-y-4">
                 <Block title="补充说明">
                   <div className="rounded-md bg-white/92 px-3 py-2 ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2c3532]">
-                    <AutoResizeTextarea value={state.brief} onChange={form.setBrief} height={220} placeholder="例如：帮我生成一个简单的网格策略。" />
+                    <AutoResizeTextarea
+                      value={state.brief}
+                      onChange={form.setBrief}
+                      height={220}
+                      placeholder="例如：帮我生成一个简单的网格策略。"
+                    />
                   </div>
                 </Block>
               </div>
@@ -469,7 +561,7 @@ export function WorkspaceCreateDialog(props: Props) {
         <DialogFooter className="border-t border-slate-200/70 bg-[linear-gradient(180deg,rgba(249,250,251,0.7),rgba(255,255,255,0.92))] px-5 py-4 dark:border-[#202725] dark:bg-[linear-gradient(180deg,rgba(16,21,20,0.8),rgba(16,21,20,0.96))]">
           <Button
             variant="outline"
-            className="rounded-md border-slate-200/80 bg-white/90 shadow-none dark:border-[#2c3532] dark:bg-[#151918]"
+            className="rounded-md border-slate-200/80 bg-white/90 shadow-none dark:border-[#2c3532] dark:var(--shell-dark-bg)"
             onClick={form.prev}
             disabled={form.busy}
           >

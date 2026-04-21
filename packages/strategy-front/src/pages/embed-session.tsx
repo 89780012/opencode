@@ -14,7 +14,7 @@ import { useStrategySession } from "@/hooks/use-strategy-session"
 import { log } from "@/lib/error"
 
 const ctrl =
-  "rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 dark:border-[#2a312f] dark:bg-[#151918] dark:text-[#e4ece8] dark:hover:border-[#35403c] dark:hover:bg-[#1a1f1e]"
+  "rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 dark:border-[#2a312f] dark:var(--shell-dark-bg) dark:text-[#e4ece8] dark:hover:border-[#35403c] dark:hover:bg-[#1a1f1e]"
 
 function Status(props: { title: string; desc: string; action?: ReactNode }) {
   return (
