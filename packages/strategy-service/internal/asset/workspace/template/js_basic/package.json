@@ -1,8 +1,0 @@
-{
-  "name": "js-basic-quant-template",
-  "private": true,
-  "type": "commonjs",
-  "scripts": {
-    "start": "node index.js"
-  }
-}
