@@ -52,7 +52,7 @@ permission:
 4. 不要把“代码改完”当成结束信号；默认还需要运行、看日志、确认行为、必要时继续修复。
 5. 不要在还有可继续推进的验证路径时过早停下。
 6. 如果任务无法调试，必须明确说明为什么不能调试，以及卡在什么外部条件上。
-7. 修改了 JS、EJS 或 Vue 前端源码后，默认需要运行 `npm run build`。
+7. 默认不要修改 JS、EJS 或 Vue 前端源码，除非用户明确要求涉及前端代码。
 8. 修改了 Python 后端逻辑后，默认需要进入 `smartx-debug` 启动并看日志确认是否正常。
 9. 如果本次任务形成了新的进展、阻塞、待办变化或交接信息，结束前要回写 `.project-state/`。
 
@@ -60,7 +60,7 @@ permission:
 
 1. 纯问答或纯分析：可直接回答，但若工作区已有 `.project-state/` 且问题与当前项目强相关，仍应先读取记忆后再回答。
 2. 项目管理或恢复上下文：优先使用 `project-manager`。
-3. 功能实现、重构、代码修复、代码审查：先 `project-manager`，再 `smartx-develop`，最后进入 `smartx-debug` 做验证; 如果修改了前端代码，先补跑 `npm run build`。
+3. 功能实现、重构、代码修复、代码审查：先 `project-manager`，再 `smartx-develop`，最后进入 `smartx-debug` 做验证；默认不修改前端代码，除非用户明确要求；若涉及前端改动，遵循 `smartx-develop` 的构建验证要求。
 4. 报错、日志、启动失败、行为异常、跑不通：先 `project-manager` 恢复上下文，再进入 `smartx-debug` 主导闭环；若需要改代码，由 `smartx-develop` 提供实现约束。
 
 实现类任务的标准流程：
@@ -74,7 +74,7 @@ permission:
 3. 再阅读相关 README、references、入口文件、配置和最近改动。
 4. 明确本次实现目标、运行入口和验证方式。
 5. 调用 `smartx-develop` 完成代码实现。
-6. 如果改动包含 JS、EJS 或 Vue 前端源码，先运行 `npm run build`，确认构建链路正常。
+6. 若用户没有明确要求涉及前端代码，默认不要修改 JS、EJS 或 Vue 前端源码。
 7. 如果改动包含 Python 后端逻辑，或需要确认策略实际行为，代码改完后不要结束；立即切换到 `smartx-debug`：
    - 启动策略或对应运行入口
    - 查看最新日志
@@ -123,6 +123,7 @@ permission:
 - 复用现有项目结构、脚本和模板。
 - 在修改业务逻辑前，先确认 SDK 或项目约定的真实用法。
 - 如果当前项目结构已经足够，不要额外引入新框架。
+- 默认不修改 JS、EJS 或 Vue 前端源码，除非用户明确要求。
 - 如果请求仅涉及分析，不要编辑文件。
 - SmartX 相关任务默认优先参考并执行 `project-manager`、`smartx-develop` 和 `smartx-debug` 中的规则。
 
