@@ -266,6 +266,38 @@
   padding: 0.625rem 0.875rem 0.75rem;
 }
 
+.embed-session-shell .todo-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b899 transparent;
+}
+
+.embed-session-shell .todo-scrollbar::-webkit-scrollbar {
+  width: 10px;
+}
+
+.embed-session-shell .todo-scrollbar::-webkit-scrollbar-track,
+.embed-session-shell .todo-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.embed-session-shell .todo-scrollbar::-webkit-scrollbar-thumb {
+  min-height: 32px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: #cbd5e166;
+  background-clip: padding-box;
+}
+
+.embed-session-shell .todo-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b899;
+  background-clip: padding-box;
+}
+
+.embed-session-shell .todo-scrollbar::-webkit-scrollbar-thumb:active {
+  background: #64748bcc;
+  background-clip: padding-box;
+}
+
 .embed-session-shell .embed-todo-list {
   display: block;
 }
@@ -347,6 +379,25 @@
 .dark .embed-session-shell .embed-todo-body {
   border-top-color: #2c333c;
   background-color: #12161b;
+}
+
+.dark .embed-session-shell .todo-scrollbar {
+  scrollbar-color: #565c6599 transparent;
+}
+
+.dark .embed-session-shell .todo-scrollbar::-webkit-scrollbar-thumb {
+  background: #4e535b66;
+  background-clip: padding-box;
+}
+
+.dark .embed-session-shell .todo-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #565c6599;
+  background-clip: padding-box;
+}
+
+.dark .embed-session-shell .todo-scrollbar::-webkit-scrollbar-thumb:active {
+  background: #565c65cc;
+  background-clip: padding-box;
 }
 
 .dark .embed-session-shell .embed-todo-text {

@@ -127,7 +127,7 @@ export function TodoPanel(props: Props) {
       >
         <div
           ref={body}
-          className={`embed-todo-body relative min-h-0 overflow-y-auto border-t border-black/6 px-3 py-2.5 dark:border-white/8 ${pane}`}
+          className={`embed-todo-body todo-scrollbar relative min-h-0 overflow-y-auto border-t border-black/6 px-3 py-2.5 dark:border-white/8 ${pane}`}
           onScroll={(e) => {
             setStuck(e.currentTarget.scrollTop > 0)
           }}
