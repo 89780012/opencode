@@ -2,12 +2,29 @@ import { describe, expect, test } from "bun:test"
 import { build } from "../src/hooks.js"
 import { fresh } from "../src/state.js"
 
+type Row = {
+  message: string
+  extra?: Record<string, unknown>
+}
+
+function stub(rows: Row[]) {
+  return {
+    app: {
+      log: async (input: { body: Row }) => {
+        rows.push(input.body)
+        return true
+      },
+    },
+  } as never
+}
+
 describe("smartx workflow hooks", () => {
   test("adds a reminder after smartx_start", async () => {
     const mem = new Map([["s1", fresh("s1")]])
+    const rows: Row[] = []
     const hooks = build(
       {
-        client: {} as never,
+        client: stub(rows),
         project: {} as never,
         directory: "",
         worktree: "",
@@ -36,9 +53,10 @@ describe("smartx workflow hooks", () => {
 
   test("clears the reminder after matching smartx_logs", async () => {
     const mem = new Map([["s1", { ...fresh("s1"), logs: 1 }]])
+    const rows: Row[] = []
     const hooks = build(
       {
-        client: {} as never,
+        client: stub(rows),
         project: {} as never,
         directory: "",
         worktree: "",
@@ -67,9 +85,10 @@ describe("smartx workflow hooks", () => {
 
   test("keeps the reminder until every start is matched", async () => {
     const mem = new Map([["s1", fresh("s1")]])
+    const rows: Row[] = []
     const hooks = build(
       {
-        client: {} as never,
+        client: stub(rows),
         project: {} as never,
         directory: "",
         worktree: "",
@@ -106,9 +125,10 @@ describe("smartx workflow hooks", () => {
 
   test("adds a reminder after loading smartx-develop", async () => {
     const mem = new Map([["s1", fresh("s1")]])
+    const rows: Row[] = []
     const hooks = build(
       {
-        client: {} as never,
+        client: stub(rows),
         project: {} as never,
         directory: "",
         worktree: "",
@@ -139,9 +159,10 @@ describe("smartx workflow hooks", () => {
 
   test("clears the reminder after loading smartx-debug", async () => {
     const mem = new Map([["s1", { ...fresh("s1"), debug: 1 }]])
+    const rows: Row[] = []
     const hooks = build(
       {
-        client: {} as never,
+        client: stub(rows),
         project: {} as never,
         directory: "",
         worktree: "",
@@ -170,9 +191,10 @@ describe("smartx workflow hooks", () => {
 
   test("keeps sessions isolated in memory", async () => {
     const mem = new Map<string, ReturnType<typeof fresh>>()
+    const rows: Row[] = []
     const hooks = build(
       {
-        client: {} as never,
+        client: stub(rows),
         project: {} as never,
         directory: "",
         worktree: "",
@@ -201,5 +223,39 @@ describe("smartx workflow hooks", () => {
     expect(mem.get("s1")?.debug).toBe(0)
     expect(mem.get("s2")?.logs).toBe(0)
     expect(mem.get("s2")?.debug).toBe(1)
+  })
+
+  test("writes structured logs for key events", async () => {
+    const mem = new Map([["s1", fresh("s1")]])
+    const rows: Row[] = []
+    const hooks = build(
+      {
+        client: stub(rows),
+        project: {} as never,
+        directory: "f:/code/opencode",
+        worktree: "f:/code/opencode",
+        serverUrl: new URL("http://localhost:4096"),
+        $: {} as never,
+      },
+      {
+        mem,
+      },
+    )
+
+    await Promise.resolve()
+    await hooks["tool.execute.after"]?.(
+      { sessionID: "s1", tool: "smartx_start", callID: "c1", args: {} },
+      { title: "", output: "", metadata: {} },
+    )
+
+    const output = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.(
+      { sessionID: "s1", model: {} as never },
+      output,
+    )
+
+    expect(rows.some((item) => item.message === "插件已加载")).toBe(true)
+    expect(rows.some((item) => item.message === "命中关键工具并更新状态")).toBe(true)
+    expect(rows.some((item) => item.message === "注入顺序约束提示")).toBe(true)
   })
 })
