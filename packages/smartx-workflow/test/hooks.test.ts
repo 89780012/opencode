@@ -1,38 +1,13 @@
 import { describe, expect, test } from "bun:test"
-import { build, live, watch } from "../src/hooks.js"
+import { build } from "../src/hooks.js"
 import { fresh } from "../src/state.js"
 
 describe("smartx workflow hooks", () => {
-  test("watch builds auto follow-up prompt", () => {
-    const flow = fresh("s1", "verify the strategy", "2026-04-20T00:00:00Z")
-    expect(watch(flow)).toBe(true)
-  })
-
-  test("live extracts idle session id", () => {
-    expect(live({ type: "session.idle", properties: { sessionID: "s1" } } as const)).toBe("s1")
-  })
-
-  test("idle event queues promptAsync for active smartx flow", async () => {
-    const sent: string[] = []
-    const io = {
-      flow: fresh("s1", "verify the strategy", "2026-04-20T00:00:00Z"),
-      async load(session: string) {
-        return session === this.flow.session ? this.flow : undefined
-      },
-      async save(flow: ReturnType<typeof fresh>) {
-        this.flow = flow
-      },
-    }
+  test("adds a reminder after smartx_start", async () => {
+    const mem = new Map([["s1", fresh("s1")]])
     const hooks = build(
       {
-        client: {
-          session: {
-            promptAsync: async (input: { body?: { parts: Array<{ text: string }> } }) => {
-              sent.push(input.body.parts[0]!.text)
-              return { data: {} }
-            },
-          },
-        } as never,
+        client: {} as never,
         project: {} as never,
         directory: "",
         worktree: "",
@@ -40,12 +15,191 @@ describe("smartx workflow hooks", () => {
         $: {} as never,
       },
       {
-        io,
-        now: () => "2026-04-20T00:00:01Z",
+        mem,
       },
     )
-    await hooks.event?.({ event: { type: "session.idle", properties: { sessionID: "s1" } } as const })
-    expect(sent.length).toBe(1)
-    expect(sent[0]?.includes("Continue the SmartX workflow.")).toBe(true)
+
+    await hooks["tool.execute.after"]?.(
+      { sessionID: "s1", tool: "smartx_start", callID: "c1", args: {} },
+      { title: "", output: "", metadata: {} },
+    )
+
+    const output = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.(
+      { sessionID: "s1", model: {} as never },
+      output,
+    )
+
+    expect(mem.get("s1")?.logs).toBe(1)
+    expect(output.system[0]?.includes("`smartx_start` 和 `smartx_logs` 是有前后顺序的一对调用。")).toBe(true)
+  })
+
+  test("clears the reminder after matching smartx_logs", async () => {
+    const mem = new Map([["s1", { ...fresh("s1"), logs: 1 }]])
+    const hooks = build(
+      {
+        client: {} as never,
+        project: {} as never,
+        directory: "",
+        worktree: "",
+        serverUrl: new URL("http://localhost:4096"),
+        $: {} as never,
+      },
+      {
+        mem,
+      },
+    )
+
+    await hooks["tool.execute.after"]?.(
+      { sessionID: "s1", tool: "smartx_logs", callID: "c1", args: {} },
+      { title: "", output: "", metadata: {} },
+    )
+
+    const output = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.(
+      { sessionID: "s1", model: {} as never },
+      output,
+    )
+
+    expect(mem.get("s1")?.logs).toBe(0)
+    expect(output.system.length).toBe(0)
+  })
+
+  test("keeps the reminder until every start is matched", async () => {
+    const mem = new Map([["s1", fresh("s1")]])
+    const hooks = build(
+      {
+        client: {} as never,
+        project: {} as never,
+        directory: "",
+        worktree: "",
+        serverUrl: new URL("http://localhost:4096"),
+        $: {} as never,
+      },
+      {
+        mem,
+      },
+    )
+
+    await hooks["tool.execute.after"]?.(
+      { sessionID: "s1", tool: "smartx_start", callID: "c1", args: {} },
+      { title: "", output: "", metadata: {} },
+    )
+    await hooks["tool.execute.after"]?.(
+      { sessionID: "s1", tool: "smartx_start", callID: "c2", args: {} },
+      { title: "", output: "", metadata: {} },
+    )
+    await hooks["tool.execute.after"]?.(
+      { sessionID: "s1", tool: "smartx_logs", callID: "c3", args: {} },
+      { title: "", output: "", metadata: {} },
+    )
+
+    const output = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.(
+      { sessionID: "s1", model: {} as never },
+      output,
+    )
+
+    expect(mem.get("s1")?.logs).toBe(1)
+    expect(output.system[0]?.includes("在结束当前回复前，你还需要再调用 1 次 `smartx_logs`。")).toBe(true)
+  })
+
+  test("adds a reminder after loading smartx-develop", async () => {
+    const mem = new Map([["s1", fresh("s1")]])
+    const hooks = build(
+      {
+        client: {} as never,
+        project: {} as never,
+        directory: "",
+        worktree: "",
+        serverUrl: new URL("http://localhost:4096"),
+        $: {} as never,
+      },
+      {
+        mem,
+      },
+    )
+
+    await hooks["tool.execute.after"]?.(
+      { sessionID: "s1", tool: "skill", callID: "c1", args: { name: "smartx-develop" } },
+      { title: "", output: "", metadata: {} },
+    )
+
+    const output = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.(
+      { sessionID: "s1", model: {} as never },
+      output,
+    )
+
+    expect(mem.get("s1")?.debug).toBe(1)
+    expect(output.system[0]?.includes("`smartx-develop` 和 `smartx-debug` 是有前后顺序的一对 skill 调用。")).toBe(
+      true,
+    )
+  })
+
+  test("clears the reminder after loading smartx-debug", async () => {
+    const mem = new Map([["s1", { ...fresh("s1"), debug: 1 }]])
+    const hooks = build(
+      {
+        client: {} as never,
+        project: {} as never,
+        directory: "",
+        worktree: "",
+        serverUrl: new URL("http://localhost:4096"),
+        $: {} as never,
+      },
+      {
+        mem,
+      },
+    )
+
+    await hooks["tool.execute.after"]?.(
+      { sessionID: "s1", tool: "skill", callID: "c1", args: { name: "smartx-debug" } },
+      { title: "", output: "", metadata: {} },
+    )
+
+    const output = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.(
+      { sessionID: "s1", model: {} as never },
+      output,
+    )
+
+    expect(mem.get("s1")?.debug).toBe(0)
+    expect(output.system.length).toBe(0)
+  })
+
+  test("keeps sessions isolated in memory", async () => {
+    const mem = new Map<string, ReturnType<typeof fresh>>()
+    const hooks = build(
+      {
+        client: {} as never,
+        project: {} as never,
+        directory: "",
+        worktree: "",
+        serverUrl: new URL("http://localhost:4096"),
+        $: {} as never,
+      },
+      {
+        mem,
+      },
+    )
+
+    await hooks["tool.execute.after"]?.(
+      { sessionID: "s1", tool: "smartx-start", callID: "c1", args: {} },
+      { title: "", output: "", metadata: {} },
+    )
+    await hooks["tool.execute.after"]?.(
+      { sessionID: "s2", tool: "smartx_log", callID: "c2", args: {} },
+      { title: "", output: "", metadata: {} },
+    )
+    await hooks["tool.execute.after"]?.(
+      { sessionID: "s2", tool: "skill", callID: "c3", args: { name: "smartx-develop" } },
+      { title: "", output: "", metadata: {} },
+    )
+
+    expect(mem.get("s1")?.logs).toBe(1)
+    expect(mem.get("s1")?.debug).toBe(0)
+    expect(mem.get("s2")?.logs).toBe(0)
+    expect(mem.get("s2")?.debug).toBe(1)
   })
 })
