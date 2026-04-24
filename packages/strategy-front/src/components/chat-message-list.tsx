@@ -1,5 +1,5 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
-import { CheckCircle2, ChevronDown, Circle, ListTodo, LoaderCircle, MinusCircle } from "lucide-react"
+import { Check, CheckCircle2, ChevronDown, Circle, Copy, ListTodo, LoaderCircle, MinusCircle } from "lucide-react"
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation"
 import { Message, MessageContent } from "@/components/ai-elements/message"
 import { Response } from "@/components/ai-elements/response"
@@ -24,6 +24,7 @@ const abort =
 const card =
   "chat-inline-card border-slate-200 bg-slate-50 text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] dark:border-[#2a312f] dark:bg-[#171b1a] dark:text-[#dbe5e1] dark:shadow-none"
 const note = "text-slate-500 dark:text-[#93a29b]"
+const ansi = /\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g
 
 interface Props {
   messages: ChatMessageInfo[]
@@ -45,6 +46,10 @@ function errorText(err?: ChatError) {
 function abortText(value?: string) {
   if (!value) return false
   return value.trim().toLowerCase() === "aborted"
+}
+
+function interrupted(info?: ChatMessageInfo) {
+  return info?.role === "assistant" && info.error?.name === "MessageAbortedError"
 }
 
 function todos(state: ChatToolState) {
@@ -116,6 +121,284 @@ function renderTodoTool(part: ChatToolPart) {
       </div>
       <div className="min-w-0 flex-1 truncate">{todoText(part.tool, state)}</div>
       <div className={cn("shrink-0 uppercase tracking-[0.08em] text-[10px]", note)}>{state.status}</div>
+    </div>
+  )
+}
+
+function text(value: unknown) {
+  if (typeof value !== "string") return
+  const next = value.trim()
+  if (!next) return
+  return next
+}
+
+function clean(value?: string) {
+  if (!value) return ""
+  return value.replace(ansi, "")
+}
+
+function bashCmd(part: ChatToolPart) {
+  return text(part.state.input.command)
+}
+
+function bashDesc(part: ChatToolPart) {
+  return text(part.state.input.description)
+}
+
+function bashDir(part: ChatToolPart) {
+  const dir = text(part.state.input.workdir)
+  if (!dir || dir === ".") return
+  return dir
+}
+
+function bashOut(part: ChatToolPart) {
+  if (part.state.status === "running") {
+    return clean(text(part.state.metadata?.output))
+  }
+  if ("output" in part.state) {
+    return clean(text(part.state.output))
+  }
+  return ""
+}
+
+function bashErr(part: ChatToolPart, halted?: boolean) {
+  if (halted && (part.state.status === "running" || part.state.status === "pending")) return "Aborted"
+  if ("error" in part.state) return text(part.state.error)
+}
+
+function bashTitle(part: ChatToolPart) {
+  const desc = bashDesc(part)
+  const dir = bashDir(part)
+  if (!desc && !dir) return "Shell"
+  if (!desc) return `Shell in ${dir}`
+  if (!dir || desc.includes(dir)) return desc
+  return `${desc} in ${dir}`
+}
+
+function bashMeta(part: ChatToolPart, halted?: boolean) {
+  if (halted && (part.state.status === "running" || part.state.status === "pending")) return "Command aborted"
+  if (part.state.status === "pending") return "Waiting for command to start"
+  if (part.state.status === "running") return "Streaming output"
+  if (part.state.status === "completed") return "Command finished"
+  return "Command failed"
+}
+
+function searchQuery(part: ChatToolPart) {
+  return text(part.state.input.query)
+}
+
+function searchOut(part: ChatToolPart) {
+  if ("output" in part.state) return clean(text(part.state.output))
+  return ""
+}
+
+function searchErr(part: ChatToolPart, halted?: boolean) {
+  if (halted && (part.state.status === "running" || part.state.status === "pending")) return "Aborted"
+  if ("error" in part.state) return text(part.state.error)
+}
+
+function searchTitle(part: ChatToolPart) {
+  if (part.tool === "codesearch") return "Code search"
+  return "Web search"
+}
+
+function searchMeta(part: ChatToolPart, hits: number, halted?: boolean) {
+  if (halted && (part.state.status === "running" || part.state.status === "pending")) return "Search aborted"
+  if (part.state.status === "pending") return "Waiting to start search"
+  if (part.state.status === "running") return "Searching..."
+  if (part.state.status === "error") return "Search failed"
+  if (hits > 0) return `${hits} links found`
+  return "Search finished"
+}
+
+function stale(part: ChatToolPart, halted?: boolean) {
+  return !!halted && (part.state.status === "running" || part.state.status === "pending")
+}
+
+function urls(value?: string) {
+  if (!value) return []
+  const seen = new Set<string>()
+  const list = value.match(/https?:\/\/[^\s)>\]]+/g) ?? []
+  return list.filter((item) => {
+    if (seen.has(item)) return false
+    seen.add(item)
+    return true
+  })
+}
+
+function BashTool(props: { part: ChatToolPart; halted?: boolean }) {
+  const part = props.part
+  const cmd = bashCmd(part)
+  const out = bashOut(part)
+  const err = bashErr(part, props.halted)
+  const lines = out ? out.split(/\r?\n/) : []
+  const more = lines.length > 10
+  const [open, setOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const stop = stale(part, props.halted)
+  const run = !stop && part.state.status === "running"
+  const body = open || !more ? out : [...lines.slice(0, 10), "..."].join("\n")
+
+  useEffect(() => {
+    if (!copied) return
+    const timer = window.setTimeout(() => {
+      setCopied(false)
+    }, 2000)
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [copied])
+
+  const copy = () => {
+    const next = [cmd ? `$ ${cmd}` : "", out].filter(Boolean).join("\n\n")
+    if (!next) return
+    void navigator.clipboard.writeText(next).then(() => {
+      setCopied(true)
+    })
+  }
+
+  return (
+    <div
+      className={cn("chat-run", part.state.status === "error" || stop ? "chat-run-state-error" : "")}
+      data-tool="bash"
+      data-status={stop ? "aborted" : part.state.status}
+    >
+      <div className="chat-run-head chat-run-head-wide">
+        {run ? (
+          <span className="chat-run-spin" aria-hidden="true" />
+        ) : (
+          <div className="chat-run-mark" aria-hidden="true">
+            $
+          </div>
+        )}
+        <div className="chat-run-copy">
+          <div className="chat-run-row">
+            <div className="chat-run-main">
+              <div className="chat-run-title">{bashTitle(part)}</div>
+              <div className="chat-run-desc">{bashMeta(part, props.halted)}</div>
+            </div>
+            <button
+              type="button"
+              onClick={copy}
+              className="chat-run-copy-btn"
+              aria-label={copied ? "Copied command output" : "Copy command output"}
+              title={copied ? "Copied" : "Copy"}
+            >
+              {copied ? <Check size={14} /> : <Copy size={14} />}
+            </button>
+          </div>
+          {cmd ? (
+            <pre className="chat-run-cmd">
+              <span className="chat-run-sign">$</span>
+              <span>{cmd}</span>
+            </pre>
+          ) : null}
+          {out ? (
+            <pre className="chat-run-output chat-run-output-shell custom-scrollbar">
+              <code>{body}</code>
+            </pre>
+          ) : null}
+          {err ? (
+            <div className="chat-run-error">
+              {err}
+            </div>
+          ) : null}
+          {more ? (
+            <button
+              type="button"
+              onClick={() => setOpen((value) => !value)}
+              className="chat-run-toggle"
+            >
+              {open ? "Collapse output" : `Expand output (${lines.length} lines)`}
+            </button>
+          ) : null}
+          <div className="chat-run-meta">
+            <span className="chat-run-tag">bash</span>
+            <span className="chat-run-tag">{stop ? "aborted" : part.state.status}</span>
+            {bashDir(part) ? <span className="chat-run-tag">{bashDir(part)}</span> : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SearchTool(props: { part: ChatToolPart; halted?: boolean }) {
+  const part = props.part
+  const query = searchQuery(part)
+  const out = searchOut(part)
+  const err = searchErr(part, props.halted)
+  const links = urls(out).slice(0, 6)
+  const lines = out ? out.split(/\r?\n/) : []
+  const more = lines.length > 12
+  const [open, setOpen] = useState(false)
+  const stop = stale(part, props.halted)
+  const run = !stop && part.state.status === "running"
+  const body = open || !more ? out : [...lines.slice(0, 12), "..."].join("\n")
+
+  return (
+    <div
+      className={cn("chat-run", part.state.status === "error" || stop ? "chat-run-state-error" : "")}
+      data-tool={part.tool}
+      data-status={stop ? "aborted" : part.state.status}
+    >
+      <div className="chat-run-head chat-run-head-wide">
+        {run ? (
+          <span className="chat-run-spin" aria-hidden="true" />
+        ) : (
+          <div className="chat-run-mark" aria-hidden="true">
+            {part.tool === "codesearch" ? "<>" : "%"}
+          </div>
+        )}
+        <div className="chat-run-copy">
+          <div className="chat-run-title">{searchTitle(part)}</div>
+          <div className="chat-run-desc">{searchMeta(part, links.length, props.halted)}</div>
+          {query ? (
+            <pre className="chat-run-cmd">
+              <span className="chat-run-sign">?</span>
+              <span>{query}</span>
+            </pre>
+          ) : null}
+          {out ? (
+            <pre className="chat-run-output chat-run-output-search custom-scrollbar">
+              <code>{body}</code>
+            </pre>
+          ) : null}
+          {err ? (
+            <div className="chat-run-error">
+              {err}
+            </div>
+          ) : null}
+          {more ? (
+            <button
+              type="button"
+              onClick={() => setOpen((value) => !value)}
+              className="chat-run-toggle"
+            >
+              {open ? "Collapse results" : "Expand results"}
+            </button>
+          ) : null}
+          {links.length > 0 ? (
+            <div className="chat-run-links">
+              {links.map((item) => (
+                <a
+                  key={item}
+                  href={item}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="chat-run-link"
+                >
+                  {item}
+                </a>
+              ))}
+            </div>
+          ) : null}
+          <div className="chat-run-meta">
+            <span className="chat-run-tag">{part.tool}</span>
+            <span className="chat-run-tag">{stop ? "aborted" : part.state.status}</span>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -198,10 +481,21 @@ function Fold(props: { head: ReactNode; side?: ReactNode; body: ReactNode; open?
   )
 }
 
-function renderTool(part: ChatToolPart) {
+function renderTool(part: ChatToolPart, halted?: boolean) {
   const state = part.state
   if (part.tool === "todowrite" || part.tool === "todoread") {
     return renderTodoTool(part)
+  }
+  if (part.tool === "bash") {
+    return <BashTool part={part} halted={halted} />
+  }
+  if (
+    part.tool === "websearch" ||
+    part.tool === "codesearch" ||
+    part.tool === "web_search" ||
+    part.tool === "web_search_preview"
+  ) {
+    return <SearchTool part={part} halted={halted} />
   }
   return (
     <Fold
@@ -225,7 +519,12 @@ function renderTool(part: ChatToolPart) {
   )
 }
 
-function renderPart(part: ChatPart, role: ChatMessageInfo["role"], onOpenDiff?: (file: string) => void) {
+function renderPart(
+  part: ChatPart,
+  role: ChatMessageInfo["role"],
+  halted?: boolean,
+  onOpenDiff?: (file: string) => void,
+) {
   switch (part.type) {
     case "text":
       if (role === "assistant") {
@@ -241,7 +540,7 @@ function renderPart(part: ChatPart, role: ChatMessageInfo["role"], onOpenDiff?: 
         />
       )
     case "tool":
-      return renderTool(part)
+      return renderTool(part, halted)
     case "file":
       return (
         <div className="rounded-lg border px-3 py-2 text-xs">
@@ -316,6 +615,7 @@ const ChatMessageItem = memo(function ChatMessageItem(props: {
   const body = parts.length > 0 ? parts : empty
   const err = props.info.role === "assistant" ? errorText(props.info.error) : undefined
   const tone = abortText(err) ? abort : fail
+  const halted = interrupted(props.info)
 
   if (body.length === 0 && !err) {
     return null
@@ -325,7 +625,7 @@ const ChatMessageItem = memo(function ChatMessageItem(props: {
     <Message from={props.info.role}>
       <MessageContent>
         {body.map((part) => (
-          <div key={part.id}>{renderPart(part, props.info.role, props.onOpenDiff)}</div>
+          <div key={part.id}>{renderPart(part, props.info.role, halted, props.onOpenDiff)}</div>
         ))}
         {err ? <div className={cn("rounded-lg border px-3 py-2 text-sm", tone)}>{err}</div> : null}
       </MessageContent>
