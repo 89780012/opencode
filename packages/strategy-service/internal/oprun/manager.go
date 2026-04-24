@@ -250,7 +250,13 @@ func (m *Manager) await(ctx context.Context, ch chan struct{}) error {
 // spawn 启动 opencode 子进程并接管日志流。
 func (m *Manager) spawn() error {
 	m.log.Info("spawning opencode", "bin", m.cfg.Bin, "host", m.cfg.Host, "port", m.cfg.Port, "cwd", m.cfg.Cwd)
-	cmd := exec.Command(m.cfg.Bin, "serve", "--hostname", m.cfg.Host, "--port", fmt.Sprintf("%d", m.cfg.Port))
+	cmd := exec.Command(
+		m.cfg.Bin,
+		"serve",
+		"--print-logs",
+		"--hostname", m.cfg.Host,
+		"--port", fmt.Sprintf("%d", m.cfg.Port),
+	)
 	proc.Hide(cmd)
 	if m.cfg.Cwd != "" {
 		cmd.Dir = m.cfg.Cwd
