@@ -84,25 +84,24 @@ func New(cfg Config) (*Service, error) {
 	}, nil
 }
 
-// resolveTool 按优先级解析工具，并在需要时激活内置运行时。
-func resolveTool(run *rt.Service, id string, preferBuiltin bool) rt.Result {
+func resolveTool(run *rt.Service, id string) rt.Result {
 	row, err := run.Resolve(context.Background(), id)
 	if err != nil {
 		return rt.Result{}
 	}
-
-	if run.Has(id) && (preferBuiltin || !row.Found) {
-		out, err := run.Ensure(context.Background(), id)
-		if err == nil && out.Found {
-			return out
-		}
-	}
+	// if run.Has(id) && (preferBuiltin || !row.Found) {
+	// 	out, err := run.Ensure(context.Background(), id)
+	// 	if err == nil && out.Found {
+	// 		return out
+	// 	}
+	// }
 	return row
 }
 
 // resolveOpencode 优先激活内置 opencode。
 func resolveOpencode(run *rt.Service, cfg Config) Config {
-	row := resolveTool(run, "opencode", true)
+	row := resolveTool(run, "opencode")
+	slog.Info("opencode opencode resolved", "bin", row.Path)
 	if row.Found {
 		cfg.Opencode.Bin = row.Path
 	}
@@ -111,7 +110,7 @@ func resolveOpencode(run *rt.Service, cfg Config) Config {
 
 // resolveGit 优先激活内置 Git，并将路径注入到 opencode 环境。
 func resolveGit(run *rt.Service, cfg Config) Config {
-	row := resolveTool(run, "git", true)
+	row := resolveTool(run, "git")
 	if !row.Found {
 		return cfg
 	}

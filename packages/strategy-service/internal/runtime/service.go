@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -43,40 +44,40 @@ func (s *Service) Ensure(_ context.Context, id string) (Result, error) {
 		return out, nil
 	}
 
-	row, err := s.pkg(id)
-	if err != nil {
-		return Result{}, err
-	}
+	// row, err := s.pkg(id)
+	// if err != nil {
+	// 	return Result{}, err
+	// }
 
-	base, err := s.runtimeDir()
-	if err != nil {
-		return Result{}, err
-	}
+	// base, err := s.runtimeDir()
+	// if err != nil {
+	// 	return Result{}, err
+	// }
 
-	dst := filepath.Join(base, id)
-	tmp := dst + ".tmp"
-	_ = os.RemoveAll(tmp)
-	_ = os.RemoveAll(dst)
+	// dst := filepath.Join(base, id)
+	// tmp := dst + ".tmp"
+	// _ = os.RemoveAll(tmp)
+	// _ = os.RemoveAll(dst)
 
-	if row.Archive != "" {
-		err = unzip(row.Archive, tmp)
-	} else {
-		err = copydir(row.Dir, tmp)
-	}
-	if err != nil {
-		return Result{}, err
-	}
+	// if row.Archive != "" {
+	// 	err = unzip(row.Archive, tmp)
+	// } else {
+	// 	err = copydir(row.Dir, tmp)
+	// }
+	// if err != nil {
+	// 	return Result{}, err
+	// }
 
-	if err := os.Rename(tmp, dst); err != nil {
-		_ = os.RemoveAll(tmp)
-		return Result{}, err
-	}
+	// if err := os.Rename(tmp, dst); err != nil {
+	// 	_ = os.RemoveAll(tmp)
+	// 	return Result{}, err
+	// }
 
-	out, ok := s.local(id)
-	if !ok {
-		return Result{}, errors.New("builtin tool activation failed")
-	}
-	return out, nil
+	// out, ok := s.local(id)
+	// if !ok {
+	// 	return Result{}, errors.New("builtin tool activation failed")
+	// }
+	return Result{}, nil
 }
 
 func (s *Service) Remove(id string) error {
@@ -135,18 +136,32 @@ func found(id string, path string) Result {
 
 // 查找本地bin
 func (s *Service) local(id string) (Result, bool) {
-	base, err := s.runtimeDir()
-	if err != nil {
-		return Result{}, false
-	}
+    base, err := s.runtimeDir()
+    if err != nil {
+        return Result{}, false
+    }
 
-	for _, item := range bins(id) {
-		path := filepath.Join(base, id, item)
-		if _, err := os.Stat(path); err == nil {
-			return found(id, path), true
-		}
-	}
-	return Result{}, false
+    for _, item := range bins(id) {
+        log.Println("local item:", item)
+
+        candidates := []string{}
+        // 如果 item 是绝对路径，直接检查
+        if filepath.IsAbs(item) {
+            candidates = append(candidates, item)
+        } else {
+            // 常见候选： base/id/item, base/item, 以及相对路径 item 本身（作为最后的回退）
+            candidates = append(candidates, filepath.Join(base, id, item))
+            candidates = append(candidates, filepath.Join(base, item))
+            candidates = append(candidates, item)
+        }
+
+        for _, path := range candidates {
+            if _, err := os.Stat(path); err == nil {
+                return found(id, path), true
+            }
+        }
+    }
+    return Result{}, false
 }
 
 func (s *Service) pkg(id string) (Result, error) {
@@ -254,12 +269,14 @@ func copydir(src string, dst string) error {
 }
 
 func (s *Service) runtimeDir() (string, error) {
-	dir, err := os.UserCacheDir()
+	// 使用用户目录
+	dir, err := os.UserHomeDir()
 	if err != nil {
 		dir = "."
 	}
 
-	out := filepath.Join(dir, "strategy-service", "runtime")
+	out := filepath.Join(dir, ".xtp-smart", "ai-agent", "runtime")
+	log.Println("runtimeDir dir:", out)
 	if err := os.MkdirAll(out, 0o755); err != nil {
 		return "", err
 	}
