@@ -72,6 +72,7 @@ func (a *API) Register(r *gin.Engine) {
 	op.POST("/skills", a.opencodeSkillsCreate)
 	op.PUT("/skills/:name", a.opencodeSkillUpdate)
 	op.DELETE("/skills/:name", a.opencodeSkillDelete)
+	op.POST("/discover", a.opencodeDiscover)
 
 	ws := api.Group("/workspace")
 	ws.GET("/list", a.workspaceList)

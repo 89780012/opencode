@@ -2,14 +2,18 @@ package web
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"log/slog"
+	"net/http"
 	"strings"
 	"time"
 
 	"strategy-service/internal/asset"
 
-	"github.com/gin-gonic/gin"
 	"strategy-service/internal/oprun"
+
+	"github.com/gin-gonic/gin"
 )
 
 type named struct {
@@ -188,4 +192,118 @@ func (a *API) opencodeRestart(c *gin.Context) {
 
 func (a *API) opencodeStop(c *gin.Context) {
 	run(c, "stop", a.op.Stop)
+}
+
+// opencodeDiscover 在服务端请求外部 provider 的 /models 端点，
+// 避免浏览器直接请求外部 API 导致 CORS 错误。
+func (a *API) opencodeDiscover(c *gin.Context) {
+	var req struct {
+		BaseURL string            `json:"baseURL"`
+		ApiKey  string            `json:"apiKey"`
+		Headers map[string]string `json:"headers"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		bad(c, err)
+		return
+	}
+
+	url := strings.TrimRight(req.BaseURL, "/")
+	if !strings.HasSuffix(url, "/models") {
+		url += "/models"
+	}
+
+	hdr := http.Header{
+		"Accept": {"application/json"},
+	}
+	for k, v := range req.Headers {
+		k = strings.TrimSpace(k)
+		v = strings.TrimSpace(v)
+		if k != "" && v != "" {
+			hdr.Set(k, v)
+		}
+	}
+	if key := strings.TrimSpace(req.ApiKey); key != "" && hdr.Get("Authorization") == "" {
+		hdr.Set("Authorization", "Bearer "+key)
+	}
+
+	httpReq, err := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, url, nil)
+	if err != nil {
+		fail(c, http.StatusBadRequest, "无效的服务地址: "+err.Error(), nil)
+		return
+	}
+	httpReq.Header = hdr
+
+	resp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		slog.Error("discover models request failed", "url", url, "error", err)
+		fail(c, http.StatusBadGateway, "请求模型列表失败: "+err.Error(), nil)
+		return
+	}
+	defer resp.Body.Close()
+
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fail(c, http.StatusBadGateway, "读取响应失败: "+err.Error(), nil)
+		return
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		var errBody struct {
+			Error struct {
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		if json.Unmarshal(raw, &errBody) == nil && errBody.Error.Message != "" {
+			fail(c, resp.StatusCode, errBody.Error.Message, nil)
+			return
+		}
+		fail(c, resp.StatusCode, "获取模型失败: "+resp.Status, nil)
+		return
+	}
+
+	var data any
+	if json.Unmarshal(raw, &data) != nil {
+		fail(c, http.StatusBadGateway, "解析响应失败", nil)
+		return
+	}
+
+	rows := extractModels(data)
+	ok(c, rows)
+}
+
+// extractModels 从不同格式的响应中提取模型列表。
+func extractModels(data any) []map[string]string {
+	var arr []any
+	switch v := data.(type) {
+	case []any:
+		arr = v
+	case map[string]any:
+		if d, ok := v["data"].([]any); ok {
+			arr = d
+		} else if m, ok := v["models"].([]any); ok {
+			arr = m
+		}
+	}
+
+	var out []map[string]string
+	for _, item := range arr {
+		m, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		id, _ := m["id"].(string)
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		name := id
+		if n, _ := m["name"].(string); strings.TrimSpace(n) != "" {
+			name = strings.TrimSpace(n)
+		}
+		out = append(out, map[string]string{"id": id, "name": name})
+	}
+	if out == nil {
+		out = []map[string]string{}
+	}
+	return out
 }
