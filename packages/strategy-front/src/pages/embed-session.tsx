@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
-import { Cog, PanelRightClose, PanelRightOpen, Plus, RefreshCw } from "lucide-react"
+import { Cog, MessageSquareMore, PanelRightClose, PanelRightOpen, Plus, RefreshCw } from "lucide-react"
 import { useSearchParams } from "react-router-dom"
 import { toast } from "sonner"
+import { WorkspaceQuestionsPanel } from "@/components/chat/workspace-questions-panel"
+import { WorkspaceQuestionsTrigger } from "@/components/chat/workspace-questions-trigger"
 import { EmbedProviderSettingsDialog } from "@/components/chat/embed-provider-settings-dialog"
 import { StrategyChatPanel } from "@/components/strategy/strategy-chat-panel"
 import { Button } from "@/components/ui/button"
@@ -11,6 +13,8 @@ import { WorkspaceDetailPane, type WorkspaceDetailTab } from "@/components/works
 import { useComposer } from "@/hooks/use-composer"
 import { useEmbedEntry } from "@/hooks/use-embed-entry"
 import { useStrategySession } from "@/hooks/use-strategy-session"
+import { useWorkspaceQuestions } from "@/hooks/use-workspace-questions"
+import { useAppSelector, selectQuestionRecordStamp } from "@/store"
 import { log } from "@/lib/error"
 
 const ctrl =
@@ -36,12 +40,30 @@ export default function EmbedSessionPage() {
   const composer = useComposer()
   const agent = "smartx-helper"
   const chat = useStrategySession(workspace?.path)
+  const questions = useWorkspaceQuestions(workspace?.path)
   const [open, setOpen] = useState(false)
+  const [panel, setPanel] = useState(false)
   const [file, setFile] = useState<string | null>(null)
   const [tab, setTab] = useState<WorkspaceDetailTab>("files")
   const [spin, setSpin] = useState(false)
   const [settings, setSettings] = useState(false)
+  const stamp = useAppSelector(selectQuestionRecordStamp)
   const init = useRef<string | null>(null)
+  const refresh = useRef(questions.refresh)
+  refresh.current = questions.refresh
+
+  // 首次加载（workspace 就绪后仅执行一次）
+  useEffect(() => {
+    if (!workspace?.path) return
+    void refresh.current()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspace?.path])
+
+  // append 成功后 Redux stamp 递增 → 刷新问题列表
+  useEffect(() => {
+    if (stamp === 0) return
+    void refresh.current()
+  }, [stamp])
 
   useEffect(() => {
     if (init.current === workspace?.path) {
@@ -82,6 +104,19 @@ export default function EmbedSessionPage() {
     workspace?.path,
   ])
 
+  useEffect(() => {
+    if (!panel) {
+      return
+    }
+    void refresh.current()
+  }, [panel])
+
+  useEffect(() => {
+    if (open) {
+      setPanel(false)
+    }
+  }, [open])
+
   const onAbort = useCallback(async () => {
     try {
       await chat.abortSession()
@@ -106,6 +141,7 @@ export default function EmbedSessionPage() {
       init.current = null
       await entry.refresh()
       await chat.reloadSessions?.()
+      await questions.refresh()
       if (chat.selectedSessionId) {
         await chat.refresh(chat.selectedSessionId)
       }
@@ -115,7 +151,7 @@ export default function EmbedSessionPage() {
     } finally {
       setSpin(false)
     }
-  }, [chat, entry])
+  }, [chat, entry, questions])
 
   const wait =
     entry.phase === "init"
@@ -183,6 +219,18 @@ export default function EmbedSessionPage() {
             >
               <Plus className="size-4" />
               创建会话
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className={ctrl}
+              onClick={() => {
+                setPanel(true)
+              }}
+              disabled={open}
+            >
+              <MessageSquareMore className="size-4" />
+              问题 ({questions.questions.length})
             </Button>
             <Button
               variant="outline"
@@ -280,6 +328,24 @@ export default function EmbedSessionPage() {
             />
           </ResizablePanel>
         </ResizablePanelGroup>
+
+        {!open ? <WorkspaceQuestionsTrigger count={questions.questions.length} onClick={() => setPanel(true)} /> : null}
+
+        <WorkspaceQuestionsPanel
+          open={panel}
+          onOpenChange={setPanel}
+          questions={questions.questions}
+          loaded={questions.loaded}
+          busy={questions.busy}
+          err={questions.err}
+          onRefresh={() => {
+            void questions.refresh()
+          }}
+          onSelect={(item) => {
+            chat.selectSession(item.sessionId)
+            setPanel(false)
+          }}
+        />
 
         {(chat.sessionLoading || chat.detailLoading || composer.load || entry.load) && (
           <div className="embed-session-mask absolute inset-0 flex items-center justify-center bg-white/75 dark:bg-[#0f1111]/70">

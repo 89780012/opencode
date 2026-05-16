@@ -6,6 +6,7 @@ import (
 	cfg "strategy-service/internal/config"
 	"strategy-service/internal/logs"
 	oc "strategy-service/internal/opencode"
+	"strategy-service/internal/question"
 	rt "strategy-service/internal/runtime"
 	"strategy-service/internal/smartx"
 	"strategy-service/internal/workspace"
@@ -14,11 +15,12 @@ import (
 )
 
 type API struct {
-	ws  *workspace.Service
-	op  *oc.Service
-	cfg *cfg.Store
-	sx  *smartx.Service
-	log *logs.Hub
+	ws       *workspace.Service
+	op       *oc.Service
+	cfg      *cfg.Store
+	sx       *smartx.Service
+	log      *logs.Hub
+	question *question.Service
 }
 
 type envelope struct {
@@ -48,13 +50,14 @@ func bad(c *gin.Context, err error) {
 }
 
 // NewAPI 组装 API 所需的各类底层服务。
-func NewAPI(run *rt.Service, op *oc.Service, cfg *cfg.Store, sx *smartx.Service) *API {
+func NewAPI(run *rt.Service, op *oc.Service, cfg *cfg.Store, sx *smartx.Service, question *question.Service) *API {
 	return &API{
-		ws:  workspace.NewService(run),
-		op:  op,
-		cfg: cfg,
-		sx:  sx,
-		log: logs.New(),
+		ws:       workspace.NewService(run),
+		op:       op,
+		cfg:      cfg,
+		sx:       sx,
+		log:      logs.New(),
+		question: question,
 	}
 }
 
@@ -84,6 +87,10 @@ func (a *API) Register(r *gin.Engine) {
 	ws.GET("/files", a.workspaceFiles)
 	ws.GET("/file-content", a.workspaceFileGet)
 	ws.PUT("/file-content", a.workspaceFilePut)
+
+	q := api.Group("/question")
+	q.GET("", a.questionList)
+	q.POST("", a.questionAppend)
 
 	sys := api.Group("/system")
 	sys.GET("/config", a.configGet)

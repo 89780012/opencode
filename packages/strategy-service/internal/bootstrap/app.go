@@ -13,6 +13,7 @@ import (
 	conf "strategy-service/internal/config"
 	oc "strategy-service/internal/opencode"
 	"strategy-service/internal/oprun"
+	"strategy-service/internal/question"
 	rt "strategy-service/internal/runtime"
 	"strategy-service/internal/smartx"
 	web "strategy-service/internal/web"
@@ -61,7 +62,7 @@ func New(cfg Config) (*Service, error) {
 		Account:  cfg.Account,
 		WindowId: cfg.WindowId,
 		LogDir:   cfg.LogDir,
-	}))
+	}), question.NewService())
 
 	gin.SetMode(gin.ReleaseMode)
 	mux := gin.New()
