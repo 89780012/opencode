@@ -9,6 +9,7 @@ import (
 	"strategy-service/internal/question"
 	rt "strategy-service/internal/runtime"
 	"strategy-service/internal/smartx"
+	"strategy-service/internal/summary"
 	"strategy-service/internal/workspace"
 
 	"github.com/gin-gonic/gin"
@@ -21,6 +22,7 @@ type API struct {
 	sx       *smartx.Service
 	log      *logs.Hub
 	question *question.Service
+	summary  *summary.Service
 }
 
 type envelope struct {
@@ -50,7 +52,7 @@ func bad(c *gin.Context, err error) {
 }
 
 // NewAPI 组装 API 所需的各类底层服务。
-func NewAPI(run *rt.Service, op *oc.Service, cfg *cfg.Store, sx *smartx.Service, question *question.Service) *API {
+func NewAPI(run *rt.Service, op *oc.Service, cfg *cfg.Store, sx *smartx.Service, question *question.Service, summary *summary.Service) *API {
 	return &API{
 		ws:       workspace.NewService(run),
 		op:       op,
@@ -58,6 +60,7 @@ func NewAPI(run *rt.Service, op *oc.Service, cfg *cfg.Store, sx *smartx.Service,
 		sx:       sx,
 		log:      logs.New(),
 		question: question,
+		summary:  summary,
 	}
 }
 
@@ -91,6 +94,11 @@ func (a *API) Register(r *gin.Engine) {
 	q := api.Group("/question")
 	q.GET("", a.questionList)
 	q.POST("", a.questionAppend)
+
+	sum := api.Group("/summary")
+	sum.GET("/session", a.summaryGet)
+	sum.POST("/session", a.summaryRun)
+	sum.POST("/session/stop", a.summaryStop)
 
 	sys := api.Group("/system")
 	sys.GET("/config", a.configGet)

@@ -18,6 +18,7 @@ function readMode(): ReviewMode {
   return value === "unified" ? "unified" : "split"
 }
 
+// active 是否刷新
 export function useChatReview(workspacePath?: string | null, sessionId?: string | null, active?: boolean) {
   const dispatch = useAppDispatch()
   const diffs = useAppSelector((state) => selectSessionDiffs(state, sessionId))

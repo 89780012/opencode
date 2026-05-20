@@ -149,3 +149,76 @@ React 生态成熟，配合 Redux Toolkit 进行状态管理，Monaco Editor 提
 - 将 [`WorkspaceQuestionsPanel`](packages/strategy-front/src/components/chat/workspace-questions-panel.tsx:36) 的搜索范围改为仅匹配 `item.text`
 - 从后端 [`question.Entry`](packages/strategy-service/internal/question/model.go:3) 移除 `SessionTitle`
 - 在 [`packages/strategy-front`](packages/strategy-front) 执行 [`bun typecheck`](packages/strategy-front/package.json)，并在 [`packages/strategy-service`](packages/strategy-service) 执行 [`go test ./...`](packages/strategy-service/go.mod)，均通过
+
+---
+
+### Decision
+
+[2026-05-19 09:32:07] - `/app/embed/session` 总结浮窗采用隐藏 child session + strategy-service 独立 summary 存储
+
+**Rationale:**
+用户需要在 [`EmbedSessionPage`](packages/strategy-front/src/pages/embed-session.tsx:35) 左侧展示全局总结浮窗，但总结过程不能污染业务会话，也不能出现在现有会话列表。当前会话列表通过 [`chatApi.listSessions()`](packages/strategy-front/src/api/modules/chat.ts:8) 请求 `/session` 且带 `roots=true`，OpenCode 的 [`Session.list()`](packages/opencode/src/session/index.ts:542) 会在 `roots=true` 时过滤 `parent_id` 非空会话。因此将总结生成载体建模为当前业务会话的 child session，可以天然避免出现在 root 会话列表中。
+
+**Implications/Details:**
+
+- 不调用 [`POST /session/:sessionID/summarize`](packages/opencode/src/server/routes/session.ts:488) 作为主流程，避免 compaction 语义改写当前业务会话上下文
+- `strategy-service` 新增 `/api/summary` 编排接口，负责创建/复用 hidden child session、生成总结、持久化状态
+- 前端新增左侧浮窗与 `useSessionSummary`，仅监听当前业务会话完成后触发，不调用 `chat.selectSession(summarySessionId)`
+- 总结结果保存到 `~/.strategy-service/summaries.json` 一类外部配置目录，前端刷新后可恢复
+- 详细设计记录在 [`embed-session-summary-floating-window-design.md`](memory-bank/embed-session-summary-floating-window-design.md)
+
+---
+
+### Decision (Code)
+
+[2026-05-19 09:51:52] - 前端会话列表在 Redux 写入层过滤 parentID 非空会话
+
+**Rationale:**
+后端总结任务会创建 OpenCode child session。虽然列表请求已使用 roots=true，但 SSE session.created/session.updated 仍可能把 child session upsert 到前端状态。为满足总结会话不出现在会话列表中的要求，在 setWorkspaceSessions 与 upsertWorkspaceSession 层统一过滤 parentID。
+
+**Details:**
+
+- packages/strategy-front/src/store/chat-session-slice.ts
+
+---
+
+### Decision (Code)
+
+[2026-05-20 09:50:40] - 会话总结打断采用“保留最近 ready 快照 + abort hidden child session”机制
+
+**Rationale:**
+会话总结运行态会覆盖当前 entry 为 running。如果用户打断时直接置空或置错状态，会导致界面没有可展示内容。运行新总结前将当前 ready 文本保存为最近快照，打断时先恢复该快照并调用 OpenCode child session abort，可以立即展示最近一次总结，同时阻止后台新结果覆盖用户选择。
+
+**Details:**
+
+- [`Entry`](packages/strategy-service/internal/summary/model.go:12) 新增 `LastText` / `LastMessageCount` / `LastUpdatedAt` 快照字段
+- [`Service.Stop()`](packages/strategy-service/internal/summary/service.go:136) 恢复最近 ready 总结并调用 hidden child session abort
+- [`summaryStop()`](packages/strategy-service/internal/web/summary_api.go:37) 挂载到 `/api/summary/session/stop`
+- [`useSessionSummary()`](packages/strategy-front/src/hooks/use-session-summary.ts:39) 暴露 `stop`
+- [`SessionSummaryFloatingWindow`](packages/strategy-front/src/components/chat/session-summary-floating-window.tsx:24) 在 running 状态显示“打断”按钮
+
+
+---
+### Decision (Code)
+[2026-05-20 10:25:10] - �Ự�ܽ����ɼ��Ը������������¼� Redux ����
+
+**Rationale:**
+���� useChatRuntime ��ͨ�� EventSource ���� OpenCode �¼������� chat-event-reducer д�� session.status �� eventErrs���Ự�ܽ� hidden child session ͬ������� session.error/session.status�����ǰ���������� EventSource��ֱ�Ӱ� summarySessionId ��ȡ selectSessionEventError �� selectSessionStatus���ɱ����ظ����Ӻ��¼������߼���
+
+**Details:**
+- useSessionSummary ��ȡ selectSessionEventError/selectSessionStatus
+- SessionSummaryFloatingWindow �� running ״̬չʾ retry/status �İ�
+
+
+
+---
+### Decision (Code)
+[2026-05-20 10:29:45] - �Ự�ܽ���ɼ����� summary session idle �¼��󵥴�ˢ��
+
+**Rationale:**
+��Ȼ hidden summary session �� session.status �ѽ��� Redux���̶� 2.5s ��ѯ������ظ����󡣸�Ϊ�� running ״̬�¼�¼ summary session �Ƿ���ֹ��� idle ״̬��������ص� idle ʱ����һ�� summary get���������¼�����Ҳ�������մ� strategy-service �־û������ȡ�Ŀɿ��ԡ�
+
+**Details:**
+- useSessionSummary �Ƴ� setInterval ��ѯ
+- useSessionSummary �� status �� busy/retry �ص� idle �� refresh
+

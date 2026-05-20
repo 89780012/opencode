@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo } from "react"
 import { chatApi } from "@/api/modules"
-import type { ChatStatus } from "@/types/chat"
 import {
   selectSelectedSessionId,
   selectSessionDetailLoading,
@@ -10,8 +9,6 @@ import {
   selectSessionMessages,
   selectSessionStatus,
   selectWorkspaceSessionCreating,
-  selectWorkspaceSessionLoaded,
-  selectWorkspaceSessionLoading,
   selectWorkspaceSessions,
   useAppDispatch,
   useAppSelector,
@@ -20,40 +17,19 @@ import {
   setSelectedWorkspaceSession,
   setSessionDetailLoading,
   setWorkspaceSessionCreating,
-  setWorkspaceSessionLoading,
   setWorkspaceSessions,
   upsertWorkspaceSession,
   hydrateSessionMessages,
 } from "@/store/chat-session-slice"
 
 // 本质上效果是去重,防止误点击等操作
-const loads = new Map<string, Promise<void>>()
 const creates = new Map<string, Promise<string>>()
 const details = new Map<string, Promise<void>>()
 
-function inferStatus(messages: ReturnType<typeof selectSessionMessages>, status: ChatStatus) {
-  if (status.type !== "idle") {
-    return status
-  }
-  const last = messages[messages.length - 1]
-  if (!last) {
-    return status
-  }
-  if (last.role === "user") {
-    return { type: "busy" } as const
-  }
-  if (!last.time.completed && !last.error) {
-    return { type: "busy" } as const
-  }
-  return status
-}
-
 export function useChatSessions(path?: string | null) {
   const dispatch = useAppDispatch()
-  const loaded = useAppSelector((state) => selectWorkspaceSessionLoaded(state, path))
   const sessions = useAppSelector((state) => selectWorkspaceSessions(state, path))
   const selectedSessionId = useAppSelector((state) => selectSelectedSessionId(state, path))
-  const loading = useAppSelector((state) => selectWorkspaceSessionLoading(state, path))
   const creating = useAppSelector((state) => selectWorkspaceSessionCreating(state, path))
 
   // 获取会话列表
@@ -62,38 +38,16 @@ export function useChatSessions(path?: string | null) {
       return
     }
 
-    const cur = loads.get(path)
-    if (cur) {
-      return cur
-    }
-
-    dispatch(setWorkspaceSessionLoading({ workspace: path, loading: true }))
-    const task = (async () => {
-      try {
-        const sessions = await chatApi.listSessions(path)
-        dispatch(setWorkspaceSessions({ workspace: path, sessions }))
-      } finally {
-        dispatch(setWorkspaceSessionLoading({ workspace: path, loading: false }))
-      }
-    })()
-
-    loads.set(path, task)
-
-    try {
-      await task
-    } finally {
-      if (loads.get(path) === task) {
-        loads.delete(path)
-      }
-    }
+    const sessions = await chatApi.listSessions(path)
+    dispatch(setWorkspaceSessions({ workspace: path, sessions }))
   }, [dispatch, path])
 
   const ensureSessions = useCallback(async () => {
-    if (!path || loaded) {
+    if (!path) {
       return
     }
     await refreshSessions()
-  }, [loaded, path, refreshSessions])
+  }, [path, refreshSessions])
 
   // 创建会话
   const createSession = useCallback(async () => {
@@ -141,27 +95,15 @@ export function useChatSessions(path?: string | null) {
 
   return useMemo(
     () => ({
-      loaded,
       sessions,
       selectedSessionId,
-      loading,
       creating,
       ensureSessions,
       refreshSessions,
       createSession,
       selectSession,
     }),
-    [
-      createSession,
-      creating,
-      ensureSessions,
-      loaded,
-      loading,
-      refreshSessions,
-      selectSession,
-      selectedSessionId,
-      sessions,
-    ],
+    [createSession, creating, ensureSessions, refreshSessions, selectSession, selectedSessionId, sessions],
   )
 }
 
@@ -236,15 +178,17 @@ export function useChatSessionDetail(path?: string | null, sessionId?: string | 
 export function useStrategySession(path?: string | null) {
   const chat = useChatSessions(path)
   const detail = useChatSessionDetail(path, chat.selectedSessionId)
-  const status = useMemo(() => inferStatus(detail.messages, detail.status), [detail.messages, detail.status])
+  const status = detail.status
   const busy = !!chat.selectedSessionId && status.type !== "idle"
 
+  // 初次只查询一次
   useEffect(() => {
+    if (!path) return
     void chat.ensureSessions()
-  }, [chat])
+  }, [path])
 
   useEffect(() => {
-    if (!chat.loaded || chat.selectedSessionId || chat.sessions.length === 0) {
+    if (chat.selectedSessionId || chat.sessions.length === 0) {
       return
     }
     chat.selectSession(chat.sessions[0].id)
@@ -265,7 +209,6 @@ export function useStrategySession(path?: string | null) {
       busy,
       abortSession,
       detailLoading: detail.loading,
-      sessionLoading: chat.loading,
       ensure: chat.ensureSessions,
       reloadSessions: chat.refreshSessions,
     }),

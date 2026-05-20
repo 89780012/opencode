@@ -25,6 +25,7 @@ It is optional, but recommended to be updated as the project evolves.
 - **Go 分层架构**: Strategy Service 采用 `internal/` 分层（asset, workspace, bootstrap 等）
 - **React + Redux**: Strategy Front 使用 Redux Toolkit 进行全局状态管理
 - **SolidJS 控制台**: Console 包使用 SolidJS + Kobalte 组件库
+- **隐藏子会话后台任务**: 对不应进入 root 会话列表的后台任务（如会话总结），使用 OpenCode child session（`parentID` 指向业务 session）承载生成过程，并由 strategy-service 独立持久化业务结果
 
 ## Testing Patterns
 

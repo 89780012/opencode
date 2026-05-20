@@ -36,15 +36,7 @@ export function selectWorkspaceSessions(state: RootState, workspace?: string | n
   if (!workspace) {
     return empty
   }
-  return state.chatSession.sessions[workspace] ?? empty
-}
-
-export function selectWorkspaceSessionLoaded(state: RootState, workspace?: string | null) {
-  return workspace ? (state.chatSession.loaded[workspace] ?? false) : false
-}
-
-export function selectWorkspaceSessionLoading(state: RootState, workspace?: string | null) {
-  return workspace ? (state.chatSession.sessionLoading[workspace] ?? false) : false
+  return state.chatSession.sessions[workspace]?.filter((session) => session.title != "__summary__") ?? empty
 }
 
 export function selectWorkspaceSessionCreating(state: RootState, workspace?: string | null) {

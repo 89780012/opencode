@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { WorkspaceQuestionsPanel } from "@/components/chat/workspace-questions-panel"
 import { WorkspaceQuestionsTrigger } from "@/components/chat/workspace-questions-trigger"
 import { EmbedProviderSettingsDialog } from "@/components/chat/embed-provider-settings-dialog"
+import { SessionSummaryFloatingWindow } from "@/components/chat/session-summary-floating-window"
 import { StrategyChatPanel } from "@/components/strategy/strategy-chat-panel"
 import { Button } from "@/components/ui/button"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
@@ -12,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { WorkspaceDetailPane, type WorkspaceDetailTab } from "@/components/workspace/workspace-detail-pane"
 import { useComposer } from "@/hooks/use-composer"
 import { useEmbedEntry } from "@/hooks/use-embed-entry"
+import { useSessionSummary } from "@/hooks/use-session-summary"
 import { useStrategySession } from "@/hooks/use-strategy-session"
 import { useWorkspaceQuestions } from "@/hooks/use-workspace-questions"
 import { useAppSelector, selectQuestionRecordStamp } from "@/store"
@@ -48,6 +50,17 @@ export default function EmbedSessionPage() {
   const [spin, setSpin] = useState(false)
   const [settings, setSettings] = useState(false)
   const stamp = useAppSelector(selectQuestionRecordStamp)
+  const [isAbort, setIsAbort] = useState(false)
+  const summary = useSessionSummary({
+    workspacePath: workspace?.path,
+    sessionId: chat.selectedSessionId,
+    messages: chat.messages,
+    busy: chat.busy,
+    model: composer.model,
+    variant: composer.variant,
+    isAbort: isAbort,
+  })
+
   const init = useRef<string | null>(null)
   const refresh = useRef(questions.refresh)
   refresh.current = questions.refresh
@@ -75,7 +88,7 @@ export default function EmbedSessionPage() {
   useEffect(() => {
     if (!workspace?.path) return
     if (!chat.loaded) return
-    if (chat.sessionLoading || chat.creating) return
+    if (chat.creating) return
     if (init.current === workspace.path) return
 
     init.current = workspace.path
@@ -99,7 +112,6 @@ export default function EmbedSessionPage() {
     chat.loaded,
     chat.selectedSessionId,
     chat.selectSession,
-    chat.sessionLoading,
     chat.sessions,
     workspace?.path,
   ])
@@ -120,11 +132,12 @@ export default function EmbedSessionPage() {
   const onAbort = useCallback(async () => {
     try {
       await chat.abortSession()
+      setIsAbort((prev) => (prev = true))
     } catch (err) {
       log("停止嵌入会话失败", err)
       toast.error("停止会话失败")
     }
-  }, [chat])
+  }, [chat, setIsAbort])
 
   const onCreate = useCallback(async () => {
     try {
@@ -274,7 +287,6 @@ export default function EmbedSessionPage() {
             <StrategyChatPanel
               workspace={workspace}
               selectedSessionId={chat.selectedSessionId}
-              sessionLoading={chat.sessionLoading}
               detailLoading={chat.detailLoading}
               messages={chat.messages}
               status={chat.status}
@@ -297,6 +309,9 @@ export default function EmbedSessionPage() {
               onVariant={composer.setVariant}
               onAbort={() => {
                 void onAbort()
+              }}
+              setIsAbort={(value) => {
+                setIsAbort(value)
               }}
               onOpenDiff={(value) => {
                 setFile(value)
@@ -329,6 +344,25 @@ export default function EmbedSessionPage() {
           </ResizablePanel>
         </ResizablePanelGroup>
 
+        {chat.selectedSessionId && !open ? (
+          <SessionSummaryFloatingWindow
+            summary={summary.item}
+            load={summary.load}
+            err={summary.err}
+            ready={summary.ready}
+            onRefresh={() => {
+              void summary.refresh()
+            }}
+            onRun={() => {
+              setIsAbort((prev) => (prev = false))
+              void summary.run()
+            }}
+            onStop={() => {
+              void summary.stop()
+            }}
+          />
+        ) : null}
+
         {!open ? <WorkspaceQuestionsTrigger count={questions.questions.length} onClick={() => setPanel(true)} /> : null}
 
         <WorkspaceQuestionsPanel
@@ -347,7 +381,7 @@ export default function EmbedSessionPage() {
           }}
         />
 
-        {(chat.sessionLoading || chat.detailLoading || composer.load || entry.load) && (
+        {(chat.detailLoading || composer.load || entry.load) && (
           <div className="embed-session-mask absolute inset-0 flex items-center justify-center bg-white/75 dark:bg-[#0f1111]/70">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>

@@ -12,7 +12,6 @@ import type { LocalWorkspace } from "@/types/workspace"
 interface Props {
   workspace: LocalWorkspace
   selectedSessionId: string | null
-  sessionLoading: boolean
   detailLoading: boolean
   messages: ChatMessageInfo[]
   status: ChatStatus
@@ -35,6 +34,7 @@ interface Props {
   onVariant: (value: string) => void
   onAbort: () => void
   onOpenDiff: (path: string) => void
+  setIsAbort: (value: boolean) => void
 }
 
 export function StrategyChatPanel(props: Props) {
@@ -49,7 +49,9 @@ export function StrategyChatPanel(props: Props) {
     createSession: props.onCreate,
     selectSession: props.onSelectSession,
   })
-  const empty = !props.sessionLoading && !props.detailLoading && props.messages.length === 0 && !props.eventErr
+  const setIsAbort = props.setIsAbort
+
+  const empty = !props.detailLoading && props.messages.length === 0 && !props.eventErr
   const lock = chat.busy || chat.submitting || props.creating || props.load
   return (
     <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-transparent">
@@ -127,12 +129,13 @@ export function StrategyChatPanel(props: Props) {
               onModel={props.onModel}
               onSubmit={(value) => {
                 void chat.submit(value)
+                void setIsAbort(false)
               }}
               onValueChange={chat.draft.setText}
               onVariant={props.onVariant}
               showAgent={props.showAgent}
               showModel={props.showModel}
-              submitting={chat.submitting || props.creating || props.sessionLoading}
+              submitting={chat.submitting || props.creating}
               value={chat.draft.text}
               variant={props.variant}
               variants={props.variants}

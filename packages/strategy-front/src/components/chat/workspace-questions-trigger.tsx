@@ -10,7 +10,7 @@ interface Props {
 
 export function WorkspaceQuestionsTrigger(props: Props) {
   return (
-    <div className={cn("pointer-events-none absolute top-1/2 right-5 z-20 -translate-y-1/2", props.className)}>
+    <div className={cn("pointer-events-none absolute top-4 right-5 z-20", props.className)}>
       <Button
         type="button"
         size="sm"

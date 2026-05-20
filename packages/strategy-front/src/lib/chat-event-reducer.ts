@@ -13,8 +13,8 @@ import type {
 
 export type ChatStateShape = {
   sessions: Record<string, ChatSessionSummary[]>
-  loaded: Record<string, boolean>
-  sessionLoading: Record<string, boolean>
+  // loaded: Record<string, boolean>
+  // sessionLoading: Record<string, boolean>
   sessionCreating: Record<string, boolean>
   selected: Record<string, string | null>
   hydrated: Record<string, boolean>
@@ -172,6 +172,7 @@ export function removeSession(state: ChatStateShape, workspace: string, info: Ch
   delete state.questions[info.id]
 }
 
+// 解析数据格式
 export function applyChatEvent(state: ChatStateShape, workspace: string, evt: ChatEvent) {
   switch (evt.type) {
     case "session.created":
@@ -207,6 +208,8 @@ export function applyChatEvent(state: ChatStateShape, workspace: string, evt: Ch
       return
     }
     case "session.status": {
+      //大概就是这样格式
+      //data: {"type":"session.status","properties":{"sessionID":"ses_1d6a8e84cffem57xu8gr3f4l27","status":{"type":"retry","attempt":1,"message":"Free usage exceeded, add credits https://opencode.ai/zen","next":1779235199608}}}
       state.status[evt.properties.sessionID] = evt.properties.status
       if (evt.properties.status.type === "busy") {
         delete state.eventErrs[evt.properties.sessionID]

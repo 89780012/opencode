@@ -22,8 +22,6 @@ type State = ChatStateShape
 
 const initialState: State = {
   sessions: {},
-  loaded: {},
-  sessionLoading: {},
   sessionCreating: {},
   selected: {},
   hydrated: {},
@@ -47,27 +45,23 @@ const slice = createSlice({
   initialState,
   reducers: {
     setWorkspaceSessions(state, action: PayloadAction<{ workspace: string; sessions: ChatSessionSummary[] }>) {
-      state.sessions[action.payload.workspace] = [...action.payload.sessions].sort(
-        (a, b) => b.time.updated - a.time.updated,
-      )
-      state.loaded[action.payload.workspace] = true
+      const sessions = action.payload.sessions.filter((item) => !item.parentID && item.title !== "__summary__")
+      state.sessions[action.payload.workspace] = [...sessions].sort((a, b) => b.time.updated - a.time.updated)
       const id = state.selected[action.payload.workspace]
       if (!id) {
         return
       }
-      const ok = action.payload.sessions.some((item) => item.id === id)
+      const ok = sessions.some((item) => item.id === id)
       if (ok) {
         return
       }
       state.selected[action.payload.workspace] = null
     },
-    setWorkspaceSessionLoading(state, action: PayloadAction<{ workspace: string; loading: boolean }>) {
-      state.sessionLoading[action.payload.workspace] = action.payload.loading
-    },
     setWorkspaceSessionCreating(state, action: PayloadAction<{ workspace: string; creating: boolean }>) {
       state.sessionCreating[action.payload.workspace] = action.payload.creating
     },
     upsertWorkspaceSession(state, action: PayloadAction<{ workspace: string; session: ChatSessionSummary }>) {
+      if (action.payload.session.parentID || action.payload.session.title === "__summary__") return
       upsertSession(state, action.payload.workspace, action.payload.session)
     },
     removeWorkspaceSession(state, action: PayloadAction<{ workspace: string; session: ChatSessionSummary }>) {
@@ -112,7 +106,6 @@ const slice = createSlice({
 
 export const {
   setWorkspaceSessions,
-  setWorkspaceSessionLoading,
   setWorkspaceSessionCreating,
   upsertWorkspaceSession,
   removeWorkspaceSession,

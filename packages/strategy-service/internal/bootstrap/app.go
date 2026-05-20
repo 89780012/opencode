@@ -16,6 +16,7 @@ import (
 	"strategy-service/internal/question"
 	rt "strategy-service/internal/runtime"
 	"strategy-service/internal/smartx"
+	"strategy-service/internal/summary"
 	web "strategy-service/internal/web"
 
 	"github.com/gin-gonic/gin"
@@ -62,7 +63,7 @@ func New(cfg Config) (*Service, error) {
 		Account:  cfg.Account,
 		WindowId: cfg.WindowId,
 		LogDir:   cfg.LogDir,
-	}), question.NewService())
+	}), question.NewService(), summary.NewService(op))
 
 	gin.SetMode(gin.ReleaseMode)
 	mux := gin.New()

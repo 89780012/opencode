@@ -145,6 +145,7 @@ function useEvents(workspacePath?: string | null) {
 
     const src = new EventSource(url)
     src.onmessage = (msg) => {
+      // 数据格式 data: {"type":"server.heartbeat","properties":{}}
       const event = parse(msg.data)
       if (!event) return
       dispatch(applyWorkspaceEvent({ workspace: workspacePath, event }))
@@ -203,9 +204,7 @@ function usePermission(workspacePath?: string | null, sessionId?: string | null)
   const dispatch = useAppDispatch()
   const [sending, setSending] = useState(false)
   const loaded = useAppSelector(selectPermissionLoaded)
-  const req = useAppSelector((state) =>
-    selectSessionPermissionRequest(state, workspacePath, sessionId),
-  )
+  const req = useAppSelector((state) => selectSessionPermissionRequest(state, workspacePath, sessionId))
 
   const refresh = useCallback(async () => {
     if (!workspacePath) return
@@ -267,9 +266,7 @@ function useQuestion(workspacePath?: string | null, sessionId?: string | null) {
   const dispatch = useAppDispatch()
   const [sending, setSending] = useState(false)
   const loaded = useAppSelector(selectQuestionLoaded)
-  const req = useAppSelector((state) =>
-    selectSessionQuestionRequest(state, workspacePath, sessionId),
-  )
+  const req = useAppSelector((state) => selectSessionQuestionRequest(state, workspacePath, sessionId))
 
   const refresh = useCallback(async () => {
     if (!workspacePath) return
