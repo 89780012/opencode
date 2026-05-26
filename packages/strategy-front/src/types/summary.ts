@@ -6,7 +6,6 @@ export interface SessionSummary {
   summarySessionId?: string
   state: SummaryState
   text?: string
-  messageCount: number
   updatedAt: number
   err?: string
 }
@@ -14,7 +13,4 @@ export interface SessionSummary {
 export interface SessionSummaryRequest {
   workspacePath: string
   sessionId: string
-  providerID: string
-  modelID: string
-  variant?: string
 }

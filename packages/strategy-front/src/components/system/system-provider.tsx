@@ -50,38 +50,37 @@ export function SystemProvider(props: { children: ReactNode }) {
     }
   }, [])
 
-  const save = useCallback(async (next: SystemConfig) => {
-    const prev = cfg
-    const id = ++seq.current
-    setCfg(next)
-    setErr("")
+  const save = useCallback(
+    async (next: SystemConfig) => {
+      const prev = cfg
+      const id = ++seq.current
+      setCfg(next)
+      setErr("")
 
-    try {
-      const out = await systemApi.saveConfig(next)
-      if (id === seq.current) {
-        setCfg(out)
+      try {
+        const out = await systemApi.saveConfig(next)
+        if (id === seq.current) {
+          setCfg(out)
+        }
+        return out
+      } catch (err) {
+        if (id === seq.current) {
+          setCfg(prev)
+        }
+        if (err instanceof Error) {
+          setErr(err.message)
+        }
+        throw err
       }
-      return out
-    } catch (err) {
-      if (id === seq.current) {
-        setCfg(prev)
-      }
-      if (err instanceof Error) {
-        setErr(err.message)
-      }
-      throw err
-    }
-  }, [cfg])
+    },
+    [cfg],
+  )
 
   useEffect(() => {
     void reload()
   }, [reload])
 
-  return (
-    <Ctx.Provider value={{ cfg, load, err, reload, save }}>
-      {props.children}
-    </Ctx.Provider>
-  )
+  return <Ctx.Provider value={{ cfg, load, err, reload, save }}>{props.children}</Ctx.Provider>
 }
 
 export function useSystem() {

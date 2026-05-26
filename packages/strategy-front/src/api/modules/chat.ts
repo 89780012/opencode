@@ -1,3 +1,4 @@
+import { modelChainApi } from "@/api/modules/model-chain"
 import { opencode } from "@/api/opencode"
 import { workspaceQuestionApi } from "@/api/modules/question"
 import { store } from "@/store"
@@ -49,10 +50,10 @@ export const chatApi = {
   sendPrompt(workspacePath: string, sessionId: string, body: ChatPromptBody) {
     const text = body.parts.find((p) => p.type === "text")?.text
 
-    const promise = opencode.post<boolean, ChatPromptBody>(`/session/${sessionId}/prompt_async`, body, {
-      params: {
-        directory: workspacePath,
-      },
+    const promise = modelChainApi.sendPrompt({
+      ...body,
+      workspacePath,
+      sessionId,
     })
 
     // fire-and-forget: 用户问题本地留存一份，不阻塞主流程

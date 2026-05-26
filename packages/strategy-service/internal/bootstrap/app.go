@@ -11,6 +11,7 @@ import (
 	"time"
 
 	conf "strategy-service/internal/config"
+	"strategy-service/internal/modelchain"
 	oc "strategy-service/internal/opencode"
 	"strategy-service/internal/oprun"
 	"strategy-service/internal/question"
@@ -58,19 +59,22 @@ func New(cfg Config) (*Service, error) {
 
 	mgr := oprun.New(oprun.Config(cfg.Opencode))
 	op := oc.New(mgr)
+	chain := modelchain.NewService(op)
 	api := web.NewAPI(run, op, &conf.Store{}, smartx.New(smartx.Config{
 		Platform: cfg.Platform,
 		Account:  cfg.Account,
 		WindowId: cfg.WindowId,
 		LogDir:   cfg.LogDir,
-	}), question.NewService(), summary.NewService(op))
+	}), question.NewService(), summary.NewService(op, chain), chain)
 
 	gin.SetMode(gin.ReleaseMode)
 	mux := gin.New()
 	mux.Use(web.RequestLog(), gin.Recovery())
 	api.Register(mux)
-	mux.Any("/opencode", web.NewOpencodeProxy(op))
-	mux.Any("/opencode/*path", web.NewOpencodeProxy(op))
+
+	//===============opencode自代理==================
+	mux.Any("/opencode", web.NewOpencodeProxy(op, chain))
+	mux.Any("/opencode/*path", web.NewOpencodeProxy(op, chain))
 	mux.NoRoute(gin.WrapH(web.NewStatic(cfg.Dist)))
 
 	srv := &http.Server{

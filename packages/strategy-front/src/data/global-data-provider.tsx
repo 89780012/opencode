@@ -1,8 +1,17 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react"
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react"
 import { agentApi, mcpApi, providerApi, skillApi, workspaceApi } from "@/api/modules"
-import { rankAgent } from "@/lib/chat-composer"
 import { note } from "@/lib/error"
-import { latestModels, modelVisible, readModelVisibility } from "@/lib/model-catalog"
+import { latestModels, modelKey, modelVisible, normalizeModelChain, readModelVisibility } from "@/lib/model-catalog"
 import type { GlobalAgentCatalog, RuntimeAgent } from "@/types/agent"
 import type { ComposerModel, ProviderCatalogState } from "@/types/composer"
 import type { McpDoc, McpMap } from "@/types/mcp"
@@ -53,6 +62,7 @@ type DataMap = {
   workspace: WorkspaceData
 }
 
+// 基本状态变量
 type State = {
   agent: Box<AgentData>
   provider: Box<ProviderData>
@@ -66,6 +76,7 @@ type Action =
   | { type: "load_done"; key: Key; box: Box<DataMap[Key]> }
   | { type: "invalidate"; key: Key }
 
+// 联合类型
 type Ctx = State & {
   ensure: <K extends Key>(key: K) => Promise<Box<DataMap[K]>>
   refresh: <K extends Key>(key: K) => Promise<Box<DataMap[K]>>
@@ -85,8 +96,9 @@ type Out<T> = {
 }
 
 const emptyAgent: AgentData = {
-  run: [],
+  run: [], // 实际跑的agents
   cfg: {
+    // 我们自己配置的agents
     root: "",
     agents: [],
   },
@@ -102,6 +114,7 @@ const emptyProvider: ProviderData = {
   auth: {},
   connectedModels: [],
   visibleModels: [],
+  chainModels: [],
 }
 
 const emptyMcp: McpData = {
@@ -235,15 +248,6 @@ function skillScope(name: string, cfg: GlobalSkillCatalog) {
   return ""
 }
 
-function allow(item?: string, current?: string) {
-  const row = scope(item)
-  const cur = scope(current)
-  if (!row || row === "all") {
-    return true
-  }
-  return row === cur
-}
-
 function buildProvider(providers: List, config: Config, auth: AuthMap): ProviderData {
   const user = readModelVisibility()
   const connected = new Set(providers.connected)
@@ -269,12 +273,16 @@ function buildProvider(providers: List, config: Config, auth: AuthMap): Provider
   )
   const showAll = visibleModels.length === 0 && connectedModels.length > 0 && Object.keys(user).length === 0
 
+  const shown = showAll ? connectedModels : visibleModels
+  const map = new Map(shown.map((item) => [modelKey({ providerID: item.provider.id, modelID: item.id }), item]))
+
   return {
     providers,
     config,
     auth,
     connectedModels,
-    visibleModels: showAll ? connectedModels : visibleModels,
+    visibleModels: shown,
+    chainModels: normalizeModelChain(shown).flatMap((item) => map.get(modelKey(item)) ?? []),
   }
 }
 
@@ -475,10 +483,7 @@ export function GlobalDataProvider(props: { children: ReactNode }) {
     [pull],
   )
 
-  const refresh = useCallback(
-    <K extends Key>(key: K) => pull(key, true),
-    [pull],
-  )
+  const refresh = useCallback(<K extends Key>(key: K) => pull(key, true), [pull])
 
   const refreshMany = useCallback(
     async (keys: Key[]) => {
@@ -544,7 +549,7 @@ export function GlobalDataProvider(props: { children: ReactNode }) {
   }, [ensure])
 
   const current = useMemo(
-    () => (selected ? state.workspace.data.workspaces.find((item) => item.path === selected) ?? null : null),
+    () => (selected ? (state.workspace.data.workspaces.find((item) => item.path === selected) ?? null) : null),
     [selected, state.workspace.data.workspaces],
   )
 
@@ -577,8 +582,9 @@ export function useGlobalData() {
   return ctx
 }
 
-export function useAgentList(current?: string) {
+export function useAgentList() {
   const data = useGlobalData()
+  //console.log("agent list", data)
   const ensure = data.ensure
   const refresh = data.refresh
 
@@ -588,17 +594,13 @@ export function useAgentList(current?: string) {
 
   const ags = useMemo(
     () =>
-      data.agent.data.run
-        .filter((item) => item.mode !== "subagent" && !item.hidden && allow(item.scope, current))
+      data.agent.data.run //从实际运行的agent 过滤掉子agent 、隐藏的
+        .filter((item) => item.mode !== "subagent" && !item.hidden)
         .slice()
         .sort((a, b) => {
-          const diff = rankAgent(a.name) - rankAgent(b.name)
-          if (diff !== 0) {
-            return diff
-          }
           return a.name.localeCompare(b.name)
         }),
-    [current, data.agent.data.run],
+    [data.agent.data.run],
   )
 
   return useMemo(
@@ -627,7 +629,6 @@ export function useSkillList(current?: string) {
     const map = new Map<string, { name: string; description: string }>()
 
     for (const item of data.skill.data.cfg.skills) {
-      if (!allow(item.scope, current)) continue
       map.set(item.name, {
         name: item.name,
         description: item.description || "",
@@ -635,7 +636,6 @@ export function useSkillList(current?: string) {
     }
 
     for (const item of data.skill.data.run) {
-      if (!allow(item.scope, current)) continue
       map.set(item.name, {
         name: item.name,
         description: map.get(item.name)?.description || item.description || "",
@@ -660,28 +660,26 @@ export function useSkillList(current?: string) {
 
 export function useProviderList() {
   const data = useGlobalData()
-  const ensure = data.ensure
+  // console.log("provider list", data)
   const refresh = data.refresh
-
-  useEffect(() => {
-    void ensure("provider")
-  }, [ensure])
 
   return useMemo(
     () => ({
-      auth: data.provider.data.auth,
+      auth: data.provider.data.auth, //授权登录
+      chainModels: data.provider.data.chainModels, //链式模型
       config: data.provider.data.config,
-      connectedModels: data.provider.data.connectedModels,
+      connectedModels: data.provider.data.connectedModels, //所有链接的模型
       err: data.provider.err,
       load: data.provider.load,
-      providers: data.provider.data.providers,
+      providers: data.provider.data.providers, //全部提供商
       reload: () => refresh("provider"),
       refresh: () => refresh("provider"),
       sync: data.syncProvider,
-      visibleModels: data.provider.data.visibleModels,
+      visibleModels: data.provider.data.visibleModels, //所有可见的模型
     }),
     [
       data.provider.data.auth,
+      data.provider.data.chainModels,
       data.provider.data.config,
       data.provider.data.connectedModels,
       data.provider.data.providers,

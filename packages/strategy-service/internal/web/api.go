@@ -5,6 +5,7 @@ import (
 
 	cfg "strategy-service/internal/config"
 	"strategy-service/internal/logs"
+	"strategy-service/internal/modelchain"
 	oc "strategy-service/internal/opencode"
 	"strategy-service/internal/question"
 	rt "strategy-service/internal/runtime"
@@ -23,6 +24,7 @@ type API struct {
 	log      *logs.Hub
 	question *question.Service
 	summary  *summary.Service
+	chain    *modelchain.Service
 }
 
 type envelope struct {
@@ -52,7 +54,10 @@ func bad(c *gin.Context, err error) {
 }
 
 // NewAPI 组装 API 所需的各类底层服务。
-func NewAPI(run *rt.Service, op *oc.Service, cfg *cfg.Store, sx *smartx.Service, question *question.Service, summary *summary.Service) *API {
+func NewAPI(run *rt.Service, op *oc.Service, cfg *cfg.Store, sx *smartx.Service, question *question.Service, summary *summary.Service, chain *modelchain.Service) *API {
+	if chain == nil {
+		chain = modelchain.NewService(op)
+	}
 	return &API{
 		ws:       workspace.NewService(run),
 		op:       op,
@@ -61,6 +66,7 @@ func NewAPI(run *rt.Service, op *oc.Service, cfg *cfg.Store, sx *smartx.Service,
 		log:      logs.New(),
 		question: question,
 		summary:  summary,
+		chain:    chain,
 	}
 }
 
@@ -99,6 +105,11 @@ func (a *API) Register(r *gin.Engine) {
 	sum.GET("/session", a.summaryGet)
 	sum.POST("/session", a.summaryRun)
 	sum.POST("/session/stop", a.summaryStop)
+
+	chain := api.Group("/model-chain")
+	chain.GET("", a.modelChainGet)
+	chain.PUT("", a.modelChainPut)
+	chain.POST("/session/:sessionId/prompt", a.modelChainPrompt)
 
 	sys := api.Group("/system")
 	sys.GET("/config", a.configGet)

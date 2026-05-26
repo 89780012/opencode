@@ -9,46 +9,116 @@ export type ModelKey = {
 export type ModelRow = Model & {
   provider: Provider
 }
+export type ModelChain = {
+  chain: ModelKey[]
+  chainTouched: boolean
+}
+
+type Store = ModelChain & {
+  user: Record<string, Vis>
+}
 
 export const modelStoreKey = "strategy-front.provider-models.v1"
+export const modelChainLimit = 10
 const win = 1000 * 60 * 60 * 24 * 30 * 6
 
 export function modelKey(input: ModelKey) {
   return `${input.providerID}:${input.modelID}`
 }
 
-export function readModelVisibility() {
-  if (typeof window === "undefined") return {}
+function parse(): Store {
+  if (typeof window === "undefined") {
+    return { user: {}, chain: [], chainTouched: false }
+  }
 
   try {
     const raw = load(modelStoreKey)
-    if (!raw) return {}
-    const data = JSON.parse(raw) as { user?: Record<string, Vis> }
-    return data.user ?? {}
+    if (!raw) return { user: {}, chain: [], chainTouched: false }
+    const data = JSON.parse(raw) as Partial<Store>
+    return {
+      user: data.user ?? {},
+      chain: Array.isArray(data.chain)
+        ? data.chain.filter((item) => item.providerID && item.modelID).slice(0, modelChainLimit)
+        : [],
+      chainTouched: !!data.chainTouched,
+    }
   } catch {
-    return {}
+    return { user: {}, chain: [], chainTouched: false }
   }
 }
 
-export function writeModelCatalog(input: { user?: Record<string, Vis> }) {
+function ref(row: ModelRow): ModelKey {
+  return { providerID: row.provider.id, modelID: row.id }
+}
+
+function rank(row: ModelRow) {
+  const text = `${row.provider.id} ${row.provider.name} ${row.id} ${row.name}`.toLowerCase()
+  if (row.provider.source === "custom") return 0
+  if (text.includes("claude") || text.includes("anthropic")) return 1
+  if (text.includes("gpt") || text.includes("openai")) return 2
+  return 3
+}
+
+export function readModelVisibility() {
+  return parse().user
+}
+
+export function readModelChain(): ModelChain {
+  const data = parse()
+  return { chain: data.chain, chainTouched: data.chainTouched }
+}
+
+export function writeModelCatalog(input: { user?: Record<string, Vis>; chain?: ModelKey[]; chainTouched?: boolean }) {
   if (typeof window === "undefined") return
 
-  const cur = (() => {
-    try {
-      const raw = load(modelStoreKey)
-      if (!raw) return {}
-      return JSON.parse(raw) as { user?: Record<string, Vis> }
-    } catch {
-      return {}
-    }
-  })()
-
+  const cur = parse()
   save(
     modelStoreKey,
     JSON.stringify({
-      user: input.user ?? cur.user ?? {},
+      user: input.user ?? cur.user,
+      chain: input.chain ?? cur.chain,
+      chainTouched: input.chainTouched ?? cur.chainTouched,
     }),
   )
+}
+
+export function autoModelChain(rows: ModelRow[]) {
+  return rows
+    .slice()
+    .sort(
+      (a, b) =>
+        rank(a) - rank(b) ||
+        a.provider.name.localeCompare(b.provider.name) ||
+        a.provider.id.localeCompare(b.provider.id) ||
+        a.name.localeCompare(b.name) ||
+        a.id.localeCompare(b.id),
+    )
+    .map(ref)
+    .slice(0, modelChainLimit)
+}
+
+export function normalizeModelChain(rows: ModelRow[], saved = readModelChain()) {
+  const map = new Map(rows.map((row) => [modelKey(ref(row)), row]))
+  const base = saved.chainTouched && saved.chain.length > 0 ? saved.chain : autoModelChain(rows)
+  const seen = new Set<string>()
+  const chain = base.filter((item) => {
+    const id = modelKey(item)
+    if (seen.has(id)) return false
+    if (!map.has(id)) return false
+    seen.add(id)
+    return true
+  })
+
+  rows.forEach((row) => {
+    if (chain.length >= modelChainLimit) return
+    const item = ref(row)
+    const id = modelKey(item)
+    if (seen.has(id)) return
+    chain.push(item)
+    seen.add(id)
+  })
+
+  return chain.slice(0, modelChainLimit)
 }
 
 export function stamp(value: string) {

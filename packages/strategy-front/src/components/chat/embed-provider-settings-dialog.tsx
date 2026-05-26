@@ -1,17 +1,11 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react"
-import { Loader2, Plus, RefreshCcw, RotateCcw } from "lucide-react"
+import { ArrowDown, ArrowUp, Loader2, Plus, RefreshCcw, RotateCcw } from "lucide-react"
+import { modelChainApi } from "@/api/modules/model-chain"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -23,7 +17,18 @@ import {
 } from "@/components/shared/global-resource-section"
 import { useProviderList } from "@/data/global-data-provider"
 import { useProviderPage } from "@/hooks/use-provider-page"
-import { latestModels, modelKey, modelVisible, readModelVisibility, writeModelCatalog } from "@/lib/model-catalog"
+import {
+  autoModelChain,
+  latestModels,
+  modelKey,
+  modelChainLimit,
+  modelVisible,
+  normalizeModelChain,
+  readModelChain,
+  readModelVisibility,
+  writeModelCatalog,
+  type ModelKey,
+} from "@/lib/model-catalog"
 import type { ComposerModel } from "@/types/composer"
 import type { Provider } from "@/types/provider"
 import { ProviderConnectDialog } from "../provider/provider-connect-dialog"
@@ -33,19 +38,9 @@ import { note, popular, source } from "../provider/utils"
 type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  model?: string
-  models: ComposerModel[]
-  variant?: string | null
-  variants: string[]
-  onModel: (value: string) => void
-  onVariant: (value: string) => void
 }
 
 type Vis = "show" | "hide"
-type Key = {
-  providerID: string
-  modelID: string
-}
 type Row = ComposerModel & {
   def: boolean
   free: boolean
@@ -144,6 +139,8 @@ export function EmbedProviderSettingsDialog(props: Props) {
   const [tab, setTab] = useState("providers")
   const [q, setQ] = useState("")
   const [user, setUser] = useState<Record<string, Vis>>(() => readModelVisibility())
+  const [chain, setChain] = useState<ModelKey[]>(() => readModelChain().chain)
+  const [touched, setTouched] = useState(() => readModelChain().chainTouched)
   const dq = useDeferredValue(q.trim().toLowerCase())
   const sync = useRef(prv.sync)
   const linked = useMemo(() => new Set(page.providers.connected), [page.providers.connected])
@@ -160,11 +157,15 @@ export function EmbedProviderSettingsDialog(props: Props) {
     [page.connected, page.providers.default],
   )
   const latest = useMemo(() => latestModels(rows), [rows])
-  const pick = props.models.some((item) => `${item.provider.id}/${item.id}` === props.model)
-    ? (props.model ?? "")
-    : props.models[0]
-      ? `${props.models[0].provider.id}/${props.models[0].id}`
-      : ""
+  const shown = useMemo(
+    () =>
+      rows.filter((row) =>
+        modelVisible({ row, user, latest, model: { providerID: row.provider.id, modelID: row.id } }),
+      ),
+    [latest, rows, user],
+  )
+  const order = useMemo(() => normalizeModelChain(shown, { chain, chainTouched: touched }), [chain, shown, touched])
+  const pick = order[0] ? `${order[0].providerID}/${order[0].modelID}` : ""
 
   useEffect(() => {
     sync.current = prv.sync
@@ -172,17 +173,25 @@ export function EmbedProviderSettingsDialog(props: Props) {
 
   useEffect(() => {
     if (!props.open) return
+    const data = readModelChain()
     setUser(readModelVisibility())
+    setChain(data.chain)
+    setTouched(data.chainTouched)
     setQ("")
   }, [props.open])
 
   useEffect(() => {
     if (typeof window === "undefined") return
-    writeModelCatalog({ user })
+    writeModelCatalog({ user, chain: order, chainTouched: touched })
+    void modelChainApi
+      .save({
+        chain: order,
+      })
+      .catch(() => undefined)
     sync.current()
-  }, [user])
+  }, [user, order, touched])
 
-  const visible = (input: Key, row?: Row) =>
+  const visible = (input: ModelKey, row?: Row) =>
     modelVisible({
       row,
       user,
@@ -190,9 +199,25 @@ export function EmbedProviderSettingsDialog(props: Props) {
       model: input,
     })
 
-  const setVisible = (input: Key, on: boolean) => {
+  const setVisible = (input: ModelKey, on: boolean) => {
     const id = modelKey(input)
     setUser((prev) => ({ ...prev, [id]: on ? "show" : "hide" }))
+  }
+
+  const move = (idx: number, dir: number) => {
+    const next = idx + dir
+    if (next < 0 || next >= order.length) return
+    setTouched(true)
+    setChain(
+      order
+        .map((item, at) => (at === idx ? order[next] : at === next ? order[idx] : item))
+        .filter((item): item is ModelKey => !!item),
+    )
+  }
+
+  const reset = () => {
+    setTouched(false)
+    setChain(autoModelChain(shown))
   }
 
   const groups = useMemo(() => {
@@ -216,14 +241,18 @@ export function EmbedProviderSettingsDialog(props: Props) {
       }))
   }, [dq, rows])
 
-  const stats = useMemo(() => {
-    const shown = rows.filter((row) => visible({ providerID: row.provider.id, modelID: row.id }, row)).length
-    return {
+  const stats = useMemo(
+    () => ({
       providers: page.connected.length,
       models: rows.length,
-      shown,
-    }
-  }, [page.connected.length, rows, user, latest])
+      shown: shown.length,
+    }),
+    [page.connected.length, rows.length, shown.length],
+  )
+  const map = useMemo(
+    () => new Map(shown.map((item) => [modelKey({ providerID: item.provider.id, modelID: item.id }), item])),
+    [shown],
+  )
 
   return (
     <>
@@ -231,9 +260,7 @@ export function EmbedProviderSettingsDialog(props: Props) {
         <DialogContent className="flex max-h-[85vh] flex-col overflow-hidden p-0 sm:max-w-5xl">
           <DialogHeader className="border-b px-6 py-5">
             <DialogTitle>嵌入设置</DialogTitle>
-            <DialogDescription>
-              在这里连接提供商、管理模型展示，并决定当前会话默认使用哪个模型。
-            </DialogDescription>
+            <DialogDescription>在这里连接提供商、管理模型展示，并决定当前会话默认使用哪个模型。</DialogDescription>
           </DialogHeader>
 
           <Tabs className="min-h-0 flex-1 gap-0" value={tab} onValueChange={setTab}>
@@ -347,49 +374,91 @@ export function EmbedProviderSettingsDialog(props: Props) {
                 <div className="space-y-6 px-6 py-5">
                   <Card className="gap-0">
                     <CardHeader className="border-b">
-                      <div className="space-y-2">
-                        <CardTitle>当前模型</CardTitle>
-                        <CardDescription>这里选择当前会话默认模型，展示范围由下方的模型目录决定。</CardDescription>
+                      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                        <div className="space-y-2">
+                          <CardTitle>链式模型优先级</CardTitle>
+                          <CardDescription>
+                            程序会按顺序使用已启用模型，最多保留前 {modelChainLimit} 个参与链式 fallback。
+                          </CardDescription>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className="text-sm text-muted-foreground">
+                            {order.length}/{modelChainLimit}
+                          </span>
+                          <Button variant="outline" onClick={reset} disabled={shown.length === 0}>
+                            <RotateCcw className="size-4" />
+                            重置自动排序
+                          </Button>
+                        </div>
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-4 py-6">
-                      <div className="space-y-2">
-                        <div className="text-sm font-medium">模型</div>
-                        <Select value={pick} onValueChange={props.onModel} disabled={props.models.length === 0}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="选择模型" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {props.models.map((item) => (
-                              <SelectItem key={`${item.provider.id}/${item.id}`} value={`${item.provider.id}/${item.id}`}>
-                                {`${item.id} (${item.provider.id})`}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {props.variants.length > 0 ? (
-                        <div className="space-y-2">
-                          <div className="text-sm font-medium">变体</div>
-                          <Select value={props.variant ?? "default"} onValueChange={props.onVariant}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="选择变体" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="default">default</SelectItem>
-                              {props.variants.map((item) => (
-                                <SelectItem key={item} value={item}>
-                                  {item}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                      {order.length === 0 ? (
+                        <div className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">
+                          暂无可参与排序的模型，请先连接 provider 并开启模型展示。
                         </div>
-                      ) : null}
+                      ) : (
+                        <div className="max-h-80 space-y-3 overflow-y-auto pr-2">
+                          {order.map((item, idx) => {
+                            const row = map.get(modelKey(item))
+                            if (!row) return null
+                            const value = `${item.providerID}/${item.modelID}`
+                            const active = value === pick
+
+                            return (
+                              <div key={modelKey(item)} className="rounded-2xl border px-4 py-3">
+                                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                  <div className="min-w-0 flex-1 space-y-1">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                                        #{idx + 1}
+                                      </span>
+                                      <span className="font-medium">{row.name}</span>
+                                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                                        {row.id}
+                                      </span>
+                                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
+                                        {row.provider.name}
+                                      </span>
+                                      {active ? (
+                                        <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
+                                          当前
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                    <div className="text-sm text-muted-foreground">
+                                      上下文 {row.limit.context.toLocaleString()} ·{" "}
+                                      {row.capabilities?.toolcall ? "支持工具" : "不支持工具"}
+                                    </div>
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => move(idx, -1)}
+                                      disabled={idx === 0}
+                                    >
+                                      <ArrowUp className="size-4" />
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => move(idx, 1)}
+                                      disabled={idx === order.length - 1}
+                                    >
+                                      <ArrowDown className="size-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
 
                       <div className="rounded-lg border border-dashed px-3 py-2 text-xs leading-5 text-muted-foreground">
-                        隐藏某个模型后，它会从输入框的模型下拉中消失；如果当前模型被隐藏，界面会自动切到下一个可见模型。
+                        只有已连接且展示中的模型会参与链式排序；最多保留前 {modelChainLimit} 个，隐藏模型或断开 provider
+                        后会自动从排序链移除。
                       </div>
                     </CardContent>
                   </Card>
@@ -410,7 +479,7 @@ export function EmbedProviderSettingsDialog(props: Props) {
                             variant="outline"
                             onClick={() => {
                               setUser({})
-                              writeModelCatalog({ user: {} })
+                              writeModelCatalog({ user: {}, chain: order, chainTouched: touched })
                             }}
                             disabled={prv.load || Object.keys(user).length === 0}
                           >
@@ -420,7 +489,11 @@ export function EmbedProviderSettingsDialog(props: Props) {
                         </div>
                       </div>
                       <div className="relative">
-                        <Input value={q} onChange={(event) => setQ(event.target.value)} placeholder="搜索提供商或模型" />
+                        <Input
+                          value={q}
+                          onChange={(event) => setQ(event.target.value)}
+                          placeholder="搜索提供商或模型"
+                        />
                       </div>
                     </CardHeader>
                     <CardContent className="grid gap-4 py-6 md:grid-cols-3">
@@ -495,7 +568,7 @@ export function EmbedProviderSettingsDialog(props: Props) {
                                 </div>
                               </div>
                             </CardHeader>
-                            <CardContent className="space-y-3 py-6">
+                            <CardContent className="max-h-80 space-y-3 overflow-y-auto py-6 pr-2">
                               {group.items.map((item) => {
                                 const on = visible({ providerID: item.provider.id, modelID: item.id }, item)
 
@@ -531,7 +604,9 @@ export function EmbedProviderSettingsDialog(props: Props) {
                                         </div>
                                       </div>
                                       <div className="flex items-center gap-3">
-                                        <span className="text-sm text-muted-foreground">{on ? "显示中" : "已隐藏"}</span>
+                                        <span className="text-sm text-muted-foreground">
+                                          {on ? "显示中" : "已隐藏"}
+                                        </span>
                                         <Switch
                                           checked={on}
                                           onCheckedChange={(next) =>

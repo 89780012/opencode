@@ -409,12 +409,7 @@ export interface PromptInputMessage {
 export type ChatInputPart = ChatTextInput | ChatFileInput
 
 export interface ChatPromptBody {
-  messageID?: string
-  agent?: string
-  model?: ChatModelRef
-  variant?: string
-  noReply?: boolean
-  system?: string
+  messageID?: string // 保存问题消息ID
   parts: ChatInputPart[]
 }
 

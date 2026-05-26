@@ -6,8 +6,9 @@ import { QuestionPanel } from "@/components/chat/question-panel"
 import { TodoPanel } from "@/components/chat/todo-panel"
 import { useChatRuntime } from "@/hooks/use-chat-runtime"
 import type { ChatMessageInfo, ChatStatus } from "@/types/chat"
-import type { ComposerModel } from "@/types/composer"
 import type { LocalWorkspace } from "@/types/workspace"
+import { useAppDispatch } from "@/store"
+import { updateSessionAbortStatus } from "@/store/chat-session-slice"
 
 interface Props {
   workspace: LocalWorkspace
@@ -17,24 +18,12 @@ interface Props {
   status: ChatStatus
   busy?: boolean
   eventErr?: string
-  agents: string[]
-  models: ComposerModel[]
-  agent?: string
-  model?: string
-  variant?: string | null
-  variants: string[]
   creating: boolean
   load?: boolean
-  showAgent?: boolean
-  showModel?: boolean
   onCreate: () => Promise<string>
   onSelectSession: (value: string | null) => void
-  onAgent: (value: string) => void
-  onModel: (value: string) => void
-  onVariant: (value: string) => void
   onAbort: () => void
   onOpenDiff: (path: string) => void
-  setIsAbort: (value: boolean) => void
 }
 
 export function StrategyChatPanel(props: Props) {
@@ -43,15 +32,11 @@ export function StrategyChatPanel(props: Props) {
     sessionId: props.selectedSessionId,
     status: props.status,
     busy: props.busy,
-    agent: props.agent,
-    model: props.model,
-    variant: props.variant,
     createSession: props.onCreate,
     selectSession: props.onSelectSession,
   })
-  const setIsAbort = props.setIsAbort
-
-  const empty = !props.detailLoading && props.messages.length === 0 && !props.eventErr
+  const dispatch = useAppDispatch()
+  const empty = !props.detailLoading && props.messages.length === 0
   const lock = chat.busy || chat.submitting || props.creating || props.load
   return (
     <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-transparent">
@@ -59,7 +44,6 @@ export function StrategyChatPanel(props: Props) {
         <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
           <ChatMessageList
             key={`${props.workspace.path}:${props.selectedSessionId ?? "empty"}`}
-            err={props.eventErr}
             loading={props.detailLoading && !!props.selectedSessionId}
             messages={props.messages}
             onOpenDiff={props.onOpenDiff}
@@ -118,27 +102,16 @@ export function StrategyChatPanel(props: Props) {
           ) : null}
           <div className="w-full">
             <PromptBar
-              agent={props.agent}
-              agents={props.agents}
               busy={chat.busy}
               disabled={props.load}
-              model={props.model}
-              models={props.models}
               onAbort={props.onAbort}
-              onAgent={props.onAgent}
-              onModel={props.onModel}
               onSubmit={(value) => {
+                dispatch(updateSessionAbortStatus({ sessionId: props.selectedSessionId || "", status: false }))
                 void chat.submit(value)
-                void setIsAbort(false)
               }}
               onValueChange={chat.draft.setText}
-              onVariant={props.onVariant}
-              showAgent={props.showAgent}
-              showModel={props.showModel}
               submitting={chat.submitting || props.creating}
               value={chat.draft.text}
-              variant={props.variant}
-              variants={props.variants}
             />
           </div>
         </div>

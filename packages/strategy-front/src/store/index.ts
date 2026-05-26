@@ -67,8 +67,22 @@ export function selectSessionStatus(state: RootState, sessionId?: string | null)
   return sessionId ? (state.chatSession.status[sessionId] ?? idle) : idle
 }
 
+export function selectSessionAbort(state: RootState, sessionId?: string | null) {
+  return sessionId ? (state.chatSession.sessionAbort[sessionId] ?? false) : false
+}
+
+export function selectSessionIssue(state: RootState, sessionId?: string | null) {
+  if (!sessionId) return
+  if (state.chatSession.sessionAbort[sessionId]) return "Aborted"
+  return state.chatSession.messageErrs[sessionId] ?? state.chatSession.eventErrs[sessionId]
+}
+
 export function selectSessionMessageError(state: RootState, sessionId?: string | null) {
   return sessionId ? state.chatSession.messageErrs[sessionId] : undefined
+}
+
+export function selectMessageRunError(state: RootState, messageId?: string | null) {
+  return messageId ? state.chatSession.runErrs[messageId] : undefined
 }
 
 export function selectSessionEventError(state: RootState, sessionId?: string | null) {

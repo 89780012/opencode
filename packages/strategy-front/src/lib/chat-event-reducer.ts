@@ -30,10 +30,14 @@ export type ChatStateShape = {
   status: Record<string, ChatStatus>
   // AI 消息自身携带的历史错误。它属于时间线的一部分，后续进入会话时不应被清掉。
   messageErrs: Record<string, string | undefined>
+  runErrs: Record<string, string | undefined>
   // 运行时事件错误。典型场景是 session.error 先到达，但对应的 assistant message.error
   // 还没回流，或某些错误只以事件形式出现（例如上下文溢出触发 compaction）。
   eventErrs: Record<string, string | undefined>
   questionRecordStamp: number
+
+  // session 打断状态
+  sessionAbort: Record<string, boolean>
 }
 
 export const idle: ChatStatus = { type: "idle" }
@@ -50,19 +54,42 @@ const msgErr = (err?: { data?: Record<string, unknown> }) => {
   return typeof txt === "string" && txt ? txt : undefined
 }
 
-const lastAssistantErr = (list: ChatMessageInfo[]) => {
+const itemErr = (item: ChatMessageInfo, errs: Record<string, string | undefined>) => {
+  if (item.role !== "assistant") return
+  const own = msgErr(item.error)
+  if (own && !abortErr(own)) return own
+  const run = errs[item.id]
+  if (run && !abortErr(run)) return run
+}
+
+const lastAssistantErr = (list: ChatMessageInfo[], errs: Record<string, string | undefined>) => {
   for (let i = list.length - 1; i >= 0; i--) {
     const item = list[i]
-    if (item.role !== "assistant") continue
-    const msg = msgErr(item.error)
-    if (!msg || abortErr(msg)) return
+    const msg = itemErr(item, errs)
+    if (!msg) continue
     return msg
+  }
+}
+
+const lastAssistant = (list: ChatMessageInfo[]) => {
+  for (let i = list.length - 1; i >= 0; i--) {
+    if (list[i].role === "assistant") return list[i]
   }
 }
 
 const abortErr = (txt?: string) => {
   if (!txt) return false
   return txt.toLowerCase().includes("abort")
+}
+
+const aborted = (info?: ChatMessageInfo) => info?.role === "assistant" && info.error?.name === "MessageAbortedError"
+
+const syncAbort = (state: ChatStateShape, sessionID: string, list = state.messages[sessionID] ?? []) => {
+  if (aborted(list[list.length - 1])) {
+    state.sessionAbort[sessionID] = true
+    return
+  }
+  delete state.sessionAbort[sessionID]
 }
 
 function add(part: ChatPart, field: string, delta: string) {
@@ -111,12 +138,13 @@ export function hydrateChat(state: ChatStateShape, sessionID: string, list: Chat
     }
   })
 
-  const msg = lastAssistantErr(nextMessages)
-  if (!msg) {
-    delete state.messageErrs[sessionID]
-  } else {
-    state.messageErrs[sessionID] = msg
-  }
+  // const msg = lastAssistantErr(nextMessages, state.runErrs)
+  // if (!msg) {
+  //   delete state.messageErrs[sessionID]
+  // } else {
+  //   state.messageErrs[sessionID] = msg
+  // }
+  syncAbort(state, sessionID, nextMessages)
   if (!state.status[sessionID]) {
     state.status[sessionID] = idle
   }
@@ -160,12 +188,16 @@ export function removeSession(state: ChatStateShape, workspace: string, info: Ch
   if (state.selected[workspace] === info.id) {
     state.selected[workspace] = null
   }
+  ;(state.messages[info.id] ?? []).forEach((item) => {
+    delete state.runErrs[item.id]
+  })
   delete state.detailLoading[info.id]
   delete state.hydrated[info.id]
   delete state.messages[info.id]
   delete state.status[info.id]
   delete state.messageErrs[info.id]
   delete state.eventErrs[info.id]
+  delete state.sessionAbort[info.id]
   delete state.sessionDiffs[info.id]
   delete state.todos[info.id]
   delete state.permissions[info.id]
@@ -208,8 +240,6 @@ export function applyChatEvent(state: ChatStateShape, workspace: string, evt: Ch
       return
     }
     case "session.status": {
-      //大概就是这样格式
-      //data: {"type":"session.status","properties":{"sessionID":"ses_1d6a8e84cffem57xu8gr3f4l27","status":{"type":"retry","attempt":1,"message":"Free usage exceeded, add credits https://opencode.ai/zen","next":1779235199608}}}
       state.status[evt.properties.sessionID] = evt.properties.status
       if (evt.properties.status.type === "busy") {
         delete state.eventErrs[evt.properties.sessionID]
@@ -227,62 +257,74 @@ export function applyChatEvent(state: ChatStateShape, workspace: string, evt: Ch
         delete state.eventErrs[evt.properties.sessionID]
         return
       }
-      state.eventErrs[evt.properties.sessionID] = msg
+      const item = lastAssistant(state.messages[evt.properties.sessionID] ?? [])
+      if (!item) {
+        state.eventErrs[evt.properties.sessionID] = msg
+        return
+      }
+      state.runErrs[item.id] = msg
+      state.messageErrs[evt.properties.sessionID] = msg
+      delete state.eventErrs[evt.properties.sessionID]
       return
     }
     case "message.updated": {
       const info = evt.properties.info
       const list = state.messages[info.sessionID] ?? []
-      const exactMatch = list.some((item) => item.id === info.id)
-      let next: ChatMessageInfo[]
-      if (exactMatch) {
-        next = list.map((item) => (item.id === info.id ? info : item))
-      } else {
-        // Check for optimistic message with client-generated ID (same role, close timestamp)
-        const optimisticIdx = list.findIndex(
-          (item) =>
-            item.id !== info.id &&
-            item.role === info.role &&
-            item.id.startsWith("msg_") &&
-            Math.abs(item.time.created - info.time.created) < 5000,
-        )
-        if (optimisticIdx >= 0) {
-          // Replace optimistic message with server message, and migrate parts
-          const oldId = list[optimisticIdx].id
-          next = list.map((item, i) => (i === optimisticIdx ? info : item))
-          // Migrate parts from client ID to server ID
-          if (state.parts[oldId]) {
-            if (!state.parts[info.id]) {
-              state.parts[info.id] = state.parts[oldId]
-            }
-            delete state.parts[oldId]
-          }
-        } else {
-          next = [...list, info]
-        }
-      }
+      const next = list.some((item) => item.id === info.id)
+        ? list.map((item) => (item.id === info.id ? info : item))
+        : [...list, info]
       state.messages[info.sessionID] = sortMsg(next)
-      const msg = lastAssistantErr(state.messages[info.sessionID])
-      if (!msg) {
-        delete state.messageErrs[info.sessionID]
-        return
+
+      if (info.role === "assistant") {
+        const msg = msgErr(info.error)
+        if (msg && !abortErr(msg)) {
+          state.runErrs[info.id] = msg
+        }
+        if (!msg || abortErr(msg)) {
+          delete state.runErrs[info.id]
+        }
+        const err = lastAssistantErr(state.messages[info.sessionID], state.runErrs)
+        if (err) {
+          state.messageErrs[info.sessionID] = err
+        }
+        if (!err) {
+          delete state.messageErrs[info.sessionID]
+        }
+        delete state.eventErrs[info.sessionID]
       }
-      state.messageErrs[info.sessionID] = msg
+
+      syncAbort(state, info.sessionID, state.messages[info.sessionID])
       return
     }
     case "message.removed": {
-      const list = state.messages[evt.properties.sessionID] ?? []
-      state.messages[evt.properties.sessionID] = list.filter((item) => item.id !== evt.properties.messageID)
-      delete state.parts[evt.properties.messageID]
+      // const list = state.messages[evt.properties.sessionID] ?? []
+      // state.messages[evt.properties.sessionID] = list.filter((item) => item.id !== evt.properties.messageID)
+      // syncAbort(state, evt.properties.sessionID, state.messages[evt.properties.sessionID])
+      // delete state.runErrs[evt.properties.messageID]
+      // const msg = lastAssistantErr(state.messages[evt.properties.sessionID], state.runErrs)
+      // if (!msg) {
+      //   delete state.messageErrs[evt.properties.sessionID]
+      // } else {
+      //   state.messageErrs[evt.properties.sessionID] = msg
+      // }
+      // delete state.parts[evt.properties.messageID]
       return
     }
     case "message.part.updated": {
       const part = evt.properties.part
       const list = state.parts[part.messageID] ?? []
       const next = list.some((item) => item.id === part.id)
-        ? list.map((item) => (item.id === part.id ? part : item))
+        ? list.map((item) => (item.id === part.id ? part : item)) //partID 一般都是唯一的不会出现重复的情况
         : [...list, part]
       state.parts[part.messageID] = sortPart(next)
+      return
+    }
+    case "message.part.delta": {
+      const list = state.parts[evt.properties.messageID]
+      if (!list) return
+      const idx = list.findIndex((item) => item.id === evt.properties.partID)
+      if (idx < 0) return
+      add(list[idx], evt.properties.field, evt.properties.delta)
       return
     }
     case "message.part.removed": {
@@ -295,14 +337,7 @@ export function applyChatEvent(state: ChatStateShape, workspace: string, evt: Ch
       state.parts[evt.properties.messageID] = next
       return
     }
-    case "message.part.delta": {
-      const list = state.parts[evt.properties.messageID]
-      if (!list) return
-      const idx = list.findIndex((item) => item.id === evt.properties.partID)
-      if (idx < 0) return
-      add(list[idx], evt.properties.field, evt.properties.delta)
-      return
-    }
+
     case "todo.updated": {
       state.todos[evt.properties.sessionID] = evt.properties.todos
       return

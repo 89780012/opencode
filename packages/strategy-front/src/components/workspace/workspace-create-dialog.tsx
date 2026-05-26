@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useWorkspaceCreate } from "@/hooks/use-workspace-create"
 import { cards, flip, picks, text } from "@/lib/strategy-create"
@@ -479,41 +478,6 @@ export function WorkspaceCreateDialog(props: Props) {
             <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
               <div className="space-y-4">
                 <Block title="当前创建配置">
-                  <div className="mb-4 grid gap-3">
-                    <div className="space-y-2">
-                      <Label>使用智能体</Label>
-                      <Select value={form.composer.agent?.name} onValueChange={form.setAgent}>
-                        <SelectTrigger className="h-10 w-full rounded-md border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2d3733]">
-                          <SelectValue placeholder="选择智能体" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {form.ags.ags.map((item) => (
-                            <SelectItem key={item.name} value={item.name}>
-                              {item.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>使用模型</Label>
-                      <Select value={form.model} onValueChange={form.setModel}>
-                        <SelectTrigger className="h-10 w-full rounded-md border-transparent bg-white/90 shadow-none ring-1 ring-slate-200/80 dark:bg-[#141918] dark:ring-[#2d3733]">
-                          <SelectValue placeholder="选择模型" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {form.models.map((item) => {
-                            const value = `${item.provider.id}/${item.id}`
-                            return (
-                              <SelectItem key={value} value={value}>
-                                {value}
-                              </SelectItem>
-                            )
-                          })}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
                   <div className="space-y-2 text-sm text-slate-600 dark:text-[#9aaba4]">
                     <div>创建方式：普通创建</div>
                     <div>类型：{form.card.title}</div>

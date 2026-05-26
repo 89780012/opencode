@@ -16,7 +16,6 @@ import {
 } from "@/store"
 import {
   applyWorkspaceEvent,
-  clearSessionEventError,
   hydrateSessionMessages,
   setPendingPermissions,
   setPendingQuestions,
@@ -24,7 +23,6 @@ import {
 } from "@/store/chat-session-slice"
 import type {
   ChatEvent,
-  ChatModelRef,
   ChatQuestionAnswer,
   ChatStatus,
   ChatTodo,
@@ -37,9 +35,6 @@ type Input = {
   sessionId?: string | null
   status: ChatStatus
   busy?: boolean
-  agent?: string
-  model?: string
-  variant?: string | null
   createSession: () => Promise<string>
   selectSession: (sessionId: string) => void
 }
@@ -54,17 +49,6 @@ type LegacyDraftEntry = DraftEntry & {
 }
 
 const storageKey = "strategy-front.session-draft.v1"
-
-function ref(model?: string) {
-  if (!model) {
-    return
-  }
-  const [providerID, ...rest] = model.split("/")
-  return {
-    providerID,
-    modelID: rest.join("/"),
-  }
-}
 
 function parse(data: string) {
   if (!data) return
@@ -366,9 +350,6 @@ function useTodo(workspacePath?: string | null, sessionId?: string | null, live 
 function useSubmit(input: {
   workspacePath?: string | null
   sessionId?: string | null
-  agent?: string
-  model?: ChatModelRef
-  variant?: string
   createSession: () => Promise<string>
   selectSession: (sessionId: string) => void
   onSubmitted?: () => void
@@ -378,7 +359,7 @@ function useSubmit(input: {
 
   const submit = useCallback(
     async (msg: PromptInputMessage) => {
-      if (!input.workspacePath || !input.agent || !input.model) {
+      if (!input.workspacePath) {
         return
       }
 
@@ -394,14 +375,8 @@ function useSubmit(input: {
         if (created) {
           dispatch(hydrateSessionMessages({ sessionId, records: [] }))
         }
-        dispatch(clearSessionEventError({ sessionId }))
         input.selectSession(sessionId)
-        await chatApi.sendPrompt(input.workspacePath, sessionId, {
-          agent: input.agent,
-          model: input.model,
-          variant: input.variant,
-          parts,
-        })
+        await chatApi.sendPrompt(input.workspacePath, sessionId, { parts })
         input.onSubmitted?.()
       } finally {
         setSubmitting(false)
@@ -425,13 +400,9 @@ export function useChatRuntime(input: Input) {
   const busy = input.busy ?? (!!input.sessionId && input.status.type !== "idle")
   const live = busy || !!permission.req || !!question.req
   const todo = useTodo(input.workspacePath, input.sessionId, live)
-  const model = useMemo(() => ref(input.model), [input.model])
   const prompt = useSubmit({
     workspacePath: input.workspacePath,
     sessionId: input.sessionId,
-    agent: input.agent,
-    model,
-    variant: input.variant ?? undefined,
     createSession: input.createSession,
     selectSession: input.selectSession,
     onSubmitted: draft.clear,
@@ -439,13 +410,9 @@ export function useChatRuntime(input: Input) {
 
   const submit = useCallback(
     async (msg: PromptInputMessage) => {
-      if (!input.agent || !model) {
-        toast.error("请先选择智能体和模型")
-        return false
-      }
-
       try {
         await prompt.submit(msg)
+
         return true
       } catch (err) {
         log("提交会话消息失败", err)
@@ -453,7 +420,7 @@ export function useChatRuntime(input: Input) {
         return false
       }
     },
-    [input.agent, model, prompt],
+    [prompt],
   )
 
   return useMemo(

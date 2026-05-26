@@ -51,3 +51,30 @@ This file tracks the project's progress using a task list format.
 * [2026-05-20 11:00:45] - 完成会话总结打断消息过滤：useSessionSummary 在最后一条 assistant 消息为 MessageAbortedError 时跳过自动 run；packages/strategy-front bun typecheck 仍被既有 sessionLoading/loading 类型错误阻塞
 * [2026-05-20 11:25:47] - 完成会话总结空消息保护：input.messages 为空时跳过自动 run；packages/strategy-front bun typecheck 仍被既有 sessionLoading/loading 类型错误阻塞
 * [2026-05-20 11:28:05] - 完成会话总结打断判断位置调整：last 消息只在 count 非 0 后读取；packages/strategy-front bun typecheck 仍被既有 sessionLoading/loading 类型错误阻塞
+* [2026-05-20 13:44:14] - 完成 [`/app/embed/session`](packages/strategy-front/src/pages/embed-session.tsx:37) 全局链式模型选择方案设计，产出 [`embed-session-model-chain-design.md`](memory-bank/embed-session-model-chain-design.md)
+* [2026-05-20 13:56:55] - 完成嵌入会话全局链式模型选择实现与类型校验；[`packages/strategy-front`](packages/strategy-front) 下 [`bun typecheck`](packages/strategy-front/package.json) 通过
+* [2026-05-20 14:42:24] - 完成模型链后端 JSON 持久化、事件监听自动切换与前端保存/发送接入；[`packages/strategy-service`](packages/strategy-service) 下 `go test ./...` 通过，[`packages/strategy-front`](packages/strategy-front) 下 [`bun typecheck`](packages/strategy-front/package.json) 通过
+* [2026-05-20 14:48:06] - 移除模型链“设为当前”按钮，链路第一位即当前模型；[`packages/strategy-front`](packages/strategy-front) 下 [`bun typecheck`](packages/strategy-front/package.json) 通过
+* [2026-05-20 15:51:42] - 完成模型链 prompt 兼容修复：[`modelchain.Prompt`](packages/strategy-service/internal/modelchain/model.go:15) 保留 model 字段，后端 [`modelchain.Service.Prompt()`](packages/strategy-service/internal/modelchain/service.go:49) 在 req.model 为空时回退到 chain 首位模型；[`packages/strategy-service`](packages/strategy-service) 下 [`go test ./...`](packages/strategy-service/go.mod) 通过
+* [2026-05-20 20:48:39] - 完成会话总结模型链接入：summary prompt 不再依赖请求模型字段，改从后端模型链 cfg.Chain 首位取模型；packages/strategy-service 下 go test ./... 通过
+* [2026-05-20 20:50:41] - 完成会话总结模型链失败重试能力：按 cfg.Chain 顺序尝试其他模型，直到获得非空总结或返回最后错误；packages/strategy-service 下 go test ./... 通过
+* [2026-05-20 21:04:47] - 完成 use-chat-runtime workspacePath 类型收窄修复，并清理相关未使用符号；packages/strategy-front 下 bun typecheck 通过
+* [2026-05-20 21:55:17] - 完成 model-chain 存储 Windows 覆盖保存修复，避免 model-chain.json.tmp rename 被占用导致 API 返回错误；packages/strategy-service 下 go test ./... 通过
+* [2026-05-20 22:42:51] - 完成模型链中间层事件监听改造：`/opencode/event` 代理流继续转给前端，同时旁路投递给 [`modelchain.Service.Event()`](packages/strategy-service/internal/modelchain/service.go:91) 触发故障切换；packages/strategy-service 下 go test ./... 通过
+* [2026-05-20 23:15:54] - 完成会话总结 hook 简化：[`useSessionSummary()`](packages/strategy-front/src/hooks/use-session-summary.ts:24) 首次只查询一次，生成后等待 hidden summary session status 进入 idle 再查询结果；[`packages/strategy-front`](packages/strategy-front) 下 [`bun typecheck`](packages/strategy-front/package.json) 被既有 [`StrictMode`](packages/strategy-front/src/main.tsx:1) 未使用错误阻塞
+* [2026-05-21 08:54:48] - 完成会话总结自动触发条件修正：仅在 input.busy true->false 时触发 run；packages/strategy-front bun typecheck 仍被既有 src/main.tsx StrictMode 未使用错误阻塞
+* [2026-05-21 10:00:56] - �޸� selectSessionAbort ȱʧ�������⣬��׼��ִ�� packages/strategy-front bun typecheck ��֤
+* [2026-05-21 10:19:00] - ��� modelchain session.status retry ��������޸���packages/strategy-service �� go test ./... ͨ��
+* [2026-05-21 10:47:30] - 完成模型链 fail fallback 修复：先 abort 当前 session，再切换到下一模型发送继续；packages/strategy-service 下 go test ./... 通过
+* [2026-05-24 18:56:18] - 完成链式模型优先级列表滚动限制：[`embed-provider-settings-dialog.tsx`](packages/strategy-front/src/components/chat/embed-provider-settings-dialog.tsx) 排序区域超出最大高度后显示纵向滚动条
+* [2026-05-24 18:59:21] - 完成模型目录分组列表滚动限制：[`CardContent`](packages/strategy-front/src/components/chat/embed-provider-settings-dialog.tsx:594) 超出最大高度后显示纵向滚动条
+* [2026-05-24 19:03:51] - 完成链式模型优先级最多 10 个的架构设计，建议前后端同时限制并在 UI 中展示上限说明
+* [2026-05-24 19:07:21] - 完成链式模型优先级 10 个上限代码实现：前端归一化/自动排序/读取旧数据均裁剪，后端 clean 存储入口限制为 10 个
+* [2026-05-24 19:21:44] - 完成嵌入会话去除输入区 agent/model 选择的影响面分析：确认应移除嵌入页 agent/model 偏好参与发送，仅保留链式模型与 variant 设置
+* [2026-05-24 19:34:25] - 更新为通用化方案：全局移除 [`StrategyChatPanel`](packages/strategy-front/src/components/strategy/strategy-chat-panel.tsx:41) / [`PromptBar`](packages/strategy-front/src/components/chat/prompt-bar.tsx:43) 的 agent/model 输入能力，链式模型作为后续统一能力
+* [2026-05-24 21:08:01] - 完成通用链式模型入口改造第一阶段：移除聊天输入区 agent/model 选择和发送透传，清理 [`EmbedProviderSettingsDialog`](packages/strategy-front/src/components/chat/embed-provider-settings-dialog.tsx:39) 的 model/onModel props，并在 [`packages/strategy-front`](packages/strategy-front) 下 [`bun typecheck`](packages/strategy-front/package.json) 通过
+* [2026-05-24 21:32:34] - 完成前端 variant 去除：对话框输入链路与创建工作区首条 prompt 不再发送 variant，设置弹窗删除变体选择，并在 [`packages/strategy-front`](packages/strategy-front) 下 [`bun typecheck`](packages/strategy-front/package.json) 通过
+* [2026-05-24 21:49:23] - 完成 composer 偏好代码删除：移除 `useComposer`、`useComposerPrefs`、`ComposerProvider`、`ComposerSettingsDialog`、`chat-composer`，精简 [`use-workspace-create.ts`](packages/strategy-front/src/hooks/use-workspace-create.ts:1) 与 shell 包裹，并通过搜索确认无引用残留
+* [2026-05-26 10:31:07] - 完成聊天事件消息/part 渲染问题分析：确认 `message.updated` 写入消息时间线、`message.part.updated` 写入按 messageID 分组的 parts，建议 UI 以 message 为外层、parts 为内层渲染，并修复新消息 upsert 丢失问题
+* [2026-05-26 10:59:35] - 完成聊天消息不可见问题修复：[`message.updated`](packages/strategy-front/src/lib/chat-event-reducer.ts:265) 改为 upsert，错误事件写入 [`runErrs`](packages/strategy-front/src/lib/chat-event-reducer.ts:33) / [`eventErrs`](packages/strategy-front/src/lib/chat-event-reducer.ts:36)，[`ChatMessageItem`](packages/strategy-front/src/components/chat-message-list.tsx:588) 恢复错误卡片渲染
+* [2026-05-26 11:22:00] - 完成聊天错误渲染收敛：移除 [`ChatMessageList`](packages/strategy-front/src/components/chat-message-list.tsx:615) 的会话级 `err` 展示与 per-message `runErrs` fallback，改为只展示 [`message.updated`](packages/strategy-front/src/lib/chat-event-reducer.ts:270) 的 `info.error`；[`packages/strategy-front`](packages/strategy-front) 下 [`bun typecheck`](packages/strategy-front/package.json) 通过

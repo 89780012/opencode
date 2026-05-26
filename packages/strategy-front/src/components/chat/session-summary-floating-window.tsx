@@ -37,7 +37,6 @@ export function SessionSummaryFloatingWindow(props: Props) {
         >
           {busy ? <Loader2 className="size-5 animate-spin" /> : <Sparkles className="size-5" />}
           <span className="text-[11px] leading-none font-medium">总结</span>
-          <span className="text-lg leading-none font-semibold tabular-nums">{props.summary.messageCount || 0}</span>
         </Button>
       </div>
     )
@@ -78,7 +77,7 @@ export function SessionSummaryFloatingWindow(props: Props) {
       </div>
 
       <div className="flex items-center justify-between gap-2 border-t border-slate-100 p-3 dark:border-[#242b29]">
-        <div className="text-[11px] text-slate-400">消息 {props.summary.messageCount || 0}</div>
+        <div className="text-[11px] text-slate-400"></div>
         <div className="flex gap-2">
           {props.summary.state === "running" ? (
             <Button

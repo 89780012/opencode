@@ -42,10 +42,10 @@ export const providerApi = {
     )
   },
 
-  config(directory?: string | null) {
-    const url = directory ? "/config" : "/global/config"
+  config() {
+    const url = "/global/config"
     return opencode.get<Config>(url, {
-      params: directory ? { directory } : undefined,
+      params: undefined,
     })
   },
 

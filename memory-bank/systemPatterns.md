@@ -26,6 +26,7 @@ It is optional, but recommended to be updated as the project evolves.
 - **React + Redux**: Strategy Front 使用 Redux Toolkit 进行全局状态管理
 - **SolidJS 控制台**: Console 包使用 SolidJS + Kobalte 组件库
 - **隐藏子会话后台任务**: 对不应进入 root 会话列表的后台任务（如会话总结），使用 OpenCode child session（`parentID` 指向业务 session）承载生成过程，并由 strategy-service 独立持久化业务结果
+- **全局链式模型选择**: 嵌入会话的模型优先级由设置弹窗统一管理，候选集只来自已连接且展示中的模型，自动排序采用自定义模型 > Claude > GPT > 其他，用户排序通过本地 catalog store 持久化
 
 ## Testing Patterns
 

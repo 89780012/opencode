@@ -15,11 +15,9 @@ type Entry struct {
 	SummarySessionID string `json:"summarySessionId,omitempty"`
 	State            State  `json:"state"`
 	Text             string `json:"text,omitempty"`
-	MessageCount     int    `json:"messageCount"`
 	UpdatedAt        int64  `json:"updatedAt"`
 	Err              string `json:"err,omitempty"`
 	LastText         string `json:"lastText,omitempty"`
-	LastMessageCount int    `json:"lastMessageCount,omitempty"`
 	LastUpdatedAt    int64  `json:"lastUpdatedAt,omitempty"`
 }
 
@@ -30,7 +28,4 @@ type Index struct {
 type Request struct {
 	WorkspacePath string `json:"workspacePath"`
 	SessionID     string `json:"sessionId"`
-	ProviderID    string `json:"providerID"`
-	ModelID       string `json:"modelID"`
-	Variant       string `json:"variant,omitempty"`
 }

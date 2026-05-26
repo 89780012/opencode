@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { toast } from "sonner"
 import { summaryApi } from "@/api/modules/summary"
 import { log } from "@/lib/error"
-import { selectSessionEventError, selectSessionStatus, useAppSelector } from "@/store"
+import { selectSessionAbort, selectSessionIssue, useAppSelector } from "@/store"
 import type { ChatMessageInfo } from "@/types/chat"
 import type { SessionSummary } from "@/types/summary"
 
@@ -11,39 +10,26 @@ type Input = {
   sessionId?: string | null
   messages: ChatMessageInfo[]
   busy: boolean
-  model?: string
-  variant?: string
-  isAbort: boolean
 }
 
 const empty = (workspacePath = "", sessionId = ""): SessionSummary => ({
   workspacePath,
   sessionId,
   state: "empty",
-  messageCount: 0,
   updatedAt: 0,
 })
-
-// 模型拆解
-function ref(model?: string) {
-  if (!model) return
-  const [providerID, ...rest] = model.split("/")
-  const modelID = rest.join("/")
-  if (!providerID || !modelID) return
-  return { providerID, modelID }
-}
 
 export function useSessionSummary(input: Input) {
   const [item, setItem] = useState<SessionSummary>(() => empty(input.workspacePath ?? "", input.sessionId ?? ""))
   const [load, setLoad] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const flag = useRef({ busy: false, live: false, sent: "" })
-  const model = ref(input.model)
-  const evt = useAppSelector((state) => selectSessionEventError(state, item.summarySessionId))
-  const status = useAppSelector((state) => selectSessionStatus(state, item.summarySessionId))
-  const count = input.messages.length
-  const isAbort = input.isAbort
+  const isAbort = useAppSelector((state) => selectSessionAbort(state, input.sessionId))
+  const issue = useAppSelector((state) => selectSessionIssue(state, input.sessionId))
 
+  const prev = useRef(input.busy)
+  const summaryStatus = useAppSelector((state) =>
+    item.summarySessionId ? state.chatSession.status[item.summarySessionId] : undefined,
+  )
   const refresh = useCallback(async () => {
     if (!input.workspacePath || !input.sessionId) {
       setItem(empty(input.workspacePath ?? "", input.sessionId ?? ""))
@@ -59,10 +45,21 @@ export function useSessionSummary(input: Input) {
     } finally {
       setLoad(false)
     }
-  }, [input.sessionId, input.workspacePath, setItem])
+  }, [input.sessionId, input.workspacePath])
 
   const run = useCallback(async () => {
-    if (!input.workspacePath || !input.sessionId || !model) return
+    if (!input.workspacePath || !input.sessionId) return
+    console.log("isAbort", isAbort, "issue", issue)
+    if (isAbort || issue) {
+      console.log("use-session-summary: isAbort")
+      return
+    }
+    // 收到的消息列表中
+    //data: {"type":"message.updated","properties":{"sessionID":"ses_1a3195f99ffeC9wpxwXddpKFdV","info":{"id":"msg_e5daa00ab001ZCc1VTPrRf8Er8","sessionID":"ses_1a3195f99ffeC9wpxwXddpKFdV","role":"assistant","time":{"created":1779687882923,"completed":1779687935203},"parentID":"msg_e5daa00640013FErAwbwA2SQ1r","modelID":"aifeifei798/DarkIdol-Llama-3.1-8B-Instruct-1.2-Uncensored","providerID":"linuxdo","mode":"smartx-helper","agent":"smartx-helper","path":{"cwd":"C:\\Users\\Admin\\.xtp-smart\\plugins\\grid-iy11ai","root":"C:\\Users\\Admin\\.xtp-smart\\plugins\\grid-iy11ai"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"error":{"name":"MessageAbortedError","data":{"message":"Aborted"}}}}}
+    //data: {"type":"session.status","properties":{"sessionID":"ses_1a3195f99ffeC9wpxwXddpKFdV","status":{"type":"idle"}}}
+    // 直接错误消息也要返回
+    //data: {"type":"session.error","properties":{"sessionID":"ses_1a3195f99ffeC9wpxwXddpKFdV","error":{"name":"APIError","data":{"message":"model not found: aifeifei798/DarkIdol-Llama-3.1-8B-Instruct-1.2-Uncensored (no channel candidates remain; applied filters: api_key.binding_mode=manual, api_key.channelIDs, api_format=openai/chat_completions, stream=true, client_ip_blacklist; candidate trace: api_format 0->0 (request_api_format=openai/chat_completions), stream_policy 0->0 (no upstream candidates), ip_blacklist 0->0 (no upstream candidates))","statusCode":422,"isRetryable":false,"responseHeaders":{"ah-request-id":"ar-e3160828-8a0a-48dd-81a2-f43ea8d540fc","alt-svc":"h3=\":443\"; ma=86400","cf-cache-status":"DYNAMIC","cf-ray":"a012786df9e0b78b-HKG","connection":"keep-alive","content-length":"477","content-type":"application/json; charset=utf-8","date":"Mon, 25 May 2026 06:26:47 GMT","nel":"{\"report_to\":\"cf-nel\",\"success_fraction\":0.0,\"max_age\":604800}","report-to":"{\"group\":\"cf-nel\",\"max_age\":604800,\"endpoints\":[{\"url\":\"https://a.nel.cloudflare.com/report/v4?s=bv3ij5Ua7bUpRpWJE393tXM1ZAdUhxiRyDjUgI5MWoxV3%2Bpsmd864QuZloFjpmRPtXtZ602mMgsfpPxY1v3E7Niaw2O42sqOT44cP4CzlMWaQB7B%2FHwcO86ecpT70dLXIlI%3D\"}]}","server":"cloudflare","strict-transport-security":"max-age=15552000; includeSubDomains; preload","x-content-type-options":"nosniff","set-cookie":"server_name_session=6724747f20c59da0e0374c434c64a713; Max-Age=86400; httponly; path=/"},"responseBody":"{\"error\":{\"message\":\"model not found: aifeifei798/DarkIdol-Llama-3.1-8B-Instruct-1.2-Uncensored (no channel candidates remain; applied filters: api_key.binding_mode=manual, api_key.channelIDs, api_format=openai/chat_completions, stream=true, client_ip_blacklist; candidate trace: api_format 0-\\u003e0 (request_api_format=openai/chat_completions), stream_policy 0-\\u003e0 (no upstream candidates), ip_blacklist 0-\\u003e0 (no upstream candidates))\",\"type\":\"invalid_model_error\"}}","metadata":{"url":"https://hub.oaifree.com/v1/chat/completions"}}}}}
+
     setLoad(true)
     setErr(null)
     try {
@@ -70,9 +67,6 @@ export function useSessionSummary(input: Input) {
         await summaryApi.run({
           workspacePath: input.workspacePath,
           sessionId: input.sessionId,
-          providerID: model.providerID,
-          modelID: model.modelID,
-          variant: input.variant,
         }),
       )
     } catch (e) {
@@ -81,14 +75,14 @@ export function useSessionSummary(input: Input) {
     } finally {
       setLoad(false)
     }
-  }, [input.sessionId, input.variant, input.workspacePath, model?.modelID, model?.providerID, setItem])
+  }, [input.sessionId, input.workspacePath, isAbort])
 
   const stop = useCallback(async () => {
     if (!input.workspacePath || !input.sessionId) return
     setLoad(true)
     setErr(null)
     try {
-      await summaryApi.stop(input.workspacePath, input.sessionId)
+      setItem(await summaryApi.stop(input.workspacePath, input.sessionId))
     } catch (e) {
       log("打断会话总结失败", e)
       setErr(e instanceof Error ? e.message : "打断总结失败")
@@ -98,54 +92,30 @@ export function useSessionSummary(input: Input) {
   }, [input.sessionId, input.workspacePath])
 
   useEffect(() => {
-    flag.current = { busy: false, live: false, sent: "" }
     void refresh()
   }, [refresh])
 
   useEffect(() => {
-    //如果是打断的，则不需要总结
-    console.log("isAbort", isAbort)
-    if (isAbort) return
-
-    if (input.busy) {
-      flag.current.busy = true
-      return
-    }
-    if (!flag.current.busy) return
-
-    const key = `${input.workspacePath}\u0000${input.sessionId}\u0000${count}`
-    if (flag.current.sent === key) return
-    flag.current.sent = key
+    const done = prev.current && !input.busy
+    prev.current = input.busy
+    if (!done || !item.sessionId) return
     void run()
-  }, [count, input.busy, input.sessionId, input.workspacePath, run])
+  }, [input.busy, item.sessionId, run])
 
+  // 监听摘要状态
   useEffect(() => {
-    if (item.state !== "running") {
-      flag.current.live = false
-      return
-    }
-    if (status.type !== "idle") {
-      flag.current.live = true
-      if (status.type === "retry") setErr(status.message)
-      return
-    }
-    if (!flag.current.live) return
-    flag.current.live = false
+    console.log("summaryStatus start", summaryStatus)
+    if (!item.summarySessionId || summaryStatus?.type !== "idle") return
+    console.log("summaryStatus start call refresh")
     void refresh()
-  }, [item.state, refresh, status])
-
-  useEffect(() => {
-    if (item.state !== "running" || !evt) return
-    setItem({ ...item, state: "error", err: evt, updatedAt: Date.now() })
-    toast.error(evt)
-  }, [setItem, evt, item])
+  }, [item.summarySessionId, refresh, summaryStatus?.type])
 
   return useMemo(
     () => ({
       item,
       load,
       err,
-      ready: !input.busy,
+      ready: !input.busy && summaryStatus?.type === "idle", // 没有摘要总结信息
       refresh,
       run,
       stop,

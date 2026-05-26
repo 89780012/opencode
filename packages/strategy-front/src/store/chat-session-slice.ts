@@ -36,8 +36,10 @@ const initialState: State = {
   questionLoaded: false,
   status: {},
   messageErrs: {},
+  runErrs: {},
   eventErrs: {},
   questionRecordStamp: 0,
+  sessionAbort: {},
 }
 
 const slice = createSlice({
@@ -101,6 +103,9 @@ const slice = createSlice({
     bumpQuestionRecord(state) {
       state.questionRecordStamp++
     },
+    updateSessionAbortStatus(state, action: PayloadAction<{ sessionId: string; status: boolean }>) {
+      state.sessionAbort[action.payload.sessionId] = action.payload.status
+    },
   },
 })
 
@@ -119,6 +124,7 @@ export const {
   applyWorkspaceEvent,
   clearSessionEventError,
   bumpQuestionRecord,
+  updateSessionAbortStatus,
 } = slice.actions
 
 export const chatSessionReducer = slice.reducer

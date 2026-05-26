@@ -1,10 +1,8 @@
-import { useMemo, useState } from "react"
+import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 import { chatApi, workspaceApi } from "@/api/modules"
-import { useAgentList, useProviderList, useWorkspaceList } from "@/data/global-data-provider"
-import { useComposerPrefs } from "@/hooks/use-composer-prefs"
-import { resolveComposer } from "@/lib/chat-composer"
+import { useWorkspaceList } from "@/data/global-data-provider"
 import { log, note } from "@/lib/error"
 import { cards, picks, prompt, seed, tail, type Card } from "@/lib/strategy-create"
 import { encodeStrategyPath } from "@/lib/strategy-path"
@@ -22,17 +20,9 @@ export function useWorkspaceCreate(props: Props) {
   const nav = useNavigate()
   const { refresh, select } = useWorkspaceList()
   const [state, setState] = useState(seed)
-  const ags = useAgentList()
-  const catalog = useProviderList()
-  const prefs = useComposerPrefs()
-  const composer = useMemo(
-    () => resolveComposer({ agents: ags.ags, catalog, state: prefs.state }),
-    [ags.ags, catalog, prefs.state],
-  )
   const card = cards[state.kind]
   const rich = state.kind !== "other"
   const full = state.name.trim() ? `${state.name.trim()}-${state.tail.trim()}` : ""
-  const model = composer.model ? `${composer.model.providerID}/${composer.model.modelID}` : ""
 
   /**
    * 重置弹窗内的临时状态。
@@ -109,28 +99,6 @@ export function useWorkspaceCreate(props: Props) {
   }
 
   /**
-   * 校验并选择智能体。
-   */
-  function setAgent(value: string) {
-    if (!ags.ags.some((item) => item.name === value)) {
-      return
-    }
-    prefs.setAgent(value)
-  }
-
-  /**
-   * 校验并选择模型。
-   */
-  function setModel(value: string) {
-    const [providerID, ...rest] = value.split("/")
-    const modelID = rest.join("/")
-    if (!catalog.connectedModels.some((item) => item.provider.id === providerID && item.id === modelID)) {
-      return
-    }
-    prefs.setModel({ providerID, modelID })
-  }
-
-  /**
    * 计算当前表单对应的引导消息。
    */
   function build() {
@@ -180,11 +148,6 @@ export function useWorkspaceCreate(props: Props) {
       return
     }
 
-    if (!composer.agent || !composer.model) {
-      toast.error("当前没有可用的智能体或模型，无法自动发起引导会话")
-      return
-    }
-
     setState((prev) => ({ ...prev, busy: true }))
 
     try {
@@ -193,9 +156,6 @@ export function useWorkspaceCreate(props: Props) {
       select(data.workspace)
       const session = await chatApi.createSession(data.workspace.path)
       await chatApi.sendPrompt(data.workspace.path, session.id, {
-        agent: composer.agent.name,
-        model: composer.model,
-        variant: composer.variant,
         parts: [{ type: "text", text: state.prompt || build() }],
       })
       props.onDone?.()
@@ -212,24 +172,18 @@ export function useWorkspaceCreate(props: Props) {
   }
 
   return {
-    ags,
     busy: state.busy,
     card,
-    composer,
     create,
     full,
-    model,
-    models: catalog.visibleModels,
     next,
     panel: state.panel,
     prev,
     reset,
     rich,
-    setAgent,
     setBrief,
     setGuide,
     setKind,
-    setModel,
     setName,
     setPanel,
     setPrompt,
@@ -238,24 +192,18 @@ export function useWorkspaceCreate(props: Props) {
     steps: picks.steps,
     refreshTail,
   } satisfies {
-    ags: ReturnType<typeof useAgentList>
     busy: boolean
     card: Card
-    composer: ReturnType<typeof resolveComposer>
     create: () => Promise<void>
     full: string
-    model: string
-    models: typeof catalog.visibleModels
     next: () => void
     panel: (typeof picks.panels)[number]
     prev: () => void
     reset: () => void
     rich: boolean
-    setAgent: (value: string) => void
     setBrief: (brief: string) => void
     setGuide: (next: Guide | ((prev: Guide) => Guide)) => void
     setKind: (kind: StrategyType) => void
-    setModel: (value: string) => void
     setName: (name: string) => void
     setPanel: (panel: (typeof picks.panels)[number]) => void
     setPrompt: (prompt: string) => void

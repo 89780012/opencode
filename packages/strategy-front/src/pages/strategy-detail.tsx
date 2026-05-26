@@ -8,7 +8,6 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { WorkspaceDetailPane, type WorkspaceDetailTab } from "@/components/workspace/workspace-detail-pane"
 import { useWorkspaceList } from "@/data/global-data-provider"
-import { useComposer } from "@/hooks/use-composer"
 import { useStrategySession } from "@/hooks/use-strategy-session"
 import { log } from "@/lib/error"
 import { decodeStrategyPath } from "@/lib/strategy-path"
@@ -21,7 +20,6 @@ export default function StrategyDetailPage() {
   const path = params.strategyID ? decodeStrategyPath(params.strategyID) : ""
   const { loading, refresh, select, workspaces } = useWorkspaceList()
   const workspace = useMemo(() => workspaces.find((item) => item.path === path) ?? null, [path, workspaces])
-  const composer = useComposer()
   const chat = useStrategySession(path)
   const [open, setOpen] = useState(false)
   const [file, setFile] = useState<string | null>(null)
@@ -181,25 +179,14 @@ export default function StrategyDetailPage() {
             <StrategyChatPanel
               workspace={workspace}
               selectedSessionId={chat.selectedSessionId}
-              sessionLoading={chat.sessionLoading}
               detailLoading={chat.detailLoading}
               messages={chat.messages}
               status={chat.status}
               busy={chat.busy}
               eventErr={chat.eventErr}
-              agents={composer.agents}
-              models={composer.models}
-              agent={composer.agent}
-              model={composer.model}
-              variant={composer.variant}
-              variants={composer.variants}
               creating={chat.creating}
-              load={composer.load}
               onCreate={chat.createSession}
               onSelectSession={chat.selectSession}
-              onAgent={composer.setAgent}
-              onModel={composer.setModel}
-              onVariant={composer.setVariant}
               onAbort={() => {
                 void onAbort()
               }}
@@ -234,7 +221,7 @@ export default function StrategyDetailPage() {
           </ResizablePanel>
         </ResizablePanelGroup>
 
-        {(chat.sessionLoading || chat.detailLoading) && (
+        {chat.detailLoading && (
           <div className="strategy-detail-mask absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm dark:bg-background/30">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>

@@ -29,7 +29,6 @@ const ansi = /\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g
 interface Props {
   messages: ChatMessageInfo[]
   status?: ChatStatus
-  err?: string
   loading?: boolean
   onOpenDiff?: (file: string) => void
   footer?: ReactNode
@@ -298,17 +297,9 @@ function BashTool(props: { part: ChatToolPart; halted?: boolean }) {
               <code>{body}</code>
             </pre>
           ) : null}
-          {err ? (
-            <div className="chat-run-error">
-              {err}
-            </div>
-          ) : null}
+          {err ? <div className="chat-run-error">{err}</div> : null}
           {more ? (
-            <button
-              type="button"
-              onClick={() => setOpen((value) => !value)}
-              className="chat-run-toggle"
-            >
+            <button type="button" onClick={() => setOpen((value) => !value)} className="chat-run-toggle">
               {open ? "Collapse output" : `Expand output (${lines.length} lines)`}
             </button>
           ) : null}
@@ -364,30 +355,16 @@ function SearchTool(props: { part: ChatToolPart; halted?: boolean }) {
               <code>{body}</code>
             </pre>
           ) : null}
-          {err ? (
-            <div className="chat-run-error">
-              {err}
-            </div>
-          ) : null}
+          {err ? <div className="chat-run-error">{err}</div> : null}
           {more ? (
-            <button
-              type="button"
-              onClick={() => setOpen((value) => !value)}
-              className="chat-run-toggle"
-            >
+            <button type="button" onClick={() => setOpen((value) => !value)} className="chat-run-toggle">
               {open ? "Collapse results" : "Expand results"}
             </button>
           ) : null}
           {links.length > 0 ? (
             <div className="chat-run-links">
               {links.map((item) => (
-                <a
-                  key={item}
-                  href={item}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="chat-run-link"
-                >
+                <a key={item} href={item} target="_blank" rel="noreferrer" className="chat-run-link">
                   {item}
                 </a>
               ))}
@@ -634,21 +611,12 @@ const ChatMessageItem = memo(function ChatMessageItem(props: {
 })
 
 export const ChatMessageList = memo(function ChatMessageList(props: Props) {
-  const tone = abortText(props.err) ? abort : fail
-
   return (
     <Conversation className="chat-scroll custom-scrollbar-2 h-full min-w-0 flex-1">
       <ConversationContent className="chat-body mx-auto min-w-0 w-full max-w-[776px]">
         {props.messages.map((info) => (
           <ChatMessageItem key={info.id} info={info} onOpenDiff={props.onOpenDiff} />
         ))}
-        {props.err ? (
-          <Message from="assistant">
-            <MessageContent>
-              <div className={cn("rounded-lg border px-3 py-2 text-sm", tone)}>{props.err}</div>
-            </MessageContent>
-          </Message>
-        ) : null}
         <ChatRunningStatus messages={props.messages} status={props.status} />
         {props.status?.type === "retry" ? (
           <Message from="assistant">

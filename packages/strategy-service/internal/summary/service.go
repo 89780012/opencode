@@ -13,16 +13,16 @@ import (
 	"sync"
 	"time"
 
+	"strategy-service/internal/modelchain"
 	oc "strategy-service/internal/opencode"
 )
 
 type Service struct {
 	doc    *store
 	op     *oc.Service
+	chain  *modelchain.Service
 	client *http.Client
 	mu     sync.Mutex
-	runs   map[string]bool
-	stops  map[string]bool
 }
 
 type session struct {
@@ -43,15 +43,14 @@ type part struct {
 	Text string `json:"text"`
 }
 
-func NewService(op *oc.Service) *Service {
+func NewService(op *oc.Service, chain *modelchain.Service) *Service {
 	return &Service{
-		doc: &store{},
-		op:  op,
+		doc:   &store{},
+		op:    op,
+		chain: chain,
 		client: &http.Client{
 			Timeout: 3 * time.Minute,
 		},
-		runs:  map[string]bool{},
-		stops: map[string]bool{},
 	}
 }
 
@@ -81,21 +80,6 @@ func (s *Service) Run(ctx context.Context, req Request) (Entry, error) {
 	if req.SessionID == "" {
 		return Entry{}, fmt.Errorf("sessionId is required")
 	}
-	if req.ProviderID == "" {
-		return Entry{}, fmt.Errorf("providerID is required")
-	}
-	if req.ModelID == "" {
-		return Entry{}, fmt.Errorf("modelID is required")
-	}
-
-	// 获取全部消息
-	msgs, err := s.messages(ctx, req.WorkspacePath, req.SessionID)
-
-	if err != nil {
-		return Entry{}, err
-	}
-	count := len(msgs)
-	key := req.WorkspacePath + "\x00" + req.SessionID
 
 	s.mu.Lock()
 	idx, err := s.doc.load()
@@ -103,36 +87,22 @@ func (s *Service) Run(ctx context.Context, req Request) (Entry, error) {
 		s.mu.Unlock()
 		return Entry{}, err
 	}
-	// 找到当前摘要信息
+	// 找到当前摘要信息, 
 	entry, _ := find(idx, req.WorkspacePath, req.SessionID)
-	if entry.State == StateReady && entry.MessageCount == count {
-		s.mu.Unlock()
-		return entry, nil
-	}
-	if s.runs[key] {
-		if entry.State == "" {
-			entry = Entry{WorkspacePath: req.WorkspacePath, SessionID: req.SessionID}
-		}
-		entry.State = StateRunning
-		s.mu.Unlock()
-		return entry, nil
-	}
 	entry.WorkspacePath = req.WorkspacePath
 	entry.SessionID = req.SessionID
 	entry.State = StateRunning
 	entry.Err = ""
 	entry.LastText = entry.Text
-	entry.LastMessageCount = entry.MessageCount
 	entry.LastUpdatedAt = entry.UpdatedAt
-	entry.MessageCount = count
 	entry.UpdatedAt = time.Now().UnixMilli()
+
+	//更新信息
 	idx = put(idx, entry)
 	if err := s.doc.save(idx); err != nil {
 		s.mu.Unlock()
 		return Entry{}, err
 	}
-	s.runs[key] = true
-	delete(s.stops, key)
 	s.mu.Unlock()
 
 	go s.work(req, entry)
@@ -147,7 +117,6 @@ func (s *Service) Stop(ctx context.Context, ws string, id string) (Entry, error)
 		return Entry{}, fmt.Errorf("sessionId is required")
 	}
 
-	key := ws + "\x00" + id
 	var child string
 
 	s.mu.Lock()
@@ -162,7 +131,6 @@ func (s *Service) Stop(ctx context.Context, ws string, id string) (Entry, error)
 		return entry, nil
 	}
 	child = entry.SummarySessionID
-	s.stops[key] = true
 	entry = restore(entry)
 	idx = put(idx, entry)
 	if err := s.doc.save(idx); err != nil {
@@ -180,16 +148,10 @@ func (s *Service) Stop(ctx context.Context, ws string, id string) (Entry, error)
 func (s *Service) work(req Request, entry Entry) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	key := req.WorkspacePath + "\x00" + req.SessionID
-	defer func() {
-		s.mu.Lock()
-		delete(s.runs, key)
-		delete(s.stops, key)
-		s.mu.Unlock()
-	}()
 
 	child := entry.SummarySessionID
 	if child == "" {
+		// 创建摘要会话
 		item, err := s.create(ctx, req.WorkspacePath, req.SessionID)
 		if err != nil {
 			s.fail(entry, err)
@@ -206,18 +168,16 @@ func (s *Service) work(req Request, entry Entry) {
 		return
 	}
 	text, err := s.prompt(ctx, req, child, msgs)
+	slog.Info("summary result-2", "text", text)
 	if err != nil {
 		s.fail(entry, err)
 		return
 	}
-	if s.stopped(key) {
-		return
-	}
+
 	entry.State = StateReady
 	entry.Text = text
 	entry.Err = ""
 	entry.LastText = ""
-	entry.LastMessageCount = 0
 	entry.LastUpdatedAt = 0
 	entry.UpdatedAt = time.Now().UnixMilli()
 	s.save(entry)
@@ -241,29 +201,40 @@ func (s *Service) create(ctx context.Context, ws string, parent string) (session
 }
 
 func (s *Service) prompt(ctx context.Context, req Request, child string, msgs []record) (string, error) {
-	body := map[string]any{
-		"agent": "smartx-helper",
-		"model": map[string]string{
-			"providerID": req.ProviderID,
-			"modelID":    req.ModelID,
-		},
-		"parts": []map[string]string{{
-			"type": "text",
-			"text": prompt(transcript(msgs)),
-		}},
-	}
-	if req.Variant != "" {
-		body["variant"] = req.Variant
-	}
-	var out record
-	if err := s.post(ctx, s.addr(path("/session/"+url.PathEscape(child)+"/message", req.WorkspacePath)), body, &out); err != nil {
+	cfg, err := s.chain.Get()
+	if err != nil {
 		return "", err
 	}
-	text := strings.TrimSpace(parts(out.Parts))
-	if text == "" {
-		return "", fmt.Errorf("summary result is empty")
+	if len(cfg.Chain) == 0 {
+		return "", fmt.Errorf("model chain is required")
 	}
-	return text, nil
+	var last error
+	for _, model := range cfg.Chain {
+		body := map[string]any{
+			"agent": "smartx-helper",
+			"model": model,
+			"parts": []map[string]string{{
+				"type": "text",
+				"text": prompt(transcript(msgs)),
+			}},
+		}
+		var out record
+		err := s.post(ctx, s.addr(path("/session/"+url.PathEscape(child)+"/message", req.WorkspacePath)), body, &out)
+		if err != nil {
+			last = err
+			slog.Warn("summary model failed", "model", model.ModelID, "provider", model.ProviderID, "error", err)
+			continue
+		}
+		text := strings.TrimSpace(parts(out.Parts))
+		slog.Info("summary result-1", "text", text)
+		if text == "" {
+			last = fmt.Errorf("summary result is empty")
+			slog.Warn("summary model returned empty result", "model", model.ModelID, "provider", model.ProviderID)
+			continue
+		}
+		return text, nil
+	}
+	return "", last
 }
 
 func (s *Service) get(ctx context.Context, addr string, out any) error {
@@ -299,37 +270,26 @@ func (s *Service) post(ctx context.Context, addr string, body any, out any) erro
 }
 
 func (s *Service) fail(entry Entry, err error) {
-	if s.stopped(entry.WorkspacePath + "\x00" + entry.SessionID) {
-		return
-	}
+
 	entry.State = StateError
 	entry.Err = err.Error()
 	entry.UpdatedAt = time.Now().UnixMilli()
 	s.save(entry)
 }
 
-func (s *Service) stopped(key string) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.stops[key]
-}
-
 func restore(entry Entry) Entry {
 	if entry.LastText == "" {
 		entry.State = StateEmpty
 		entry.Text = ""
-		entry.MessageCount = 0
 		entry.UpdatedAt = time.Now().UnixMilli()
 		entry.Err = ""
 		return entry
 	}
 	entry.State = StateReady
 	entry.Text = entry.LastText
-	entry.MessageCount = entry.LastMessageCount
 	entry.UpdatedAt = entry.LastUpdatedAt
 	entry.Err = ""
 	entry.LastText = ""
-	entry.LastMessageCount = 0
 	entry.LastUpdatedAt = 0
 	return entry
 }

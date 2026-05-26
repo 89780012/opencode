@@ -11,13 +11,14 @@ import { Button } from "@/components/ui/button"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { WorkspaceDetailPane, type WorkspaceDetailTab } from "@/components/workspace/workspace-detail-pane"
-import { useComposer } from "@/hooks/use-composer"
 import { useEmbedEntry } from "@/hooks/use-embed-entry"
 import { useSessionSummary } from "@/hooks/use-session-summary"
 import { useStrategySession } from "@/hooks/use-strategy-session"
 import { useWorkspaceQuestions } from "@/hooks/use-workspace-questions"
 import { useAppSelector, selectQuestionRecordStamp } from "@/store"
 import { log } from "@/lib/error"
+import { updateSessionAbortStatus } from "@/store/chat-session-slice"
+import { useAppDispatch } from "@/store"
 
 const ctrl =
   "rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 dark:border-[#2a312f] dark:var(--shell-dark-bg) dark:text-[#e4ece8] dark:hover:border-[#35403c] dark:hover:bg-[#1a1f1e]"
@@ -35,12 +36,11 @@ function Status(props: { title: string; desc: string; action?: ReactNode }) {
 }
 
 export default function EmbedSessionPage() {
+  const dispatch = useAppDispatch()
   const [query] = useSearchParams()
   const path = query.get("path")?.trim() ?? ""
   const entry = useEmbedEntry(path)
   const workspace = entry.workspace
-  const composer = useComposer()
-  const agent = "smartx-helper"
   const chat = useStrategySession(workspace?.path)
   const questions = useWorkspaceQuestions(workspace?.path)
   const [open, setOpen] = useState(false)
@@ -50,15 +50,11 @@ export default function EmbedSessionPage() {
   const [spin, setSpin] = useState(false)
   const [settings, setSettings] = useState(false)
   const stamp = useAppSelector(selectQuestionRecordStamp)
-  const [isAbort, setIsAbort] = useState(false)
   const summary = useSessionSummary({
     workspacePath: workspace?.path,
     sessionId: chat.selectedSessionId,
     messages: chat.messages,
     busy: chat.busy,
-    model: composer.model,
-    variant: composer.variant,
-    isAbort: isAbort,
   })
 
   const init = useRef<string | null>(null)
@@ -131,13 +127,13 @@ export default function EmbedSessionPage() {
 
   const onAbort = useCallback(async () => {
     try {
+      dispatch(updateSessionAbortStatus({ sessionId: chat.selectedSessionId || "", status: true }))
       await chat.abortSession()
-      setIsAbort((prev) => (prev = true))
     } catch (err) {
       log("停止嵌入会话失败", err)
       toast.error("停止会话失败")
     }
-  }, [chat, setIsAbort])
+  }, [chat])
 
   const onCreate = useCallback(async () => {
     try {
@@ -258,13 +254,7 @@ export default function EmbedSessionPage() {
               {open ? <PanelRightClose className="size-4" /> : <PanelRightOpen className="size-4" />}
               {open ? "隐藏代码区" : "显示代码区"}
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className={ctrl}
-              onClick={() => setSettings(true)}
-              disabled={composer.load}
-            >
+            <Button variant="outline" size="sm" className={ctrl} onClick={() => setSettings(true)}>
               <Cog className="size-4" />
               设置
             </Button>
@@ -292,26 +282,11 @@ export default function EmbedSessionPage() {
               status={chat.status}
               busy={chat.busy}
               eventErr={chat.eventErr}
-              agents={composer.agents}
-              models={composer.models}
-              agent={agent}
-              model={composer.model}
-              variant={composer.variant}
-              variants={composer.variants}
               creating={chat.creating}
-              load={composer.load}
-              showAgent={false}
-              showModel={true}
               onCreate={chat.createSession}
               onSelectSession={chat.selectSession}
-              onAgent={composer.setAgent}
-              onModel={composer.setModel}
-              onVariant={composer.setVariant}
               onAbort={() => {
                 void onAbort()
-              }}
-              setIsAbort={(value) => {
-                setIsAbort(value)
               }}
               onOpenDiff={(value) => {
                 setFile(value)
@@ -354,7 +329,6 @@ export default function EmbedSessionPage() {
               void summary.refresh()
             }}
             onRun={() => {
-              setIsAbort((prev) => (prev = false))
               void summary.run()
             }}
             onStop={() => {
@@ -381,23 +355,14 @@ export default function EmbedSessionPage() {
           }}
         />
 
-        {(chat.detailLoading || composer.load || entry.load) && (
+        {(chat.detailLoading || entry.load) && (
           <div className="embed-session-mask absolute inset-0 flex items-center justify-center bg-white/75 dark:bg-[#0f1111]/70">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>
         )}
       </div>
 
-      <EmbedProviderSettingsDialog
-        open={settings}
-        onOpenChange={setSettings}
-        model={composer.model}
-        models={composer.models}
-        variant={composer.variant}
-        variants={composer.variants}
-        onModel={composer.setModel}
-        onVariant={composer.setVariant}
-      />
+      <EmbedProviderSettingsDialog open={settings} onOpenChange={setSettings} />
     </div>
   )
 }
