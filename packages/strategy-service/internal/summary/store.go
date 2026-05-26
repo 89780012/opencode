@@ -1,58 +1,50 @@
 package summary
 
-import (
-	"encoding/json"
-	"os"
-	"path/filepath"
-
-	cfg "strategy-service/internal/config"
-)
-
-const file = "summaries.json"
+import "strategy-service/internal/db"
 
 type store struct{}
 
-func (s *store) path() (string, error) {
-	dir, err := cfg.ServerRootDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(dir, file), nil
-}
-
 func (s *store) load() (Index, error) {
-	path, err := s.path()
+	doc, err := db.Open()
 	if err != nil {
 		return Index{}, err
 	}
-	body, err := os.ReadFile(path)
-	if os.IsNotExist(err) {
-		return Index{}, nil
-	}
+	rows, err := doc.Query(`select workspace_path, session_id, summary_session_id, state, text, updated_at, err, last_text, last_updated_at from summaries order by updated_at asc`)
 	if err != nil {
 		return Index{}, err
 	}
-	var idx Index
-	err = json.Unmarshal(body, &idx)
-	if err != nil {
-		return Index{}, nil
+	defer rows.Close()
+
+	idx := Index{}
+	for rows.Next() {
+		var row Entry
+		if err := rows.Scan(&row.WorkspacePath, &row.SessionID, &row.SummarySessionID, &row.State, &row.Text, &row.UpdatedAt, &row.Err, &row.LastText, &row.LastUpdatedAt); err != nil {
+			return Index{}, err
+		}
+		idx.Summaries = append(idx.Summaries, row)
 	}
-	return idx, nil
+	return idx, rows.Err()
 }
 
 func (s *store) save(idx Index) error {
-	path, err := s.path()
+	doc, err := db.Open()
 	if err != nil {
 		return err
 	}
-	body, err := json.MarshalIndent(idx, "", "  ")
+	tx, err := doc.Begin()
 	if err != nil {
 		return err
 	}
-	tmp := path + ".tmp"
-	err = os.WriteFile(tmp, append(body, '\n'), 0o644)
-	if err != nil {
+	if _, err := tx.Exec("delete from summaries"); err != nil {
+		_ = tx.Rollback()
 		return err
 	}
-	return os.Rename(tmp, path)
+	for _, row := range idx.Summaries {
+		_, err := tx.Exec(`insert into summaries(workspace_path, session_id, summary_session_id, state, text, updated_at, err, last_text, last_updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)`, row.WorkspacePath, row.SessionID, row.SummarySessionID, row.State, row.Text, row.UpdatedAt, row.Err, row.LastText, row.LastUpdatedAt)
+		if err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+	}
+	return tx.Commit()
 }

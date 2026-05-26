@@ -385,3 +385,18 @@ OpenCode 事件流中 `message.updated` 与 `message.part.updated` 是两个粒�
 - 删除 [`ChatMessageList`](packages/strategy-front/src/components/chat-message-list.tsx:615) 的会话级 `err` prop 和全局错误卡片
 - 删除 [`ChatMessageItem`](packages/strategy-front/src/components/chat-message-list.tsx:588) 对 [`selectMessageRunError`](packages/strategy-front/src/store/index.ts:86) 的读取，仅使用 `props.info.error`
 - [`StrategyChatPanel`](packages/strategy-front/src/components/strategy/strategy-chat-panel.tsx:45) 不再向 [`ChatMessageList`](packages/strategy-front/src/components/chat-message-list.tsx:615) 传递 `eventErr`
+
+---
+
+### Decision (Code)
+
+[2026-05-26 13:44:00] - Strategy Service 客户本地持久化采用纯 Go SQLite 专用业务表
+
+**Rationale:**
+客户本地部署需要比多个 JSON 文件更稳定的统一持久化载体，同时当前构建脚本使用 `CGO_ENABLED=0` 做跨平台 CLI 打包。选择 [`modernc.org/sqlite`](packages/strategy-service/go.mod:67) 可避免 CGO 依赖。根据用户反馈，放弃不友好的 bucket/key/value 文档表，改为按业务对象建立独立表，便于后续查询、维护和排查；同时明确不再兼容旧 JSON 文件，避免双写/迁移路径持续增加复杂度。
+
+**Details:**
+
+- [`db.Open()`](packages/strategy-service/internal/db/store.go:23) 初始化 [`strategy.db`](packages/strategy-service/internal/db/store.go:48)，启用 busy timeout、WAL 与业务表 schema
+- 新建 [`config`](packages/strategy-service/internal/db/store.go:86)、[`workspaces`](packages/strategy-service/internal/db/store.go:93)、[`questions`](packages/strategy-service/internal/db/store.go:106)、[`summaries`](packages/strategy-service/internal/db/store.go:115)、[`model_chain`](packages/strategy-service/internal/db/store.go:128) 表，移除 `kv`、`Migrate`、`LegacyRead` 等旧 JSON 兼容代码
+- [`config.Store.LoadUserConfig()`](packages/strategy-service/internal/config/store.go:55)、[`workspace.store.load()`](packages/strategy-service/internal/workspace/store.go:15)、[`question.store.load()`](packages/strategy-service/internal/question/store.go:7)、[`summary.store.load()`](packages/strategy-service/internal/summary/store.go:7)、[`modelchain.store.load()`](packages/strategy-service/internal/modelchain/store.go:7) 全部改为专用表读写

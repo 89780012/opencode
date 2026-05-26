@@ -1,10 +1,14 @@
 package config
 
 import (
-	"encoding/json"
+	"database/sql"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
+
+	"strategy-service/internal/db"
 )
 
 type Config struct {
@@ -51,32 +55,17 @@ func ServerRootDir() (string, error) {
 	return dir, nil
 }
 
-// Path 返回状态目录下的配置文件路径。
-func ConfigPath() (string, error) {
-	dir, err := ServerRootDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(dir, "config.json"), nil
-}
-
 // Load 读取持久化的用户配置。
 func (s *Store) LoadUserConfig() (Config, error) {
-	path, err := ConfigPath()
+	doc, err := db.Open()
 	if err != nil {
 		return Default(), err
 	}
-
-	body, err := os.ReadFile(path)
-	if os.IsNotExist(err) {
-		return Default(), nil
-	}
-	if err != nil {
-		return Default(), err
-	}
-
 	cfg := Default()
-	err = json.Unmarshal(body, &cfg)
+	err = doc.QueryRow("select theme_mode, theme_accent, logs_tail from config where id = 1").Scan(&cfg.Theme.Mode, &cfg.Theme.Accent, &cfg.Logs.Tail)
+	if errors.Is(err, sql.ErrNoRows) {
+		return cfg, nil
+	}
 	if err != nil {
 		return Default(), err
 	}
@@ -85,18 +74,13 @@ func (s *Store) LoadUserConfig() (Config, error) {
 
 // Save 在规范化后保存用户配置。
 func (s *Store) Save(cfg Config) (Config, error) {
-	path, err := ConfigPath()
+	doc, err := db.Open()
 	if err != nil {
 		return Default(), err
 	}
-
 	cfg = clean(cfg)
-	body, err := json.MarshalIndent(cfg, "", "  ")
-	if err != nil {
-		return Default(), err
-	}
-
-	err = os.WriteFile(path, append(body, '\n'), 0o644)
+	_, err = doc.Exec(`insert into config(id, theme_mode, theme_accent, logs_tail, updated_at) values (1, ?, ?, ?, ?)
+on conflict(id) do update set theme_mode = excluded.theme_mode, theme_accent = excluded.theme_accent, logs_tail = excluded.logs_tail, updated_at = excluded.updated_at`, cfg.Theme.Mode, cfg.Theme.Accent, cfg.Logs.Tail, time.Now().UnixMilli())
 	if err != nil {
 		return Default(), err
 	}

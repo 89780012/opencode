@@ -11,6 +11,7 @@ import (
 	"time"
 
 	conf "strategy-service/internal/config"
+	"strategy-service/internal/db"
 	"strategy-service/internal/modelchain"
 	oc "strategy-service/internal/opencode"
 	"strategy-service/internal/oprun"
@@ -51,6 +52,11 @@ func New(cfg Config) (*Service, error) {
 			slog.Info("opencode port adjusted", "host", cfg.Opencode.Host, "from", cfg.Opencode.Port, "to", port)
 			cfg.Opencode.Port = port
 		}
+	}
+
+	if _, err := db.Open(); err != nil {
+		slog.Error("local database initialization failed", "error", err)
+		return nil, err
 	}
 
 	run := rt.New()
@@ -156,6 +162,9 @@ func (s *Service) Shutdown(ctx context.Context) error {
 		slog.Error("http server shutdown error", "error", err)
 	}
 	_, _ = s.op.Stop(context.Background())
+	if closeErr := db.Close(); closeErr != nil && err == nil {
+		err = closeErr
+	}
 	slog.Info("service shutdown complete")
 	return err
 }

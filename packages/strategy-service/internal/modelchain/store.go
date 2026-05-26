@@ -1,68 +1,56 @@
 package modelchain
 
-import (
-	"encoding/json"
-	"os"
-	"path/filepath"
-
-	cfg "strategy-service/internal/config"
-)
-
-const file = "model-chain.json"
+import localdb "strategy-service/internal/db"
 
 type store struct{}
 
-func (s *store) path() (string, error) {
-	dir, err := cfg.ServerRootDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(dir, file), nil
-}
-
 func (s *store) load() (Config, error) {
-	path, err := s.path()
+	doc, err := localdb.Open()
 	if err != nil {
 		return Default(), err
 	}
-	body, err := os.ReadFile(path)
-	if os.IsNotExist(err) {
-		return Default(), nil
-	}
+	rows, err := doc.Query("select provider_id, model_id, updated_at from model_chain order by position asc")
 	if err != nil {
 		return Default(), err
 	}
-	var cfg Config
-	err = json.Unmarshal(body, &cfg)
-	if err != nil {
-		return Default(), nil
+	defer rows.Close()
+
+	cfg := Default()
+	for rows.Next() {
+		var row Model
+		if err := rows.Scan(&row.ProviderID, &row.ModelID, &cfg.UpdatedAt); err != nil {
+			return Default(), err
+		}
+		cfg.Chain = append(cfg.Chain, row)
+	}
+	if err := rows.Err(); err != nil {
+		return Default(), err
 	}
 	return clean(cfg), nil
 }
 
 func (s *store) save(cfg Config) (Config, error) {
-	path, err := s.path()
+	doc, err := localdb.Open()
 	if err != nil {
 		return Default(), err
 	}
 	cfg = clean(cfg)
-	body, err := json.MarshalIndent(cfg, "", "  ")
+	tx, err := doc.Begin()
 	if err != nil {
 		return Default(), err
 	}
-	tmp := path + ".tmp"
-	err = os.WriteFile(tmp, append(body, '\n'), 0o644)
-	if err != nil {
+	if _, err := tx.Exec("delete from model_chain"); err != nil {
+		_ = tx.Rollback()
 		return Default(), err
 	}
-	err = os.Rename(tmp, path)
-	if err == nil {
-		return cfg, nil
+	for pos, row := range cfg.Chain {
+		_, err := tx.Exec("insert into model_chain(position, provider_id, model_id, updated_at) values (?, ?, ?, ?)", pos, row.ProviderID, row.ModelID, cfg.UpdatedAt)
+		if err != nil {
+			_ = tx.Rollback()
+			return Default(), err
+		}
 	}
-	_ = os.Remove(path)
-	err = os.Rename(tmp, path)
-	if err != nil {
-		_ = os.Remove(tmp)
+	if err := tx.Commit(); err != nil {
 		return Default(), err
 	}
 	return cfg, nil

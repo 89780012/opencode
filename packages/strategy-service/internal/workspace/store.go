@@ -4,79 +4,79 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 
-	cfg "strategy-service/internal/config"
+	"strategy-service/internal/db"
 )
-
-const file = "strategies.json"
 
 type store struct{}
 
-// path 返回工作区索引文件的绝对路径。
-func (s *store) path() (string, error) {
-	dir, err := cfg.ServerRootDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(dir, file), nil
-}
-
-// load 读取索引文件；首次启动时会自动构建默认内容。
+// load 读取索引；首次启动时会自动构建默认内容。
 func (s *store) load() ([]Local, error) {
-	path, err := s.path()
+	doc, err := db.Open()
 	if err != nil {
 		return nil, err
 	}
+	rows, err := doc.Query(`select id, name, path, type, template, entry_file, keywords, source, managed, updated_at from workspaces order by name asc`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
-	body, err := os.ReadFile(path)
-	if os.IsNotExist(err) {
-		rows, err := s.seed()
-		if err != nil {
+	out := []Local{}
+	for rows.Next() {
+		var row Local
+		var keywords string
+		if err := rows.Scan(&row.ID, &row.Name, &row.Path, &row.Type, &row.Template, &row.EntryFile, &keywords, &row.Source, &row.Managed, &row.UpdatedAt); err != nil {
 			return nil, err
 		}
-		return rows, s.save(rows)
+		if keywords != "" {
+			_ = json.Unmarshal([]byte(keywords), &row.Keywords)
+		}
+		out = append(out, row)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(out) > 0 {
+		return clean(out), nil
+	}
+	seed, err := s.seed()
 	if err != nil {
 		return nil, err
 	}
-
-	rows := []Local{}
-	err = json.Unmarshal(body, &rows)
-	if err != nil {
-		return nil, err
-	}
-	return clean(rows), nil
+	return seed, s.save(seed)
 }
 
-// save 原子写回工作区索引文件。
+// save 写回工作区索引。
 func (s *store) save(rows []Local) error {
-	path, err := s.path()
+	doc, err := db.Open()
 	if err != nil {
 		return err
 	}
-
-	body, err := json.MarshalIndent(clean(rows), "", "  ")
+	tx, err := doc.Begin()
 	if err != nil {
 		return err
 	}
-
-	tmp := path + ".tmp"
-	err = os.WriteFile(tmp, append(body, '\n'), 0o644)
-	if err != nil {
+	if _, err := tx.Exec("delete from workspaces"); err != nil {
+		_ = tx.Rollback()
 		return err
 	}
-
-	err = os.Rename(tmp, path)
-	if err == nil {
-		return nil
+	for _, row := range clean(rows) {
+		body, err := json.Marshal(uniq(row.Keywords))
+		if err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+		_, err = tx.Exec(`insert into workspaces(id, name, path, type, template, entry_file, keywords, source, managed, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, row.ID, row.Name, row.Path, row.Type, row.Template, row.EntryFile, string(body), row.Source, row.Managed, row.UpdatedAt)
+		if err != nil {
+			_ = tx.Rollback()
+			return err
+		}
 	}
-
-	_ = os.Remove(tmp)
-	return err
+	return tx.Commit()
 }
 
 // seed 扫描默认插件和用户工作区，生成初始索引。
