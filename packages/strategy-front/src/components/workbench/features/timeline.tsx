@@ -1,4 +1,4 @@
-import { Check, Clock3, GitCompareArrows, Minus, Plus, Sparkles, X } from "lucide-react"
+import { Check, Clock3, GitCompareArrows, Minus, Plus, RotateCcw, Sparkles, X } from "lucide-react"
 import type { KeyboardEvent, PointerEvent, RefObject, WheelEvent } from "react"
 import type { SessionItem, TimelineEvent } from "../data"
 import { kind } from "../lib"
@@ -38,24 +38,26 @@ export function Timeline(props: {
             <Clock3 size={16} />
             <span>策略时间线</span>
           </strong>
-          <span>滚轮缩放，拖动空白区域平移。</span>
+          <span className={css.badge}>滚轮缩放 · 自由拖拽</span>
         </div>
         <div className={css.zoom}>
-          <button type="button" onClick={() => props.onZoom(Math.max(20, props.zoom - 10))}>
+          <button type="button" aria-label="缩小时间线" onClick={() => props.onZoom(Math.max(20, props.zoom - 10))}>
             <Minus size={14} />
           </button>
           <span>{props.zoom}%</span>
-          <button type="button" onClick={() => props.onZoom(Math.min(250, props.zoom + 10))}>
+          <button type="button" aria-label="放大时间线" onClick={() => props.onZoom(Math.min(250, props.zoom + 10))}>
             <Plus size={14} />
           </button>
           <button
             type="button"
+            className={css.reset}
             onClick={() => {
               props.onZoom(100)
               props.onPan({ x: 0, y: 0 })
             }}
           >
-            重置
+            <RotateCcw size={13} />
+            <span>重置</span>
           </button>
         </div>
       </div>
@@ -158,50 +160,60 @@ export function Timeline(props: {
         </div>
 
         <aside className={`${css.analysis} ${ui.scroll}`}>
-          <div className={css.head}>
-            <strong className={ui.sectiontitle}>
-              <GitCompareArrows size={16} />
-              <span>Git 节点分析</span>
-            </strong>
-            <span>已选 {props.picked.length} 项</span>
-          </div>
-          <div className={css.selected}>
-            {props.picks.length ? (
-              props.picks.map((item) => <span key={item.id}>{item.commitHash ?? item.label}</span>)
-            ) : (
-              <span>请选择 Git 节点</span>
-            )}
-          </div>
-          <textarea
-            value={props.note}
-            placeholder="输入分析诉求，例如：分析两个提交之间的代码差异与风控变化。"
-            onChange={(event) => props.onNote(event.target.value)}
-          />
-          <div className={css.actions}>
-            <button type="button" className={ui.primary} onClick={props.onSubmit}>
-              <Sparkles size={14} />
-              <span>提交 AI 分析</span>
-            </button>
-            <button type="button" className={ui.blockbtn} onClick={props.onReset}>
-              <X size={14} />
-              <span>清空选择</span>
-            </button>
-          </div>
-          <div className={css.result}>
-            <strong className={ui.sectiontitle}>
-              <Sparkles size={16} />
-              <span>分析结论</span>
-            </strong>
-            <p>
-              {props.analysis || "点击时间线中的 Git 节点后，可以在这里对提交差异、审查结果与回测关联做进一步分析。"}
-            </p>
-            {props.picks.map((item) => (
-              <div key={item.id} className={css.diff}>
-                <strong>{item.commitHash ?? item.label}</strong>
-                <p>{item.diffSummary ?? item.description}</p>
+          {props.picked.length || props.analysis ? (
+            <>
+              <div className={css.head}>
+                <div>
+                  <strong className={ui.sectiontitle}>
+                    <GitCompareArrows size={16} />
+                    <span>Git 节点分析</span>
+                  </strong>
+                  <span>已选 {props.picked.length} 个节点</span>
+                </div>
+                {props.picks.length ? (
+                  <div className={css.selected}>
+                    {props.picks.map((item) => (
+                      <span key={item.id}>{item.commitHash ?? item.label}</span>
+                    ))}
+                  </div>
+                ) : null}
               </div>
-            ))}
-          </div>
+              <div className={css.form}>
+                <textarea
+                  value={props.note}
+                  placeholder="输入分析需求，例如：分析这两个提交之间的代码差异、评估风控逻辑的改进..."
+                  onChange={(event) => props.onNote(event.target.value)}
+                />
+                <div className={css.actions}>
+                  <button type="button" className={ui.primary} onClick={props.onSubmit}>
+                    <Sparkles size={14} />
+                    <span>提交 AI 分析</span>
+                  </button>
+                  <button type="button" className={ui.blockbtn} onClick={props.onReset}>
+                    <X size={14} />
+                    <span>清除选择</span>
+                  </button>
+                </div>
+              </div>
+              {props.analysis || props.picks.length ? (
+                <div className={css.result}>
+                  <strong className={ui.sectiontitle}>
+                    <Sparkles size={16} />
+                    <span>分析结论</span>
+                  </strong>
+                  {props.analysis ? <p>{props.analysis}</p> : null}
+                  {props.picks.map((item) => (
+                    <div key={item.id} className={css.diff}>
+                      <strong>{item.commitHash ?? item.label}</strong>
+                      <p>{item.diffSummary ?? item.description}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <div className={css.empty}>💡 在时间线中点击 Git 节点（紫色圆点）进行选择，然后在此处提交 AI 分析</div>
+          )}
         </aside>
       </div>
     </section>
