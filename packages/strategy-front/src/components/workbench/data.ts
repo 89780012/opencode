@@ -1,6 +1,5 @@
 export type Role = "ai" | "user"
-export type Stage = "session" | "flowchart" | "backtest" | "timeline"
-export type LeftView = "chat" | "code"
+export type Stage = "session" | "flowchart" | "code" | "backtest" | "timeline"
 export type SidebarTab = "requirements" | "sessions"
 export type ReviewStatus = "idle" | "running" | "passed" | "failed"
 export type FlowStatus = "idle" | "generating" | "done"

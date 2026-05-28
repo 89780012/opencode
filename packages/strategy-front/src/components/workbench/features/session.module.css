@@ -38,45 +38,6 @@
   white-space: nowrap;
 }
 
-.tabs {
-  display: flex;
-  align-items: center;
-  gap: 0.2rem;
-  padding: 0.16rem;
-  border-radius: 0.45rem;
-  background: #f1f5f9;
-}
-
-.tabs button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.32rem;
-  border: 0;
-  background: transparent;
-  color: #64748b;
-  border-radius: 0.35rem;
-  padding: 0.36rem 0.54rem;
-  font-size: 0.78rem;
-  transition:
-    background 0.16s ease,
-    color 0.16s ease,
-    border-color 0.16s ease,
-    box-shadow 0.16s ease,
-    transform 0.16s ease;
-}
-
-.tabs button:hover,
-.codehead button:hover {
-  background: #f1f5f9;
-  color: #0f172a;
-}
-
-.tabon {
-  background: #0f172a !important;
-  color: #ffffff !important;
-  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
-}
-
 .chat {
   flex: 1;
   min-width: 0;
@@ -139,60 +100,6 @@
   background: #0f172a;
   color: #ffffff;
   border-top-right-radius: 0.38rem;
-}
-
-.codeonly,
-.codepanel {
-  flex: 1;
-  min-height: 0;
-}
-
-.codeonly {
-  display: flex;
-  background: #1e1e2e;
-}
-
-.codepanel {
-  background: #1e1e2e;
-  border-top: 1px solid #313145;
-}
-
-.codehead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.46rem 0.8rem;
-  background: #252536;
-  border-bottom: 1px solid #313145;
-}
-
-.codehead span,
-.codehead button,
-.codepanel pre {
-  font-family: var(--font-code);
-}
-
-.codehead span,
-.codehead button {
-  color: #a6adc8;
-  font-size: 0.71rem;
-}
-
-.codehead button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.32rem;
-  border: 0;
-  background: transparent;
-}
-
-.codepanel pre {
-  margin: 0;
-  padding: 0.9rem 1rem;
-  color: #cdd6f4;
-  font-size: 0.76rem;
-  line-height: 1.68;
-  overflow: auto;
 }
 
 .inputbar {

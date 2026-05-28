@@ -8,12 +8,11 @@ import {
   type PointerEvent,
   type WheelEvent,
 } from "react"
-import { ChartColumn, Clock3, MessageSquareMore, Workflow } from "lucide-react"
+import { ChartColumn, Clock3, Code, MessageSquareMore, Workflow } from "lucide-react"
 import {
   createBacktest,
   createReviewSteps,
   createSessions,
-  type LeftView,
   type ReviewStatus,
   type SessionItem,
   type SidebarTab,
@@ -23,6 +22,7 @@ import {
 } from "./data"
 import { clamp, sleep } from "./lib"
 import { Backtest } from "./features/backtest"
+import { CodePanel } from "./features/code"
 import { Flow } from "./features/flow"
 import { Modal } from "./features/modal"
 import { Review } from "./features/review"
@@ -37,7 +37,6 @@ export function Workbench() {
   const [sessions, setSessions] = useState(() => createSessions())
   const [active, setActive] = useState("sess-1")
   const [stage, setStage] = useState<Stage>("session")
-  const [view, setView] = useState<LeftView>("chat")
   const [tab, setTab] = useState<SidebarTab>("requirements")
   const [right, setRight] = useState(false)
   const [left, setLeft] = useState(300)
@@ -362,7 +361,6 @@ export function Workbench() {
     setReqs(["请描述你的策略需求"])
     setStage("session")
     setTab("requirements")
-    setView("chat")
     setRight(true)
   }
 
@@ -541,6 +539,14 @@ export function Workbench() {
               </button>
               <button
                 type="button"
+                className={`${shell.topbtn} ${stage === "code" ? shell.topactive : ""}`}
+                onClick={() => setStage("code")}
+              >
+                <Code size={14} />
+                <span>代码</span>
+              </button>
+              <button
+                type="button"
                 className={`${shell.topbtn} ${stage === "backtest" ? shell.topactive : ""}`}
                 onClick={() => setStage("backtest")}
               >
@@ -559,18 +565,9 @@ export function Workbench() {
             <div className={shell.current}>当前会话：{cur.name}</div>
           </div>
 
-          {stage === "session" ? (
-            <Session
-              cur={cur}
-              view={view}
-              draft={draft}
-              onDraft={setDraft}
-              onView={setView}
-              onCopy={() => void copy()}
-              onSend={send}
-            />
-          ) : null}
+          {stage === "session" ? <Session cur={cur} draft={draft} onDraft={setDraft} onSend={send} /> : null}
           {stage === "flowchart" ? <Flow cur={cur} id={active} onRun={() => void runBacktest()} /> : null}
+          {stage === "code" ? <CodePanel cur={cur} onCopy={() => void copy()} /> : null}
           {stage === "backtest" ? <Backtest cur={cur} onRun={() => void runBacktest()} /> : null}
           {stage === "timeline" ? (
             <Timeline
