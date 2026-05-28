@@ -391,56 +391,64 @@
 .step {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 0.45rem;
-  padding: 0.38rem 0.1rem;
-  border-radius: 0.4rem;
+  padding: 0.42rem 0.5rem;
+  border-radius: 0.5rem;
 }
 
 .step:hover {
   background: #f8fafc;
 }
 
+.step_done {
+  background: #ecfdf5;
+}
+
+.step_running {
+  background: #eff6ff;
+}
+
+.step_pending {
+  background: #f8fafc;
+}
+
 .progress {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 0.45rem;
   color: #334155;
-  font-size: 0.68rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
 }
 
 .progress strong {
-  font-size: 0.68rem;
-  font-weight: 600;
+  font-weight: 500;
 }
 
-.note {
-  color: #64748b;
-  font-size: 0.62rem;
-}
-
-.dot {
-  width: 0.75rem;
-  height: 0.75rem;
-  border-radius: 999px;
-  display: inline-block;
+.stepicon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
   flex: none;
 }
 
-.dot_done {
-  background: #10b981;
+.stepicon_done {
+  color: #10b981;
 }
 
-.dot_run {
-  background: #3b82f6;
+.stepicon_running {
+  color: #3b82f6;
 }
 
-.dot_warn {
-  background: #ef4444;
+.stepicon_pending {
+  color: #94a3b8;
 }
 
-.dot_idle {
-  background: #cbd5e1;
+.logtitle {
+  color: #0f172a;
+  font-weight: 500;
 }
 
 @media (max-width: 920px) {

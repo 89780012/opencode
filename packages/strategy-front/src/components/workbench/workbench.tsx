@@ -307,6 +307,17 @@ export function Workbench() {
     })
   }
 
+  const showBacktest = (idx: number) => {
+    const item = cur.backtestHistory[idx]
+    if (!item) return
+    patch((entry) => ({
+      ...entry,
+      backtestResults: item.results,
+      backtestStatus: "done",
+    }))
+    setStage("backtest")
+  }
+
   const createSession = async () => {
     if (step === 1) {
       setBusy(true)
@@ -496,6 +507,7 @@ export function Workbench() {
           onStage={setStage}
           onRename={rename}
           onDelete={remove}
+          onBacktest={showBacktest}
         />
 
         <Handle

@@ -1,13 +1,18 @@
 import {
   ChartColumn,
+  CheckCircle2,
   ChevronDown,
   ChevronRight,
   CircleAlert,
   Clock3,
+  ClipboardCheck,
   ClipboardList,
+  Code2,
+  FileCheck,
   FileText,
   FolderTree,
   HelpCircle,
+  LoaderCircle,
   MessageCircle,
   MessageSquareMore,
   Pencil,
@@ -16,7 +21,7 @@ import {
   Trash2,
   Workflow,
 } from "lucide-react"
-import { prog, type SessionItem, type SidebarTab, type Stage } from "../data"
+import { type SessionItem, type SidebarTab, type Stage } from "../data"
 import ui from "../shared.module.css"
 import { Compact } from "../layout/compact"
 import css from "./side.module.css"
@@ -35,7 +40,34 @@ export function Side(props: {
   onStage: (stage: Stage) => void
   onRename: (id: string) => void
   onDelete: (id: string) => void
+  onBacktest: (idx: number) => void
 }) {
+  const steps = [
+    { key: "requirement", label: "需求确认", icon: FileCheck },
+    { key: "code", label: "代码编写", icon: Code2 },
+    { key: "review", label: "代码审查", icon: ClipboardCheck },
+    { key: "flowchart", label: "流程图生成", icon: Workflow },
+    { key: "backtest", label: "回测验证", icon: ChartColumn },
+  ] as const
+
+  const status = (key: (typeof steps)[number]["key"]) => {
+    if (key === "requirement") return "done"
+    if (key === "code") return "done"
+    if (key === "review") {
+      if (props.cur.reviewStatus === "running") return "running"
+      if (props.cur.reviewStatus === "passed" || props.cur.reviewStatus === "failed") return "done"
+      return "pending"
+    }
+    if (key === "flowchart") {
+      if (props.cur.flowchartStatus === "generating") return "running"
+      if (props.cur.flowchartStatus === "done") return "done"
+      return "pending"
+    }
+    if (props.cur.backtestStatus === "running") return "running"
+    if (props.cur.backtestStatus === "done") return "done"
+    return "pending"
+  }
+
   return (
     <aside className={css.root}>
       <div className={css.logo}>
@@ -230,15 +262,26 @@ export function Side(props: {
             }
           >
             <div className={css.stepbox}>
-              {prog.map((item) => (
-                <div key={item.label} className={css.step}>
-                  <div className={css.progress}>
-                    <span className={`${css.dot} ${css[`dot_${item.tone}`]}`}></span>
-                    <strong>{item.label}</strong>
+              {steps.map((item) => {
+                const Icon = item.icon
+                const tone = status(item.key)
+                return (
+                  <div key={item.key} className={`${css.step} ${css[`step_${tone}`]}`}>
+                    <div className={css.progress}>
+                      <span className={`${css.stepicon} ${css[`stepicon_${tone}`]}`}>
+                        {tone === "done" ? (
+                          <CheckCircle2 size={14} />
+                        ) : tone === "running" ? (
+                          <LoaderCircle size={14} className={ui.spin} />
+                        ) : (
+                          <Icon size={14} />
+                        )}
+                      </span>
+                      <strong>{item.label}</strong>
+                    </div>
                   </div>
-                  <span className={css.note}>{item.note}</span>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </Compact>
 
@@ -255,14 +298,14 @@ export function Side(props: {
                     key={`${item.time}-${idx}`}
                     type="button"
                     className={css.log}
-                    onClick={() => props.onStage("backtest")}
+                    onClick={() => props.onBacktest(idx)}
                   >
                     <div className={css.rowtop}>
+                      <span className={css.logtitle}>回测 #{props.cur.backtestHistory.length - idx}</span>
                       <span>{item.time}</span>
-                      <span>记录</span>
                     </div>
                     <p className={css.logic}>
-                      收益 {item.results.totalReturn} / 夏普 {item.results.sharpe}
+                      收益: {item.results.totalReturn} · 夏普: {item.results.sharpe}
                     </p>
                   </button>
                 ))
