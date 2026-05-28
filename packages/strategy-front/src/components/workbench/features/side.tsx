@@ -63,7 +63,7 @@ export function Side(props: {
       </div>
 
       {props.tab === "sessions" ? (
-        <div className={css.stack}>
+        <div className={css.stack} style={{ fontSize: 12 }}>
           <section className={`${css.group} ${props.cur.sections.sessions ? css.groupopen : css.groupshut}`}>
             <button type="button" className={css.grouphead} onClick={() => props.onToggle("sessions")}>
               <span className={css.groupleft}>

@@ -1,26 +1,23 @@
 .handle {
-  width: 5px;
+  width: 1px;
   cursor: col-resize;
-  background: transparent;
+  background: #e2e8f0;
+  border-left: 1px solid #e2e8f0;
+  border-right: 1px solid #e2e8f0;
   position: relative;
   touch-action: none;
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease;
 }
 
-.handle::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: transparent;
-  transition: background 0.16s ease;
-}
-
-.handle:hover::before,
-.on::before {
+.handle:hover,
+.on {
   background: #3b82f6;
+  border-color: #3b82f6;
 }
 
 .right {
-  border-left: 1px solid #e2e8f0;
 }
 
 @media (max-width: 920px) {
