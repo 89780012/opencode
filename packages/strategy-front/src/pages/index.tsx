@@ -1,5 +1,5 @@
-import { Navigate } from "react-router-dom"
+import { Workbench } from "@/components/workbench/workbench"
 
 export default function Home() {
-  return <Navigate to="/app/strategies" replace />
+  return <Workbench />
 }

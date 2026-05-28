@@ -27,7 +27,7 @@ function LegacyPage() {
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <Navigate to="/app/strategies" replace />,
+    element: <Navigate to="/app" replace />,
   },
   {
     path: "/app/embed",

@@ -1,0 +1,393 @@
+.root {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.68rem 1rem;
+  border-bottom: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.copy {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.copy strong {
+  font-size: 0.84rem;
+}
+
+.copy span {
+  color: #64748b;
+  font-size: 0.72rem;
+}
+
+.zoom {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.zoom button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.48rem;
+  background: #ffffff;
+  color: #475569;
+  font-size: 0.72rem;
+  padding: 0.36rem 0.58rem;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+.zoom button:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.zoom span,
+.hash,
+.tip em {
+  font-family: var(--font-code);
+}
+
+.zoom span {
+  min-width: 3rem;
+  text-align: center;
+  color: #64748b;
+  font-size: 0.72rem;
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+}
+
+.canvas {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0)), #fafbfc;
+  cursor: grab;
+  touch-action: none;
+}
+
+.canvasdrag {
+  cursor: grabbing;
+}
+
+.move,
+.zoomwrap {
+  position: absolute;
+  transform-origin: 0 0;
+}
+
+.move {
+  inset: 0;
+}
+
+.zoomwrap {
+  position: relative;
+}
+
+.axis {
+  position: absolute;
+  width: 3px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #e2e8f0 0%, #94a3b8 50%, #e2e8f0 100%);
+}
+
+.tick {
+  position: absolute;
+  width: 20px;
+  height: 1px;
+  background: #cbd5e1;
+  z-index: 1;
+}
+
+.node {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  width: auto;
+  z-index: 2;
+  transition:
+    transform 0.18s ease,
+    filter 0.18s ease;
+}
+
+.node:hover {
+  transform: translateX(4px) scale(1.03);
+}
+
+.node:focus-visible {
+  border-radius: 0.75rem;
+}
+
+.nodeleft,
+.noderight {
+  flex-direction: row;
+}
+
+.nodegit {
+  cursor: pointer;
+}
+
+.line {
+  position: absolute;
+  top: 10px;
+  width: 40px;
+  height: 2px;
+  border-radius: 1px;
+  z-index: 0;
+}
+
+.dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: 3px solid #cbd5e1;
+  background: #ffffff;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.nodeselected .dot {
+  box-shadow: 0 0 0 8px rgba(99, 102, 241, 0.35);
+  border-color: #6366f1;
+  transform: scale(1.15);
+}
+
+.label {
+  margin-left: 10px;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #475569;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  line-height: 1.2;
+}
+
+.dot_requirement {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+
+.dot_code {
+  border-color: #8b5cf6;
+  background: #f5f3ff;
+}
+
+.dot_git {
+  width: 24px;
+  height: 24px;
+  border-color: #6366f1;
+  background: #eef2ff;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+
+.dot_review {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.dot_flowchart {
+  border-color: #10b981;
+  background: #ecfdf5;
+}
+
+.dot_backtest {
+  border-color: #ef4444;
+  background: #fef2f2;
+}
+
+.check {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #d1d5db;
+  border-radius: 7px;
+  background: #ffffff;
+  color: transparent;
+  cursor: pointer;
+  z-index: 5;
+  padding: 0;
+}
+
+.checkon {
+  border-color: #6366f1;
+  background: #6366f1;
+  color: #ffffff;
+}
+
+.hash {
+  margin-left: 10px;
+  border-radius: 4px;
+  background: #eef2ff;
+  color: #6366f1;
+  padding: 2px 5px;
+  font-size: 9.5px;
+}
+
+.tip {
+  position: absolute;
+  z-index: 8;
+  pointer-events: none;
+  max-width: 18rem;
+  display: grid;
+  gap: 0.28rem;
+  padding: 0.72rem 0.8rem;
+  border-radius: 0.8rem;
+  background: #1e293b;
+  color: #f8fafc;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.24);
+}
+
+.tip strong {
+  font-size: 0.76rem;
+}
+
+.tip span {
+  color: #cbd5e1;
+  font-size: 0.66rem;
+}
+
+.tip p,
+.result p,
+.diff p {
+  margin: 0;
+}
+
+.tip p {
+  color: #e2e8f0;
+  font-size: 0.7rem;
+}
+
+.tip em {
+  color: #a5b4fc;
+  font-size: 0.66rem;
+  font-style: normal;
+}
+
+.analysis {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.92rem;
+  border-left: 1px solid #e2e8f0;
+  background: #ffffff;
+  min-width: 0;
+  overflow: auto;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  color: #64748b;
+  font-size: 0.62rem;
+}
+
+.analysis textarea {
+  min-height: 5.6rem;
+  resize: none;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.9rem;
+  background: #f8fafc;
+  color: #334155;
+  padding: 0.75rem 0.9rem;
+  font-size: 0.86rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.selected {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.selected span {
+  padding: 0.35rem 0.58rem;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4f46e5;
+  font-size: 0.68rem;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.result {
+  display: grid;
+  gap: 0.75rem;
+  border: 1px solid #dbe3ec;
+  border-radius: 1rem;
+  background: #ffffff;
+  padding: 0.8rem;
+  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.04);
+}
+
+.diff {
+  display: grid;
+  gap: 0.25rem;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 0.75rem;
+}
+
+.diff strong {
+  color: #4338ca;
+  font-size: 0.74rem;
+}
+
+.diff p {
+  color: #475569;
+  font-size: 0.72rem;
+}
+
+@media (max-width: 1080px) {
+  .body {
+    grid-template-columns: 1fr;
+  }
+
+  .analysis {
+    border-left: 0;
+    border-top: 1px solid #e2e8f0;
+  }
+}
+
+@media (max-width: 920px) {
+  .bar {
+    flex-wrap: wrap;
+  }
+}

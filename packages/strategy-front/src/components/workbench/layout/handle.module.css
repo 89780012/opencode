@@ -1,0 +1,30 @@
+.handle {
+  width: 5px;
+  cursor: col-resize;
+  background: transparent;
+  position: relative;
+  touch-action: none;
+}
+
+.handle::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  transition: background 0.16s ease;
+}
+
+.handle:hover::before,
+.on::before {
+  background: #3b82f6;
+}
+
+.right {
+  border-left: 1px solid #e2e8f0;
+}
+
+@media (max-width: 920px) {
+  .handle {
+    display: none;
+  }
+}

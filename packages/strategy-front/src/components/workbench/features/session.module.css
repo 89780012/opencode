@@ -1,0 +1,263 @@
+.root {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.req {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: #1e3a8a;
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+.reqicon {
+  color: #3b82f6;
+  flex: none;
+}
+
+.req span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.16rem;
+  border-radius: 0.45rem;
+  background: #f1f5f9;
+}
+
+.tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  border-radius: 0.35rem;
+  padding: 0.36rem 0.54rem;
+  font-size: 0.78rem;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+.tabs button:hover,
+.codehead button:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.tabon {
+  background: #0f172a !important;
+  color: #ffffff !important;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
+}
+
+.chat {
+  flex: 1;
+  overflow: auto;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.bubblewrap {
+  display: flex;
+  gap: 0.65rem;
+}
+
+.bubbleai {
+  justify-content: flex-start;
+}
+
+.bubbleuser {
+  justify-content: flex-end;
+}
+
+.avatar,
+.avataruser {
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  flex: none;
+}
+
+.avatar {
+  background: rgba(15, 23, 42, 0.92);
+}
+
+.avataruser {
+  background: #f59e0b;
+}
+
+.bubble {
+  max-width: min(80%, 44rem);
+  border-radius: 1rem;
+  padding: 0.72rem 0.9rem;
+  font-size: 0.88rem;
+  line-height: 1.58;
+}
+
+.bubbleai .bubble {
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+  color: #334155;
+  border-top-left-radius: 0.38rem;
+}
+
+.bubbleuser .bubble {
+  background: #0f172a;
+  color: #ffffff;
+  border-top-right-radius: 0.38rem;
+}
+
+.codeonly,
+.codepanel {
+  flex: 1;
+  min-height: 0;
+}
+
+.codeonly {
+  display: flex;
+  background: #1e1e2e;
+}
+
+.codepanel {
+  background: #1e1e2e;
+  border-top: 1px solid #313145;
+}
+
+.codehead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.46rem 0.8rem;
+  background: #252536;
+  border-bottom: 1px solid #313145;
+}
+
+.codehead span,
+.codehead button,
+.codepanel pre {
+  font-family: var(--font-code);
+}
+
+.codehead span,
+.codehead button {
+  color: #a6adc8;
+  font-size: 0.71rem;
+}
+
+.codehead button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  border: 0;
+  background: transparent;
+}
+
+.codepanel pre {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  color: #cdd6f4;
+  font-size: 0.76rem;
+  line-height: 1.68;
+  overflow: auto;
+}
+
+.inputbar {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  padding: 0.78rem;
+  border-top: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.inputbar textarea {
+  flex: 1;
+  resize: none;
+  min-height: 2.7rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.9rem;
+  background: #f8fafc;
+  color: #334155;
+  padding: 0.75rem 0.9rem;
+  font-size: 0.86rem;
+}
+
+.send,
+.reviewsend {
+  width: 2.3rem;
+  height: 2.3rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 0.8rem;
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+.send {
+  background: #0f172a;
+}
+
+.reviewsend {
+  background: #4f46e5;
+}
+
+.send:hover,
+.reviewsend:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+@media (max-width: 920px) {
+  .head {
+    flex-wrap: wrap;
+  }
+
+  .inputbar textarea,
+  .send,
+  .reviewsend {
+    width: 100%;
+  }
+}

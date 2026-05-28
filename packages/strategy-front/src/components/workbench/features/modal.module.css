@@ -1,0 +1,173 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.35);
+  z-index: 20;
+}
+
+.modal {
+  width: min(560px, calc(100vw - 2rem));
+  max-height: 85vh;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  border-radius: 1.3rem;
+  background: #ffffff;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.2);
+}
+
+.head,
+.foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+}
+
+.head {
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.head strong {
+  font-size: 0.95rem;
+}
+
+.head button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.76rem;
+}
+
+.steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0 1.1rem;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.num {
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #94a3b8;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.numon {
+  background: #0f172a;
+  color: #ffffff;
+}
+
+.step em {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-style: normal;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0 1.1rem;
+}
+
+.body label {
+  color: #334155;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.body textarea,
+.body input {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.9rem;
+  background: #f8fafc;
+  color: #334155;
+  padding: 0.75rem 0.9rem;
+  font-size: 0.86rem;
+}
+
+.reqbox {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.reqrow {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.reqrow input {
+  flex: 1;
+}
+
+.reqrow button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  border: 0;
+  background: #fee2e2;
+  color: #991b1b;
+  border-radius: 0.6rem;
+  padding: 0 0.75rem;
+  font-size: 0.72rem;
+}
+
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.25rem 0;
+}
+
+.preview p,
+.row p {
+  margin: 0;
+}
+
+.preview > p {
+  color: #0f172a;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.38rem;
+  color: #334155;
+  font-size: 0.68rem;
+}
+
+.row span {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+@media (max-width: 920px) {
+  .foot {
+    flex-wrap: wrap;
+  }
+}
