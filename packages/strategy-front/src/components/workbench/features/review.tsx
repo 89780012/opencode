@@ -140,12 +140,14 @@ export function Review(props: {
         </>
       ) : null}
 
-      <div className={css.rail}>
-        <button type="button" className={`${css.minibtn} ${props.right ? css.minibtnon : ""}`} onClick={props.onOpen}>
-          <ClipboardCheck size={15} />
-          <span>审查</span>
-        </button>
-      </div>
+      {!props.right ? (
+        <div className={css.rail}>
+          <button type="button" className={css.minibtn} onClick={props.onOpen} aria-label="展开审查面板">
+            <ClipboardCheck size={16} />
+            <span style={{ fontSize: 10 }}>审查</span>
+          </button>
+        </div>
+      ) : null}
     </aside>
   )
 }

@@ -39,8 +39,8 @@ export function Workbench() {
   const [stage, setStage] = useState<Stage>("session")
   const [view, setView] = useState<LeftView>("chat")
   const [tab, setTab] = useState<SidebarTab>("requirements")
-  const [right, setRight] = useState(true)
-  const [left, setLeft] = useState(260)
+  const [right, setRight] = useState(false)
+  const [left, setLeft] = useState(300)
   const [side, setSide] = useState(360)
   const [draft, setDraft] = useState("")
   const [picked, setPicked] = useState<string[]>([])
@@ -620,7 +620,7 @@ export function Workbench() {
             }))
           }
           onClose={() => setRight(false)}
-          onOpen={() => setRight((item) => !item)}
+          onOpen={() => setRight(true)}
           onRun={() => void triggerReview()}
         />
       </div>
