@@ -509,7 +509,7 @@ export function Workbench() {
         />
 
         <main className={shell.main}>
-          <div className={shell.topbar}>
+          <div className={shell.topbar} style={{ fontSize: 12 }}>
             <div className={shell.toptabs}>
               <button
                 type="button"
