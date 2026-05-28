@@ -23,6 +23,7 @@ import {
 import { clamp, sleep } from "./lib"
 import { Backtest } from "./features/backtest"
 import { CodePanel } from "./features/code"
+import { Composer } from "./features/composer"
 import { Flow } from "./features/flow"
 import { Modal } from "./features/modal"
 import { Review } from "./features/review"
@@ -565,7 +566,7 @@ export function Workbench() {
             <div className={shell.current}>当前会话：{cur.name}</div>
           </div>
 
-          {stage === "session" ? <Session cur={cur} draft={draft} onDraft={setDraft} onSend={send} /> : null}
+          {stage === "session" ? <Session cur={cur} /> : null}
           {stage === "flowchart" ? <Flow cur={cur} id={active} onRun={() => void runBacktest()} /> : null}
           {stage === "code" ? <CodePanel cur={cur} onCopy={() => void copy()} /> : null}
           {stage === "backtest" ? <Backtest cur={cur} onRun={() => void runBacktest()} /> : null}
@@ -600,6 +601,7 @@ export function Workbench() {
               onKey={keypick}
             />
           ) : null}
+          {stage !== "timeline" ? <Composer draft={draft} onDraft={setDraft} onSend={send} /> : null}
         </main>
 
         <Review
