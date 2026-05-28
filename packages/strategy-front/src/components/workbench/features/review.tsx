@@ -23,7 +23,16 @@ export function Review(props: {
     <aside className={css.root}>
       {props.right ? (
         <>
-          <Handle edge="right" onDown={props.onDown} onKey={props.onKey} active={props.size} min={280} max={500} now={props.side} label="Resize review panel" />
+          <Handle
+            edge="right"
+            onDown={props.onDown}
+            onKey={props.onKey}
+            active={props.size}
+            min={280}
+            max={500}
+            now={props.side}
+            label="Resize review panel"
+          />
           <div className={css.panel}>
             <div className={css.head}>
               <div className={css.title}>
@@ -31,10 +40,17 @@ export function Review(props: {
                   <ClipboardCheck size={16} />
                   <span>审查</span>
                 </div>
-                <span className={`${css.badge} ${css[`badge_${props.cur.reviewStatus}`]}`}>{text(props.cur.reviewStatus)}</span>
+                <span className={`${css.badge} ${css[`badge_${props.cur.reviewStatus}`]}`}>
+                  {text(props.cur.reviewStatus)}
+                </span>
               </div>
               <div className={css.actions}>
-                <button type="button" className={css.action} onClick={props.onView} aria-label={props.cur.reviewView === "current" ? "查看历史" : "查看当前"}>
+                <button
+                  type="button"
+                  className={css.action}
+                  onClick={props.onView}
+                  aria-label={props.cur.reviewView === "current" ? "查看历史" : "查看当前"}
+                >
                   {props.cur.reviewView === "current" ? <Clock3 size={14} /> : <History size={14} />}
                 </button>
                 <button type="button" className={css.action} onClick={props.onClose} aria-label="收起审查面板">
@@ -43,7 +59,7 @@ export function Review(props: {
               </div>
             </div>
 
-            <div className={css.body}>
+            <div className={`${css.body} ${ui.scroll}`}>
               {props.cur.reviewView === "current" ? (
                 <>
                   {props.cur.reviewProgress ? (

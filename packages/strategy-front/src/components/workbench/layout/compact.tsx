@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 import { ChevronDown, ChevronRight, type LucideIcon } from "lucide-react"
 import css from "./compact.module.css"
+import ui from "../shared.module.css"
 
 export function Compact(props: {
   open: boolean
@@ -47,7 +48,7 @@ export function Compact(props: {
           <ChevronDown size={14} className={`${css.fold} ${props.open ? css.foldopen : ""}`} />
         </span>
       </div>
-      {props.open ? <div className={css.body}>{props.children}</div> : null}
+      {props.open ? <div className={`${css.body} ${ui.scroll}`}>{props.children}</div> : null}
     </section>
   )
 }

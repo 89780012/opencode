@@ -94,7 +94,7 @@ export function Side(props: {
             </button>
             {props.cur.sections.sessions ? (
               <div className={css.groupbody}>
-                <div className={css.sessionlist}>
+                <div className={`${css.sessionlist} ${ui.scroll}`}>
                   {props.sessions.map((item) => (
                     <button
                       key={item.id}
@@ -151,7 +151,7 @@ export function Side(props: {
             </button>
             {props.cur.sections.issues ? (
               <div className={css.groupbody}>
-                <div className={css.issuelist}>
+                <div className={`${css.issuelist} ${ui.scroll}`}>
                   {props.issues.length ? (
                     props.issues.map((item) => (
                       <button
@@ -213,7 +213,7 @@ export function Side(props: {
                 <span>{props.risk}</span>
               </p>
               <p className={css.logic}>{props.hint}</p>
-              <p className={css.mini}>需求：{props.cur.currentRequirement}</p>
+              <p className={css.logic}>需求：{props.cur.currentRequirement}</p>
             </div>
           </Compact>
 
@@ -248,7 +248,7 @@ export function Side(props: {
             title="回测记录"
             onToggle={() => props.onToggle("backtest")}
           >
-            <div className={css.logbox}>
+            <div className={`${css.logbox} ${ui.scroll}`}>
               {props.cur.backtestHistory.length ? (
                 props.cur.backtestHistory.map((item, idx) => (
                   <button
@@ -261,7 +261,7 @@ export function Side(props: {
                       <span>{item.time}</span>
                       <span>记录</span>
                     </div>
-                    <p>
+                    <p className={css.logic}>
                       收益 {item.results.totalReturn} / 夏普 {item.results.sharpe}
                     </p>
                   </button>

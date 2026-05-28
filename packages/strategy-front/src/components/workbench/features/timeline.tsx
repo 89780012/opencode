@@ -61,12 +61,35 @@ export function Timeline(props: {
       </div>
 
       <div className={css.body}>
-        <div ref={props.boxRef} className={`${css.canvas} ${props.drag.on ? css.canvasdrag : ""}`} onPointerDown={props.onGrab} onWheel={props.onWheel}>
+        <div
+          ref={props.boxRef}
+          className={`${css.canvas} ${props.drag.on ? css.canvasdrag : ""}`}
+          onPointerDown={props.onGrab}
+          onWheel={props.onWheel}
+        >
           <div className={css.move} style={{ transform: `translate(${props.pan.x}px, ${props.pan.y}px)` }}>
-            <div className={css.zoomwrap} style={{ transform: `scale(${props.zoom / 100})`, width: `${props.pane.w}px`, height: `${props.pane.h}px` }}>
-              <div className={css.axis} style={{ left: `${props.pane.axis}px`, top: `${props.pane.top}px`, height: `${Math.max(props.pane.h - props.pane.top * 2, 120)}px` }}></div>
+            <div
+              className={css.zoomwrap}
+              style={{
+                transform: `scale(${props.zoom / 100})`,
+                width: `${props.pane.w}px`,
+                height: `${props.pane.h}px`,
+              }}
+            >
+              <div
+                className={css.axis}
+                style={{
+                  left: `${props.pane.axis}px`,
+                  top: `${props.pane.top}px`,
+                  height: `${Math.max(props.pane.h - props.pane.top * 2, 120)}px`,
+                }}
+              ></div>
               {props.pane.marks.map((item, idx) => (
-                <span key={`tick-${idx}`} className={css.tick} style={{ top: `${item}px`, left: `${props.pane.axis - 10}px` }}></span>
+                <span
+                  key={`tick-${idx}`}
+                  className={css.tick}
+                  style={{ top: `${item}px`, left: `${props.pane.axis - 10}px` }}
+                ></span>
               ))}
               {props.cur.timelineEvents.map((item, idx) => {
                 const top = props.pane.marks[idx] - 12
@@ -78,7 +101,10 @@ export function Timeline(props: {
                     key={item.id}
                     data-node
                     className={`${css.node} ${right ? css.noderight : css.nodeleft} ${git ? css.nodegit : ""} ${on ? css.nodeselected : ""}`}
-                    style={{ left: `${right ? props.pane.axis + 40 : Math.max(props.pane.axis - 180, 24)}px`, top: `${top}px` }}
+                    style={{
+                      left: `${right ? props.pane.axis + 40 : Math.max(props.pane.axis - 180, 24)}px`,
+                      top: `${top}px`,
+                    }}
                     onClick={(event) => {
                       if (!git || (event.target as HTMLElement).closest(`.${css.check}`)) return
                       props.onPick(item.id)
@@ -94,7 +120,10 @@ export function Timeline(props: {
                     aria-pressed={git ? on : undefined}
                     aria-label={`${item.label} ${item.time}`}
                   >
-                    <span className={css.line} style={{ left: right ? "-40px" : "160px", background: git ? "#c7d2fe" : "#e2e8f0" }}></span>
+                    <span
+                      className={css.line}
+                      style={{ left: right ? "-40px" : "160px", background: git ? "#c7d2fe" : "#e2e8f0" }}
+                    ></span>
                     <span className={`${css.dot} ${css[`dot_${item.type}`]}`}></span>
                     {git ? (
                       <button
@@ -109,7 +138,9 @@ export function Timeline(props: {
                         {on ? <Check size={12} strokeWidth={3} /> : null}
                       </button>
                     ) : null}
-                    <div className={git ? css.hash : css.label}>{git ? item.commitHash ?? item.label : kind(item.type)}</div>
+                    <div className={git ? css.hash : css.label}>
+                      {git ? (item.commitHash ?? item.label) : kind(item.type)}
+                    </div>
                   </article>
                 )
               })}
@@ -126,7 +157,7 @@ export function Timeline(props: {
           ) : null}
         </div>
 
-        <aside className={css.analysis}>
+        <aside className={`${css.analysis} ${ui.scroll}`}>
           <div className={css.head}>
             <strong className={ui.sectiontitle}>
               <GitCompareArrows size={16} />
@@ -135,9 +166,17 @@ export function Timeline(props: {
             <span>已选 {props.picked.length} 项</span>
           </div>
           <div className={css.selected}>
-            {props.picks.length ? props.picks.map((item) => <span key={item.id}>{item.commitHash ?? item.label}</span>) : <span>请选择 Git 节点</span>}
+            {props.picks.length ? (
+              props.picks.map((item) => <span key={item.id}>{item.commitHash ?? item.label}</span>)
+            ) : (
+              <span>请选择 Git 节点</span>
+            )}
           </div>
-          <textarea value={props.note} placeholder="输入分析诉求，例如：分析两个提交之间的代码差异与风控变化。" onChange={(event) => props.onNote(event.target.value)} />
+          <textarea
+            value={props.note}
+            placeholder="输入分析诉求，例如：分析两个提交之间的代码差异与风控变化。"
+            onChange={(event) => props.onNote(event.target.value)}
+          />
           <div className={css.actions}>
             <button type="button" className={ui.primary} onClick={props.onSubmit}>
               <Sparkles size={14} />
@@ -153,7 +192,9 @@ export function Timeline(props: {
               <Sparkles size={16} />
               <span>分析结论</span>
             </strong>
-            <p>{props.analysis || "点击时间线中的 Git 节点后，可以在这里对提交差异、审查结果与回测关联做进一步分析。"}</p>
+            <p>
+              {props.analysis || "点击时间线中的 Git 节点后，可以在这里对提交差异、审查结果与回测关联做进一步分析。"}
+            </p>
             {props.picks.map((item) => (
               <div key={item.id} className={css.diff}>
                 <strong>{item.commitHash ?? item.label}</strong>

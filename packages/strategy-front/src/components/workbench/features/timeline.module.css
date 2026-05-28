@@ -303,6 +303,7 @@
   background: #ffffff;
   min-width: 0;
   overflow: auto;
+  padding-right: 0.55rem;
 }
 
 .head {

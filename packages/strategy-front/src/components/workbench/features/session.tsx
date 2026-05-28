@@ -2,6 +2,7 @@ import { Bot, ClipboardCheck, Code, Copy, FileText, MessageSquareMore, Send, Use
 import { useEffect, useRef, type KeyboardEvent } from "react"
 import type { LeftView, SessionItem } from "../data"
 import css from "./session.module.css"
+import ui from "../shared.module.css"
 
 function Bubble(props: { body: string; role: "ai" | "user" }) {
   const Icon = props.role === "ai" ? Bot : UserRound
@@ -57,11 +58,19 @@ export function Session(props: {
             <span>{props.cur.currentRequirement}</span>
           </div>
           <div className={css.tabs}>
-            <button type="button" className={props.view === "chat" ? css.tabon : ""} onClick={() => props.onView("chat")}>
+            <button
+              type="button"
+              className={props.view === "chat" ? css.tabon : ""}
+              onClick={() => props.onView("chat")}
+            >
               <MessageSquareMore size={14} />
               <span>对话</span>
             </button>
-            <button type="button" className={props.view === "code" ? css.tabon : ""} onClick={() => props.onView("code")}>
+            <button
+              type="button"
+              className={props.view === "code" ? css.tabon : ""}
+              onClick={() => props.onView("code")}
+            >
               <Code size={14} />
               <span>代码</span>
             </button>
@@ -69,7 +78,7 @@ export function Session(props: {
         </div>
 
         {props.view === "chat" ? (
-          <div ref={ref} className={css.chat}>
+          <div ref={ref} className={`${css.chat} ${ui.scroll}`}>
             {props.cur.messages.map((item, idx) => (
               <Bubble key={`${item.role}-${idx}-${item.body}`} role={item.role} body={item.body} />
             ))}
@@ -91,7 +100,13 @@ export function Session(props: {
       </section>
 
       <div className={css.inputbar}>
-        <textarea rows={2} value={props.draft} placeholder="输入修改意见，回车发送，Shift + Enter 换行。" onChange={(event) => props.onDraft(event.target.value)} onKeyDown={key} />
+        <textarea
+          rows={2}
+          value={props.draft}
+          placeholder="输入修改意见，回车发送，Shift + Enter 换行。"
+          onChange={(event) => props.onDraft(event.target.value)}
+          onKeyDown={key}
+        />
         <button type="button" className={css.send} onClick={() => props.onSend(false)} aria-label="发送消息">
           <Send size={15} />
         </button>
