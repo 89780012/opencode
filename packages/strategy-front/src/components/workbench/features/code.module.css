@@ -1,0 +1,68 @@
+.root {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #1e1e2e;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid #313145;
+  background: #252536;
+}
+
+.eyebrow {
+  color: #94a3b8;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.head h2,
+.head button,
+.root pre {
+  font-family: var(--font-code);
+}
+
+.head h2 {
+  color: #cdd6f4;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.head button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  border: 0;
+  border-radius: 0.45rem;
+  background: transparent;
+  color: #a6adc8;
+  font-size: 0.72rem;
+  padding: 0.32rem 0.5rem;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease;
+}
+
+.head button:hover {
+  background: #313145;
+  color: #ffffff;
+}
+
+.root pre {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  overflow: auto;
+  padding: 1rem 1.1rem;
+  color: #cdd6f4;
+  font-size: 0.78rem;
+  line-height: 1.7;
+}
