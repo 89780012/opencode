@@ -9,7 +9,6 @@ import { useWorkbench } from "./hooks/use-workbench"
 import { Handle } from "./layout/handle"
 import shell from "./layout/shell.module.css"
 import { Topbar } from "./layout/topbar"
-import ui from "./shared.module.css"
 
 export function Workbench() {
   const panel = usePanels()
@@ -17,7 +16,7 @@ export function Workbench() {
   const time = useTimeline(app.cur, app.active, app.stage)
 
   return (
-    <div className={ui.root}>
+    <>
       <div
         className={shell.shell}
         data-workbench
@@ -97,6 +96,6 @@ export function Workbench() {
         onReqs={app.setReqs}
         onSubmit={() => void app.create()}
       />
-    </div>
+    </>
   )
 }

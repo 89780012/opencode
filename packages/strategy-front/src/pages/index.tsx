@@ -1,5 +1,5 @@
-import { Workbench } from "@/components/workbench/workbench"
+import { Workstation } from "@/components/workbench"
 
 export default function Home() {
-  return <Workbench />
+  return <Workstation />
 }
