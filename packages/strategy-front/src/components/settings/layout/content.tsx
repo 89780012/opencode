@@ -1,19 +1,19 @@
-import { Box, Cpu, X } from "lucide-react"
+import { Box, Cpu } from "lucide-react"
 import { useState } from "react"
-import { ConnectDialog } from "./connect-dialog"
-import { CustomDialog } from "./custom-dialog"
-import { ModelsPanel } from "./models-panel"
-import { ProvidersPanel } from "./providers-panel"
-import css from "./settings.module.css"
-import type { Tab } from "./types"
-import { useSettings } from "./use-settings"
+import { ConnectDialog } from "../dialogs/connect"
+import { CustomDialog } from "../dialogs/custom"
+import { useSettings } from "../hooks/use-settings"
+import { ModelsPanel } from "../panels/models"
+import { ProvidersPanel } from "../panels/providers"
+import css from "../settings.module.css"
+import type { Tab } from "../types"
 
 const tabs = [
   { key: "providers", icon: Box, label: "提供商" },
   { key: "models", icon: Cpu, label: "模型" },
 ] as const
 
-function SettingsContent() {
+export function SettingsContent() {
   const app = useSettings()
   const [tab, setTab] = useState<Tab>("providers")
 
@@ -69,26 +69,5 @@ function SettingsContent() {
         }}
       />
     </>
-  )
-}
-
-export function SettingsDialog(props: { open: boolean; onOpenChange: (open: boolean) => void }) {
-  if (!props.open) return null
-
-  return (
-    <div className={css.overlay} onClick={() => props.onOpenChange(false)}>
-      <div className={css.dialog} role="dialog" aria-modal="true" aria-label="设置" onClick={(event) => event.stopPropagation()}>
-        <div className={css.dialogbar}>
-          <div>
-            <strong>设置</strong>
-            <span>Provider 和模型配置</span>
-          </div>
-          <button type="button" className={css.iconbtn} onClick={() => props.onOpenChange(false)} aria-label="关闭设置">
-            <X size={14} />
-          </button>
-        </div>
-        <SettingsContent />
-      </div>
-    </div>
   )
 }

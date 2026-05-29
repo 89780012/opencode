@@ -1,12 +1,12 @@
-import { useMemo, useState, type FormEvent, type ReactNode } from "react"
+import { useMemo, useState, type FormEvent } from "react"
 import { Loader2, Plus, Trash2, X } from "lucide-react"
 import { toast } from "sonner"
 import { providerApi } from "@/api/modules/provider"
 import type { Config } from "@/types/provider"
 import { headerRow, modelRow, validate, type Form } from "../../provider/provider-custom-form"
 import { text } from "../../provider/utils"
-import ui from "../shared.module.css"
-import css from "./settings.module.css"
+import { Field, Rows } from "../ui/form"
+import css from "../settings.module.css"
 
 function init(): Form {
   return {
@@ -154,9 +154,21 @@ export function CustomDialog(props: {
         <form className={css.form} onSubmit={save}>
           <div className={`${css.modalbody} ${css.scroll}`}>
             <div className={css.grid}>
-              <Field label="Provider ID" value={form.providerID} err={form.err.providerID} onChange={(value) => field("providerID", value)} placeholder="请输入唯一标识" />
+              <Field
+                label="Provider ID"
+                value={form.providerID}
+                err={form.err.providerID}
+                onChange={(value) => field("providerID", value)}
+                placeholder="请输入唯一标识"
+              />
               <Field label="显示名称" value={form.name} err={form.err.name} onChange={(value) => field("name", value)} placeholder="请输入显示名称" />
-              <Field label="服务地址" value={form.baseURL} err={form.err.baseURL} onChange={(value) => field("baseURL", value)} placeholder="https://api.example.com/v1" />
+              <Field
+                label="服务地址"
+                value={form.baseURL}
+                err={form.err.baseURL}
+                onChange={(value) => field("baseURL", value)}
+                placeholder="https://api.example.com/v1"
+              />
               <Field label="API Key" value={form.apiKey} onChange={(value) => field("apiKey", value)} placeholder="可填密钥，或使用 {env:MY_KEY}" />
             </div>
 
@@ -164,7 +176,7 @@ export function CustomDialog(props: {
               title="模型"
               action={
                 <button type="button" className={css.btn} disabled={busy || loading} onClick={() => void discover()}>
-                  {loading ? <Loader2 className={ui.spin} size={14} /> : <Plus size={14} />}
+                  {loading ? <Loader2 className={css.spin} size={14} /> : <Plus size={14} />}
                   获取模型
                 </button>
               }
@@ -250,28 +262,6 @@ export function CustomDialog(props: {
         </form>
       </div>
     </div>
-  )
-}
-
-function Field(props: { label?: string; value: string; err?: string; placeholder: string; onChange: (value: string) => void }) {
-  return (
-    <label className={css.field}>
-      {props.label ? <span>{props.label}</span> : null}
-      <input value={props.value} onChange={(event) => props.onChange(event.target.value)} placeholder={props.placeholder} />
-      {props.err ? <em>{props.err}</em> : null}
-    </label>
-  )
-}
-
-function Rows(props: { title: string; action: ReactNode; children: ReactNode }) {
-  return (
-    <section className={css.formblock}>
-      <div className={css.formhead}>
-        <h4>{props.title}</h4>
-        {props.action}
-      </div>
-      <div className={css.rows}>{props.children}</div>
-    </section>
   )
 }
 

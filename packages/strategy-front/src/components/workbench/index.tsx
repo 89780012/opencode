@@ -1,7 +1,7 @@
 import { useState } from "react"
+import { SettingsDialog } from "../settings"
 import { Rail } from "./layout/rail"
 import shell from "./layout/shell.module.css"
-import { SettingsDialog } from "./settings"
 import ui from "./shared.module.css"
 import { Workbench } from "./workbench"
 

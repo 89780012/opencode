@@ -4,8 +4,7 @@ import { toast } from "sonner"
 import { providerApi } from "@/api/modules/provider"
 import type { Grant, Method, Provider } from "@/types/provider"
 import { text } from "../../provider/utils"
-import ui from "../shared.module.css"
-import css from "./settings.module.css"
+import css from "../settings.module.css"
 
 function label(method: Method) {
   if (method.type === "api") return "API 密钥"
@@ -204,7 +203,7 @@ export function ConnectDialog(props: {
 
           {busy && !grant && method?.type === "oauth" ? (
             <div className={css.load}>
-              <Loader2 className={ui.spin} size={14} />
+              <Loader2 className={css.spin} size={14} />
               正在发起授权...
             </div>
           ) : null}
@@ -245,7 +244,7 @@ export function ConnectDialog(props: {
                 {grant.instructions ? <code>{grant.instructions}</code> : null}
               </div>
               <div className={css.load}>
-                <Loader2 className={ui.spin} size={14} />
+                <Loader2 className={css.spin} size={14} />
                 等待服务端完成 OAuth 回调...
               </div>
               {err ? <p className={css.error}>{err}</p> : null}

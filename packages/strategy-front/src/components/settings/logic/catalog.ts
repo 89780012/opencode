@@ -1,5 +1,5 @@
 import { popular } from "../../provider/utils"
-import type { Row } from "./types"
+import type { Row } from "../types"
 
 export function match(row: Row, q: string) {
   if (!q) return true

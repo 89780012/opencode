@@ -2,9 +2,8 @@ import { Loader2, Plus, RefreshCcw } from "lucide-react"
 import { useState } from "react"
 import type { Provider } from "@/types/provider"
 import { note, source } from "../../provider/utils"
-import ui from "../shared.module.css"
-import css from "./settings.module.css"
-import type { useSettings } from "./use-settings"
+import css from "../settings.module.css"
+import type { useSettings } from "../hooks/use-settings"
 
 type App = ReturnType<typeof useSettings>
 
@@ -17,7 +16,7 @@ function List(props: {
   if (props.app.page.load) {
     return (
       <div className={css.load}>
-        <Loader2 className={ui.spin} size={14} />
+        <Loader2 className={css.spin} size={14} />
         正在加载提供商状态...
       </div>
     )
@@ -58,7 +57,7 @@ function List(props: {
                 <span className={css.status}>来自环境变量</span>
               ) : (
                 <button type="button" className={css.btn} onClick={() => void props.app.page.remove(item)} disabled={busy}>
-                  {busy ? <Loader2 className={ui.spin} size={14} /> : null}
+                  {busy ? <Loader2 className={css.spin} size={14} /> : null}
                   {busy ? "处理中..." : "断开"}
                 </button>
               )}
@@ -84,7 +83,7 @@ export function ProvidersPanel(props: { app: App }) {
         </div>
         <div className={css.actions}>
           <button type="button" className={css.btn} onClick={() => void app.page.refresh()} disabled={app.page.load}>
-            <RefreshCcw className={app.page.load ? ui.spin : ""} size={14} />
+            <RefreshCcw className={app.page.load ? css.spin : ""} size={14} />
             刷新
           </button>
           <button type="button" className={`${css.btn} ${css.primary}`} onClick={() => app.page.setCustomOpen(true)}>

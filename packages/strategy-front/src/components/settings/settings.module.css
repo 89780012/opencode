@@ -43,13 +43,13 @@
 
 .dialogbar strong {
   color: #0f172a;
-  font-size: 0.8rem;
+  font-size: 0.92rem;
   line-height: 1.2;
 }
 
 .dialogbar span {
   color: #64748b;
-  font-size: 0.62rem;
+  font-size: 0.74rem;
 }
 
 .side {
@@ -67,7 +67,7 @@
   padding: 0.5rem 0.65rem;
   border-bottom: 1px solid #e2e8f0;
   color: #0f172a;
-  font-size: 0.8rem;
+  font-size: 0.92rem;
   font-weight: 700;
   letter-spacing: 0.01em;
 }
@@ -89,10 +89,10 @@
   border-radius: 0.375rem;
   background: transparent;
   color: #64748b;
-  font-size: 0.72rem;
+  font-size: 0.84rem;
   font-weight: 600;
-  line-height: 0.95rem;
-  padding: 0.34rem 0.46rem 0.34rem calc(0.46rem - 3px);
+  line-height: 1.1rem;
+  padding: 0.42rem 0.54rem 0.42rem calc(0.54rem - 3px);
   text-align: left;
   transition:
     background 0.16s ease,
@@ -143,7 +143,7 @@
 
 .head h2 {
   color: #0f172a;
-  font-size: 0.86rem;
+  font-size: 1rem;
   line-height: 1.2;
   font-weight: 700;
 }
@@ -152,7 +152,7 @@
 .title p {
   margin-top: 0.12rem;
   color: #64748b;
-  font-size: 0.62rem;
+  font-size: 0.84rem;
   line-height: 1.4;
 }
 
@@ -169,15 +169,15 @@
   align-items: center;
   justify-content: center;
   gap: 0.28rem;
-  min-height: 1.55rem;
+  min-height: 1.8rem;
   border: 0;
   border-radius: 0.34rem;
   background: transparent;
   color: #64748b;
-  font-size: 0.7rem;
+  font-size: 0.82rem;
   font-weight: 600;
   line-height: 1;
-  padding: 0.28rem 0.56rem;
+  padding: 0.36rem 0.66rem;
   white-space: nowrap;
   transition:
     background 0.16s ease,
@@ -205,8 +205,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.32rem;
-  height: 1.32rem;
+  width: 1.55rem;
+  height: 1.55rem;
   border: 0;
   border-radius: 0.28rem;
   background: transparent;
@@ -246,12 +246,12 @@
 
 .metrics span {
   color: #64748b;
-  font-size: 0.6rem;
+  font-size: 0.74rem;
 }
 
 .metrics strong {
   color: #0f172a;
-  font-size: 0.72rem;
+  font-size: 0.9rem;
   font-weight: 700;
 }
 
@@ -298,7 +298,7 @@
 .title h3,
 .formhead h4 {
   color: #0f172a;
-  font-size: 0.72rem;
+  font-size: 0.88rem;
   line-height: 1.2;
   font-weight: 700;
 }
@@ -318,10 +318,9 @@
   gap: 0.65rem;
   border-bottom: 1px solid #eef2f7;
   background: transparent;
-  padding: 0.38rem 0.3rem;
+  padding: 0.5rem 0.35rem;
   color: #475569;
-  transition:
-    background 0.16s ease;
+  transition: background 0.16s ease;
 }
 
 .groupbtn {
@@ -332,7 +331,7 @@
   border: 0;
   background: transparent;
   color: #0f172a;
-  font-size: 0.72rem;
+  font-size: 0.88rem;
   font-weight: 700;
   line-height: 1.2;
   padding: 0.12rem 0;
@@ -364,7 +363,7 @@
 .groupbtn em {
   flex: none;
   color: #64748b;
-  font-size: 0.6rem;
+  font-size: 0.74rem;
   font-style: normal;
   font-weight: 500;
 }
@@ -388,7 +387,7 @@
 
 .line strong {
   color: #0f172a;
-  font-size: 0.7rem;
+  font-size: 0.86rem;
   font-weight: 600;
 }
 
@@ -399,28 +398,28 @@
   border-radius: 0.3rem;
   background: #f8fafc;
   color: #475569;
-  font-size: 0.55rem;
+  font-size: 0.68rem;
   line-height: 1;
-  padding: 0.1rem 0.28rem;
+  padding: 0.16rem 0.34rem;
   white-space: nowrap;
 }
 
 .info p {
   margin: 0.16rem 0 0;
   color: #64748b;
-  font-size: 0.6rem;
+  font-size: 0.76rem;
   line-height: 1.45;
 }
 
 .meta {
   margin-top: 0.16rem;
   color: #64748b;
-  font-size: 0.58rem;
+  font-size: 0.72rem;
 }
 
 .status {
   color: #64748b;
-  font-size: 0.62rem;
+  font-size: 0.76rem;
   white-space: nowrap;
 }
 
@@ -429,8 +428,8 @@
   border-radius: 0.38rem;
   background: #fef2f2;
   color: #b91c1c;
-  font-size: 0.62rem;
-  padding: 0.38rem 0.48rem;
+  font-size: 0.76rem;
+  padding: 0.46rem 0.56rem;
 }
 
 .empty {
@@ -442,8 +441,8 @@
   border-bottom: 1px solid #eef2f7;
   background: transparent;
   color: #64748b;
-  font-size: 0.64rem;
-  padding: 0.48rem 0.3rem;
+  font-size: 0.78rem;
+  padding: 0.56rem 0.35rem;
 }
 
 .load {
@@ -451,7 +450,7 @@
   align-items: center;
   gap: 0.45rem;
   color: #64748b;
-  font-size: 0.64rem;
+  font-size: 0.78rem;
 }
 
 .search {
@@ -476,7 +475,7 @@
   border-radius: 0.38rem;
   background: #ffffff;
   color: #0f172a;
-  font-size: 0.68rem;
+  font-size: 0.82rem;
   outline: 0;
   transition:
     background 0.16s ease,
@@ -485,12 +484,12 @@
 }
 
 .search input {
-  height: 1.62rem;
+  height: 1.9rem;
   padding: 0 0.7rem 0 2rem;
 }
 
 .field input {
-  height: 1.78rem;
+  height: 2rem;
   padding: 0 0.62rem;
 }
 
@@ -507,7 +506,7 @@
   justify-content: flex-end;
   gap: 0.45rem;
   color: #64748b;
-  font-size: 0.6rem;
+  font-size: 0.74rem;
   white-space: nowrap;
 }
 
@@ -596,14 +595,14 @@
 
 .modalhead h3 {
   color: #0f172a;
-  font-size: 0.78rem;
+  font-size: 0.94rem;
   line-height: 1.2;
 }
 
 .modalhead p,
 .note {
   color: #64748b;
-  font-size: 0.62rem;
+  font-size: 0.76rem;
 }
 
 .modalbody {
@@ -668,12 +667,12 @@
 }
 
 .choice strong {
-  font-size: 0.68rem;
+  font-size: 0.84rem;
 }
 
 .choice span {
   color: #64748b;
-  font-size: 0.6rem;
+  font-size: 0.74rem;
 }
 
 .field {
@@ -682,14 +681,14 @@
   flex-direction: column;
   gap: 0.22rem;
   color: #334155;
-  font-size: 0.62rem;
+  font-size: 0.76rem;
   font-weight: 600;
 }
 
 .field em,
 .error {
   color: #dc2626;
-  font-size: 0.58rem;
+  font-size: 0.7rem;
   font-style: normal;
   font-weight: 500;
 }
@@ -737,6 +736,16 @@
   color: #475569;
   font-family: var(--font-code);
   overflow-wrap: anywhere;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 920px) {

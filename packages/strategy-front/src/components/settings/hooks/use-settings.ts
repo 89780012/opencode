@@ -13,8 +13,8 @@ import {
   writeModelCatalog,
   type ModelKey,
 } from "@/lib/model-catalog"
-import { match, sortProvider } from "./lib"
-import type { Row, Vis } from "./types"
+import { match, sortProvider } from "../logic/catalog"
+import type { Row, Vis } from "../types"
 
 function sig(input: ModelKey[]) {
   return input.map((item) => modelKey(item)).join("|")

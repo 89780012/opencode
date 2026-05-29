@@ -1,9 +1,9 @@
 import { ArrowDown, ArrowUp, ChevronDown, Loader2, RefreshCcw, RotateCcw, Search } from "lucide-react"
 import { useState } from "react"
 import { modelChainLimit, modelKey } from "@/lib/model-catalog"
-import ui from "../shared.module.css"
-import css from "./settings.module.css"
-import type { useSettings } from "./use-settings"
+import { Switch } from "../ui/switch"
+import css from "../settings.module.css"
+import type { useSettings } from "../hooks/use-settings"
 
 type App = ReturnType<typeof useSettings>
 
@@ -22,7 +22,7 @@ export function ModelsPanel(props: { app: App; onProviders: () => void }) {
         </div>
         <div className={css.actions}>
           <button type="button" className={css.btn} onClick={() => void app.prv.reload()} disabled={app.prv.load}>
-            <RefreshCcw className={app.prv.load ? ui.spin : ""} size={14} />
+            <RefreshCcw className={app.prv.load ? css.spin : ""} size={14} />
             刷新
           </button>
           <button type="button" className={css.btn} onClick={app.clear} disabled={app.prv.load || Object.keys(app.user).length === 0}>
@@ -110,7 +110,7 @@ export function ModelsPanel(props: { app: App; onProviders: () => void }) {
 
         {app.prv.load ? (
           <div className={css.load}>
-            <Loader2 className={ui.spin} size={14} />
+            <Loader2 className={css.spin} size={14} />
             正在加载模型目录...
           </div>
         ) : app.stats.providers === 0 ? (
@@ -192,17 +192,5 @@ export function ModelsPanel(props: { app: App; onProviders: () => void }) {
         )}
       </section>
     </div>
-  )
-}
-
-function Switch(props: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
-  return (
-    <label className={css.switchline}>
-      <span>{props.label}</span>
-      <span className={css.switch}>
-        <input type="checkbox" checked={props.checked} onChange={(event) => props.onChange(event.target.checked)} />
-        <span className={css.track} />
-      </span>
-    </label>
   )
 }
