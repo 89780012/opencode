@@ -1,4 +1,5 @@
-import { ArrowDown, ArrowUp, Loader2, RefreshCcw, RotateCcw, Search } from "lucide-react"
+import { ArrowDown, ArrowUp, ChevronDown, Loader2, RefreshCcw, RotateCcw, Search } from "lucide-react"
+import { useState } from "react"
 import { modelChainLimit, modelKey } from "@/lib/model-catalog"
 import ui from "../shared.module.css"
 import css from "./settings.module.css"
@@ -9,6 +10,8 @@ type App = ReturnType<typeof useSettings>
 export function ModelsPanel(props: { app: App; onProviders: () => void }) {
   const app = props.app
   const pick = app.order[0] ? `${app.order[0].providerID}/${app.order[0].modelID}` : ""
+  const [open, setOpen] = useState<Record<string, boolean>>({})
+  const query = app.q.trim().length > 0
 
   return (
     <div className={css.panel}>
@@ -91,7 +94,7 @@ export function ModelsPanel(props: { app: App; onProviders: () => void }) {
         )}
       </section>
 
-      <section className={css.section}>
+      <section className={`${css.section} ${css.fill}`}>
         <div className={css.titleline}>
           <div className={css.title}>
             <h3>模型目录</h3>
@@ -120,59 +123,72 @@ export function ModelsPanel(props: { app: App; onProviders: () => void }) {
         ) : app.groups.length === 0 ? (
           <div className={css.empty}>没有匹配的模型。</div>
         ) : (
-          app.groups.map((group) => {
-            const all = group.items.every((item) => app.visible({ providerID: item.provider.id, modelID: item.id }, item))
+          <div className={css.catalog}>
+            {app.groups.map((group, idx) => {
+              const all = group.items.every((item) => app.visible({ providerID: item.provider.id, modelID: item.id }, item))
+              const show = query || (open[group.id] ?? idx === 0)
 
-            return (
-              <div key={group.id} className={css.group}>
-                <div className={css.titleline}>
-                  <div className={css.title}>
-                    <h3>{group.name}</h3>
-                    <p>{group.items.length} 个模型</p>
+              return (
+                <div key={group.id} className={css.group}>
+                  <div className={css.titleline}>
+                    <button
+                      type="button"
+                      className={css.groupbtn}
+                      aria-expanded={show}
+                      onClick={() => setOpen((prev) => ({ ...prev, [group.id]: !show }))}
+                    >
+                      <ChevronDown className={show ? css.turn : ""} size={14} />
+                      <span>{group.name}</span>
+                      <em>{group.items.length} 个模型</em>
+                    </button>
+                    {show ? (
+                      <Switch
+                        label="全部"
+                        checked={all}
+                        onChange={(on) =>
+                          group.items.forEach((item) => {
+                            app.show({ providerID: item.provider.id, modelID: item.id }, on)
+                          })
+                        }
+                      />
+                    ) : null}
                   </div>
-                  <Switch
-                    label="全部"
-                    checked={all}
-                    onChange={(on) =>
-                      group.items.forEach((item) => {
-                        app.show({ providerID: item.provider.id, modelID: item.id }, on)
-                      })
-                    }
-                  />
-                </div>
 
-                <div className={css.rows}>
-                  {group.items.map((item) => {
-                    const on = app.visible({ providerID: item.provider.id, modelID: item.id }, item)
+                  {show ? (
+                    <div className={css.rows}>
+                      {group.items.map((item) => {
+                        const on = app.visible({ providerID: item.provider.id, modelID: item.id }, item)
 
-                    return (
-                      <article key={`${item.provider.id}:${item.id}`} className={css.row}>
-                        <div className={css.info}>
-                          <div className={css.line}>
-                            <strong>{item.name}</strong>
-                            <span>{item.id}</span>
-                            {item.def ? <span>默认</span> : null}
-                            {app.latest.has(modelKey({ providerID: item.provider.id, modelID: item.id })) ? <span>最新</span> : null}
-                            {item.free ? <span>免费</span> : null}
-                          </div>
-                          <div className={css.meta}>
-                            <span>上下文 {item.limit.context.toLocaleString()}</span>
-                            <span>{item.capabilities?.reasoning ? "支持推理" : "不支持推理"}</span>
-                            <span>{item.capabilities?.toolcall ? "支持工具" : "不支持工具"}</span>
-                          </div>
-                        </div>
-                        <Switch
-                          label={on ? "显示中" : "已隐藏"}
-                          checked={on}
-                          onChange={(next) => app.show({ providerID: item.provider.id, modelID: item.id }, next)}
-                        />
-                      </article>
-                    )
-                  })}
+                        return (
+                          <article key={`${item.provider.id}:${item.id}`} className={css.row}>
+                            <div className={css.info}>
+                              <div className={css.line}>
+                                <strong>{item.name}</strong>
+                                <span>{item.id}</span>
+                                {item.def ? <span>默认</span> : null}
+                                {app.latest.has(modelKey({ providerID: item.provider.id, modelID: item.id })) ? <span>最新</span> : null}
+                                {item.free ? <span>免费</span> : null}
+                              </div>
+                              <div className={css.meta}>
+                                <span>上下文 {item.limit.context.toLocaleString()}</span>
+                                <span>{item.capabilities?.reasoning ? "支持推理" : "不支持推理"}</span>
+                                <span>{item.capabilities?.toolcall ? "支持工具" : "不支持工具"}</span>
+                              </div>
+                            </div>
+                            <Switch
+                              label={on ? "显示中" : "已隐藏"}
+                              checked={on}
+                              onChange={(next) => app.show({ providerID: item.provider.id, modelID: item.id }, next)}
+                            />
+                          </article>
+                        )
+                      })}
+                    </div>
+                  ) : null}
                 </div>
-              </div>
-            )
-          })
+              )
+            })}
+          </div>
         )}
       </section>
     </div>

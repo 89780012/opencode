@@ -1,4 +1,5 @@
 import { Loader2, Plus, RefreshCcw } from "lucide-react"
+import { useState } from "react"
 import type { Provider } from "@/types/provider"
 import { note, source } from "../../provider/utils"
 import ui from "../shared.module.css"
@@ -71,6 +72,8 @@ function List(props: {
 
 export function ProvidersPanel(props: { app: App }) {
   const app = props.app
+  const [more, setMore] = useState(false)
+  const other = more ? app.page.other : app.page.other.slice(0, 10)
 
   return (
     <div className={css.panel}>
@@ -125,11 +128,18 @@ export function ProvidersPanel(props: { app: App }) {
       </section>
 
       <section className={css.section}>
-        <div className={css.title}>
-          <h3>更多</h3>
-          <p>后端已经识别到但尚未连接的其他 provider。</p>
+        <div className={css.titleline}>
+          <div className={css.title}>
+            <h3>更多</h3>
+            <p>后端已经识别到但尚未连接的其他 provider。</p>
+          </div>
+          {app.page.other.length > 10 ? (
+            <button type="button" className={css.btn} onClick={() => setMore((prev) => !prev)}>
+              {more ? "收起" : `显示全部 ${app.page.other.length} 个`}
+            </button>
+          ) : null}
         </div>
-        <List app={app} items={app.page.other} mode="available" empty="没有更多可用 provider。" />
+        <List app={app} items={other} mode="available" empty="没有更多可用 provider。" />
       </section>
     </div>
   )

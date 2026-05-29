@@ -16,6 +16,10 @@ import {
 import { match, sortProvider } from "./lib"
 import type { Row, Vis } from "./types"
 
+function sig(input: ModelKey[]) {
+  return input.map((item) => modelKey(item)).join("|")
+}
+
 export function useSettings() {
   const page = useProviderPage()
   const prv = useProviderList()
@@ -25,6 +29,11 @@ export function useSettings() {
   const [touched, setTouched] = useState(() => readModelChain().chainTouched)
   const dq = useDeferredValue(q.trim().toLowerCase())
   const sync = useRef(prv.sync)
+  const saved = useRef({
+    chain: "",
+    touched,
+    user: JSON.stringify(user),
+  })
   const linked = useMemo(() => new Set(page.providers.connected), [page.providers.connected])
   const rows = useMemo(
     () =>
@@ -94,7 +103,19 @@ export function useSettings() {
   useEffect(() => {
     if (typeof window === "undefined") return
     writeModelCatalog({ user, chain: order, chainTouched: touched })
-    void modelChainApi.save({ chain: order }).catch(() => undefined)
+    const next = {
+      chain: sig(order),
+      touched,
+      user: JSON.stringify(user),
+    }
+    if (saved.current.chain === next.chain && saved.current.touched === next.touched && saved.current.user === next.user) return
+
+    const push = saved.current.chain !== next.chain
+    saved.current = next
+
+    if (push) {
+      void modelChainApi.save({ chain: order }).catch(() => undefined)
+    }
     sync.current()
   }, [order, touched, user])
 
