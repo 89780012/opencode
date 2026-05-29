@@ -2,7 +2,7 @@ import { ClipboardCheck, Clock3, History, X } from "lucide-react"
 import type { KeyboardEvent, PointerEvent } from "react"
 import type { SessionItem } from "../data"
 import { badge, lead, stepText, text, tone } from "../lib"
-import ui from "../shared.module.css"
+import ui from "../../workstation/shared.module.css"
 import { Handle } from "../layout/handle"
 import css from "./review.module.css"
 

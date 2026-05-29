@@ -122,6 +122,60 @@
   color: #0f172a;
 }
 
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.28rem;
+  min-height: 1.8rem;
+  border: 0;
+  border-radius: 0.34rem;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1;
+  padding: 0.36rem 0.66rem;
+  white-space: nowrap;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.btnPrimary {
+  background: #0f172a;
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+
+.btnPrimary:hover {
+  background: #0f172a;
+  color: #ffffff;
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.55rem;
+  height: 1.55rem;
+  border: 0;
+  border-radius: 0.28rem;
+  background: transparent;
+  color: #64748b;
+}
+
+.icon:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
 .ghost {
   display: inline-flex;
   align-items: center;
@@ -180,6 +234,14 @@
   color: #64748b;
   font-size: 0.68rem;
   text-align: center;
+}
+
+.load {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: #64748b;
+  font-size: 0.78rem;
 }
 
 .flip {

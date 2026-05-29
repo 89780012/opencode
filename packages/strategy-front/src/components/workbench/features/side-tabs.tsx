@@ -22,7 +22,7 @@ import {
 import type { ReactNode } from "react"
 import { type SessionItem, type Stage } from "../data"
 import { Compact } from "../layout/compact"
-import ui from "../shared.module.css"
+import ui from "../../workstation/shared.module.css"
 import css from "./side.module.css"
 
 export type Issue = { sid: string; name: string; body: string }

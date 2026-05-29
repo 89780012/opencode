@@ -2,6 +2,7 @@ import { Loader2, Plus, RefreshCcw } from "lucide-react"
 import { useState } from "react"
 import type { Provider } from "@/types/provider"
 import { note, source } from "../../provider/utils"
+import ui from "../../workstation/shared.module.css"
 import css from "../settings.module.css"
 import type { useSettings } from "../hooks/use-settings"
 
@@ -15,8 +16,8 @@ function List(props: {
 }) {
   if (props.app.page.load) {
     return (
-      <div className={css.load}>
-        <Loader2 className={css.spin} size={14} />
+      <div className={ui.load}>
+        <Loader2 className={ui.spin} size={14} />
         正在加载提供商状态...
       </div>
     )
@@ -50,14 +51,14 @@ function List(props: {
             </div>
             <div className={css.actions}>
               {props.mode === "available" ? (
-                <button type="button" className={`${css.btn} ${css.primary}`} onClick={() => props.app.page.setItem(item)}>
+                <button type="button" className={`${ui.btn} ${ui.btnPrimary}`} onClick={() => props.app.page.setItem(item)}>
                   连接
                 </button>
               ) : item.source === "env" ? (
                 <span className={css.status}>来自环境变量</span>
               ) : (
-                <button type="button" className={css.btn} onClick={() => void props.app.page.remove(item)} disabled={busy}>
-                  {busy ? <Loader2 className={css.spin} size={14} /> : null}
+                <button type="button" className={ui.btn} onClick={() => void props.app.page.remove(item)} disabled={busy}>
+                  {busy ? <Loader2 className={ui.spin} size={14} /> : null}
                   {busy ? "处理中..." : "断开"}
                 </button>
               )}
@@ -82,11 +83,11 @@ export function ProvidersPanel(props: { app: App }) {
           <p>连接、断开和添加当前工作台可用的模型 provider。</p>
         </div>
         <div className={css.actions}>
-          <button type="button" className={css.btn} onClick={() => void app.page.refresh()} disabled={app.page.load}>
-            <RefreshCcw className={app.page.load ? css.spin : ""} size={14} />
+          <button type="button" className={ui.btn} onClick={() => void app.page.refresh()} disabled={app.page.load}>
+            <RefreshCcw className={app.page.load ? ui.spin : ""} size={14} />
             刷新
           </button>
-          <button type="button" className={`${css.btn} ${css.primary}`} onClick={() => app.page.setCustomOpen(true)}>
+          <button type="button" className={`${ui.btn} ${ui.btnPrimary}`} onClick={() => app.page.setCustomOpen(true)}>
             <Plus size={14} />
             自定义
           </button>
@@ -133,7 +134,7 @@ export function ProvidersPanel(props: { app: App }) {
             <p>后端已经识别到但尚未连接的其他 provider。</p>
           </div>
           {app.page.other.length > 10 ? (
-            <button type="button" className={css.btn} onClick={() => setMore((prev) => !prev)}>
+            <button type="button" className={ui.btn} onClick={() => setMore((prev) => !prev)}>
               {more ? "收起" : `显示全部 ${app.page.other.length} 个`}
             </button>
           ) : null}

@@ -2,6 +2,7 @@ import { ArrowDown, ArrowUp, ChevronDown, Loader2, RefreshCcw, RotateCcw, Search
 import { useState } from "react"
 import { modelChainLimit, modelKey } from "@/lib/model-catalog"
 import { Switch } from "../ui/switch"
+import ui from "../../workstation/shared.module.css"
 import css from "../settings.module.css"
 import type { useSettings } from "../hooks/use-settings"
 
@@ -21,11 +22,11 @@ export function ModelsPanel(props: { app: App; onProviders: () => void }) {
           <p>控制模型显示范围和链式模型优先级。</p>
         </div>
         <div className={css.actions}>
-          <button type="button" className={css.btn} onClick={() => void app.prv.reload()} disabled={app.prv.load}>
-            <RefreshCcw className={app.prv.load ? css.spin : ""} size={14} />
+          <button type="button" className={ui.btn} onClick={() => void app.prv.reload()} disabled={app.prv.load}>
+            <RefreshCcw className={app.prv.load ? ui.spin : ""} size={14} />
             刷新
           </button>
-          <button type="button" className={css.btn} onClick={app.clear} disabled={app.prv.load || Object.keys(app.user).length === 0}>
+          <button type="button" className={ui.btn} onClick={app.clear} disabled={app.prv.load || Object.keys(app.user).length === 0}>
             <RotateCcw size={14} />
             重置显示
           </button>
@@ -42,7 +43,7 @@ export function ModelsPanel(props: { app: App; onProviders: () => void }) {
             <span className={css.status}>
               {app.order.length}/{modelChainLimit}
             </span>
-            <button type="button" className={css.btn} onClick={app.reset} disabled={app.shown.length === 0}>
+            <button type="button" className={ui.btn} onClick={app.reset} disabled={app.shown.length === 0}>
               <RotateCcw size={14} />
               自动排序
             </button>
@@ -109,14 +110,14 @@ export function ModelsPanel(props: { app: App; onProviders: () => void }) {
         {app.prv.err ? <div className={css.alert}>{app.prv.err}</div> : null}
 
         {app.prv.load ? (
-          <div className={css.load}>
-            <Loader2 className={css.spin} size={14} />
+          <div className={ui.load}>
+            <Loader2 className={ui.spin} size={14} />
             正在加载模型目录...
           </div>
         ) : app.stats.providers === 0 ? (
           <div className={css.empty}>
             还没有已连接的 provider。
-            <button type="button" className={`${css.btn} ${css.primary}`} onClick={props.onProviders}>
+            <button type="button" className={`${ui.btn} ${ui.btnPrimary}`} onClick={props.onProviders}>
               去连接
             </button>
           </div>

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
 import { ChevronDown, ChevronRight, type LucideIcon } from "lucide-react"
 import css from "./compact.module.css"
-import ui from "../shared.module.css"
+import ui from "../../workstation/shared.module.css"
 
 export function Compact(props: {
   open: boolean

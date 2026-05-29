@@ -2,7 +2,7 @@ import { Check, Clock3, GitCompareArrows, Minus, Plus, RotateCcw, Sparkles, X } 
 import type { KeyboardEvent, PointerEvent, RefObject, WheelEvent } from "react"
 import type { SessionItem, TimelineEvent } from "../data"
 import { kind } from "../lib"
-import ui from "../shared.module.css"
+import ui from "../../workstation/shared.module.css"
 import css from "./timeline.module.css"
 
 export function TimelineToolbar(props: { zoom: number; onZoom: (zoom: number) => void; onPan: (pan: { x: number; y: number }) => void }) {

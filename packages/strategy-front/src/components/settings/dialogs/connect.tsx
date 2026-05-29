@@ -4,6 +4,7 @@ import { toast } from "sonner"
 import { providerApi } from "@/api/modules/provider"
 import type { Grant, Method, Provider } from "@/types/provider"
 import { text } from "../../provider/utils"
+import ui from "../../workstation/shared.module.css"
 import css from "../settings.module.css"
 
 function label(method: Method) {
@@ -184,7 +185,7 @@ export function ConnectDialog(props: {
             <h3>{`连接 ${item.name}`}</h3>
             <p>选择认证方式并完成授权。</p>
           </div>
-          <button type="button" className={css.iconbtn} onClick={() => change(false)} disabled={busy}>
+          <button type="button" className={ui.icon} onClick={() => change(false)} disabled={busy}>
             <X size={14} />
           </button>
         </div>
@@ -202,8 +203,8 @@ export function ConnectDialog(props: {
           ) : null}
 
           {busy && !grant && method?.type === "oauth" ? (
-            <div className={css.load}>
-              <Loader2 className={css.spin} size={14} />
+            <div className={ui.load}>
+              <Loader2 className={ui.spin} size={14} />
               正在发起授权...
             </div>
           ) : null}
@@ -243,8 +244,8 @@ export function ConnectDialog(props: {
                 <p>请在新窗口完成授权。</p>
                 {grant.instructions ? <code>{grant.instructions}</code> : null}
               </div>
-              <div className={css.load}>
-                <Loader2 className={css.spin} size={14} />
+              <div className={ui.load}>
+                <Loader2 className={ui.spin} size={14} />
                 等待服务端完成 OAuth 回调...
               </div>
               {err ? <p className={css.error}>{err}</p> : null}
@@ -259,10 +260,10 @@ export function ConnectDialog(props: {
 function Foot(props: { busy: boolean; one: boolean; onBack: () => void }) {
   return (
     <div className={css.modalfoot}>
-      <button type="button" className={css.btn} onClick={props.onBack} disabled={props.busy || props.one}>
+      <button type="button" className={ui.btn} onClick={props.onBack} disabled={props.busy || props.one}>
         返回
       </button>
-      <button type="submit" className={`${css.btn} ${css.primary}`} disabled={props.busy}>
+      <button type="submit" className={`${ui.btn} ${ui.btnPrimary}`} disabled={props.busy}>
         {props.busy ? "提交中..." : "提交"}
       </button>
     </div>

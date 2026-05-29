@@ -6,6 +6,7 @@ import type { Config } from "@/types/provider"
 import { headerRow, modelRow, validate, type Form } from "../../provider/provider-custom-form"
 import { text } from "../../provider/utils"
 import { Field, Rows } from "../ui/form"
+import ui from "../../workstation/shared.module.css"
 import css from "../settings.module.css"
 
 function init(): Form {
@@ -146,7 +147,7 @@ export function CustomDialog(props: {
             <h3>自定义 provider</h3>
             <p>配置一个兼容 OpenAI 的 provider，并通过服务地址获取模型列表。</p>
           </div>
-          <button type="button" className={css.iconbtn} onClick={() => close(false)} disabled={busy || loading}>
+          <button type="button" className={ui.icon} onClick={() => close(false)} disabled={busy || loading}>
             <X size={14} />
           </button>
         </div>
@@ -175,8 +176,8 @@ export function CustomDialog(props: {
             <Rows
               title="模型"
               action={
-                <button type="button" className={css.btn} disabled={busy || loading} onClick={() => void discover()}>
-                  {loading ? <Loader2 className={css.spin} size={14} /> : <Plus size={14} />}
+                <button type="button" className={ui.btn} disabled={busy || loading} onClick={() => void discover()}>
+                  {loading ? <Loader2 className={ui.spin} size={14} /> : <Plus size={14} />}
                   获取模型
                 </button>
               }
@@ -213,7 +214,7 @@ export function CustomDialog(props: {
             <Rows
               title="请求头"
               action={
-                <button type="button" className={css.btn} onClick={() => setForm((prev) => ({ ...prev, headers: [...prev.headers, headerRow()] }))}>
+                <button type="button" className={ui.btn} onClick={() => setForm((prev) => ({ ...prev, headers: [...prev.headers, headerRow()] }))}>
                   <Plus size={14} />
                   添加请求头
                 </button>
@@ -252,10 +253,10 @@ export function CustomDialog(props: {
           </div>
 
           <div className={css.modalfoot}>
-            <button type="button" className={css.btn} onClick={() => close(false)} disabled={busy || loading}>
+            <button type="button" className={ui.btn} onClick={() => close(false)} disabled={busy || loading}>
               取消
             </button>
-            <button type="submit" className={`${css.btn} ${css.primary}`} disabled={busy || loading}>
+            <button type="submit" className={`${ui.btn} ${ui.btnPrimary}`} disabled={busy || loading}>
               {busy ? "保存中..." : "保存"}
             </button>
           </div>
@@ -267,7 +268,7 @@ export function CustomDialog(props: {
 
 function Icon(props: { disabled: boolean; label: string; onClick: () => void }) {
   return (
-    <button type="button" className={css.iconbtn} disabled={props.disabled} onClick={props.onClick} aria-label={props.label}>
+    <button type="button" className={ui.icon} disabled={props.disabled} onClick={props.onClick} aria-label={props.label}>
       <Trash2 size={14} />
     </button>
   )

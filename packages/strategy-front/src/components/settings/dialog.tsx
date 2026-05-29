@@ -1,5 +1,6 @@
 import { X } from "lucide-react"
 import { SettingsContent } from "./layout/content"
+import ui from "../workstation/shared.module.css"
 import css from "./settings.module.css"
 
 export function SettingsDialog(props: { open: boolean; onOpenChange: (open: boolean) => void }) {
@@ -13,7 +14,7 @@ export function SettingsDialog(props: { open: boolean; onOpenChange: (open: bool
             <strong>设置</strong>
             <span>Provider 和模型配置</span>
           </div>
-          <button type="button" className={css.iconbtn} onClick={() => props.onOpenChange(false)} aria-label="关闭设置">
+          <button type="button" className={ui.icon} onClick={() => props.onOpenChange(false)} aria-label="关闭设置">
             <X size={14} />
           </button>
         </div>

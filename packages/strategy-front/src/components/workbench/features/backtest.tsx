@@ -1,6 +1,6 @@
 import { ChartColumn, LoaderCircle, Play } from "lucide-react"
 import type { BacktestResult, SessionItem } from "../data"
-import ui from "../shared.module.css"
+import ui from "../../workstation/shared.module.css"
 import css from "./stage.module.css"
 
 function Result(props: { result: BacktestResult | null }) {

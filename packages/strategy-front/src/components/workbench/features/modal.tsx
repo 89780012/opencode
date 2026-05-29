@@ -1,5 +1,5 @@
 import { Check, ChevronRight, LoaderCircle, Plus, Sparkles, Trash2, X } from "lucide-react"
-import ui from "../shared.module.css"
+import ui from "../../workstation/shared.module.css"
 import css from "./modal.module.css"
 
 export function Modal(props: {
