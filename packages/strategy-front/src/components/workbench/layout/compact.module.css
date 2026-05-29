@@ -44,6 +44,7 @@
 .left {
   gap: 0.3rem;
   min-width: 0;
+  font-size: 0.8rem;
 }
 
 .right {
