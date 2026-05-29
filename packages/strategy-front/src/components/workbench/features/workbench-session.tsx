@@ -5,11 +5,7 @@ import type { LocalWorkspace } from "@/types/workspace"
 import type { ChatMessageInfo, ChatStatus } from "@/types/chat"
 import { SessionComposer } from "./session-composer"
 import { SessionMessageList } from "./session-message-list"
-import {
-  WorkbenchPermissionPanel,
-  WorkbenchQuestionPanel,
-  WorkbenchTodoPanel,
-} from "./session-request-panels"
+import { WorkbenchPermissionPanel, WorkbenchQuestionPanel, WorkbenchTodoPanel } from "./session-request-panels"
 import panels from "./session-panels.module.css"
 import css from "./session-chat.module.css"
 
@@ -35,8 +31,6 @@ export function WorkbenchSession(props: {
     createSession: props.onCreate,
     selectSession: props.onSelectSession,
   })
-  const empty = !props.detailLoading && props.messages.length === 0
-
   return (
     <section className={css.root}>
       <SessionMessageList
@@ -45,16 +39,6 @@ export function WorkbenchSession(props: {
         status={props.status}
         onOpenDiff={props.onOpenDiff}
       />
-
-      {empty ? (
-        <div className={css.body}>
-          <div className={panels.panel}>
-            <div className={panels.title}>想先研究哪类策略？</div>
-            <div className={panels.desc}>可以描述策略思路、代码问题、回测目标，或直接要求我审查当前工作区。</div>
-          </div>
-        </div>
-      ) : null}
-
       <div className={panels.stack} style={{ padding: "0 1rem" }}>
         {chat.permission.req ? (
           <WorkbenchPermissionPanel
