@@ -1,8 +1,8 @@
 import { CheckCircle2, Circle, LoaderCircle, MinusCircle, ShieldAlert } from "lucide-react"
 import { useState } from "react"
 import type { ChatQuestionAnswer, ChatQuestionRequest, ChatTodo, PermissionRequest } from "@/types/chat"
-import common from "./session-common.module.css"
-import css from "./session-panels.module.css"
+import common from "../../styles/session/session-common.module.css"
+import css from "../../styles/session/session-panels.module.css"
 
 function TodoIcon(props: { status: string }) {
   if (props.status === "completed") return <CheckCircle2 size={14} color="#16a34a" />

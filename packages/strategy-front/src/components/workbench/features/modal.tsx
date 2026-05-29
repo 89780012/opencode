@@ -1,6 +1,6 @@
 import { Check, ChevronRight, LoaderCircle, Plus, Sparkles, Trash2, X } from "lucide-react"
-import ui from "../../workstation/shared.module.css"
-import css from "./modal.module.css"
+import ui from "../../shared/styles/ui.module.css"
+import css from "../styles/modal/modal.module.css"
 
 export function Modal(props: {
   open: boolean

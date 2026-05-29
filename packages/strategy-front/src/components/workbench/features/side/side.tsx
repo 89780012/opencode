@@ -1,6 +1,6 @@
 import { ClipboardList, MessageSquareMore, Sparkles } from "lucide-react"
-import { type SessionItem, type SidebarTab, type Stage } from "../data"
-import css from "./side.module.css"
+import { type SessionItem, type SidebarTab, type Stage } from "../../data"
+import css from "../../styles/side/side.module.css"
 import { type Issue, RequirementsTab, SessionsTab } from "./side-tabs"
 
 export function Side(props: {

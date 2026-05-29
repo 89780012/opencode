@@ -1,6 +1,6 @@
 import { Send, Square } from "lucide-react"
 import type { KeyboardEvent } from "react"
-import css from "./session-composer.module.css"
+import css from "../../styles/session/session-composer.module.css"
 
 export function SessionComposer(props: {
   busy: boolean

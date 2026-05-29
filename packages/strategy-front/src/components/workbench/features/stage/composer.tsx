@@ -1,6 +1,6 @@
 import { ClipboardCheck, Send } from "lucide-react"
 import type { KeyboardEvent } from "react"
-import css from "./composer.module.css"
+import css from "../../styles/stage/composer.module.css"
 
 export function Composer(props: { draft: string; onDraft: (text: string) => void; onSend: (review: boolean) => void }) {
   const key = (event: KeyboardEvent<HTMLTextAreaElement>) => {

@@ -1,7 +1,7 @@
 import { Copy } from "lucide-react"
-import type { SessionItem } from "../data"
-import css from "./code.module.css"
-import ui from "../../workstation/shared.module.css"
+import type { SessionItem } from "../../data"
+import css from "../../styles/stage/code.module.css"
+import ui from "../../../shared/styles/ui.module.css"
 
 export function CodePanel(props: { cur: SessionItem; onCopy: () => void }) {
   return (

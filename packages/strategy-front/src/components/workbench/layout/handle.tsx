@@ -1,5 +1,5 @@
 import type { KeyboardEventHandler, PointerEventHandler } from "react"
-import css from "./handle.module.css"
+import css from "../styles/layout/handle.module.css"
 
 export function Handle(props: {
   edge?: "right"

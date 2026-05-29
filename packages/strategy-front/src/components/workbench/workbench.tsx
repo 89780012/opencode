@@ -3,15 +3,15 @@ import { Modal } from "./features/modal"
 import { Review } from "./features/review"
 import { Side } from "./features/side"
 import { StageView } from "./features/stage"
-import { WorkbenchSession } from "./features/workbench-session"
+import { WorkbenchSession } from "./features/session"
 import { usePanels } from "./hooks/use-panels"
 import { useTimeline } from "./hooks/use-timeline"
 import { useWorkbench } from "./hooks/use-workbench"
 import { useWorkbenchChat } from "./hooks/use-workbench-chat"
 import { Handle } from "./layout/handle"
-import shell from "./layout/shell.module.css"
+import shell from "./styles/layout/shell.module.css"
 import { Topbar } from "./layout/topbar"
-import common from "./features/session-common.module.css"
+import common from "./styles/session/session-common.module.css"
 
 export function Workbench() {
   const panel = usePanels()

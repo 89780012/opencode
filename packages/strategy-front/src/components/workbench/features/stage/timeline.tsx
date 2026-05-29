@@ -1,6 +1,6 @@
 import type { KeyboardEvent, PointerEvent, RefObject, WheelEvent } from "react"
-import type { SessionItem, TimelineEvent } from "../data"
-import css from "./timeline.module.css"
+import type { SessionItem, TimelineEvent } from "../../data"
+import css from "../../styles/stage/timeline.module.css"
 import { TimelineAnalysis, TimelineCanvas, TimelineToolbar } from "./timeline-parts"
 
 export function Timeline(props: {

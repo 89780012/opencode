@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 import { Rail } from "./layout/rail"
-import shell from "./layout.module.css"
+import shell from "./styles/layout.module.css"
 
 export function Layout(props: {
   page: "bench" | "settings"
@@ -14,4 +14,3 @@ export function Layout(props: {
     </div>
   )
 }
-

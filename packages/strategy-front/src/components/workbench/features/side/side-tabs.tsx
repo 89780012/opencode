@@ -20,10 +20,10 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import type { ReactNode } from "react"
-import { type SessionItem, type Stage } from "../data"
-import { Compact } from "../layout/compact"
-import ui from "../../workstation/shared.module.css"
-import css from "./side.module.css"
+import { type SessionItem, type Stage } from "../../data"
+import { Compact } from "../../layout/compact"
+import ui from "../../../shared/styles/ui.module.css"
+import css from "../../styles/side/side.module.css"
 
 export type Issue = { sid: string; name: string; body: string }
 

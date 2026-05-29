@@ -1,8 +1,8 @@
 import { Bot, FileText, UserRound } from "lucide-react"
 import { useEffect, useRef } from "react"
-import type { SessionItem } from "../data"
-import css from "./session.module.css"
-import ui from "../../workstation/shared.module.css"
+import type { SessionItem } from "../../data"
+import css from "../../styles/session/session.module.css"
+import ui from "../../../shared/styles/ui.module.css"
 
 function Bubble(props: { body: string; role: "ai" | "user" }) {
   const Icon = props.role === "ai" ? Bot : UserRound

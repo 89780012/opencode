@@ -1,4 +1,4 @@
-import css from "../settings.module.css"
+import css from "../styles/settings.module.css"
 
 export function Switch(props: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
   return (

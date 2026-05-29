@@ -1,6 +1,6 @@
 import { ChartColumn, Clock3, Code, MessageSquareMore, Workflow } from "lucide-react"
 import type { Stage } from "../data"
-import shell from "./shell.module.css"
+import shell from "../styles/layout/shell.module.css"
 
 const tabs = [
   { key: "session", icon: MessageSquareMore, label: "会话与审查" },

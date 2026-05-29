@@ -1,7 +1,7 @@
 import { X } from "lucide-react"
 import { SettingsContent } from "./layout/content"
-import ui from "../workstation/shared.module.css"
-import css from "./settings.module.css"
+import ui from "../shared/styles/ui.module.css"
+import css from "./styles/settings.module.css"
 
 export function SettingsDialog(props: { open: boolean; onOpenChange: (open: boolean) => void }) {
   if (!props.open) return null

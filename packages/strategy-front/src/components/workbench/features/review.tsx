@@ -2,9 +2,9 @@ import { ClipboardCheck, Clock3, History, X } from "lucide-react"
 import type { KeyboardEvent, PointerEvent } from "react"
 import type { SessionItem } from "../data"
 import { badge, lead, stepText, text, tone } from "../lib"
-import ui from "../../workstation/shared.module.css"
+import ui from "../../shared/styles/ui.module.css"
 import { Handle } from "../layout/handle"
-import css from "./review.module.css"
+import css from "../styles/review/review.module.css"
 
 export function Review(props: {
   cur: SessionItem

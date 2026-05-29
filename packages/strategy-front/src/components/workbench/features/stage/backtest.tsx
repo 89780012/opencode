@@ -1,7 +1,7 @@
 import { ChartColumn, LoaderCircle, Play } from "lucide-react"
-import type { BacktestResult, SessionItem } from "../data"
-import ui from "../../workstation/shared.module.css"
-import css from "./stage.module.css"
+import type { BacktestResult, SessionItem } from "../../data"
+import ui from "../../../shared/styles/ui.module.css"
+import css from "../../styles/stage/stage.module.css"
 
 function Result(props: { result: BacktestResult | null }) {
   if (!props.result) return <div className={ui.empty}>暂无回测结果</div>

@@ -1,5 +1,5 @@
-import type { SessionItem, Stage } from "../data"
-import type { TimelineState } from "../hooks/use-timeline"
+import type { SessionItem, Stage } from "../../data"
+import type { TimelineState } from "../../hooks/use-timeline"
 import { Backtest } from "./backtest"
 import { CodePanel } from "./code"
 import { Composer } from "./composer"

@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { SettingsDialog } from "../settings"
-import ui from "./shared.module.css"
+import ui from "../shared/styles/ui.module.css"
 import { Layout } from "./layout"
 import { Workbench } from "../workbench"
 
@@ -16,4 +16,3 @@ export function Workstation() {
     </div>
   )
 }
-

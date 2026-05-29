@@ -6,8 +6,8 @@ import type { Config } from "@/types/provider"
 import { headerRow, modelRow, validate, type Form } from "../../provider/provider-custom-form"
 import { text } from "../../provider/utils"
 import { Field, Rows } from "../ui/form"
-import ui from "../../workstation/shared.module.css"
-import css from "../settings.module.css"
+import ui from "../../shared/styles/ui.module.css"
+import css from "../styles/settings.module.css"
 
 function init(): Form {
   return {

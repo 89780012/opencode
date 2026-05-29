@@ -12,8 +12,8 @@ import { memo, useEffect, useRef, useState, type ReactNode } from "react"
 import { Response } from "@/components/ai-elements/response"
 import { selectSessionParts, useAppSelector } from "@/store"
 import type { ChatMessageInfo, ChatPart, ChatStatus, ChatToolPart } from "@/types/chat"
-import common from "./session-common.module.css"
-import css from "./session-chat.module.css"
+import common from "../../styles/session/session-common.module.css"
+import css from "../../styles/session/session-chat.module.css"
 
 const empty: ChatPart[] = []
 const ansi = /\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g

@@ -2,8 +2,8 @@ import { ArrowDown, ArrowUp, ChevronDown, Loader2, RefreshCcw, RotateCcw, Search
 import { useState } from "react"
 import { modelChainLimit, modelKey } from "@/lib/model-catalog"
 import { Switch } from "../ui/switch"
-import ui from "../../workstation/shared.module.css"
-import css from "../settings.module.css"
+import ui from "../../shared/styles/ui.module.css"
+import css from "../styles/settings.module.css"
 import type { useSettings } from "../hooks/use-settings"
 
 type App = ReturnType<typeof useSettings>

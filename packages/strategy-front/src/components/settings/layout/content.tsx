@@ -5,7 +5,7 @@ import { CustomDialog } from "../dialogs/custom"
 import { useSettings } from "../hooks/use-settings"
 import { ModelsPanel } from "../panels/models"
 import { ProvidersPanel } from "../panels/providers"
-import css from "../settings.module.css"
+import css from "../styles/settings.module.css"
 import type { Tab } from "../types"
 
 const tabs = [

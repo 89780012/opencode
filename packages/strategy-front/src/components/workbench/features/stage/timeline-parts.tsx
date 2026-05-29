@@ -1,9 +1,9 @@
 import { Check, Clock3, GitCompareArrows, Minus, Plus, RotateCcw, Sparkles, X } from "lucide-react"
 import type { KeyboardEvent, PointerEvent, RefObject, WheelEvent } from "react"
-import type { SessionItem, TimelineEvent } from "../data"
-import { kind } from "../lib"
-import ui from "../../workstation/shared.module.css"
-import css from "./timeline.module.css"
+import type { SessionItem, TimelineEvent } from "../../data"
+import { kind } from "../../lib"
+import ui from "../../../shared/styles/ui.module.css"
+import css from "../../styles/stage/timeline.module.css"
 
 export function TimelineToolbar(props: { zoom: number; onZoom: (zoom: number) => void; onPan: (pan: { x: number; y: number }) => void }) {
   return (

@@ -1,5 +1,5 @@
 import { LayoutGrid, Settings } from "lucide-react"
-import shell from "../layout.module.css"
+import shell from "../styles/layout.module.css"
 
 export function Rail(props: { page: "bench" | "settings"; onPage: (page: "bench" | "settings") => void }) {
   return (

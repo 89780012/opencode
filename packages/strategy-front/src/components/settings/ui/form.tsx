@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import css from "../settings.module.css"
+import css from "../styles/settings.module.css"
 
 export function Field(props: { label?: string; value: string; err?: string; placeholder: string; onChange: (value: string) => void }) {
   return (

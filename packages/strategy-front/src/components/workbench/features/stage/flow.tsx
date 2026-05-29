@@ -1,8 +1,8 @@
 import { Maximize2, Minus, Play, Plus, Workflow } from "lucide-react"
 import { useEffect, useRef, useState, type PointerEvent, type WheelEvent } from "react"
-import type { SessionItem } from "../data"
-import ui from "../../workstation/shared.module.css"
-import css from "./stage.module.css"
+import type { SessionItem } from "../../data"
+import ui from "../../../shared/styles/ui.module.css"
+import css from "../../styles/stage/stage.module.css"
 
 let boot = false
 const ZOOM_MIN = 0.3

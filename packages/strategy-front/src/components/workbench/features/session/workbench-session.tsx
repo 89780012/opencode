@@ -6,8 +6,8 @@ import type { ChatMessageInfo, ChatStatus } from "@/types/chat"
 import { SessionComposer } from "./session-composer"
 import { SessionMessageList } from "./session-message-list"
 import { WorkbenchPermissionPanel, WorkbenchQuestionPanel, WorkbenchTodoPanel } from "./session-request-panels"
-import panels from "./session-panels.module.css"
-import css from "./session-chat.module.css"
+import panels from "../../styles/session/session-panels.module.css"
+import css from "../../styles/session/session-chat.module.css"
 
 export function WorkbenchSession(props: {
   workspace: LocalWorkspace

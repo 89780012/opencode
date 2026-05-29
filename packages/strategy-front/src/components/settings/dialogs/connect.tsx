@@ -4,8 +4,8 @@ import { toast } from "sonner"
 import { providerApi } from "@/api/modules/provider"
 import type { Grant, Method, Provider } from "@/types/provider"
 import { text } from "../../provider/utils"
-import ui from "../../workstation/shared.module.css"
-import css from "../settings.module.css"
+import ui from "../../shared/styles/ui.module.css"
+import css from "../styles/settings.module.css"
 
 function label(method: Method) {
   if (method.type === "api") return "API 密钥"
