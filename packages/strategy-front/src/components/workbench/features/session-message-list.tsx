@@ -17,6 +17,7 @@ import css from "./session-chat.module.css"
 
 const empty: ChatPart[] = []
 const ansi = /\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g
+type Retry = Extract<ChatStatus, { type: "retry" }>
 
 function clean(value?: string) {
   return value?.replace(ansi, "") ?? ""
@@ -249,6 +250,7 @@ export function SessionMessageList(props: {
   onOpenDiff?: (file: string) => void
 }) {
   const body = useRef<HTMLDivElement | null>(null)
+  const [retry, setRetry] = useState<Retry | null>(null)
   const stamp = useAppSelector((state) =>
     props.messages
       .map((info) => {
@@ -262,10 +264,26 @@ export function SessionMessageList(props: {
   )
 
   useEffect(() => {
+    setRetry(null)
+  }, [props.messages[0]?.sessionID])
+
+  useEffect(() => {
+    if (props.status.type === "retry") {
+      setRetry(props.status)
+      return
+    }
+    if (props.status.type === "idle") {
+      setRetry(null)
+    }
+  }, [props.status])
+
+  useEffect(() => {
     const node = body.current
     if (!node) return
     node.scrollTop = node.scrollHeight
-  }, [props.loading, props.messages.length, props.status.type, stamp])
+  }, [props.loading, props.messages.length, props.status.type, retry?.attempt, stamp])
+
+  const note = props.status.type === "retry" ? props.status : retry
 
   return (
     <div ref={body} className={css.body}>
@@ -279,15 +297,12 @@ export function SessionMessageList(props: {
           <Item key={info.id} info={info} onOpenDiff={props.onOpenDiff} />
         ))}
         {props.status.type !== "idle" ? (
-          <div className={css.status}>
-            <LoaderCircle className={common.spin} size={13} />
-            正在回复
-          </div>
-        ) : null}
-        {props.status.type === "retry" ? (
-          <div className={css.statusErr}>
-            <CircleAlert size={14} />
-            重试 #{props.status.attempt}: {props.status.message}
+          <div className={`${css.status} ${note ? css.statusRetry : ""}`}>
+            {note ? <CircleAlert size={14} /> : <LoaderCircle className={common.spin} size={13} />}
+            <div className={css.statuscopy}>
+              <span>{note ? `正在重试，第 ${note.attempt} 次` : "正在回复"}</span>
+              {note?.message ? <span className={css.statusmeta}>{note.message}</span> : null}
+            </div>
           </div>
         ) : null}
       </div>

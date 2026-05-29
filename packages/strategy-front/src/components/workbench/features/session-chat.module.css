@@ -392,8 +392,8 @@
 .status {
   justify-self: start;
   display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
+  align-items: flex-start;
+  gap: 0.45rem;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -401,6 +401,35 @@
   font-size: 0.74rem;
   font-weight: 600;
   padding: 0.1rem 0;
+}
+
+.statusRetry {
+  max-width: min(100%, 50rem);
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #fed7aa;
+  border-radius: 0.7rem;
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.statusRetry svg {
+  flex: none;
+  margin-top: 0.08rem;
+}
+
+.statuscopy {
+  min-width: 0;
+  display: grid;
+  gap: 0.14rem;
+}
+
+.statusmeta {
+  color: #c2410c;
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .load {
