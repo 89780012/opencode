@@ -3,17 +3,22 @@ import { Modal } from "./features/modal"
 import { Review } from "./features/review"
 import { Side } from "./features/side"
 import { StageView } from "./features/stage"
+import { WorkbenchSession } from "./features/workbench-session"
 import { usePanels } from "./hooks/use-panels"
 import { useTimeline } from "./hooks/use-timeline"
 import { useWorkbench } from "./hooks/use-workbench"
+import { useWorkbenchChat } from "./hooks/use-workbench-chat"
 import { Handle } from "./layout/handle"
 import shell from "./layout/shell.module.css"
 import { Topbar } from "./layout/topbar"
+import common from "./features/session-common.module.css"
 
 export function Workbench() {
   const panel = usePanels()
   const app = useWorkbench(panel.setRight)
+  const real = useWorkbenchChat()
   const time = useTimeline(app.cur, app.active, app.stage)
+  const session = app.stage === "session"
 
   return (
     <>
@@ -56,17 +61,41 @@ export function Workbench() {
 
         <main className={shell.main}>
           <Topbar stage={app.stage} name={app.cur.name} onStage={app.setStage} />
-          <StageView
-            cur={app.cur}
-            active={app.active}
-            stage={app.stage}
-            draft={app.draft}
-            timeline={time}
-            onDraft={app.setDraft}
-            onSend={app.send}
-            onCopy={() => void app.copy()}
-            onBacktest={() => void app.backtest()}
-          />
+          {session ? (
+            real.workspace ? (
+              <>
+                <WorkbenchSession
+                  workspace={real.workspace}
+                  selectedSessionId={real.chat.selectedSessionId}
+                  detailLoading={real.chat.detailLoading}
+                  messages={real.chat.messages}
+                  status={real.chat.status}
+                  busy={real.chat.busy}
+                  creating={real.chat.creating}
+                  onCreate={real.chat.createSession}
+                  onSelectSession={real.chat.selectSession}
+                  onAbort={() => void real.abort()}
+                  onOpenDiff={() => panel.setRight(true)}
+                />
+              </>
+            ) : (
+              <div className={common.empty}>
+                {real.list.loading ? "正在加载工作区..." : real.list.error || "没有可用工作区"}
+              </div>
+            )
+          ) : (
+            <StageView
+              cur={app.cur}
+              active={app.active}
+              stage={app.stage}
+              draft={app.draft}
+              timeline={time}
+              onDraft={app.setDraft}
+              onSend={app.send}
+              onCopy={() => void app.copy()}
+              onBacktest={() => void app.backtest()}
+            />
+          )}
         </main>
 
         <Review

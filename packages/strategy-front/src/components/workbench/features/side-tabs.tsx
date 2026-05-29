@@ -68,7 +68,11 @@ function Fold(props: {
     <section className={`${css.group} ${props.open ? css.groupopen : css.groupshut}`}>
       <button type="button" className={css.grouphead} onClick={props.onToggle}>
         <span className={css.groupleft}>
-          {props.open ? <ChevronDown size={14} className={css.groupicon} /> : <ChevronRight size={14} className={css.groupicon} />}
+          {props.open ? (
+            <ChevronDown size={14} className={css.groupicon} />
+          ) : (
+            <ChevronRight size={14} className={css.groupicon} />
+          )}
           <Icon size={14} className={css.groupicon} />
           <span>{props.title}</span>
         </span>
@@ -152,11 +156,22 @@ export function SessionsTab(props: {
         </div>
       </Fold>
 
-      <Fold open={props.cur.sections.issues} icon={HelpCircle} title="问题清单" count={props.issues.length} onToggle={() => props.onToggle("issues")}>
+      <Fold
+        open={props.cur.sections.issues}
+        icon={HelpCircle}
+        title="问题清单"
+        count={props.issues.length}
+        onToggle={() => props.onToggle("issues")}
+      >
         <div className={`${css.issuelist} ${ui.scroll}`}>
           {props.issues.length ? (
             props.issues.map((item) => (
-              <button key={`${item.sid}-${item.body}`} type="button" className={css.issue} onClick={() => props.onPick(item.sid)}>
+              <button
+                key={`${item.sid}-${item.body}`}
+                type="button"
+                className={css.issue}
+                onClick={() => props.onPick(item.sid)}
+              >
                 <div className={css.rowtop}>
                   <span className={css.issuehead}>
                     <MessageCircle size={12} />
@@ -185,7 +200,13 @@ function Progress(props: { cur: SessionItem }) {
           <div key={item.key} className={`${css.step} ${css[`step_${tone}`]}`}>
             <div className={css.progress}>
               <span className={`${css.stepicon} ${css[`stepicon_${tone}`]}`}>
-                {tone === "done" ? <CheckCircle2 size={14} /> : tone === "running" ? <LoaderCircle size={14} className={ui.spin} /> : <Icon size={14} />}
+                {tone === "done" ? (
+                  <CheckCircle2 size={14} />
+                ) : tone === "running" ? (
+                  <LoaderCircle size={14} className={ui.spin} />
+                ) : (
+                  <Icon size={14} />
+                )}
               </span>
               <strong>{item.label}</strong>
             </div>
@@ -206,7 +227,12 @@ export function RequirementsTab(props: {
 }) {
   return (
     <div className={css.stack}>
-      <Compact open={props.cur.sections.requirements} icon={FileText} title="需求理解" onToggle={() => props.onToggle("requirements")}>
+      <Compact
+        open={props.cur.sections.requirements}
+        icon={FileText}
+        title="需求理解"
+        onToggle={() => props.onToggle("requirements")}
+      >
         <div className={css.reqbox}>
           {props.cur.analyzedRequirements.map((item, idx) => (
             <div key={item} className={css.reqrow}>
@@ -254,11 +280,21 @@ export function RequirementsTab(props: {
         <Progress cur={props.cur} />
       </Compact>
 
-      <Compact open={props.cur.sections.backtest} icon={ChartColumn} title="回测记录" onToggle={() => props.onToggle("backtest")}>
+      <Compact
+        open={props.cur.sections.backtest}
+        icon={ChartColumn}
+        title="回测记录"
+        onToggle={() => props.onToggle("backtest")}
+      >
         <div className={`${css.logbox} ${ui.scroll}`}>
           {props.cur.backtestHistory.length ? (
             props.cur.backtestHistory.map((item, idx) => (
-              <button key={`${item.time}-${idx}`} type="button" className={css.log} onClick={() => props.onBacktest(idx)}>
+              <button
+                key={`${item.time}-${idx}`}
+                type="button"
+                className={css.log}
+                onClick={() => props.onBacktest(idx)}
+              >
                 <div className={css.rowtop}>
                   <span className={css.logtitle}>回测 #{props.cur.backtestHistory.length - idx}</span>
                   <span>{item.time}</span>

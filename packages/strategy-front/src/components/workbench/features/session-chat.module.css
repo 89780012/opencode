@@ -1,0 +1,410 @@
+.root {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+}
+
+.body {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 1rem 1.2rem 1.15rem;
+  background: #ffffff;
+}
+
+.list {
+  width: min(100%, 56rem);
+  margin: 0 auto;
+  display: grid;
+  gap: 0.64rem;
+}
+
+.msg {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.user {
+  flex-direction: row-reverse;
+}
+
+.ai {
+  display: block;
+}
+
+.avatar {
+  flex: none;
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #0f172a;
+  color: #ffffff;
+  margin-top: 0.1rem;
+}
+
+.user .avatar {
+  background: #f59e0b;
+}
+
+.card {
+  min-width: 0;
+  max-width: min(48rem, 86%);
+  display: grid;
+  gap: 0.45rem;
+  border: 0;
+  background: transparent;
+  color: #1f2f46;
+  font-size: 0.85rem;
+  line-height: 1.62;
+  padding: 0.12rem 0;
+}
+
+.ai .card {
+  width: min(100%, 52rem);
+  max-width: 100%;
+}
+
+.user .card {
+  border: 1px solid #0f172a;
+  border-radius: 0.88rem;
+  border-top-right-radius: 0.35rem;
+  background: #0f172a;
+  color: #ffffff;
+  padding: 0.62rem 0.82rem;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+}
+
+.text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.markdown {
+  min-width: 0;
+  color: #1f2f46;
+  font-size: 0.85rem;
+  line-height: 1.7;
+}
+
+.markdown :global(p) {
+  margin: 0.15rem 0 0.62rem;
+}
+
+.markdown :global(p:last-child) {
+  margin-bottom: 0;
+}
+
+.markdown :global(ul),
+.markdown :global(ol) {
+  margin: 0.35rem 0 0.65rem;
+  padding-left: 1.18rem;
+}
+
+.markdown :global(li) {
+  margin: 0.18rem 0;
+}
+
+.markdown :global(code) {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.28rem;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 0.78em;
+  padding: 0.06rem 0.28rem;
+}
+
+.markdown :global(pre) {
+  max-width: 100%;
+  overflow: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0.06rem 0.28rem;
+}
+
+.fold {
+  width: min(100%, 50rem);
+  min-width: 0;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  overflow: hidden;
+  --fold-indent: 1.15rem;
+}
+
+.foldhead {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.45rem;
+  padding: 0.16rem 0;
+  text-align: left;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.foldtitle {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.foldtitle svg {
+  flex: none;
+  color: #64748b;
+}
+
+.fold_running .foldtitle svg {
+  color: #2563eb;
+}
+
+.fold_done .foldtitle svg {
+  color: #16a34a;
+}
+
+.fold_error .foldtitle svg {
+  color: #dc2626;
+}
+
+.foldmeta {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: #64748b;
+  font-size: 0.72rem;
+}
+
+.foldbody {
+  border-top: 0;
+  margin: 0.25rem 0 0.45rem 0;
+  padding: 0.12rem 0 0.12rem var(--fold-indent);
+  border-left: 2px solid #dbe4ef;
+  background: transparent;
+}
+
+.foldPlain .foldbody {
+  margin-left: 0;
+  padding-left: 0;
+  border-left: 0;
+}
+
+.fold_done .foldbody {
+  border-left-color: #bbf7d0;
+}
+
+.fold_running .foldbody {
+  border-left-color: #bfdbfe;
+}
+
+.fold_error .foldbody {
+  border-left-color: #fecaca;
+}
+
+.chevronon {
+  transform: rotate(180deg);
+}
+
+.pre {
+  max-height: 14rem;
+  overflow: auto;
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #475569;
+  font-size: 0.74rem;
+  line-height: 1.55;
+}
+
+.toolbody {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.thought {
+  color: #64748b;
+  font-size: 0.78rem;
+  line-height: 1.65;
+}
+
+.thought :global(p),
+.thought :global(li) {
+  color: #64748b;
+}
+
+.muted {
+  color: #64748b;
+  font-size: 0.76rem;
+  line-height: 1.55;
+}
+
+.tool {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 0;
+  border-left: 2px solid #cbd5e1;
+  border-radius: 0;
+  background: #f8fafc;
+  padding: 0.5rem 0.65rem;
+}
+
+.codebox {
+  overflow: hidden;
+  border-radius: 0.72rem;
+  background: #f7f8fa;
+  border: 0;
+}
+
+.codehead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.56rem 0.78rem 0.3rem;
+  border-bottom: 0;
+  color: #0f172a;
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+.codeactions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: #475569;
+}
+
+.codepre {
+  margin: 0;
+  max-height: 18rem;
+  overflow: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #0f1f36;
+  font-size: 0.82rem;
+  line-height: 1.62;
+  padding: 0.48rem 0.78rem 0.78rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.codepre code {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+  padding: 0;
+}
+
+.tooltop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: #0f172a;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.tooltop span:first-child {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tag {
+  flex: none;
+  border-radius: 0;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 0;
+  text-transform: none;
+}
+
+.patch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.file {
+  border: 1px solid #dbe3ee;
+  border-radius: 0.42rem;
+  background: #ffffff;
+  color: #1e40af;
+  font-size: 0.72rem;
+  padding: 0.32rem 0.5rem;
+}
+
+.err {
+  border: 1px solid #fecaca;
+  border-radius: 0.55rem;
+  background: #fff7f7;
+  color: #b91c1c;
+  padding: 0.55rem 0.7rem;
+}
+
+.warn {
+  color: #b91c1c;
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+
+.statusErr {
+  justify-self: start;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  max-width: min(100%, 50rem);
+  color: #dc2626;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  padding: 0.15rem 0;
+}
+
+.status {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #52627a;
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 0.1rem 0;
+}
+
+.load {
+  display: flex;
+  justify-content: center;
+  padding: 1rem;
+}
