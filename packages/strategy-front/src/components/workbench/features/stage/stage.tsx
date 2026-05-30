@@ -1,11 +1,12 @@
 import type { SessionItem, Stage } from "../../data"
 import type { TimelineState } from "../../hooks/use-timeline"
 import { Backtest } from "./backtest"
-import { CodePanel } from "./code"
+import { CodePanel, type CodeTab } from "./code"
 import { Composer } from "./composer"
 import { Flow } from "./flow"
 import { Session } from "./session"
 import { Timeline } from "./timeline"
+import type { LocalWorkspace } from "@/types/workspace"
 
 export function StageView(props: {
   cur: SessionItem
@@ -13,16 +14,29 @@ export function StageView(props: {
   stage: Stage
   draft: string
   timeline: TimelineState
+  workspace: LocalWorkspace | null
+  sessionId?: string | null
+  file?: string | null
+  codeTab: CodeTab
+  onCodeTab: (tab: CodeTab) => void
   onDraft: (text: string) => void
   onSend: (review: boolean) => void
-  onCopy: () => void
   onBacktest: () => void
 }) {
   return (
     <>
       {props.stage === "session" ? <Session cur={props.cur} /> : null}
       {props.stage === "flowchart" ? <Flow cur={props.cur} id={props.active} onRun={props.onBacktest} /> : null}
-      {props.stage === "code" ? <CodePanel cur={props.cur} onCopy={props.onCopy} /> : null}
+      {props.stage === "code" ? (
+        <CodePanel
+          cur={props.cur}
+          workspace={props.workspace}
+          sessionId={props.sessionId}
+          path={props.file}
+          tab={props.codeTab}
+          onTab={props.onCodeTab}
+        />
+      ) : null}
       {props.stage === "backtest" ? <Backtest cur={props.cur} onRun={props.onBacktest} /> : null}
       {props.stage === "timeline" ? (
         <Timeline

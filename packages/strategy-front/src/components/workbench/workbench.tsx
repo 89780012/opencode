@@ -1,9 +1,10 @@
-import type { CSSProperties } from "react"
+import { useState, type CSSProperties } from "react"
 import { Modal } from "./features/modal"
 import { Review } from "./features/review"
 import { Side } from "./features/side"
 import { StageView } from "./features/stage"
 import { WorkbenchSession } from "./features/session"
+import type { CodeTab } from "./features/stage/code"
 import { usePanels } from "./hooks/use-panels"
 import { useTimeline } from "./hooks/use-timeline"
 import { useWorkbench } from "./hooks/use-workbench"
@@ -19,6 +20,8 @@ export function Workbench() {
   const real = useWorkbenchChat()
   const time = useTimeline(app.cur, app.active, app.stage)
   const session = app.stage === "session"
+  const [file, setFile] = useState<string | null>(null)
+  const [codeTab, setCodeTab] = useState<CodeTab>("files")
 
   return (
     <>
@@ -75,7 +78,11 @@ export function Workbench() {
                   onCreate={real.chat.createSession}
                   onSelectSession={real.chat.selectSession}
                   onAbort={() => void real.abort()}
-                  onOpenDiff={() => panel.setRight(true)}
+                  onOpenDiff={(path) => {
+                    setFile(path)
+                    setCodeTab("review")
+                    app.setStage("code")
+                  }}
                 />
               </>
             ) : (
@@ -90,9 +97,13 @@ export function Workbench() {
               stage={app.stage}
               draft={app.draft}
               timeline={time}
+              workspace={real.workspace}
+              sessionId={real.chat.selectedSessionId}
+              file={file}
+              codeTab={codeTab}
+              onCodeTab={setCodeTab}
               onDraft={app.setDraft}
               onSend={app.send}
-              onCopy={() => void app.copy()}
               onBacktest={() => void app.backtest()}
             />
           )}
