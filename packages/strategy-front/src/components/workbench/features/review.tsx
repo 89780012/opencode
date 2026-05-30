@@ -1,10 +1,10 @@
 import { ClipboardCheck, Clock3, History, X } from "lucide-react"
 import type { CSSProperties, KeyboardEvent, PointerEvent } from "react"
-import type { SessionItem } from "../../workbench/data"
-import { badge, lead, stepText, text, tone } from "../../workbench/lib"
-import { Handle } from "../../workbench/layout/handle"
+import type { SessionItem } from "../data"
+import { badge, lead, stepText, text, tone } from "../lib"
+import { Handle } from "../layout/handle"
 import ui from "../../shared/styles/ui.module.css"
-import css from "../styles/review.module.css"
+import css from "../styles/review/review.module.css"
 
 export function Review(props: {
   cur: SessionItem
