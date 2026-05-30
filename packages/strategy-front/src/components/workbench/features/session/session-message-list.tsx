@@ -35,6 +35,16 @@ function err(info: ChatMessageInfo) {
   return info.error?.name ?? ""
 }
 
+function internal(part: ChatPart) {
+  return (
+    part.type === "reasoning" ||
+    part.type === "tool" ||
+    part.type === "retry" ||
+    part.type === "compaction" ||
+    part.type === "agent"
+  )
+}
+
 function time(value?: { start: number; end?: number }) {
   if (!value?.start || !value.end) return ""
   const sec = Math.max(1, Math.round((value.end - value.start) / 1000))
@@ -56,11 +66,11 @@ function Fold(props: {
       <button type="button" className={css.foldhead} onClick={() => setOpen((value) => !value)}>
         <span className={css.foldtitle}>
           {state === "running" ? (
-            <LoaderCircle size={13} className={common.spin} />
+            <LoaderCircle size={15} strokeWidth={2.3} className={common.spin} />
           ) : state === "error" ? (
-            <CircleAlert size={13} />
+            <CircleAlert size={15} strokeWidth={2.3} />
           ) : (
-            <CheckCircle2 size={13} />
+            <CheckCircle2 size={15} strokeWidth={2.3} />
           )}
           {props.title}
         </span>
@@ -144,6 +154,42 @@ function Markdown(props: { children: string; className?: string }) {
   )
 }
 
+function proc(parts: ChatPart[]) {
+  if (
+    parts.some(
+      (part) =>
+        (part.type === "tool" && (part.state.status === "running" || part.state.status === "pending")) ||
+        (part.type === "reasoning" && !part.time.end),
+    )
+  ) {
+    return "running"
+  }
+  if (parts.some((part) => (part.type === "tool" && part.state.status === "error") || part.type === "retry")) {
+    return "error"
+  }
+  return "done"
+}
+
+function meta(parts: ChatPart[]) {
+  const tools = parts.filter((part): part is ChatToolPart => part.type === "tool").length
+  if (!tools) return `${parts.length} 步`
+  return `${parts.length} 步 · ${tools} 个工具`
+}
+
+function Process(props: { parts: ChatPart[]; onOpenDiff?: (file: string) => void }) {
+  if (props.parts.length === 0) return null
+
+  return (
+    <Fold title="执行过程" line={false} meta={meta(props.parts)} state={proc(props.parts)}>
+      <div className={css.process}>
+        {props.parts.map((part) => (
+          <Part key={part.id} part={part} role="assistant" onOpenDiff={props.onOpenDiff} />
+        ))}
+      </div>
+    </Fold>
+  )
+}
+
 
 function Part(props: { part: ChatPart; role: ChatMessageInfo["role"]; onOpenDiff?: (file: string) => void }) {
   if (props.part.type === "text") {
@@ -219,6 +265,8 @@ const Item = memo(function Item(props: { info: ChatMessageInfo; onOpenDiff?: (fi
   const body = parts.length > 0 ? parts : empty
   const msg = err(props.info)
   const user = props.info.role === "user"
+  const main = user ? body : body.filter((part) => !internal(part))
+  const logs = user ? empty : body.filter(internal)
 
   if (body.length === 0 && !msg) return null
 
@@ -230,7 +278,8 @@ const Item = memo(function Item(props: { info: ChatMessageInfo; onOpenDiff?: (fi
         </div>
       ) : null}
       <div className={css.card}>
-        {body.map((part) => (
+        <Process parts={logs} onOpenDiff={props.onOpenDiff} />
+        {main.map((part) => (
           <Part key={part.id} part={part} role={props.info.role} onOpenDiff={props.onOpenDiff} />
         ))}
         {msg ? (

@@ -1,40 +1,46 @@
 .root {
   flex: none;
-  border-top: 1px solid #dfe7f1;
-  background: #ffffff;
-  padding: 0.62rem 0.85rem;
+  border-top: 1px solid #d8e1ee;
+  background: #f3f7fb;
+  padding: 0.68rem 0.9rem 0.76rem;
 }
 
 .box {
   position: relative;
-  width: min(100%, 56rem);
+  width: min(100%, 52rem);
   margin: 0 auto;
+  border-radius: 0.92rem;
+  box-shadow: none;
 }
 
 .input {
   width: 100%;
-  min-height: 3.1rem;
+  min-height: 3.2rem;
   max-height: 7.5rem;
   resize: none;
-  border: 1px solid #d6e0ec;
-  border-radius: 1.05rem;
+  border: 1px solid #cbd8ea;
+  border-radius: 0.92rem;
   background: #ffffff;
-  color: #23324a;
+  color: #172033;
   font: inherit;
-  font-size: 0.86rem;
-  line-height: 1.45;
-  padding: 0.82rem 5.4rem 0.78rem 0.9rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  padding: 0.84rem 5.3rem 0.78rem 0.9rem;
   outline: 0;
   appearance: none;
   -webkit-appearance: none;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.035);
+}
+
+.input::placeholder {
+  color: #7a8aa0;
 }
 
 .input:focus {
   outline: 0;
-  border-color: #7f93ad;
+  border-color: #73849b;
   background: #ffffff;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  box-shadow: 0 0 0 3px rgba(71, 85, 105, 0.12);
 }
 
 .input:focus-visible {
@@ -52,23 +58,23 @@
 
 .controls {
   position: absolute;
-  right: 0.55rem;
-  bottom: 0.48rem;
+  right: 0.56rem;
+  bottom: 0.5rem;
   display: inline-flex;
   align-items: center;
   gap: 0.38rem;
 }
 
 .action {
-  width: 2rem;
-  height: 2rem;
+  width: 2.05rem;
+  height: 2.05rem;
   border: 0;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #dbe4f0;
-  color: #516177;
+  background: #dce5f0;
+  color: #334155;
   transition:
     background 0.16s ease,
     color 0.16s ease,
@@ -78,10 +84,11 @@
 .submit {
   background: #0f172a;
   color: #ffffff;
+  box-shadow: none;
 }
 
 .submit:hover:not(:disabled) {
-  background: #172036;
+  background: #1e293b;
   transform: translateY(-1px);
 }
 
@@ -97,8 +104,9 @@
 
 .action:disabled {
   cursor: not-allowed;
-  background: #e2e8f0;
-  color: #94a3b8;
+  background: #e8edf4;
+  color: #9aa7b8;
+  box-shadow: none;
 }
 
 @media (max-width: 920px) {
