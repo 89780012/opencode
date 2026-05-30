@@ -1,6 +1,6 @@
 .frame {
   display: grid;
-  grid-template-columns: 46px minmax(0, 1fr);
+  grid-template-columns: 46px minmax(0, 1fr) auto;
   height: 100%;
   width: 100%;
 }
@@ -64,4 +64,3 @@
   min-width: 0;
   min-height: 0;
 }
-

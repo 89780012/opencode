@@ -1,5 +1,5 @@
 import { useEffect, useState, type KeyboardEvent, type PointerEvent } from "react"
-import { clamp } from "../lib"
+import { clamp } from "../../workbench/lib"
 
 export type Size = null | { kind: "left" | "right"; x: number; w: number }
 
@@ -61,12 +61,19 @@ export function usePanels() {
   }
 
   return {
-    right,
-    setRight,
-    left,
-    side,
-    size,
-    resize,
-    key,
+    left: {
+      w: left,
+      active: size?.kind === "left",
+      onDown: (event: PointerEvent<HTMLDivElement>) => resize("left", event),
+      onKey: (event: KeyboardEvent<HTMLDivElement>) => key("left", event),
+    },
+    right: {
+      open: right,
+      setOpen: setRight,
+      w: side,
+      active: size?.kind === "right",
+      onDown: (event: PointerEvent<HTMLDivElement>) => resize("right", event),
+      onKey: (event: KeyboardEvent<HTMLDivElement>) => key("right", event),
+    },
   }
 }

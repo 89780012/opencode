@@ -1,10 +1,10 @@
 import { ClipboardCheck, Clock3, History, X } from "lucide-react"
-import type { KeyboardEvent, PointerEvent } from "react"
-import type { SessionItem } from "../data"
-import { badge, lead, stepText, text, tone } from "../lib"
+import type { CSSProperties, KeyboardEvent, PointerEvent } from "react"
+import type { SessionItem } from "../../workbench/data"
+import { badge, lead, stepText, text, tone } from "../../workbench/lib"
+import { Handle } from "../../workbench/layout/handle"
 import ui from "../../shared/styles/ui.module.css"
-import { Handle } from "../layout/handle"
-import css from "../styles/review/review.module.css"
+import css from "../styles/review.module.css"
 
 export function Review(props: {
   cur: SessionItem
@@ -33,7 +33,7 @@ export function Review(props: {
             now={props.side}
             label="Resize review panel"
           />
-          <div className={css.panel}>
+          <div className={css.panel} style={{ "--side": `${props.side}px` } as CSSProperties}>
             <div className={css.head}>
               <div className={css.title}>
                 <div className={ui.sectiontitle}>
