@@ -22,6 +22,7 @@ type API struct {
 	cfg      *cfg.Store
 	sx       *smartx.Service
 	log      *logs.Hub
+	event    *socketHub
 	question *question.Service
 	summary  *summary.Service
 	chain    *modelchain.Service
@@ -64,6 +65,7 @@ func NewAPI(run *rt.Service, op *oc.Service, cfg *cfg.Store, sx *smartx.Service,
 		cfg:      cfg,
 		sx:       sx,
 		log:      logs.New(),
+		event:    newSocketHub(),
 		question: question,
 		summary:  summary,
 		chain:    chain,
@@ -74,6 +76,7 @@ func NewAPI(run *rt.Service, op *oc.Service, cfg *cfg.Store, sx *smartx.Service,
 func (a *API) Register(r *gin.Engine) {
 	api := r.Group("/api")
 	api.GET("/health", a.health)
+	api.GET("/events/ws", a.event.serve)
 
 	op := api.Group("/opencode")
 	op.GET("/agents", a.opencodeAgentsList)
