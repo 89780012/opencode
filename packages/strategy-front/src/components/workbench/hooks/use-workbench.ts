@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import {
   createBacktest,
   createReviewSteps,
@@ -16,12 +16,6 @@ export function useWorkbench(setRight: (open: boolean) => void) {
   const [active, setActive] = useState("sess-1")
   const [stage, setStage] = useState<Stage>("session")
   const [tab, setTab] = useState<SidebarTab>("requirements")
-  const [draft, setDraft] = useState("")
-  const [modal, setModal] = useState(false)
-  const [step, setStep] = useState(1)
-  const [busy, setBusy] = useState(false)
-  const [title, setTitle] = useState("新建策略会话")
-  const [reqs, setReqs] = useState<string[]>(["请描述你的策略需求"])
 
   const cur = useMemo(() => sessions.find((item) => item.id === active) ?? sessions[0], [active, sessions])
   const issues = useMemo(
@@ -46,17 +40,6 @@ export function useWorkbench(setRight: (open: boolean) => void) {
     if (cur.backtestStatus === "done" && cur.backtestResults) list.push(`回测收益 ${cur.backtestResults.totalReturn}`)
     return list.join(" / ")
   }, [cur.backtestResults, cur.backtestStatus, cur.flowchartStatus, risk])
-
-  useEffect(() => {
-    if (!modal) return
-
-    const key = (event: globalThis.KeyboardEvent) => {
-      if (event.key === "Escape" && !busy) setModal(false)
-    }
-
-    window.addEventListener("keydown", key)
-    return () => window.removeEventListener("keydown", key)
-  }, [busy, modal])
 
   const patch = (fn: (item: SessionItem) => SessionItem) => {
     setSessions((list) => list.map((item) => (item.id === active ? fn(item) : item)))
@@ -120,8 +103,8 @@ export function useWorkbench(setRight: (open: boolean) => void) {
     })
   }
 
-  const send = (start = false) => {
-    const body = draft.trim()
+  const send = (text: string, start = false) => {
+    const body = text.trim()
     if (!body) return
 
     patch((item) => ({
@@ -139,7 +122,6 @@ export function useWorkbench(setRight: (open: boolean) => void) {
       codeContent: `${item.codeContent}\n\n# ${body}`,
     }))
 
-    setDraft("")
     if (start) void review()
   }
 
@@ -180,28 +162,15 @@ export function useWorkbench(setRight: (open: boolean) => void) {
     setStage("backtest")
   }
 
-  const create = async () => {
-    if (step === 1) {
-      setBusy(true)
-      await sleep(500)
-      setBusy(false)
-      setStep(2)
-      return
-    }
-
-    if (step === 2) {
-      setStep(3)
-      return
-    }
-
-    const name = title.trim() || "新建策略会话"
-    const list = reqs.map((item) => item.trim()).filter(Boolean)
+  const create = (data: { title: string; reqs: string[] }) => {
+    const name = data.title.trim() || "新建策略会话"
+    const reqs = data.reqs.map((item) => item.trim()).filter(Boolean)
     const item: SessionItem = {
       ...createSessions()[0],
       id: `sess-${Date.now()}`,
       name,
-      currentRequirement: list[0] ?? "请描述你的策略需求",
-      analyzedRequirements: list.length ? list : ["请描述你的策略需求"],
+      currentRequirement: reqs[0] ?? "请描述你的策略需求",
+      analyzedRequirements: reqs.length ? reqs : ["请描述你的策略需求"],
       messages: [
         {
           role: "ai",
@@ -217,11 +186,6 @@ export function useWorkbench(setRight: (open: boolean) => void) {
 
     setSessions((list) => [item, ...list])
     setActive(item.id)
-    setModal(false)
-    setStep(1)
-    setBusy(false)
-    setTitle("新建策略会话")
-    setReqs(["请描述你的策略需求"])
     setStage("session")
     setTab("requirements")
     setRight(true)
@@ -268,17 +232,6 @@ export function useWorkbench(setRight: (open: boolean) => void) {
     setStage,
     tab,
     setTab,
-    draft,
-    setDraft,
-    modal,
-    setModal,
-    step,
-    setStep,
-    busy,
-    title,
-    setTitle,
-    reqs,
-    setReqs,
     cur,
     issues,
     last,

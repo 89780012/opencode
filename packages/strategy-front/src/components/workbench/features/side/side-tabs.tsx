@@ -92,7 +92,7 @@ export function SessionsTab(props: {
   issues: Issue[]
   onToggle: (key: string) => void
   onPick: (id: string) => void
-  onModal: () => void
+  onCreate: () => void
   onRename: (id: string) => void
   onDelete: (id: string) => void
 }) {
@@ -110,7 +110,7 @@ export function SessionsTab(props: {
             className={css.headbtn}
             onClick={(event) => {
               event.stopPropagation()
-              props.onModal()
+              props.onCreate()
             }}
             aria-label="新建会话"
           >

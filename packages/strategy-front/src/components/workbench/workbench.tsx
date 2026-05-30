@@ -1,10 +1,7 @@
-import { useState, type CSSProperties, type KeyboardEventHandler, type PointerEventHandler } from "react"
-import { Modal } from "./features/modal"
+import { type CSSProperties, type KeyboardEventHandler, type PointerEventHandler } from "react"
 import { Review } from "./features/review"
 import { Side } from "./features/side"
 import { StageView } from "./features/stage"
-import type { CodeTab } from "./features/stage/code"
-import { useTimeline } from "./hooks/use-timeline"
 import { useWorkbench } from "./hooks/use-workbench"
 import { useWorkbenchChat } from "./hooks/use-workbench-chat"
 import { Handle } from "./layout/handle"
@@ -27,11 +24,8 @@ type Panels = {
 }
 
 export function Workbench(props: { panel: Panels }) {
-  const [file, setFile] = useState<string | null>(null)
-  const [code, setCode] = useState<CodeTab>("files")
   const app = useWorkbench(props.panel.right.setOpen)
   const real = useWorkbenchChat()
-  const time = useTimeline(app.cur, app.active, app.stage)
 
   return (
     <>
@@ -55,7 +49,7 @@ export function Workbench(props: { panel: Panels }) {
             onTab={app.setTab}
             onToggle={app.toggle}
             onPick={app.setActive}
-            onModal={() => app.setModal(true)}
+            onCreate={app.create}
             onStage={app.setStage}
             onRename={app.rename}
             onDelete={app.remove}
@@ -78,8 +72,6 @@ export function Workbench(props: { panel: Panels }) {
               cur={app.cur}
               active={app.active}
               stage={app.stage}
-              draft={app.draft}
-              timeline={time}
               workspace={real.workspace}
               sid={real.chat.selectedSessionId}
               load={real.chat.detailLoading}
@@ -88,35 +80,14 @@ export function Workbench(props: { panel: Panels }) {
               busy={real.chat.busy}
               making={real.chat.creating}
               empty={real.list.loading ? "正在加载工作区..." : real.list.error || "没有可用工作区"}
-              file={file}
-              codeTab={code}
-              onCodeTab={setCode}
-              onDraft={app.setDraft}
+              onStage={app.setStage}
               onSend={app.send}
               onBacktest={() => void app.backtest()}
               onCreate={real.chat.createSession}
               onPick={real.chat.selectSession}
               onAbort={() => void real.abort()}
-              onOpenDiff={(path) => {
-                setFile(path)
-                setCode("review")
-                app.setStage("code")
-              }}
             />
           </main>
-
-          <Modal
-            open={app.modal}
-            busy={app.busy}
-            step={app.step}
-            title={app.title}
-            reqs={app.reqs}
-            onClose={() => app.setModal(false)}
-            onStep={app.setStep}
-            onTitle={app.setTitle}
-            onReqs={app.setReqs}
-            onSubmit={() => void app.create()}
-          />
         </div>
       </div>
       <Review

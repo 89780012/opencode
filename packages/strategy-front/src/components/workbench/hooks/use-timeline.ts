@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type WheelEvent } from "react"
-import type { SessionItem, Stage, TimelineEvent } from "../data"
+import type { SessionItem, TimelineEvent } from "../data"
 import { clamp } from "../lib"
 
 function init(active: string) {
@@ -12,7 +12,7 @@ function init(active: string) {
   }
 }
 
-export function useTimeline(cur: SessionItem, active: string, stage: Stage) {
+export function useTimeline(cur: SessionItem, active: string) {
   const [state, setState] = useState(() => init(active))
   const [zoom, setZoom] = useState(100)
   const [pan, setPan] = useState({ x: 0, y: 0 })
@@ -44,7 +44,7 @@ export function useTimeline(cur: SessionItem, active: string, stage: Stage) {
 
   useEffect(() => {
     const node = boxRef.current
-    if (!node || stage !== "timeline") return
+    if (!node) return
 
     const sync = () => {
       setPlot({
@@ -57,7 +57,7 @@ export function useTimeline(cur: SessionItem, active: string, stage: Stage) {
     const obs = new ResizeObserver(sync)
     obs.observe(node)
     return () => obs.disconnect()
-  }, [stage])
+  }, [])
 
   useEffect(() => {
     if (!drag.on) return
