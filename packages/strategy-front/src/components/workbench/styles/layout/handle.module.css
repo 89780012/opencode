@@ -1,23 +1,65 @@
 .handle {
-  width: 1px;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--left) - 4px);
+  width: 8px;
   cursor: col-resize;
-  background: #e2e8f0;
-  border-left: 1px solid #e2e8f0;
-  border-right: 1px solid #e2e8f0;
-  position: relative;
   touch-action: none;
-  transition:
-    background 0.16s ease,
-    border-color 0.16s ease;
+  background: transparent;
+  border: 0;
+  z-index: 1;
 }
 
-.handle:hover,
-.on {
+.handle::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 1px;
+  background: #e2e8f0;
+  pointer-events: none;
+  transition: background 0.16s ease;
+}
+
+.handle:hover::before,
+.on::before {
   background: #3b82f6;
-  border-color: #3b82f6;
 }
 
 .right {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  width: 8px;
+  background: transparent;
+  border: 0;
+  z-index: 1;
+}
+
+.right::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 1px;
+  background: #e2e8f0;
+  pointer-events: none;
+  transition: background 0.16s ease;
+}
+
+.right:hover,
+.right.on {
+  background: transparent;
+  border: 0;
+}
+
+.right:hover::before,
+.right.on::before {
+  background: #3b82f6;
 }
 
 @media (max-width: 920px) {

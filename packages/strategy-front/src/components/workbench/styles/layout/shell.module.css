@@ -1,6 +1,7 @@
 .shell {
+  position: relative;
   display: grid;
-  grid-template-columns: var(--left) 5px minmax(0, 1fr) auto;
+  grid-template-columns: var(--left) minmax(0, 1fr) auto;
   height: 100%;
   width: 100%;
 }
@@ -120,7 +121,7 @@
 
 @media (max-width: 1080px) {
   .shell {
-    grid-template-columns: minmax(220px, var(--left)) 5px minmax(0, 1fr);
+    grid-template-columns: minmax(220px, var(--left)) minmax(0, 1fr);
   }
 }
 
