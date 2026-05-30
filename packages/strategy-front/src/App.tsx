@@ -1,5 +1,5 @@
 import { SystemProvider } from "@/components/system/system-provider"
-import { SocketProvider } from "@/components/socket/socket-provider"
+import { SocketBoot } from "@/components/socket/socket-boot"
 import { Toaster } from "@/components/ui/sonner"
 import { ThemeProvider } from "@/components/ui/theme-provider"
 import { AppRouter } from "@/routes"
@@ -10,10 +10,10 @@ function App() {
     <ReduxProvider>
       <ThemeProvider>
         <SystemProvider>
-          <SocketProvider>
+          <SocketBoot>
             <AppRouter />
             <Toaster />
-          </SocketProvider>
+          </SocketBoot>
         </SystemProvider>
       </ThemeProvider>
     </ReduxProvider>

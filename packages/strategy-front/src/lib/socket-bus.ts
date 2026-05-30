@@ -8,15 +8,18 @@ export type SocketEvent = {
 }
 
 type Fn = (event: SocketEvent) => void
-type State = "idle" | "connecting" | "open" | "closed"
+type Sub = () => void
+
+export type SocketState = "idle" | "connecting" | "open" | "closed"
 
 const handlers = new Map<string, Set<Fn>>()
+const subs = new Set<Sub>()
 
 let ws: WebSocket | undefined
 let timer: number | undefined
 let active = false
 let tries = 0
-let state: State = "idle"
+let state: SocketState = "idle"
 
 function url() {
   const base = apiConfig.baseURL.endsWith("/") ? `${apiConfig.baseURL}events/ws` : `${apiConfig.baseURL}/events/ws`
@@ -29,6 +32,12 @@ function valid(value: unknown): value is SocketEvent {
   if (!value || typeof value !== "object") return false
   const evt = value as Record<string, unknown>
   return typeof evt.type === "string" && evt.type.trim().length > 0
+}
+
+function sync(next: SocketState) {
+  if (state === next) return
+  state = next
+  subs.forEach((fn) => fn())
 }
 
 function dispatch(event: SocketEvent) {
@@ -63,11 +72,11 @@ function connect() {
   if (!active || typeof window === "undefined") return
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return
 
-  state = "connecting"
+  sync("connecting")
   ws = new WebSocket(url())
   ws.onopen = () => {
     tries = 0
-    state = "open"
+    sync("open")
     dispatch({ type: "socket.open", ts: Date.now() })
   }
   ws.onmessage = (msg) => {
@@ -76,7 +85,7 @@ function connect() {
     }
   }
   ws.onclose = () => {
-    state = active ? "connecting" : "closed"
+    sync(active ? "connecting" : "closed")
     dispatch({ type: "socket.close", ts: Date.now() })
     ws = undefined
     schedule()
@@ -93,9 +102,11 @@ export const socket = {
   },
   disconnect() {
     active = false
-    window.clearTimeout(timer)
+    if (typeof window !== "undefined") {
+      window.clearTimeout(timer)
+    }
     timer = undefined
-    state = "closed"
+    sync("closed")
     ws?.close()
     ws = undefined
   },
@@ -122,5 +133,11 @@ export const socket = {
   },
   status() {
     return state
+  },
+  subscribe(fn: Sub) {
+    subs.add(fn)
+    return () => {
+      subs.delete(fn)
+    }
   },
 }
