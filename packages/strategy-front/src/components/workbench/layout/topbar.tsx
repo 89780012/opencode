@@ -1,5 +1,7 @@
 import { ChartColumn, Clock3, Code, MessageSquareMore, Workflow } from "lucide-react"
-import type { Stage } from "../data"
+import { useAppDispatch } from "@/store"
+import { setStage } from "@/store/workbench-slice"
+import { useWorkbench } from "../hooks/use-workbench"
 import shell from "../styles/layout/shell.module.css"
 
 const tabs = [
@@ -10,7 +12,10 @@ const tabs = [
   { key: "timeline", icon: Clock3, label: "时间线" },
 ] as const
 
-export function Topbar(props: { stage: Stage; name: string; onStage: (stage: Stage) => void }) {
+export function Topbar() {
+  const app = useWorkbench()
+  const dispatch = useAppDispatch()
+
   return (
     <div className={shell.topbar} style={{ fontSize: 12 }}>
       <div className={shell.toptabs}>
@@ -20,8 +25,8 @@ export function Topbar(props: { stage: Stage; name: string; onStage: (stage: Sta
             <button
               key={item.key}
               type="button"
-              className={`${shell.topbtn} ${props.stage === item.key ? shell.topactive : ""}`}
-              onClick={() => props.onStage(item.key)}
+              className={`${shell.topbtn} ${app.stage === item.key ? shell.topactive : ""}`}
+              onClick={() => dispatch(setStage(item.key))}
             >
               <Icon size={14} />
               <span>{item.label}</span>
@@ -29,7 +34,7 @@ export function Topbar(props: { stage: Stage; name: string; onStage: (stage: Sta
           )
         })}
       </div>
-      <div className={shell.current}>当前会话：{props.name}</div>
+      <div className={shell.current}>当前会话：{app.cur.name}</div>
     </div>
   )
 }

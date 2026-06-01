@@ -1,78 +1,40 @@
-import { useState } from "react"
-import type { SessionItem, Stage } from "../../data"
 import common from "../../styles/session/session-common.module.css"
 import { WorkbenchSession } from "../session"
+import { useStage } from "../../hooks/use-stage"
+import { useWorkbenchChat } from "../../hooks/use-workbench-chat"
 import { Backtest } from "./backtest"
-import { CodePanel, type CodeTab } from "./code"
+import { CodePanel } from "./code"
 import { Composer } from "./composer"
 import { Flow } from "./flow"
 import { TimelineStage } from "./timeline-stage"
-import type { ChatMessageInfo, ChatStatus } from "@/types/chat"
-import type { LocalWorkspace } from "@/types/workspace"
 
-export function StageView(props: {
-  cur: SessionItem
-  active: string
-  stage: Stage
-  workspace: LocalWorkspace | null
-  sid?: string | null
-  load: boolean
-  msgs: ChatMessageInfo[]
-  status: ChatStatus
-  busy: boolean
-  making: boolean
-  empty: string
-  onStage: (stage: Stage) => void
-  onSend: (text: string, review: boolean) => void
-  onBacktest: () => void
-  onCreate: () => Promise<string>
-  onPick: (value: string) => void
-  onAbort: () => void
-}) {
-  const [file, setFile] = useState<string | null>(null)
-  const [tab, setTab] = useState<CodeTab>("files")
-
-  const diff = (path: string) => {
-    setFile(path)
-    setTab("review")
-    props.onStage("code")
-  }
+export function StageView() {
+  const stage = useStage()
+  const real = useWorkbenchChat()
 
   return (
     <>
-      {props.stage === "session" ? (
-        props.workspace ? (
-          <WorkbenchSession
-            workspace={props.workspace}
-            selectedSessionId={props.sid ?? null}
-            detailLoading={props.load}
-            messages={props.msgs}
-            status={props.status}
-            busy={props.busy}
-            creating={props.making}
-            onCreate={props.onCreate}
-            onSelectSession={props.onPick}
-            onAbort={props.onAbort}
-            onOpenDiff={diff}
-          />
+      {stage.stage === "session" ? (
+        real.workspace ? (
+          <WorkbenchSession real={real} onOpenDiff={stage.diff} />
         ) : (
-          <div className={common.empty}>{props.empty}</div>
+          <div className={common.empty}>{real.list.loading ? "正在加载工作区..." : real.list.error || "没有可用工作区"}</div>
         )
       ) : null}
-      {props.stage === "flowchart" ? <Flow cur={props.cur} id={props.active} onRun={props.onBacktest} /> : null}
-      {props.stage === "code" ? (
+      {stage.stage === "flowchart" ? <Flow cur={stage.cur} id={stage.active} onRun={() => void stage.backtest()} /> : null}
+      {stage.stage === "code" ? (
         <CodePanel
-          cur={props.cur}
-          workspace={props.workspace}
-          sessionId={props.sid}
-          path={file}
-          tab={tab}
-          onTab={setTab}
+          cur={stage.cur}
+          workspace={real.workspace}
+          sessionId={real.chat.selectedSessionId}
+          path={stage.file}
+          tab={stage.tab}
+          onTab={stage.setTab}
         />
       ) : null}
-      {props.stage === "backtest" ? <Backtest cur={props.cur} onRun={props.onBacktest} /> : null}
-      {props.stage === "timeline" ? <TimelineStage cur={props.cur} active={props.active} /> : null}
-      {props.stage !== "session" && props.stage !== "timeline" ? <Composer onSend={props.onSend} /> : null}
+      {stage.stage === "backtest" ? <Backtest cur={stage.cur} onRun={() => void stage.backtest()} /> : null}
+      {stage.stage === "timeline" ? <TimelineStage cur={stage.cur} active={stage.active} /> : null}
+      {stage.stage !== "session" && stage.stage !== "timeline" ? <Composer onSend={stage.send} /> : null}
     </>
   )
 }

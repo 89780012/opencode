@@ -1,8 +1,7 @@
 import { useChatRuntime } from "@/hooks/use-chat-runtime"
 import { updateSessionAbortStatus } from "@/store/chat-session-slice"
 import { useAppDispatch } from "@/store"
-import type { LocalWorkspace } from "@/types/workspace"
-import type { ChatMessageInfo, ChatStatus } from "@/types/chat"
+import type { WorkbenchChat } from "../../hooks/use-workbench-chat"
 import { SessionComposer } from "./session-composer"
 import { SessionMessageList } from "./session-message-list"
 import { WorkbenchPermissionPanel, WorkbenchQuestionPanel, WorkbenchTodoPanel } from "./session-request-panels"
@@ -10,33 +9,28 @@ import panels from "../../styles/session/session-panels.module.css"
 import css from "../../styles/session/session-chat.module.css"
 
 export function WorkbenchSession(props: {
-  workspace: LocalWorkspace
-  selectedSessionId: string | null
-  detailLoading: boolean
-  messages: ChatMessageInfo[]
-  status: ChatStatus
-  busy: boolean
-  creating: boolean
-  onCreate: () => Promise<string>
-  onSelectSession: (value: string) => void
-  onAbort: () => void
+  real: WorkbenchChat
   onOpenDiff: (path: string) => void
 }) {
   const dispatch = useAppDispatch()
+  const workspace = props.real.workspace
   const chat = useChatRuntime({
-    workspacePath: props.workspace.path,
-    sessionId: props.selectedSessionId,
-    status: props.status,
-    busy: props.busy,
-    createSession: props.onCreate,
-    selectSession: props.onSelectSession,
+    workspacePath: workspace?.path,
+    sessionId: props.real.chat.selectedSessionId,
+    status: props.real.chat.status,
+    busy: props.real.chat.busy,
+    createSession: props.real.chat.createSession,
+    selectSession: props.real.chat.selectSession,
   })
+
+  if (!workspace) return null
+
   return (
     <section className={css.root}>
       <SessionMessageList
-        loading={props.detailLoading && !!props.selectedSessionId}
-        messages={props.messages}
-        status={props.status}
+        loading={props.real.chat.detailLoading && !!props.real.chat.selectedSessionId}
+        messages={props.real.chat.messages}
+        status={props.real.chat.status}
         onOpenDiff={props.onOpenDiff}
       />
       <div className={panels.stack} style={{ padding: "0 1rem" }}>
@@ -61,13 +55,13 @@ export function WorkbenchSession(props: {
 
       <SessionComposer
         busy={chat.busy}
-        disabled={props.creating}
-        submitting={chat.submitting || props.creating}
+        disabled={props.real.chat.creating}
+        submitting={chat.submitting || props.real.chat.creating}
         value={chat.draft.text}
-        onAbort={props.onAbort}
+        onAbort={() => void props.real.abort()}
         onChange={chat.draft.setText}
         onSubmit={() => {
-          dispatch(updateSessionAbortStatus({ sessionId: props.selectedSessionId || "", status: false }))
+          dispatch(updateSessionAbortStatus({ sessionId: props.real.chat.selectedSessionId || "", status: false }))
           void chat.submit({ text: chat.draft.text })
         }}
       />

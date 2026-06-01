@@ -8,7 +8,7 @@ export function Handle(props: {
   active: boolean
   min: number
   max: number
-  now: number
+  width: number
   label: string
 }) {
   return (
@@ -21,7 +21,7 @@ export function Handle(props: {
       aria-label={props.label}
       aria-valuemin={props.min}
       aria-valuemax={props.max}
-      aria-valuenow={props.now}
+      aria-valuenow={props.width}
       tabIndex={0}
     ></div>
   )

@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from "react-redux"
 import { idle } from "@/lib/chat-event-reducer"
 import { sessionPermissionRequest, sessionQuestionRequest } from "@/lib/session-request-tree"
 import { chatSessionReducer } from "@/store/chat-session-slice"
+import { workbenchReducer } from "@/store/workbench-slice"
 import type {
   ChatFileDiff,
   ChatMessageInfo,
@@ -15,6 +16,7 @@ import type {
 export const store = configureStore({
   reducer: {
     chatSession: chatSessionReducer,
+    workbench: workbenchReducer,
   },
 })
 
@@ -133,4 +135,8 @@ export function selectSessionQuestionRequest(state: RootState, workspace?: strin
 
 export function selectQuestionRecordStamp(state: RootState) {
   return state.chatSession.questionRecordStamp
+}
+
+export function selectWorkbench(state: RootState) {
+  return state.workbench
 }

@@ -1,29 +1,19 @@
 import { useState } from "react"
 import { ClipboardList, MessageSquareMore, Sparkles } from "lucide-react"
-import { type SessionItem, type SidebarTab, type Stage } from "../../data"
+import { type SidebarTab } from "../../data"
 import { Modal } from "../modal"
 import css from "../../styles/side/side.module.css"
-import { type Issue, RequirementsTab, SessionsTab } from "./side-tabs"
+import { RequirementsTab, SessionsTab } from "./side-tabs"
 import { useSideSession } from "../../hooks/use-side-session"
+import { useWorkbench } from "../../hooks/use-workbench"
 
-export function Side(props: {
-  cur: SessionItem
-  sessions: SessionItem[]
-  issues: Issue[]
-  risk: string
-  hint: string
-  onToggle: (key: string) => void
-  onPick: (id: string) => void
-  onCreate: (data: { title: string; reqs: string[] }) => void | Promise<void>
-  onStage: (stage: Stage) => void
-  onRename: (id: string) => void
-  onDelete: (id: string) => void
-  onBacktest: (idx: number) => void
-}) {
+export function Side(props: { onCreate?: () => void }) {
+  const app = useWorkbench()
   const [tab, setTab] = useState<SidebarTab>("requirements")
   const session = useSideSession({
     onCreate: async (data) => {
-      await props.onCreate(data)
+      app.create(data)
+      props.onCreate?.()
       setTab("requirements")
     },
   })
@@ -56,23 +46,22 @@ export function Side(props: {
 
       {tab === "sessions" ? (
         <SessionsTab
-          cur={props.cur}
-          sessions={props.sessions}
-          issues={props.issues}
-          onToggle={props.onToggle}
-          onPick={props.onPick}
+          cur={app.cur}
+          sessions={app.sessions}
+          issues={app.issues}
+          onToggle={app.toggle}
+          onPick={app.setActive}
           onCreate={() => session.setOpen(true)}
-          onRename={props.onRename}
-          onDelete={props.onDelete}
+          onRename={app.rename}
+          onDelete={app.remove}
         />
       ) : (
         <RequirementsTab
-          cur={props.cur}
-          risk={props.risk}
-          hint={props.hint}
-          onToggle={props.onToggle}
-          onStage={props.onStage}
-          onBacktest={props.onBacktest}
+          cur={app.cur}
+          risk={app.risk}
+          hint={app.hint}
+          onToggle={app.toggle}
+          onBacktest={app.show}
         />
       )}
 

@@ -1,57 +1,55 @@
 import { ClipboardCheck, Clock3, History, X } from "lucide-react"
 import type { CSSProperties, KeyboardEvent, PointerEvent } from "react"
-import type { SessionItem } from "../data"
+import { useWorkbench } from "../hooks/use-workbench"
 import { badge, lead, stepText, text, tone } from "../lib"
 import { Handle } from "../layout/handle"
 import ui from "../../shared/styles/ui.module.css"
 import css from "../styles/review/review.module.css"
 
 export function Review(props: {
-  cur: SessionItem
-  last: SessionItem["reviewHistory"][number] | null
-  right: boolean
-  side: number
-  size: boolean
+  open: boolean
+  width: number
+  resizing: boolean
   onDown: (event: PointerEvent<HTMLDivElement>) => void
   onKey: (event: KeyboardEvent<HTMLDivElement>) => void
-  onView: () => void
   onClose: () => void
   onOpen: () => void
-  onRun: () => void
 }) {
+  const app = useWorkbench(props.onOpen)
+
   return (
     <aside className={css.root}>
-      {props.right ? (
+      {props.open ? (
         <>
           <Handle
             edge="right"
             onDown={props.onDown}
             onKey={props.onKey}
-            active={props.size}
+            active={props.resizing}
             min={280}
             max={500}
-            now={props.side}
+            width={props.width}
             label="Resize review panel"
           />
-          <div className={css.panel} style={{ "--side": `${props.side}px` } as CSSProperties}>
+          <div className={css.panel} style={{ "--side": `${props.width}px` } as CSSProperties}>
             <div className={css.head}>
               <div className={css.title}>
                 <div className={ui.sectiontitle}>
                   <ClipboardCheck size={16} />
                   <span>审查</span>
                 </div>
-                <span className={`${css.badge} ${css[`badge_${props.cur.reviewStatus}`]}`}>
-                  {text(props.cur.reviewStatus)}
+                <span className={`${css.badge} ${css[`badge_${app.cur.reviewStatus}`]}`}>
+                  {text(app.cur.reviewStatus)}
                 </span>
               </div>
               <div className={css.actions}>
                 <button
                   type="button"
                   className={css.action}
-                  onClick={props.onView}
-                  aria-label={props.cur.reviewView === "current" ? "查看历史" : "查看当前"}
+                  onClick={app.view}
+                  aria-label={app.cur.reviewView === "current" ? "查看历史" : "查看当前"}
                 >
-                  {props.cur.reviewView === "current" ? <Clock3 size={14} /> : <History size={14} />}
+                  {app.cur.reviewView === "current" ? <Clock3 size={14} /> : <History size={14} />}
                 </button>
                 <button type="button" className={css.action} onClick={props.onClose} aria-label="收起审查面板">
                   <X size={14} />
@@ -60,14 +58,14 @@ export function Review(props: {
             </div>
 
             <div className={`${css.body} ${ui.scroll}`}>
-              {props.cur.reviewView === "current" ? (
+              {app.cur.reviewView === "current" ? (
                 <>
-                  {props.cur.reviewProgress ? (
+                  {app.cur.reviewProgress ? (
                     <div className={css.box}>
                       <p className={css.status}>
-                        第 {props.cur.reviewRound} 轮 / {lead(props.cur.reviewStatus)} {text(props.cur.reviewStatus)}
+                        第 {app.cur.reviewRound} 轮 / {lead(app.cur.reviewStatus)} {text(app.cur.reviewStatus)}
                       </p>
-                      {props.cur.reviewProgress.map((item) => {
+                      {app.cur.reviewProgress.map((item) => {
                         const Icon = badge(item.status)
                         return (
                           <div key={item.text} className={css.step}>
@@ -80,12 +78,12 @@ export function Review(props: {
                         )
                       })}
                     </div>
-                  ) : props.last ? (
+                  ) : app.last ? (
                     <div className={css.box}>
                       <p className={css.status}>
-                        第 {props.last.round} 轮 / {lead(props.last.status)} {text(props.last.status)}
+                        第 {app.last.round} 轮 / {lead(app.last.status)} {text(app.last.status)}
                       </p>
-                      {props.last.steps.map((item) => {
+                      {app.last.steps.map((item) => {
                         const Icon = badge(item.status)
                         return (
                           <div key={item.text} className={css.step}>
@@ -97,17 +95,17 @@ export function Review(props: {
                           </div>
                         )
                       })}
-                      {props.last.suggestions.length ? (
+                      {app.last.suggestions.length ? (
                         <div className={css.advice}>
-                          <p>{props.last.suggestions.join(", ")}</p>
+                          <p>{app.last.suggestions.join(", ")}</p>
                         </div>
                       ) : null}
                     </div>
                   ) : (
                     <div className={ui.empty}>尚未发起审查</div>
                   )}
-                  {props.cur.reviewStatus !== "running" ? (
-                    <button type="button" className={css.submit} onClick={props.onRun}>
+                  {app.cur.reviewStatus !== "running" ? (
+                    <button type="button" className={css.submit} onClick={() => void app.review()}>
                       <ClipboardCheck size={15} />
                       <span>提交审查</span>
                     </button>
@@ -115,8 +113,8 @@ export function Review(props: {
                 </>
               ) : (
                 <div className={css.list}>
-                  {props.cur.reviewHistory.length ? (
-                    props.cur.reviewHistory
+                  {app.cur.reviewHistory.length ? (
+                    app.cur.reviewHistory
                       .slice()
                       .reverse()
                       .map((item) => (
@@ -140,7 +138,7 @@ export function Review(props: {
         </>
       ) : null}
 
-      {!props.right ? (
+      {!props.open ? (
         <div className={css.rail}>
           <button type="button" className={css.minibtn} onClick={props.onOpen} aria-label="展开审查面板">
             <ClipboardCheck size={16} />

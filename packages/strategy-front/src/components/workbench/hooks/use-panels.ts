@@ -1,12 +1,12 @@
 import { useEffect, useState, type KeyboardEvent, type PointerEvent } from "react"
-import { clamp } from "../../workbench/lib"
+import { clamp } from "../lib"
 
 export type Size = null | { kind: "left" | "right"; x: number; w: number }
 
 export function usePanels() {
-  const [right, setRight] = useState(false)
+  const [open, setOpen] = useState(false)
   const [left, setLeft] = useState(300)
-  const [side, setSide] = useState(360)
+  const [right, setRight] = useState(360)
   const [size, setSize] = useState<Size>(null)
 
   useEffect(() => {
@@ -20,7 +20,7 @@ export function usePanels() {
         setLeft(clamp(size.w + event.clientX - size.x, 220, 460))
         return
       }
-      setSide(clamp(size.w + size.x - event.clientX, 280, 500))
+      setRight(clamp(size.w + size.x - event.clientX, 280, 500))
     }
 
     const up = () => {
@@ -44,7 +44,7 @@ export function usePanels() {
     if (!event.isPrimary || event.button !== 0) return
     event.preventDefault()
     event.currentTarget.setPointerCapture(event.pointerId)
-    setSize({ kind, x: event.clientX, w: kind === "left" ? left : side })
+    setSize({ kind, x: event.clientX, w: kind === "left" ? left : right })
   }
 
   const key = (kind: "left" | "right", event: KeyboardEvent<HTMLDivElement>) => {
@@ -57,7 +57,7 @@ export function usePanels() {
       return
     }
 
-    setSide((item) => clamp(item + (event.key === "ArrowLeft" ? step : -step), 280, 500))
+    setRight((item) => clamp(item + (event.key === "ArrowLeft" ? step : -step), 280, 500))
   }
 
   return {
@@ -68,9 +68,9 @@ export function usePanels() {
       onKey: (event: KeyboardEvent<HTMLDivElement>) => key("left", event),
     },
     right: {
-      open: right,
-      setOpen: setRight,
-      w: side,
+      open,
+      setOpen,
+      w: right,
       active: size?.kind === "right",
       onDown: (event: PointerEvent<HTMLDivElement>) => resize("right", event),
       onKey: (event: KeyboardEvent<HTMLDivElement>) => key("right", event),

@@ -1,29 +1,41 @@
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
+import { selectWorkbench, useAppDispatch, useAppSelector } from "@/store"
 import {
-  createBacktest,
-  createReviewSteps,
-  createSessions,
-  type ReviewStatus,
-  type SessionItem,
-  type Stage,
-  type Step,
-} from "../data"
+  backtestFinish,
+  backtestStart,
+  create as add,
+  remove as drop,
+  rename as edit,
+  reviewFinish,
+  reviewStart,
+  reviewStep,
+  send as post,
+  setActive,
+  showBacktest,
+  toggle as fold,
+  view as flip,
+} from "@/store/workbench-slice"
+import { createReviewSteps } from "../data"
 import { sleep } from "../lib"
 
-export function useWorkbench(setRight: (open: boolean) => void) {
-  const [sessions, setSessions] = useState(() => createSessions())
-  const [active, setActive] = useState("sess-1")
-  const [stage, setStage] = useState<Stage>("session")
+const time = () => new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })
 
-  const cur = useMemo(() => sessions.find((item) => item.id === active) ?? sessions[0], [active, sessions])
+export function useWorkbench(setRight?: (open: boolean) => void) {
+  const dispatch = useAppDispatch()
+  const state = useAppSelector(selectWorkbench)
+
+  const cur = useMemo(
+    () => state.sessions.find((item) => item.id === state.active) ?? state.sessions[0],
+    [state.active, state.sessions],
+  )
   const issues = useMemo(
     () =>
-      sessions.flatMap((item) =>
+      state.sessions.flatMap((item) =>
         item.messages
           .filter((msg) => msg.role === "user")
           .map((msg) => ({ sid: item.id, name: item.name, body: msg.body })),
       ),
-    [sessions],
+    [state.sessions],
   )
   const last = cur.reviewHistory.at(-1) ?? null
   const risk = useMemo(() => {
@@ -39,86 +51,30 @@ export function useWorkbench(setRight: (open: boolean) => void) {
     return list.join(" / ")
   }, [cur.backtestResults, cur.backtestStatus, cur.flowchartStatus, risk])
 
-  const patch = (fn: (item: SessionItem) => SessionItem) => {
-    setSessions((list) => list.map((item) => (item.id === active ? fn(item) : item)))
-  }
-
-  const copy = async () => {
-    await navigator.clipboard.writeText(cur.codeContent)
-  }
-
   const review = async () => {
     if (cur.reviewStatus === "running") return
 
-    const next = createReviewSteps()
+    const id = state.active
     const round = cur.reviewHistory.length + 1
 
-    patch((item) => ({
-      ...item,
-      reviewStatus: "running",
-      reviewView: "current",
-      reviewRound: round,
-      reviewProgress: next,
-    }))
-    setRight(true)
+    dispatch(reviewStart({ id, round, steps: createReviewSteps() }))
+    setRight?.(true)
 
-    for (let i = 0; i < next.length; i += 1) {
+    for (let i = 0; i < 6; i += 1) {
       await sleep(160)
-      patch((item) => ({
-        ...item,
-        reviewProgress:
-          item.reviewProgress?.map((entry, idx) => (idx === i ? { ...entry, status: "running" } : entry)) ?? null,
-      }))
+      dispatch(reviewStep({ id, idx: i, status: "running" }))
       await sleep(220)
-      patch((item) => ({
-        ...item,
-        reviewProgress:
-          item.reviewProgress?.map((entry, idx) =>
-            idx === i ? { ...entry, status: idx === 3 || idx === 4 ? "error" : "done" } : entry,
-          ) ?? null,
-      }))
+      dispatch(reviewStep({ id, idx: i, status: i === 3 || i === 4 ? "error" : "done" }))
     }
 
-    patch((item) => {
-      const steps = item.reviewProgress ?? []
-      const status: ReviewStatus = steps.some((entry) => entry.status === "error") ? "failed" : "passed"
-      return {
-        ...item,
-        reviewStatus: status,
-        reviewView: "current",
-        reviewProgress: null,
-        reviewHistory: [
-          ...item.reviewHistory,
-          {
-            round,
-            status,
-            time: new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }),
-            steps: steps as Step[],
-            suggestions: status === "failed" ? ["优先检查空仓保护", "补充最大回撤保护", "修复边界条件分支"] : [],
-          },
-        ],
-      }
-    })
+    dispatch(reviewFinish({ id, round, time: time() }))
   }
 
   const send = (text: string, start = false) => {
     const body = text.trim()
     if (!body) return
 
-    patch((item) => ({
-      ...item,
-      messages: [
-        ...item.messages,
-        { role: "user", body },
-        {
-          role: "ai",
-          body: start
-            ? `已记录审查意见：“${body}”。下一轮审查会重点关注这个问题。`
-            : `已收到修改意见：“${body}”。我会同步更新策略代码与说明。`,
-        },
-      ],
-      codeContent: `${item.codeContent}\n\n# ${body}`,
-    }))
+    dispatch(post({ body, start }))
 
     if (start) void review()
   }
@@ -126,122 +82,51 @@ export function useWorkbench(setRight: (open: boolean) => void) {
   const backtest = async () => {
     if (cur.backtestStatus === "running") return
 
-    setStage("backtest")
-    patch((item) => ({
-      ...item,
-      backtestStatus: "running",
-    }))
+    const id = state.active
+    dispatch(backtestStart(id))
     await sleep(650)
-    patch((item) => {
-      const result = createBacktest()
-      return {
-        ...item,
-        backtestStatus: "done",
-        backtestResults: result,
-        backtestHistory: [
-          {
-            time: new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }),
-            results: result,
-          },
-          ...item.backtestHistory,
-        ],
-      }
-    })
-  }
-
-  const show = (idx: number) => {
-    const item = cur.backtestHistory[idx]
-    if (!item) return
-    patch((entry) => ({
-      ...entry,
-      backtestResults: item.results,
-      backtestStatus: "done",
-    }))
-    setStage("backtest")
+    dispatch(backtestFinish({ id, time: time() }))
   }
 
   const create = (data: { title: string; reqs: string[] }) => {
-    const name = data.title.trim() || "新建策略会话"
-    const reqs = data.reqs.map((item) => item.trim()).filter(Boolean)
-    const item: SessionItem = {
-      ...createSessions()[0],
-      id: `sess-${Date.now()}`,
-      name,
-      currentRequirement: reqs[0] ?? "请描述你的策略需求",
-      analyzedRequirements: reqs.length ? reqs : ["请描述你的策略需求"],
-      messages: [
-        {
-          role: "ai",
-          body: `会话《${name}》已创建。你可以继续补充需求，或直接发起审查。`,
-        },
-      ],
-      reviewStatus: "idle",
-      reviewRound: 0,
-      reviewView: "current",
-      reviewHistory: [],
-      reviewProgress: null,
-    }
-
-    setSessions((list) => [item, ...list])
-    setActive(item.id)
-    setStage("session")
-    setRight(true)
+    dispatch(add({ ...data, id: `sess-${Date.now()}` }))
+    setRight?.(true)
   }
 
   const rename = (id: string) => {
-    const item = sessions.find((entry) => entry.id === id)
+    const item = state.sessions.find((entry) => entry.id === id)
     if (!item) return
     const name = window.prompt("新名称", item.name)?.trim()
     if (!name) return
-    setSessions((list) => list.map((entry) => (entry.id === id ? { ...entry, name } : entry)))
+
+    dispatch(edit({ id, name }))
   }
 
   const remove = (id: string) => {
-    if (sessions.length === 1) return
+    if (state.sessions.length === 1) return
     if (!window.confirm("确定删除这个策略会话吗？")) return
 
-    const list = sessions.filter((entry) => entry.id !== id)
-    setSessions(list)
-    if (active === id) setActive(list[0]?.id ?? "")
-  }
-
-  const toggle = (key: string) => {
-    patch((item) => ({
-      ...item,
-      sections: {
-        ...item.sections,
-        [key]: !item.sections[key],
-      },
-    }))
-  }
-
-  const view = () => {
-    patch((item) => ({
-      ...item,
-      reviewView: item.reviewView === "current" ? "history" : "current",
-    }))
+    dispatch(drop(id))
   }
 
   return {
-    sessions,
-    active,
-    stage,
-    setStage,
+    sessions: state.sessions,
+    active: state.active,
+    stage: state.stage,
     cur,
     issues,
     last,
     risk,
     hint,
-    setActive,
-    toggle,
-    copy,
+    setActive: (id: string) => dispatch(setActive(id)),
+    toggle: (key: string) => dispatch(fold(key)),
     send,
     review,
     backtest,
-    show,
+    show: (idx: number) => dispatch(showBacktest({ id: state.active, idx })),
     create,
     rename,
     remove,
-    view,
+    view: () => dispatch(flip()),
   }
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import { useParams } from "react-router-dom"
 import { toast } from "sonner"
 import { useWorkspaceList } from "@/data/global-data-provider"
@@ -25,7 +25,7 @@ export function useWorkbenchChat() {
   useEffect(() => {
     if (!workspace) return
     list.select(workspace)
-  }, [list.select, workspace])
+  }, [list, workspace])
 
   useEffect(() => {
     if (init.current === workspace?.path) return
@@ -52,31 +52,22 @@ export function useWorkbenchChat() {
       log("自动创建工作台会话失败", err)
       toast.error("自动创建会话失败")
     })
-  }, [
-    chat.creating,
-    chat.createSession,
-    chat.loaded,
-    chat.selectedSessionId,
-    chat.selectSession,
-    chat.sessions,
-    workspace?.path,
-  ])
+  }, [chat, workspace?.path])
 
-  const abort = useCallback(async () => {
+  const abort = async () => {
     dispatch(updateSessionAbortStatus({ sessionId: chat.selectedSessionId || "", status: true }))
     await chat.abortSession().catch((err) => {
       log("停止工作台会话失败", err)
       toast.error("停止会话失败")
     })
-  }, [chat.abortSession, chat.selectedSessionId, dispatch])
+  }
 
-  return useMemo(
-    () => ({
-      abort,
-      chat,
-      list,
-      workspace,
-    }),
-    [abort, chat, list, workspace],
-  )
+  return {
+    abort,
+    chat,
+    list,
+    workspace,
+  }
 }
+
+export type WorkbenchChat = ReturnType<typeof useWorkbenchChat>

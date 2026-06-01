@@ -10,7 +10,9 @@ import {
   LoaderCircle,
   Workflow,
 } from "lucide-react"
-import { type SessionItem, type Stage } from "../../data"
+import { useAppDispatch } from "@/store"
+import { setStage } from "@/store/workbench-slice"
+import { type SessionItem } from "../../data"
 import { Compact } from "../../layout/compact"
 import ui from "../../../shared/styles/ui.module.css"
 import css from "../../styles/side/side.module.css"
@@ -73,9 +75,10 @@ export function RequirementsTab(props: {
   risk: string
   hint: string
   onToggle: (key: string) => void
-  onStage: (stage: Stage) => void
   onBacktest: (idx: number) => void
 }) {
+  const dispatch = useAppDispatch()
+
   return (
     <div className={css.stack}>
       <Compact
@@ -100,7 +103,7 @@ export function RequirementsTab(props: {
         title="策略逻辑蓝图"
         onToggle={() => props.onToggle("logic")}
         action={
-          <button type="button" className={css.tag} onClick={() => props.onStage("flowchart")}>
+          <button type="button" className={css.tag} onClick={() => dispatch(setStage("flowchart"))}>
             <Workflow size={12} />
             <span>流程图</span>
           </button>
@@ -122,7 +125,7 @@ export function RequirementsTab(props: {
         title="进度追踪"
         onToggle={() => props.onToggle("progress")}
         action={
-          <button type="button" className={css.tag} onClick={() => props.onStage("timeline")}>
+          <button type="button" className={css.tag} onClick={() => dispatch(setStage("timeline"))}>
             <Clock3 size={12} />
             <span>时间线</span>
           </button>
