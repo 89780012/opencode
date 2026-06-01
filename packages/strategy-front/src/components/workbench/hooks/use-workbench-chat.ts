@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useRef } from "react"
+import { useEffect, useRef } from "react"
 import { useSearchParams } from "react-router-dom"
 import { toast } from "sonner"
-import { useWorkspaceList } from "@/data/global-data"
 import { useStrategySession } from "@/hooks/use-strategy-session"
 import { useWorkspaceEntry } from "@/hooks/use-workspace-entry"
 import { log } from "@/lib/error"
@@ -13,21 +12,9 @@ export function useWorkbenchChat() {
   const [search] = useSearchParams()
   const path = search.get("path")?.trim() ?? ""
   const entry = useWorkspaceEntry(path) //主要做工作区初始化
-  const list = useWorkspaceList()
-  const workspace = useMemo(() => {
-    if (path) {
-      return entry.workspace
-    }
-    return list.selected ?? list.workspaces.find((item) => !item.missing) ?? null
-  }, [entry.workspace, list.selected, list.workspaces, path])
+  const workspace = entry.workspace
   const chat = useStrategySession(workspace?.path)
   const init = useRef<string | null>(null)
-
-  useEffect(() => {
-    if (path) return
-    if (!workspace) return
-    list.select(workspace)
-  }, [list, path, workspace])
 
   useEffect(() => {
     if (init.current === workspace?.path) return
@@ -68,7 +55,7 @@ export function useWorkbenchChat() {
     abort,
     chat,
     entry,
-    list,
+    path,
     workspace,
   }
 }

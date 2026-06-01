@@ -30,7 +30,7 @@ export function StageView() {
     ? real.entry.phase === "init"
       ? "正在初始化 Git 仓库..."
       : "正在准备工作区..."
-    : real.entry.err || real.list.error || "没有可用工作区"
+    : real.entry.err || (real.path ? "没有可用工作区" : "缺少工作区路径")
 
   return (
     <>
@@ -38,7 +38,7 @@ export function StageView() {
         real.workspace ? (
           <WorkbenchSession real={real} chat={chat} onOpenDiff={stage.diff} />
         ) : (
-          <div className={common.empty}>{real.list.loading && !real.entry.err ? "正在加载工作区..." : empty}</div>
+          <div className={common.empty}>{empty}</div>
         )
       ) : null}
       {stage.stage === "flowchart" ? (
