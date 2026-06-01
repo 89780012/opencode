@@ -1,63 +1,130 @@
 .root {
-  display: flex;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  gap: 0.55rem;
-  padding: 0.78rem;
-  border-top: 1px solid #e2e8f0;
-  background: #ffffff;
+  flex: none;
+  border-top: 1px solid #d8e1ee;
+  background: #f3f7fb;
+  padding: 0.68rem 0.9rem 0.76rem;
 }
 
-.root textarea {
-  flex: 1;
+.box {
+  position: relative;
+  width: min(100%, 52rem);
+  margin: 0 auto;
+  border-radius: 0.92rem;
+  box-shadow: none;
+}
+
+.input {
+  width: 100%;
+  min-height: 3.2rem;
+  max-height: 7.5rem;
   resize: none;
-  min-height: 2.7rem;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.9rem;
-  background: #f8fafc;
-  color: #334155;
-  padding: 0.75rem 0.9rem;
-  font-size: 0.86rem;
+  border: 1px solid #cbd8ea;
+  border-radius: 0.92rem;
+  background: #ffffff;
+  color: #172033;
+  font: inherit;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  padding: 0.84rem 7.7rem 0.78rem 0.9rem;
+  outline: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.035);
 }
 
-.send,
-.reviewsend {
-  width: 2.3rem;
-  height: 2.3rem;
+.input::placeholder {
+  color: #7a8aa0;
+}
+
+.input:focus {
+  outline: 0;
+  border-color: #73849b;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(71, 85, 105, 0.12);
+}
+
+.input:focus-visible {
+  outline: 0;
+}
+
+.input::-moz-focus-inner {
+  border: 0;
+}
+
+.input:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+.controls {
+  position: absolute;
+  right: 0.56rem;
+  bottom: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+}
+
+.action {
+  width: 2.05rem;
+  height: 2.05rem;
+  border: 0;
+  border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 0;
-  border-radius: 0.8rem;
-  color: #ffffff;
-  font-size: 0.72rem;
-  font-weight: 700;
+  background: #dce5f0;
+  color: #334155;
   transition:
     background 0.16s ease,
     color 0.16s ease,
-    border-color 0.16s ease,
-    box-shadow 0.16s ease,
     transform 0.16s ease;
 }
 
 .send {
   background: #0f172a;
+  color: #ffffff;
+  box-shadow: none;
+}
+
+.send:hover:not(:disabled) {
+  background: #1e293b;
+  transform: translateY(-1px);
 }
 
 .reviewsend {
   background: #4f46e5;
+  color: #ffffff;
 }
 
-.send:hover,
-.reviewsend:hover {
+.reviewsend:hover:not(:disabled) {
+  background: #4338ca;
   transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.stop {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.stop:hover {
+  background: #fecaca;
+  transform: translateY(-1px);
+}
+
+.action:disabled {
+  cursor: not-allowed;
+  background: #e8edf4;
+  color: #9aa7b8;
+  box-shadow: none;
 }
 
 @media (max-width: 920px) {
-  .root textarea,
-  .send,
-  .reviewsend {
+  .box {
     width: 100%;
+  }
+
+  .input {
+    padding-right: 7.7rem;
   }
 }
