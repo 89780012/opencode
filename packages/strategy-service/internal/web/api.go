@@ -11,6 +11,7 @@ import (
 	rt "strategy-service/internal/runtime"
 	"strategy-service/internal/smartx"
 	"strategy-service/internal/summary"
+	"strategy-service/internal/workbench"
 	"strategy-service/internal/workspace"
 
 	"github.com/gin-gonic/gin"
@@ -26,6 +27,9 @@ type API struct {
 	question *question.Service
 	summary  *summary.Service
 	chain    *modelchain.Service
+	bench    *workbench.Service
+
+	socketHandlers map[string]socketHandlerFunc
 }
 
 type envelope struct {
@@ -59,7 +63,7 @@ func NewAPI(run *rt.Service, op *oc.Service, cfg *cfg.Store, sx *smartx.Service,
 	if chain == nil {
 		chain = modelchain.NewService(op)
 	}
-	return &API{
+	api := &API{
 		ws:       workspace.NewService(run),
 		op:       op,
 		cfg:      cfg,
@@ -69,7 +73,13 @@ func NewAPI(run *rt.Service, op *oc.Service, cfg *cfg.Store, sx *smartx.Service,
 		question: question,
 		summary:  summary,
 		chain:    chain,
+		bench:    workbench.NewService(op),
 	}
+	api.socketHandlers = map[string]socketHandlerFunc{
+		"session.create": api.handleSessionCreate,
+	}
+	api.event.handle = api.socket
+	return api
 }
 
 // Register 将所有 HTTP 路由挂载到 gin 引擎上。

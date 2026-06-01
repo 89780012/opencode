@@ -3,23 +3,22 @@ import { apiConfig } from "@/api/config"
 export type SocketEvent = {
   id?: string
   type: string
-  payload?: unknown
-  ts?: number
+  payload?: {
+    workspacePath?: string //工作区路径
+    session?: object //当前工作区会话
+    message?: string //消息
+  }
+  ts: number
 }
 
 type Fn = (event: SocketEvent) => void
-type Sub = () => void
-
-export type SocketState = "idle" | "connecting" | "open" | "closed"
 
 const handlers = new Map<string, Set<Fn>>()
-const subs = new Set<Sub>()
 
 let ws: WebSocket | undefined
 let timer: number | undefined
 let active = false
 let tries = 0
-let state: SocketState = "idle"
 
 function url() {
   const base = apiConfig.baseURL.endsWith("/") ? `${apiConfig.baseURL}events/ws` : `${apiConfig.baseURL}/events/ws`
@@ -32,12 +31,6 @@ function valid(value: unknown): value is SocketEvent {
   if (!value || typeof value !== "object") return false
   const evt = value as Record<string, unknown>
   return typeof evt.type === "string" && evt.type.trim().length > 0
-}
-
-function sync(next: SocketState) {
-  if (state === next) return
-  state = next
-  subs.forEach((fn) => fn())
 }
 
 function dispatch(event: SocketEvent) {
@@ -72,11 +65,9 @@ function connect() {
   if (!active || typeof window === "undefined") return
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return
 
-  sync("connecting")
   ws = new WebSocket(url())
   ws.onopen = () => {
     tries = 0
-    sync("open")
     dispatch({ type: "socket.open", ts: Date.now() })
   }
   ws.onmessage = (msg) => {
@@ -85,7 +76,6 @@ function connect() {
     }
   }
   ws.onclose = () => {
-    sync(active ? "connecting" : "closed")
     dispatch({ type: "socket.close", ts: Date.now() })
     ws = undefined
     schedule()
@@ -106,18 +96,19 @@ export const socket = {
       window.clearTimeout(timer)
     }
     timer = undefined
-    sync("closed")
     ws?.close()
     ws = undefined
   },
-  emit(type: string, payload?: unknown) {
-    const event: SocketEvent = {
-      type,
-      payload,
-      ts: Date.now(),
-    }
+  emit(type: string, payload?: object, id?: string) {
     if (!ws || ws.readyState !== WebSocket.OPEN) return false
-    ws.send(JSON.stringify(event))
+    ws.send(
+      JSON.stringify({
+        id,
+        type,
+        payload,
+        ts: Date.now(),
+      } satisfies SocketEvent),
+    )
     return true
   },
   on(type: string, fn: Fn) {
@@ -129,15 +120,6 @@ export const socket = {
       if (set.size === 0) {
         handlers.delete(type)
       }
-    }
-  },
-  status() {
-    return state
-  },
-  subscribe(fn: Sub) {
-    subs.add(fn)
-    return () => {
-      subs.delete(fn)
     }
   },
 }

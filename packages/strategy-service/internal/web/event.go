@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -30,6 +31,7 @@ type socketHub struct {
 	mu      sync.Mutex
 	clients map[*socketClient]struct{}
 	up      websocket.Upgrader
+	handle  socketHandler
 }
 
 type socketClient struct {
@@ -37,6 +39,8 @@ type socketClient struct {
 	conn *websocket.Conn
 	send chan []byte
 }
+
+type socketHandler func(context.Context, *socketClient, socketEvent) bool
 
 func newSocketHub() *socketHub {
 	return &socketHub{
@@ -118,8 +122,11 @@ func (c *socketClient) read() {
 			return
 		}
 
-		msg, ok := normalize(data)
+		evt, msg, ok := normalize(data)
 		if !ok {
+			continue
+		}
+		if c.hub.handle != nil && c.hub.handle(context.Background(), c, evt) {
 			continue
 		}
 		c.hub.broadcast(msg)
@@ -154,7 +161,12 @@ func (c *socketClient) write() {
 }
 
 func (c *socketClient) emit(kind string, payload json.RawMessage) {
+	c.reply("", kind, payload)
+}
+
+func (c *socketClient) reply(id string, kind string, payload json.RawMessage) {
 	msg, err := json.Marshal(socketEvent{
+		ID:      id,
 		Type:    kind,
 		Payload: payload,
 		Ts:      time.Now().UnixMilli(),
@@ -165,18 +177,18 @@ func (c *socketClient) emit(kind string, payload json.RawMessage) {
 	c.send <- msg
 }
 
-func normalize(data []byte) ([]byte, bool) {
+func normalize(data []byte) (socketEvent, []byte, bool) {
 	evt := socketEvent{}
 	if err := json.Unmarshal(data, &evt); err != nil {
-		return nil, false
+		return evt, nil, false
 	}
 	evt.Type = strings.TrimSpace(evt.Type)
 	if evt.Type == "" {
-		return nil, false
+		return evt, nil, false
 	}
 	if evt.Ts == 0 {
 		evt.Ts = time.Now().UnixMilli()
 	}
 	out, err := json.Marshal(evt)
-	return out, err == nil
+	return evt, out, err == nil
 }
