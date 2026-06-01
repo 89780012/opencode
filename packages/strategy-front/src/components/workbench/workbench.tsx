@@ -40,13 +40,11 @@ export function Workbench(props: { panel: Panels }) {
           }
         >
           <Side
-            tab={app.tab}
             cur={app.cur}
             sessions={app.sessions}
             issues={app.issues}
             risk={app.risk}
             hint={app.hint}
-            onTab={app.setTab}
             onToggle={app.toggle}
             onPick={app.setActive}
             onCreate={app.create}

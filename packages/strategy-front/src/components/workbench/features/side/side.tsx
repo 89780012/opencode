@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { ClipboardList, MessageSquareMore, Sparkles } from "lucide-react"
 import { type SessionItem, type SidebarTab, type Stage } from "../../data"
 import { Modal } from "../modal"
@@ -6,13 +7,11 @@ import { type Issue, RequirementsTab, SessionsTab } from "./side-tabs"
 import { useSideSession } from "../../hooks/use-side-session"
 
 export function Side(props: {
-  tab: SidebarTab
   cur: SessionItem
   sessions: SessionItem[]
   issues: Issue[]
   risk: string
   hint: string
-  onTab: (tab: SidebarTab) => void
   onToggle: (key: string) => void
   onPick: (id: string) => void
   onCreate: (data: { title: string; reqs: string[] }) => void | Promise<void>
@@ -21,7 +20,13 @@ export function Side(props: {
   onDelete: (id: string) => void
   onBacktest: (idx: number) => void
 }) {
-  const session = useSideSession({ onCreate: props.onCreate })
+  const [tab, setTab] = useState<SidebarTab>("requirements")
+  const session = useSideSession({
+    onCreate: async (data) => {
+      await props.onCreate(data)
+      setTab("requirements")
+    },
+  })
 
   return (
     <aside className={css.root}>
@@ -33,23 +38,23 @@ export function Side(props: {
       <div className={css.tabs}>
         <button
           type="button"
-          className={props.tab === "requirements" ? css.tabon : ""}
-          onClick={() => props.onTab("requirements")}
+          className={tab === "requirements" ? css.tabon : ""}
+          onClick={() => setTab("requirements")}
         >
           <ClipboardList size={14} />
           <span>需求面板</span>
         </button>
         <button
           type="button"
-          className={props.tab === "sessions" ? css.tabon : ""}
-          onClick={() => props.onTab("sessions")}
+          className={tab === "sessions" ? css.tabon : ""}
+          onClick={() => setTab("sessions")}
         >
           <MessageSquareMore size={14} />
           <span>会话列表</span>
         </button>
       </div>
 
-      {props.tab === "sessions" ? (
+      {tab === "sessions" ? (
         <SessionsTab
           cur={props.cur}
           sessions={props.sessions}

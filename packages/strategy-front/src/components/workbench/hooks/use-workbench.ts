@@ -5,7 +5,6 @@ import {
   createSessions,
   type ReviewStatus,
   type SessionItem,
-  type SidebarTab,
   type Stage,
   type Step,
 } from "../data"
@@ -15,7 +14,6 @@ export function useWorkbench(setRight: (open: boolean) => void) {
   const [sessions, setSessions] = useState(() => createSessions())
   const [active, setActive] = useState("sess-1")
   const [stage, setStage] = useState<Stage>("session")
-  const [tab, setTab] = useState<SidebarTab>("requirements")
 
   const cur = useMemo(() => sessions.find((item) => item.id === active) ?? sessions[0], [active, sessions])
   const issues = useMemo(
@@ -187,7 +185,6 @@ export function useWorkbench(setRight: (open: boolean) => void) {
     setSessions((list) => [item, ...list])
     setActive(item.id)
     setStage("session")
-    setTab("requirements")
     setRight(true)
   }
 
@@ -230,8 +227,6 @@ export function useWorkbench(setRight: (open: boolean) => void) {
     active,
     stage,
     setStage,
-    tab,
-    setTab,
     cur,
     issues,
     last,
