@@ -5,7 +5,6 @@ import { chatApi, workspaceApi } from "@/api/modules"
 import { useWorkspaceList } from "@/data/global-data-provider"
 import { log, note } from "@/lib/error"
 import { cards, picks, prompt, seed, tail, type Card } from "@/lib/strategy-create"
-import { encodeStrategyPath } from "@/lib/strategy-path"
 import type { Guide, StrategyType } from "@/lib/strategy-guide"
 
 type Props = {
@@ -162,7 +161,7 @@ export function useWorkspaceCreate(props: Props) {
       props.onOpenChange(false)
       reset()
       toast.success(`策略已创建并发起引导：${data.workspace.name}`)
-      nav(`/app/strategies/${encodeStrategyPath(data.workspace.path)}`)
+      nav(`/app?path=${encodeURIComponent(data.workspace.path)}`)
     } catch (err) {
       log("创建策略工作区失败", err)
       toast.error(note(err, "创建策略失败"))

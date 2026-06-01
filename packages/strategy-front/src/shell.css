@@ -4,15 +4,6 @@
 .in-iframe #root {
   background: #eef3f8;
 }
-
-.in-iframe .embed-session-shell,
-.in-iframe .strategy-detail-shell {
-  background: #eef3f8;
-}
-
-.in-iframe .embed-session-toolbar,
-.in-iframe .embed-session-frame,
-.in-iframe .strategy-detail-frame,
 .in-iframe .workspace-detail-pane,
 .in-iframe .workspace-sidepane,
 .in-iframe .workspace-tree,
@@ -42,10 +33,6 @@
   -webkit-backface-visibility: visible !important;
   backface-visibility: visible !important;
 }
-
-.in-iframe .embed-session-toolbar,
-.in-iframe .embed-session-frame,
-.in-iframe .strategy-detail-frame,
 .in-iframe .workspace-detail-pane {
   border-color: #d8e1ea !important;
   background-color: #f8fafc !important;
@@ -167,260 +154,6 @@
   background: transparent !important;
 }
 
-.in-iframe .embed-session-mask,
-.in-iframe .strategy-detail-mask {
-  background: rgba(248, 250, 252, 0.92) !important;
-  backdrop-filter: none !important;
-}
-
-.embed-session-shell .embed-todo {
-  border-color: #d8e1ea;
-  border-radius: 18px;
-  background: #ffffff;
-  box-shadow: none;
-}
-
-.embed-session-shell .embed-todo-head {
-  display: flex;
-  align-items: flex-start;
-}
-
-.embed-session-shell .embed-todo-mark {
-  border: 1px solid #d8e1ea;
-  background: #f3f6fa;
-  color: #64748b;
-  box-shadow: none;
-}
-
-.embed-session-shell .embed-todo-toggle {
-  appearance: none;
-  -webkit-appearance: none;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  color: #0f172a;
-}
-
-.embed-session-shell .embed-todo-title {
-  color: #0f172a;
-  line-height: 1.25rem;
-}
-
-.embed-session-shell .embed-todo-count {
-  border: 1px solid #d8e1ea;
-  background: #eef2f7;
-  color: #334155;
-  box-shadow: none;
-}
-
-.embed-session-shell .embed-todo-copy {
-  position: static;
-  height: auto;
-  overflow: visible;
-  color: #64748b;
-  line-height: 1.125rem;
-}
-
-.embed-session-shell .embed-todo-preview,
-.embed-session-shell .embed-todo-total {
-  position: static;
-  display: block;
-  inset: auto;
-  transform: none;
-  transition: none;
-  opacity: 1;
-}
-
-.embed-session-shell .embed-todo[data-collapsed="true"] .embed-todo-total {
-  display: none;
-}
-
-.embed-session-shell .embed-todo[data-collapsed="false"] .embed-todo-preview {
-  display: none;
-}
-
-.embed-session-shell .embed-todo-arrow {
-  color: #94a3b8;
-  box-shadow: none;
-}
-
-.embed-session-shell .embed-todo-arrow:hover {
-  background: #f3f6fa;
-  color: #475569;
-}
-
-.embed-session-shell .embed-todo-shell {
-  display: block;
-  overflow: hidden;
-  opacity: 1;
-  transition: none;
-}
-
-.embed-session-shell .embed-todo[data-collapsed="true"] .embed-todo-shell {
-  display: none;
-}
-
-.embed-session-shell .embed-todo-body {
-  max-height: 10rem;
-  border-top: 1px solid #e2e8f0;
-  padding: 0.625rem 0.875rem 0.75rem;
-}
-
-.embed-session-shell .todo-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: #94a3b899 transparent;
-}
-
-.embed-session-shell .todo-scrollbar::-webkit-scrollbar {
-  width: 10px;
-}
-
-.embed-session-shell .todo-scrollbar::-webkit-scrollbar-track,
-.embed-session-shell .todo-scrollbar::-webkit-scrollbar-corner {
-  background: transparent;
-}
-
-.embed-session-shell .todo-scrollbar::-webkit-scrollbar-thumb {
-  min-height: 32px;
-  border: 2px solid transparent;
-  border-radius: 999px;
-  background: #cbd5e166;
-  background-clip: padding-box;
-}
-
-.embed-session-shell .todo-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #94a3b899;
-  background-clip: padding-box;
-}
-
-.embed-session-shell .todo-scrollbar::-webkit-scrollbar-thumb:active {
-  background: #64748bcc;
-  background-clip: padding-box;
-}
-
-.embed-session-shell .embed-todo-list {
-  display: block;
-}
-
-.embed-session-shell .embed-todo-row {
-  display: flex;
-  align-items: flex-start;
-  border-radius: 0;
-}
-
-.embed-session-shell .embed-todo-row + .embed-todo-row {
-  margin-top: 0.125rem;
-}
-
-.embed-session-shell .embed-todo-text {
-  color: #334155;
-  opacity: 1;
-}
-
-.embed-session-shell .embed-todo-row[data-status="in_progress"] .embed-todo-text {
-  color: #0f172a;
-}
-
-.embed-session-shell .embed-todo-row[data-status="pending"] .embed-todo-text {
-  color: #475569;
-}
-
-.embed-session-shell .embed-todo-row[data-status="completed"] .embed-todo-text,
-.embed-session-shell .embed-todo-row[data-status="cancelled"] .embed-todo-text {
-  color: #94a3b8;
-}
-
-.embed-session-shell .embed-todo-fade {
-  background: transparent;
-}
-
-.dark .embed-session-shell .embed-todo {
-  border-color: #2c333c;
-  background-color: #12161b;
-  background-image: none;
-  color: #eef3f8;
-}
-
-.dark .embed-session-shell .embed-todo-mark {
-  border-color: #2c333c;
-  background-color: #171c22;
-  color: #99a4af;
-}
-
-.dark .embed-session-shell .embed-todo-toggle {
-  background-color: transparent;
-  color: #eef3f8;
-}
-
-.dark .embed-session-shell .embed-todo-title {
-  color: #eef3f8;
-}
-
-.dark .embed-session-shell .embed-todo-count {
-  border-color: #2c333c;
-  background-color: #1f252d;
-  color: #99a4af;
-}
-
-.dark .embed-session-shell .embed-todo-copy {
-  color: #99a4af;
-}
-
-.dark .embed-session-shell .embed-todo-arrow {
-  color: #99a4af;
-  background-color: transparent;
-}
-
-.dark .embed-session-shell .embed-todo-arrow:hover {
-  background-color: #171c22;
-  color: #eef3f8;
-}
-
-.dark .embed-session-shell .embed-todo-body {
-  border-top-color: #2c333c;
-  background-color: #12161b;
-}
-
-.dark .embed-session-shell .todo-scrollbar {
-  scrollbar-color: #565c6599 transparent;
-}
-
-.dark .embed-session-shell .todo-scrollbar::-webkit-scrollbar-thumb {
-  background: #4e535b66;
-  background-clip: padding-box;
-}
-
-.dark .embed-session-shell .todo-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #565c6599;
-  background-clip: padding-box;
-}
-
-.dark .embed-session-shell .todo-scrollbar::-webkit-scrollbar-thumb:active {
-  background: #565c65cc;
-  background-clip: padding-box;
-}
-
-.dark .embed-session-shell .embed-todo-text {
-  color: #d8e0e8;
-}
-
-.dark .embed-session-shell .embed-todo-row[data-status="in_progress"] .embed-todo-text {
-  color: #eef3f8;
-}
-
-.dark .embed-session-shell .embed-todo-row[data-status="pending"] .embed-todo-text {
-  color: #d8e0e8;
-}
-
-.dark .embed-session-shell .embed-todo-row[data-status="completed"] .embed-todo-text,
-.dark .embed-session-shell .embed-todo-row[data-status="cancelled"] .embed-todo-text {
-  color: #7e8996;
-}
-
-.dark .embed-session-shell .embed-todo-fade {
-  background-color: transparent;
-}
-
 .in-iframe .workspace-tree button,
 .in-iframe .workspace-tabs button,
 .in-iframe .workspace-filter button {
@@ -512,44 +245,10 @@
 .dark.in-iframe #root {
   background: var(--shell-dark-bg) !important;
 }
-
-.dark .embed-session-shell,
-.dark .strategy-detail-shell,
-.in-iframe .dark .embed-session-shell,
-.in-iframe .dark .strategy-detail-shell,
-.dark.in-iframe .embed-session-shell,
-.dark.in-iframe .strategy-detail-shell {
-  background: var(--shell-dark-bg) !important;
-}
-
-.dark .embed-session-toolbar,
-.dark .embed-session-frame,
-.dark .strategy-detail-frame,
 .dark .workspace-detail-pane,
-.in-iframe .dark .embed-session-toolbar,
-.in-iframe .dark .embed-session-frame,
-.in-iframe .dark .strategy-detail-frame,
 .in-iframe .dark .workspace-detail-pane,
-.dark.in-iframe .embed-session-toolbar,
-.dark.in-iframe .embed-session-frame,
-.dark.in-iframe .strategy-detail-frame,
 .dark.in-iframe .workspace-detail-pane {
   border-color: var(--shell-dark-border) !important;
-}
-
-.dark .embed-session-toolbar,
-.in-iframe .dark .embed-session-toolbar,
-.dark.in-iframe .embed-session-toolbar {
-  background: var(--shell-dark-panel) !important;
-}
-
-.dark .embed-session-frame,
-.dark .strategy-detail-frame,
-.in-iframe .dark .embed-session-frame,
-.in-iframe .dark .strategy-detail-frame,
-.dark.in-iframe .embed-session-frame,
-.dark.in-iframe .strategy-detail-frame {
-  background: var(--shell-dark-bg) !important;
 }
 
 .dark [data-slot="button"][data-variant="outline"],
@@ -693,62 +392,6 @@
 .in-iframe .dark .chat-fold-body .text-slate-500,
 .dark.in-iframe .chat-fold-body .text-slate-500 {
   color: var(--shell-dark-muted) !important;
-}
-
-/* Webview-safe embed session fallback styles. */
-.embed-session-shell .embed-session-toolbar,
-.embed-session-shell .embed-session-frame {
-  background-image: none !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
-}
-
-.embed-session-shell .conversation-scroll,
-.embed-session-shell .conversation-body,
-.embed-session-shell .chat-body {
-  isolation: auto !important;
-  -webkit-transform: none !important;
-  transform: none !important;
-}
-
-.embed-session-shell .conversation-scroll,
-.embed-session-shell .conversation-body,
-.embed-session-shell .chat-body,
-.embed-session-shell .chat-item,
-.embed-session-shell .response-body,
-.embed-session-shell .response-body * {
-  -webkit-backface-visibility: visible !important;
-  backface-visibility: visible !important;
-}
-
-.embed-session-shell .chat-fold,
-.embed-session-shell .chat-inline-card {
-  border-color: #d8e1ea !important;
-  border-radius: 12px !important;
-  background: #ffffff !important;
-  background-image: none !important;
-  background-clip: padding-box !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
-}
-
-.embed-session-shell .chat-fold-trigger {
-  appearance: none !important;
-  -webkit-appearance: none !important;
-  border: 0 !important;
-  border-radius: 12px !important;
-  background: transparent !important;
-  background-image: none !important;
-  box-shadow: none !important;
-}
-
-.embed-session-shell .chat-fold-side {
-  align-self: center !important;
-}
-
-.embed-session-shell .chat-fold-shell {
-  overflow: hidden !important;
-  transition: max-height 180ms ease, opacity 160ms ease !important;
 }
 
 .chat-run {
@@ -1081,49 +724,6 @@
   }
 }
 
-.embed-session-shell .chat-fold-body {
-  border-color: #e2e8f0 !important;
-  background: #ffffff !important;
-  background-image: none !important;
-}
-
-.embed-session-shell .chat-fold:focus-within {
-  border-color: #c58b17 !important;
-  box-shadow: none !important;
-}
-
-.embed-session-shell .chat-fold:focus-within .chat-fold-trigger {
-  outline: none !important;
-  box-shadow: none !important;
-}
-
-.dark .embed-session-shell .chat-scroll {
-  background: var(--shell-dark-bg) !important;
-}
-
-.dark .embed-session-shell .chat-fold,
-.dark .embed-session-shell .chat-inline-card {
-  border-color: var(--shell-dark-border) !important;
-  background: var(--shell-dark-panel) !important;
-  color: var(--shell-dark-text) !important;
-}
-
-.dark .embed-session-shell .chat-fold-trigger {
-  background: transparent !important;
-}
-
-.dark .embed-session-shell .chat-fold-body {
-  border-color: var(--shell-dark-border) !important;
-  background: var(--shell-dark-panel) !important;
-}
-
-.dark .embed-session-shell .chat-fold-body,
-.dark .embed-session-shell .chat-fold-body pre,
-.dark .embed-session-shell .chat-fold-body code,
-.dark .embed-session-shell .chat-fold-body .text-xs {
-  color: var(--shell-dark-text-soft) !important;
-}
-
 .dark .chat-run,
 .in-iframe .dark .chat-run,
 .dark.in-iframe .chat-run {
@@ -1324,11 +924,6 @@
   border-color: #7a5a26 !important;
   background: #493616 !important;
   color: #fff0cb !important;
-}
-
-.dark .embed-session-shell .chat-fold:focus-within {
-  border-color: var(--shell-dark-border-strong) !important;
-  box-shadow: none !important;
 }
 
 .dark .chat-empty-tip,
@@ -1604,13 +1199,4 @@
   border-color: var(--shell-dark-border) !important;
   background: var(--shell-dark-panel-3) !important;
   color: var(--shell-dark-text) !important;
-}
-
-.dark .embed-session-mask,
-.dark .strategy-detail-mask,
-.in-iframe .dark .embed-session-mask,
-.in-iframe .dark .strategy-detail-mask,
-.dark.in-iframe .embed-session-mask,
-.dark.in-iframe .strategy-detail-mask {
-  background: var(--shell-dark-mask) !important;
 }

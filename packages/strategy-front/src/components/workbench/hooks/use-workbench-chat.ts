@@ -1,31 +1,33 @@
 import { useEffect, useMemo, useRef } from "react"
-import { useParams } from "react-router-dom"
+import { useSearchParams } from "react-router-dom"
 import { toast } from "sonner"
 import { useWorkspaceList } from "@/data/global-data-provider"
 import { useStrategySession } from "@/hooks/use-strategy-session"
+import { useWorkspaceEntry } from "@/hooks/use-workspace-entry"
 import { log } from "@/lib/error"
-import { decodeStrategyPath } from "@/lib/strategy-path"
 import { useAppDispatch } from "@/store"
 import { updateSessionAbortStatus } from "@/store/chat-session-slice"
 
 export function useWorkbenchChat() {
   const dispatch = useAppDispatch()
-  const params = useParams()
-  const query = params.strategyID ? decodeStrategyPath(params.strategyID) : ""
+  const [search] = useSearchParams()
+  const path = search.get("path")?.trim() ?? ""
+  const entry = useWorkspaceEntry(path)
   const list = useWorkspaceList()
   const workspace = useMemo(() => {
-    if (query) {
-      return list.workspaces.find((item) => item.path === query) ?? null
+    if (path) {
+      return entry.workspace
     }
     return list.selected ?? list.workspaces.find((item) => !item.missing) ?? null
-  }, [list.selected, list.workspaces, query])
+  }, [entry.workspace, list.selected, list.workspaces, path])
   const chat = useStrategySession(workspace?.path)
   const init = useRef<string | null>(null)
 
   useEffect(() => {
+    if (path) return
     if (!workspace) return
     list.select(workspace)
-  }, [list, workspace])
+  }, [list, path, workspace])
 
   useEffect(() => {
     if (init.current === workspace?.path) return
@@ -65,6 +67,7 @@ export function useWorkbenchChat() {
   return {
     abort,
     chat,
+    entry,
     list,
     workspace,
   }

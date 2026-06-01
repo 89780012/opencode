@@ -26,6 +26,11 @@ export function StageView() {
     selectSession: real.chat.selectSession,
   })
   const session = stage.stage === "session"
+  const empty = real.entry.load
+    ? real.entry.phase === "init"
+      ? "正在初始化 Git 仓库..."
+      : "正在准备工作区..."
+    : real.entry.err || real.list.error || "没有可用工作区"
 
   return (
     <>
@@ -33,9 +38,7 @@ export function StageView() {
         real.workspace ? (
           <WorkbenchSession real={real} chat={chat} onOpenDiff={stage.diff} />
         ) : (
-          <div className={common.empty}>
-            {real.list.loading ? "正在加载工作区..." : real.list.error || "没有可用工作区"}
-          </div>
+          <div className={common.empty}>{real.list.loading && !real.entry.err ? "正在加载工作区..." : empty}</div>
         )
       ) : null}
       {stage.stage === "flowchart" ? (

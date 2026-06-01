@@ -2,11 +2,8 @@ import { Suspense, lazy } from "react"
 import { createBrowserRouter, Navigate, RouterProvider, useLocation } from "react-router-dom"
 
 const AppShellPage = lazy(() => import("@/pages/app-shell"))
-const EmbedShellPage = lazy(() => import("@/pages/embed-shell"))
 const IndexPage = lazy(() => import("@/pages/index"))
-const EmbedSessionPage = lazy(() => import("@/pages/embed-session"))
 const StrategiesPage = lazy(() => import("@/pages/strategies"))
-const StrategyDetailPage = lazy(() => import("@/pages/strategy-detail"))
 const SettingsPage = lazy(() => import("@/pages/settings"))
 const SettingsAppearancePage = lazy(() => import("@/pages/settings-appearance"))
 const SettingsRuntimePage = lazy(() => import("@/pages/settings-runtime"))
@@ -24,20 +21,16 @@ function LegacyPage() {
   return <Navigate to={`/app${route.pathname}${route.search}${route.hash}`} replace />
 }
 
+function RootPage() {
+  const route = useLocation()
+
+  return <Navigate to={`/app${route.search}${route.hash}`} replace />
+}
+
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <Navigate to="/app" replace />,
-  },
-  {
-    path: "/app/embed",
-    element: <EmbedShellPage />,
-    children: [
-      {
-        path: "session",
-        element: <EmbedSessionPage />,
-      },
-    ],
+    element: <RootPage />,
   },
   {
     path: "/app",
@@ -49,16 +42,7 @@ const router = createBrowserRouter([
       },
       {
         path: "strategies",
-        children: [
-          {
-            index: true,
-            element: <StrategiesPage />,
-          },
-          {
-            path: ":strategyID",
-            element: <StrategyDetailPage />,
-          },
-        ],
+        element: <StrategiesPage />,
       },
       {
         path: "providers",
@@ -115,16 +99,6 @@ const router = createBrowserRouter([
       {
         path: "skills",
         element: <SkillPage />,
-      },
-    ],
-  },
-  {
-    path: "/embed",
-    element: <EmbedShellPage />,
-    children: [
-      {
-        path: "session",
-        element: <EmbedSessionPage />,
       },
     ],
   },

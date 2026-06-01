@@ -2,13 +2,13 @@ import { useCallback, useEffect, useState } from "react"
 import { workspaceApi } from "@/api/modules"
 import type { AttachWorkspaceGitState, LocalWorkspace } from "@/types/workspace"
 
-function note(err: unknown, text: string) {
+function msg(err: unknown, text: string) {
   if (err instanceof Error && err.message) return err.message
   if (typeof err === "string" && err) return err
   return text
 }
 
-export function useEmbedEntry(path?: string | null) {
+export function useWorkspaceEntry(path?: string | null) {
   const [workspace, setWorkspace] = useState<LocalWorkspace | null>(null)
   const [git, setGit] = useState<AttachWorkspaceGitState | null>(null)
   const [load, setLoad] = useState(false)
@@ -42,7 +42,7 @@ export function useEmbedEntry(path?: string | null) {
     } catch (err) {
       setWorkspace(null)
       setGit(null)
-      setErr(note(err, "工作区初始化失败"))
+      setErr(msg(err, "工作区初始化失败"))
     } finally {
       setPhase("")
       setLoad(false)

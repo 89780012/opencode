@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { WorkspaceCreateDialog } from "@/components/workspace/workspace-create-dialog"
 import { useWorkspaceList } from "@/data/global-data-provider"
-import { encodeStrategyPath } from "@/lib/strategy-path"
 import { cn } from "@/lib/utils"
 import type { LocalWorkspace } from "@/types/workspace"
 
@@ -46,7 +45,7 @@ export default function StrategiesPage() {
   }, [q, workspaces])
 
   const onSelect = (item: LocalWorkspace) => {
-    nav(`/app/strategies/${encodeStrategyPath(item.path)}`)
+    nav(`/app?path=${encodeURIComponent(item.path)}`)
   }
 
   const onDelete = async () => {
@@ -144,7 +143,7 @@ export default function StrategiesPage() {
         onDone={async (item) => {
           await refresh()
           select(item)
-          nav(`/app/strategies/${encodeStrategyPath(item.path)}`)
+          nav(`/app?path=${encodeURIComponent(item.path)}`)
         }}
       />
       <DeleteConfirmDialog
