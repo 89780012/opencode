@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from "react"
 import { useSearchParams } from "react-router-dom"
 import { toast } from "sonner"
-import { useWorkspaceList } from "@/data/global-data-provider"
+import { useWorkspaceList } from "@/data/global-data"
 import { useStrategySession } from "@/hooks/use-strategy-session"
 import { useWorkspaceEntry } from "@/hooks/use-workspace-entry"
 import { log } from "@/lib/error"
@@ -12,7 +12,7 @@ export function useWorkbenchChat() {
   const dispatch = useAppDispatch()
   const [search] = useSearchParams()
   const path = search.get("path")?.trim() ?? ""
-  const entry = useWorkspaceEntry(path)
+  const entry = useWorkspaceEntry(path) //主要做工作区初始化
   const list = useWorkspaceList()
   const workspace = useMemo(() => {
     if (path) {

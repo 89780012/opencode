@@ -1,6 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react"
 import { modelChainApi } from "@/api/modules/model-chain"
-import { useProviderList } from "@/data/global-data-provider"
+import { useProviderList } from "@/data/global-data"
 import { useProviderPage } from "@/hooks/use-provider-page"
 import {
   autoModelChain,

@@ -4,7 +4,7 @@ import { SessionSidebarPanel } from "@/components/chat/session-sidebar-panel"
 import { SidebarHeader } from "@/components/ui/sidebar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { LocalWorkspaceTab } from "@/components/workspace/local-workspace-tab"
-import { useWorkspaceList } from "@/data/global-data-provider"
+import { useWorkspaceList } from "@/data/global-data"
 
 type Tab = "workspace" | "session"
 

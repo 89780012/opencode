@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { mcpApi } from "@/api/modules"
-import { useGlobalData } from "@/data/global-data-provider"
+import { useGlobalData } from "@/data/global-data"
 import type { McpCfg, McpDoc, McpRow, McpStatus } from "@/types/mcp"
 import { enabled, isCfg, kind, oauth, sort, summary, text, view } from "@/components/mcp/utils"
 

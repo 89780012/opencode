@@ -9,7 +9,7 @@ import { StrategyList } from "@/components/strategy/strategy-list"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { WorkspaceCreateDialog } from "@/components/workspace/workspace-create-dialog"
-import { useWorkspaceList } from "@/data/global-data-provider"
+import { useWorkspaceList } from "@/data/global-data"
 import { cn } from "@/lib/utils"
 import type { LocalWorkspace } from "@/types/workspace"
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 import { systemApi } from "@/api/modules"
-import { useGlobalData } from "@/data/global-data-provider"
+import { useGlobalData } from "@/data/global-data"
 import { note } from "@/lib/error"
 import { digit, rule, wait } from "@/lib/global-markdown"
 

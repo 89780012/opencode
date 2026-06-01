@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { SidebarContent, SidebarGroup, SidebarGroupContent, SidebarHeader } from "@/components/ui/sidebar"
-import { useWorkspaceList } from "@/data/global-data-provider"
+import { useWorkspaceList } from "@/data/global-data"
 import { log, note } from "@/lib/error"
 import type { LocalWorkspace } from "@/types/workspace"
 

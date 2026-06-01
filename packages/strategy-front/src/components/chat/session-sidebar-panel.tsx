@@ -1,6 +1,6 @@
 import { FolderOpen, MessageSquareText, Plus, RefreshCw } from "lucide-react"
 import { useEffect } from "react"
-import { useWorkspaceList } from "@/data/global-data-provider"
+import { useWorkspaceList } from "@/data/global-data"
 import { Button } from "@/components/ui/button"
 import {
   SidebarContent,

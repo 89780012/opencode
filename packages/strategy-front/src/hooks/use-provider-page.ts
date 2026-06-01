@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
 import { providerApi } from "@/api/modules/provider"
-import { useProviderList } from "@/data/global-data-provider"
+import { useProviderList } from "@/data/global-data"
 import type { Provider } from "@/types/provider"
 import { custom, popular, text } from "@/components/provider/utils"
 
