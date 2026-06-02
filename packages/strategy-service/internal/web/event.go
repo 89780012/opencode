@@ -164,6 +164,22 @@ func (c *socketClient) emit(kind string, payload json.RawMessage) {
 	c.reply("", kind, payload)
 }
 
+func (h *socketHub) emitBroadcast(kind string, payload json.RawMessage) {
+	if h == nil {
+		return
+	}
+	msg, err := json.Marshal(socketEvent{
+		Type:    kind,
+		Payload: payload,
+		Ts:      time.Now().UnixMilli(),
+	})
+	if err != nil {
+		return
+	}
+	h.broadcast(msg)
+}
+
+
 func (c *socketClient) reply(id string, kind string, payload json.RawMessage) {
 	msg, err := json.Marshal(socketEvent{
 		ID:      id,
