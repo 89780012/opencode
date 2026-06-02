@@ -25,15 +25,6 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
     () => state.demo.find((session) => session.id === state.active) ?? state.demo[0],
     [state.active, state.demo],
   )
-  const issues = useMemo(
-    () =>
-      state.demo.flatMap((session) =>
-        session.messages
-          .filter((msg) => msg.role === "user")
-          .map((msg) => ({ sid: session.id, name: session.name, body: msg.body })),
-      ),
-    [state.demo],
-  )
   const last = cur.reviewHistory.at(-1) ?? null
   const risk = useMemo(() => {
     if (cur.reviewStatus === "passed") return "审查已通过"
@@ -89,7 +80,6 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
     active: state.active,
     stage: state.stage,
     cur,
-    issues,
     last,
     risk,
     hint,

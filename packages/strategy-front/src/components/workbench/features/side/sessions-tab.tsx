@@ -11,12 +11,11 @@ import {
 } from "lucide-react"
 import type { ReactNode } from "react"
 import type { SessionItem } from "../../data"
+import { useWorkbenchQuestion } from "../../hooks/use-workbench-question"
 import { useWorkbenchSession } from "../../hooks/use-workbench-session"
 import { Modal } from "../modal"
 import ui from "../../../shared/styles/ui.module.css"
 import css from "../../styles/side/side.module.css"
-
-export type Issue = { sid: string; name: string; body: string }
 
 function Fold(props: {
   open: boolean
@@ -53,12 +52,11 @@ function Fold(props: {
 
 export function SessionsTab(props: {
   cur: SessionItem
-  issues: Issue[]
   onToggle: (key: string) => void
-  onIssuePick: (id: string) => void
   onCreate?: () => void
 }) {
   const session = useWorkbenchSession({ onCreate: props.onCreate })
+  const question = useWorkbenchQuestion()
 
   return (
     <div className={css.stack} style={{ fontSize: 12 }}>
@@ -124,23 +122,29 @@ export function SessionsTab(props: {
         open={props.cur.sections.issues}
         icon={HelpCircle}
         title="问题清单"
-        count={props.issues.length}
+        count={question.questions.length}
         onToggle={() => props.onToggle("issues")}
       >
         <div className={`${css.issuelist} ${ui.scroll}`}>
-          {props.issues.length ? (
-            props.issues.map((item) => (
-              <button
-                key={`${item.sid}-${item.body}`}
-                type="button"
-                className={css.issue}
-                onClick={() => props.onIssuePick(item.sid)}
-              >
+          {question.questions.length ? (
+            question.questions.map((item) => (
+              <button key={item.id} type="button" className={css.issue} onClick={() => question.select(item.sessionId)}>
                 <div className={css.rowtop}>
                   <span className={css.issuehead}>
                     <MessageCircle size={12} />
-                    <span>{item.name}</span>
+                    <span>{item.name || item.sessionId}</span>
                   </span>
+                  <button
+                    type="button"
+                    className={`${css.iconbtn} ${css.danger}`}
+                    aria-label="删除问题"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      question.remove(item)
+                    }}
+                  >
+                    <Trash2 size={12} />
+                  </button>
                 </div>
                 <p>{item.body}</p>
               </button>

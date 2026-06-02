@@ -34,9 +34,7 @@ export function Side(props: { onCreate?: () => void }) {
       {tab === "sessions" ? (
         <SessionsTab
           cur={app.cur}
-          issues={app.issues}
           onToggle={app.toggle}
-          onIssuePick={app.setActive}
           onCreate={() => {
             props.onCreate?.()
             setTab("requirements")

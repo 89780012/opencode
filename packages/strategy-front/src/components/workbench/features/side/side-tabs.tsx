@@ -1,2 +1,2 @@
 export { RequirementsTab } from "./requirements-tab"
-export { SessionsTab, type Issue } from "./sessions-tab"
+export { SessionsTab } from "./sessions-tab"
