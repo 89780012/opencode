@@ -3,12 +3,15 @@ package workbench
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
+	"strategy-service/internal/db"
 	oc "strategy-service/internal/opencode"
 )
 
@@ -23,6 +26,11 @@ func NewService(op *oc.Service) *Service {
 func (s *Service) CreateSession(ctx context.Context, req SessionCreate) (json.RawMessage, error) {
 	if err := s.op.Ensure(ctx); err != nil {
 		return nil, err
+	}
+	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
+	req.Title = strings.TrimSpace(req.Title)
+	if req.WorkspacePath == "" {
+		return nil, fmt.Errorf("workspacePath is required")
 	}
 
 	body := io.Reader(nil)
@@ -55,5 +63,148 @@ func (s *Service) CreateSession(ctx context.Context, req SessionCreate) (json.Ra
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("opencode session create failed: %s %s", resp.Status, strings.TrimSpace(string(data)))
 	}
+	if err := s.put(ctx, req, data); err != nil {
+		return nil, err
+	}
 	return data, nil
+}
+
+func (s *Service) UpdateSession(ctx context.Context, req SessionUpdate) (SessionRow, error) {
+	req.ID = strings.TrimSpace(req.ID)
+	req.Title = strings.TrimSpace(req.Title)
+	if req.Title == "" {
+		req.Title = strings.TrimSpace(req.Name)
+	}
+	if req.ID == "" {
+		return SessionRow{}, fmt.Errorf("id is required")
+	}
+	if req.Title == "" {
+		return SessionRow{}, fmt.Errorf("title is required")
+	}
+	doc, err := db.Open()
+	if err != nil {
+		return SessionRow{}, err
+	}
+	res, err := doc.ExecContext(ctx, "update sessions set title = ? where id = ?", req.Title, req.ID)
+	if err != nil {
+		return SessionRow{}, err
+	}
+	count, err := res.RowsAffected()
+	if err != nil {
+		return SessionRow{}, err
+	}
+	if count == 0 {
+		return SessionRow{}, db.ErrNotFound
+	}
+	return loadSession(ctx, doc, req.ID)
+}
+
+func (s *Service) DeleteSession(ctx context.Context, req SessionDelete) error {
+	req.ID = strings.TrimSpace(req.ID)
+	if req.ID == "" {
+		return fmt.Errorf("id is required")
+	}
+	doc, err := db.Open()
+	if err != nil {
+		return err
+	}
+	res, err := doc.ExecContext(ctx, "delete from sessions where id = ?", req.ID)
+	if err != nil {
+		return err
+	}
+	count, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		return db.ErrNotFound
+	}
+	return nil
+}
+
+func (s *Service) ListSessions(ctx context.Context, req SessionList) (SessionListResult, error) {
+	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
+	doc, err := db.Open()
+	if err != nil {
+		return SessionListResult{}, err
+	}
+
+	var rows *sql.Rows
+	if req.WorkspacePath == "" {
+		rows, err = doc.QueryContext(ctx, "select id, workspace_path, title, body, created_at, updated_at from sessions order by updated_at desc")
+	} else {
+		rows, err = doc.QueryContext(ctx, "select id, workspace_path, title, body, created_at, updated_at from sessions where workspace_path = ? order by updated_at desc", req.WorkspacePath)
+	}
+	if err != nil {
+		return SessionListResult{}, err
+	}
+	defer rows.Close()
+
+	out := SessionListResult{WorkspacePath: req.WorkspacePath}
+	for rows.Next() {
+		row, err := scanSession(rows)
+		if err != nil {
+			return SessionListResult{}, err
+		}
+		out.Sessions = append(out.Sessions, row)
+	}
+	return out, rows.Err()
+}
+
+func (s *Service) DetailSession(ctx context.Context, req SessionDetail) (SessionRow, error) {
+	req.ID = strings.TrimSpace(req.ID)
+	if req.ID == "" {
+		return SessionRow{}, fmt.Errorf("id is required")
+	}
+	doc, err := db.Open()
+	if err != nil {
+		return SessionRow{}, err
+	}
+	return loadSession(ctx, doc, req.ID)
+}
+
+func (s *Service) put(ctx context.Context, req SessionCreate, session json.RawMessage) error {
+	meta := struct {
+		ID    string `json:"id"`
+		Title string `json:"title"`
+	}{}
+	if err := json.Unmarshal(session, &meta); err != nil {
+		return err
+	}
+	meta.ID = strings.TrimSpace(meta.ID)
+	if meta.ID == "" {
+		return fmt.Errorf("session id is required")
+	}
+	meta.Title = req.Title
+	now := time.Now().UnixMilli()
+	doc, err := db.Open()
+	if err != nil {
+		return err
+	}
+	_, err = doc.ExecContext(ctx, `insert into sessions(id, workspace_path, title, body, created_at, updated_at) values (?, ?, ?, ?, ?, ?)
+on conflict(id) do update set workspace_path = excluded.workspace_path, title = excluded.title, body = excluded.body, updated_at = excluded.updated_at`,
+		meta.ID, req.WorkspacePath, meta.Title, string(session), now, now)
+	return err
+}
+
+type scanner interface {
+	Scan(...any) error
+}
+
+func scanSession(rows scanner) (SessionRow, error) {
+	var row SessionRow
+	var body string
+	if err := rows.Scan(&row.ID, &row.WorkspacePath, &row.Title, &body, &row.CreatedAt, &row.UpdatedAt); err != nil {
+		return SessionRow{}, err
+	}
+	row.Session = json.RawMessage(body)
+	return row, nil
+}
+
+func loadSession(ctx context.Context, doc *sql.DB, id string) (SessionRow, error) {
+	row, err := scanSession(doc.QueryRowContext(ctx, "select id, workspace_path, title, body, created_at, updated_at from sessions where id = ?", id))
+	if err == sql.ErrNoRows {
+		return SessionRow{}, db.ErrNotFound
+	}
+	return row, err
 }

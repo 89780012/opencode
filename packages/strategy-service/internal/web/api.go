@@ -77,6 +77,10 @@ func NewAPI(run *rt.Service, op *oc.Service, cfg *cfg.Store, sx *smartx.Service,
 	}
 	api.socketHandlers = map[string]socketHandlerFunc{
 		"session.create": api.handleSessionCreate,
+		"session.delete": api.handleSessionDelete,
+		"session.detail": api.handleSessionDetail,
+		"session.list":   api.handleSessionList,
+		"session.update": api.handleSessionUpdate,
 	}
 	api.event.handle = api.socket
 	return api
