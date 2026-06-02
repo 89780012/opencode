@@ -11,6 +11,8 @@ import {
 } from "lucide-react"
 import type { ReactNode } from "react"
 import type { SessionItem } from "../../data"
+import { useWorkbenchSession } from "../../hooks/use-workbench-session"
+import { Modal } from "../modal"
 import ui from "../../../shared/styles/ui.module.css"
 import css from "../../styles/side/side.module.css"
 
@@ -51,21 +53,20 @@ function Fold(props: {
 
 export function SessionsTab(props: {
   cur: SessionItem
-  sessions: SessionItem[]
   issues: Issue[]
   onToggle: (key: string) => void
-  onPick: (id: string) => void
-  onCreate: () => void
-  onRename: (id: string) => void
-  onDelete: (id: string) => void
+  onIssuePick: (id: string) => void
+  onCreate?: () => void
 }) {
+  const session = useWorkbenchSession({ onCreate: props.onCreate })
+
   return (
     <div className={css.stack} style={{ fontSize: 12 }}>
       <Fold
         open={props.cur.sections.sessions}
         icon={FolderTree}
         title="策略会话"
-        count={props.sessions.length}
+        count={session.sessions.length}
         onToggle={() => props.onToggle("sessions")}
         action={
           <button
@@ -73,7 +74,7 @@ export function SessionsTab(props: {
             className={css.headbtn}
             onClick={(event) => {
               event.stopPropagation()
-              props.onCreate()
+              session.setOpen(true)
             }}
             aria-label="新建会话"
           >
@@ -82,14 +83,14 @@ export function SessionsTab(props: {
         }
       >
         <div className={`${css.sessionlist} ${ui.scroll}`}>
-          {props.sessions.map((item) => (
+          {session.sessions.map((item) => (
             <button
               key={item.id}
               type="button"
-              className={`${css.session} ${item.id === props.cur.id ? css.sessionon : ""}`}
-              onClick={() => props.onPick(item.id)}
+              className={`${css.session} ${item.id === session.active ? css.sessionon : ""}`}
+              onClick={() => session.setActive(item.id)}
             >
-              <span className={css.name}>{item.name}</span>
+              <span className={css.name}>{item.title}</span>
               <span className={css.actions}>
                 <button
                   type="button"
@@ -97,7 +98,7 @@ export function SessionsTab(props: {
                   aria-label="编辑会话"
                   onClick={(event) => {
                     event.stopPropagation()
-                    props.onRename(item.id)
+                    session.rename(item.id)
                   }}
                 >
                   <Pencil size={12} />
@@ -108,7 +109,7 @@ export function SessionsTab(props: {
                   aria-label="删除会话"
                   onClick={(event) => {
                     event.stopPropagation()
-                    props.onDelete(item.id)
+                    session.remove(item.id)
                   }}
                 >
                   <Trash2 size={12} />
@@ -133,7 +134,7 @@ export function SessionsTab(props: {
                 key={`${item.sid}-${item.body}`}
                 type="button"
                 className={css.issue}
-                onClick={() => props.onPick(item.sid)}
+                onClick={() => props.onIssuePick(item.sid)}
               >
                 <div className={css.rowtop}>
                   <span className={css.issuehead}>
@@ -149,6 +150,19 @@ export function SessionsTab(props: {
           )}
         </div>
       </Fold>
+
+      <Modal
+        open={session.open}
+        busy={session.busy}
+        step={session.step}
+        title={session.title}
+        reqs={session.reqs}
+        onClose={() => session.setOpen(false)}
+        onStep={session.setStep}
+        onTitle={session.setTitle}
+        onReqs={session.setReqs}
+        onSubmit={() => void session.submit()}
+      />
     </div>
   )
 }

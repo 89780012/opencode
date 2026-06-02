@@ -3,9 +3,6 @@ import { selectWorkbench, useAppDispatch, useAppSelector } from "@/store"
 import {
   backtestFinish,
   backtestStart,
-  create as add,
-  remove as drop,
-  rename as edit,
   reviewFinish,
   reviewStart,
   reviewStep,
@@ -25,17 +22,17 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
   const state = useAppSelector(selectWorkbench)
 
   const cur = useMemo(
-    () => state.sessions.find((item) => item.id === state.active) ?? state.sessions[0],
-    [state.active, state.sessions],
+    () => state.demo.find((session) => session.id === state.active) ?? state.demo[0],
+    [state.active, state.demo],
   )
   const issues = useMemo(
     () =>
-      state.sessions.flatMap((item) =>
-        item.messages
+      state.demo.flatMap((session) =>
+        session.messages
           .filter((msg) => msg.role === "user")
-          .map((msg) => ({ sid: item.id, name: item.name, body: msg.body })),
+          .map((msg) => ({ sid: session.id, name: session.name, body: msg.body })),
       ),
-    [state.sessions],
+    [state.demo],
   )
   const last = cur.reviewHistory.at(-1) ?? null
   const risk = useMemo(() => {
@@ -88,29 +85,7 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
     dispatch(backtestFinish({ id, time: time() }))
   }
 
-  const create = (data: { title: string; reqs: string[] }) => {
-    dispatch(add({ ...data, id: `sess-${Date.now()}` }))
-    setRight?.(true)
-  }
-
-  const rename = (id: string) => {
-    const item = state.sessions.find((entry) => entry.id === id)
-    if (!item) return
-    const name = window.prompt("新名称", item.name)?.trim()
-    if (!name) return
-
-    dispatch(edit({ id, name }))
-  }
-
-  const remove = (id: string) => {
-    if (state.sessions.length === 1) return
-    if (!window.confirm("确定删除这个策略会话吗？")) return
-
-    dispatch(drop(id))
-  }
-
   return {
-    sessions: state.sessions,
     active: state.active,
     stage: state.stage,
     cur,
@@ -124,9 +99,6 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
     review,
     backtest,
     show: (idx: number) => dispatch(showBacktest({ id: state.active, idx })),
-    create,
-    rename,
-    remove,
     view: () => dispatch(flip()),
   }
 }

@@ -18,7 +18,13 @@ export function Modal(props: {
 
   return (
     <div className={css.overlay} onClick={() => !props.busy && props.onClose()}>
-      <div className={css.modal} onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="新建会话">
+      <div
+        className={css.modal}
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="新建会话"
+      >
         <div className={css.head}>
           <strong className={ui.sectiontitle}>
             <Sparkles size={16} />
@@ -43,7 +49,11 @@ export function Modal(props: {
           {props.step === 1 ? (
             <>
               <label>请描述你的策略需求</label>
-              <textarea rows={5} value={props.reqs.join("\n")} onChange={(event) => props.onReqs(event.target.value.split("\n").filter(Boolean))} />
+              <textarea
+                rows={5}
+                value={props.reqs.join("\n")}
+                onChange={(event) => props.onReqs(event.target.value.split("\n").filter(Boolean))}
+              />
             </>
           ) : null}
 
@@ -55,8 +65,18 @@ export function Modal(props: {
               <div className={css.reqbox}>
                 {props.reqs.map((item, idx) => (
                   <div key={`${idx}-${item}`} className={css.reqrow}>
-                    <input value={item} onChange={(event) => props.onReqs(props.reqs.map((entry, i) => (i === idx ? event.target.value : entry)))} />
-                    <button type="button" onClick={() => props.onReqs(props.reqs.length > 1 ? props.reqs.filter((_, i) => i !== idx) : props.reqs)}>
+                    <input
+                      value={item}
+                      onChange={(event) =>
+                        props.onReqs(props.reqs.map((entry, i) => (i === idx ? event.target.value : entry)))
+                      }
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        props.onReqs(props.reqs.length > 1 ? props.reqs.filter((_, i) => i !== idx) : props.reqs)
+                      }
+                    >
                       <Trash2 size={14} />
                       <span>删除</span>
                     </button>
@@ -93,7 +113,13 @@ export function Modal(props: {
             <span></span>
           )}
           <button type="button" className={ui.primary} onClick={props.onSubmit}>
-            {props.step === 3 ? <Check size={14} /> : props.busy ? <LoaderCircle size={14} className={ui.spin} /> : <Sparkles size={14} />}
+            {props.step === 3 ? (
+              <Check size={14} />
+            ) : props.busy ? (
+              <LoaderCircle size={14} className={ui.spin} />
+            ) : (
+              <Sparkles size={14} />
+            )}
             <span>{props.step === 3 ? "确认创建" : props.busy ? "分析中..." : "下一步"}</span>
           </button>
         </div>

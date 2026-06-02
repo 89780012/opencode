@@ -14,26 +14,58 @@ type Create = {
   reqs: string[]
 }
 
+export type WorkbenchSession = {
+  id: string
+  title: string
+  workspacePath: string
+  session?: unknown
+  createdAt: number
+  updatedAt: number
+}
+
 type State = {
-  sessions: SessionItem[]
+  demo: SessionItem[]
+  sessions: WorkbenchSession[]
   active: string
   stage: Stage
 }
 
 const initialState: State = {
-  sessions: createSessions(),
+  demo: createSessions(),
+  sessions: [],
   active: "sess-1",
   stage: "session",
 }
 
 function find(state: State, id: string) {
-  return state.sessions.find((item) => item.id === id)
+  return state.demo.find((item) => item.id === id) ?? state.demo[0]
 }
 
 const slice = createSlice({
   name: "workbench",
   initialState,
   reducers: {
+    setSessions(state, action: PayloadAction<{ sessions: WorkbenchSession[] }>) {
+      state.sessions = action.payload.sessions
+      if (state.sessions.some((item) => item.id === state.active)) return
+      state.active = state.sessions[0]?.id ?? ""
+    },
+    upsertSession(state, action: PayloadAction<{ session: WorkbenchSession }>) {
+      const idx = state.sessions.findIndex((item) => item.id === action.payload.session.id)
+      if (idx >= 0) {
+        state.sessions[idx] = action.payload.session
+        return
+      }
+      state.sessions.unshift(action.payload.session)
+      if (!state.active) {
+        state.active = action.payload.session.id
+      }
+    },
+    deleteSession(state, action: PayloadAction<{ id: string }>) {
+      state.sessions = state.sessions.filter((item) => item.id !== action.payload.id)
+      if (state.active !== action.payload.id) return
+      state.active = state.sessions[0]?.id ?? ""
+    },
     setStage(state, action: PayloadAction<Stage>) {
       state.stage = action.payload
     },
@@ -143,7 +175,7 @@ const slice = createSlice({
         reviewProgress: null,
       }
 
-      state.sessions.unshift(item)
+      state.demo.unshift(item)
       state.active = item.id
       state.stage = "session"
     },
@@ -154,12 +186,12 @@ const slice = createSlice({
       item.name = action.payload.name
     },
     remove(state, action: PayloadAction<string>) {
-      if (state.sessions.length === 1) return
+      if (state.demo.length === 1) return
 
-      state.sessions = state.sessions.filter((item) => item.id !== action.payload)
+      state.demo = state.demo.filter((item) => item.id !== action.payload)
       if (state.active !== action.payload) return
 
-      state.active = state.sessions[0]?.id ?? ""
+      state.active = state.demo[0]?.id ?? ""
     },
     view(state) {
       const item = find(state, state.active)
@@ -174,6 +206,7 @@ export const {
   backtestFinish,
   backtestStart,
   create,
+  deleteSession,
   remove,
   rename,
   reviewFinish,
@@ -181,9 +214,11 @@ export const {
   reviewStep,
   send,
   setActive,
+  setSessions,
   setStage,
   showBacktest,
   toggle,
+  upsertSession,
   view,
 } = slice.actions
 

@@ -3,11 +3,7 @@ import { apiConfig } from "@/api/config"
 export type SocketEvent = {
   id?: string
   type: string
-  payload?: {
-    workspacePath?: string //工作区路径
-    session?: object //当前工作区会话
-    message?: string //消息
-  }
+  payload?: unknown
   ts: number
 }
 
@@ -90,6 +86,9 @@ export const socket = {
     active = true
     connect()
   },
+  ready() {
+    return !!ws && ws.readyState === WebSocket.OPEN
+  },
   disconnect() {
     active = false
     if (typeof window !== "undefined") {
@@ -99,7 +98,7 @@ export const socket = {
     ws?.close()
     ws = undefined
   },
-  emit(type: string, payload?: object, id?: string) {
+  emit(type: string, payload?: unknown, id?: string) {
     if (!ws || ws.readyState !== WebSocket.OPEN) return false
     ws.send(
       JSON.stringify({
