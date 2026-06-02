@@ -109,6 +109,14 @@ var schema = []string{
 	managed integer not null,
 	updated_at integer not null
 )`,
+	`create table if not exists sessions (
+	id text primary key,
+	workspace_path text not null,
+	title text not null,
+	body text not null,
+	created_at integer not null,
+	updated_at integer not null
+)`,
 	`create table if not exists questions (
 	id text primary key,
 	workspace_path text not null,
