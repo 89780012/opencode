@@ -13,6 +13,10 @@
   box-shadow: none;
 }
 
+.full {
+  width: 100%;
+}
+
 .input {
   width: 100%;
   min-height: 3.2rem;

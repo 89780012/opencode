@@ -17,6 +17,7 @@ export function StageView() {
   const stage = useStage()
   const real = useWorkbenchChat()
   const [draft, setDraft] = useState("")
+  const [mode, setMode] = useState<"narrow" | "full">("narrow")
   const chat = useChatRuntime({
     workspacePath: real.workspace?.path,
     sessionId: real.chat.selectedSessionId,
@@ -36,7 +37,7 @@ export function StageView() {
     <>
       {session ? (
         real.workspace ? (
-          <WorkbenchSession real={real} chat={chat} onOpenDiff={stage.diff} />
+          <WorkbenchSession real={real} chat={chat} mode={mode} onMode={setMode} onOpenDiff={stage.diff} />
         ) : (
           <div className={common.empty}>{empty}</div>
         )
@@ -61,6 +62,7 @@ export function StageView() {
         disabled={session ? real.chat.creating : false}
         submitting={session ? chat.submitting || real.chat.creating : false}
         value={session ? chat.draft.text : draft}
+        mode={session ? mode : "narrow"}
         onAbort={session ? () => void real.abort() : undefined}
         onChange={session ? chat.draft.setText : setDraft}
         onSend={(text, review) => {

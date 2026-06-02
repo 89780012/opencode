@@ -295,6 +295,7 @@ const Item = memo(function Item(props: { info: ChatMessageInfo; onOpenDiff?: (fi
 export function SessionMessageList(props: {
   loading?: boolean
   messages: ChatMessageInfo[]
+  mode: "narrow" | "full"
   status: ChatStatus
   onOpenDiff?: (file: string) => void
 }) {
@@ -336,7 +337,7 @@ export function SessionMessageList(props: {
 
   return (
     <div ref={body} className={css.body}>
-      <div className={css.list}>
+      <div className={`${css.list} ${props.mode === "full" ? css.listFull : ""}`}>
         {props.loading ? (
           <div className={css.load}>
             <LoaderCircle className={common.spin} size={20} />

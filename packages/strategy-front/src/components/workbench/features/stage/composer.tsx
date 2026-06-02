@@ -9,6 +9,7 @@ export function Composer(props: {
   submitting?: boolean
   review?: boolean
   placeholder?: string
+  mode?: "narrow" | "full"
   onAbort?: () => void
   onChange: (value: string) => void
   onSend: (text: string, review: boolean) => void
@@ -34,7 +35,7 @@ export function Composer(props: {
 
   return (
     <div className={css.root}>
-      <div className={css.box}>
+      <div className={`${css.box} ${props.mode === "full" ? css.full : ""}`}>
         <textarea
           rows={2}
           className={css.input}

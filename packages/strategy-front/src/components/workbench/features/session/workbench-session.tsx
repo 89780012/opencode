@@ -1,4 +1,6 @@
+import { FileText, Maximize2, Minimize2 } from "lucide-react"
 import type { WorkbenchChat } from "../../hooks/use-workbench-chat"
+import { useWorkbenchQuestion } from "../../hooks/use-workbench-question"
 import { SessionMessageList } from "./session-message-list"
 import { WorkbenchPermissionPanel, WorkbenchQuestionPanel, WorkbenchTodoPanel } from "./session-request-panels"
 import panels from "../../styles/session/session-panels.module.css"
@@ -7,21 +9,57 @@ import css from "../../styles/session/session-chat.module.css"
 export function WorkbenchSession(props: {
   real: WorkbenchChat
   chat: ReturnType<typeof import("@/hooks/use-chat-runtime").useChatRuntime>
+  mode: "narrow" | "full"
+  onMode: (mode: "narrow" | "full") => void
   onOpenDiff: (path: string) => void
 }) {
   const workspace = props.real.workspace
+  const question = useWorkbenchQuestion()
+  const ask =
+    question.questions
+      .filter((item) => item.sessionId === props.real.chat.selectedSessionId)
+      .sort((a, b) => b.createdAt - a.createdAt)[0]
+      ?.body.trim() ?? ""
 
   if (!workspace) return null
 
   return (
     <section className={css.root}>
+      <div className={css.bar}>
+        <div className={css.topic}>
+          <FileText size={14} />
+          <span className={css.topiclabel}>当前问题：</span>
+          <span className={css.topictext}>{ask || "暂无提问"}</span>
+        </div>
+        <div className={css.modes}>
+          <button
+            type="button"
+            className={`${css.mode} ${props.mode === "narrow" ? css.modeOn : ""}`}
+            aria-label="窄屏会话"
+            title="窄屏会话"
+            onClick={() => props.onMode("narrow")}
+          >
+            <Minimize2 size={14} />
+          </button>
+          <button
+            type="button"
+            className={`${css.mode} ${props.mode === "full" ? css.modeOn : ""}`}
+            aria-label="整宽会话"
+            title="整宽会话"
+            onClick={() => props.onMode("full")}
+          >
+            <Maximize2 size={14} />
+          </button>
+        </div>
+      </div>
       <SessionMessageList
         loading={props.real.chat.detailLoading && !!props.real.chat.selectedSessionId}
         messages={props.real.chat.messages}
+        mode={props.mode}
         status={props.real.chat.status}
         onOpenDiff={props.onOpenDiff}
       />
-      <div className={panels.stack} style={{ padding: "0 1rem" }}>
+      <div className={`${panels.stack} ${props.mode === "full" ? css.panelFull : css.panelNarrow}`}>
         {props.chat.permission.req ? (
           <WorkbenchPermissionPanel
             req={props.chat.permission.req}
