@@ -1,8 +1,8 @@
 .root {
   flex: none;
-  border-top: 1px solid #d8e1ee;
-  background: #f3f7fb;
-  padding: 0.68rem 0.9rem 0.76rem;
+  border-top: 1px solid #e8edf4;
+  background: #ffffff;
+  padding: 0.72rem 0.9rem 0.82rem;
 }
 
 .box {
@@ -22,9 +22,9 @@
   min-height: 3.2rem;
   max-height: 7.5rem;
   resize: none;
-  border: 1px solid #cbd8ea;
+  border: 1px solid #dbe3ee;
   border-radius: 0.92rem;
-  background: #ffffff;
+  background: #fbfdff;
   color: #172033;
   font: inherit;
   font-size: 0.875rem;
@@ -33,7 +33,7 @@
   outline: 0;
   appearance: none;
   -webkit-appearance: none;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.035);
+  box-shadow: none;
 }
 
 .input::placeholder {
@@ -42,9 +42,9 @@
 
 .input:focus {
   outline: 0;
-  border-color: #73849b;
+  border-color: #94a3b8;
   background: #ffffff;
-  box-shadow: 0 0 0 3px rgba(71, 85, 105, 0.12);
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.07);
 }
 
 .input:focus-visible {

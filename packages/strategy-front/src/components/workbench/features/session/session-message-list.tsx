@@ -1,13 +1,4 @@
-import {
-  CheckCircle2,
-  ChevronDown,
-  CircleAlert,
-  Copy,
-  Download,
-  FileCode2,
-  LoaderCircle,
-  UserRound,
-} from "lucide-react"
+import { Bot, CheckCircle2, ChevronDown, CircleAlert, Copy, Download, FileCode2, LoaderCircle } from "lucide-react"
 import { memo, useEffect, useRef, useState, type ReactNode } from "react"
 import { Response } from "@/components/ai-elements/response"
 import { selectSessionParts, useAppSelector } from "@/store"
@@ -267,16 +258,13 @@ const Item = memo(function Item(props: { info: ChatMessageInfo; onOpenDiff?: (fi
   const user = props.info.role === "user"
   const main = user ? body : body.filter((part) => !internal(part))
   const logs = user ? empty : body.filter(internal)
+  const trace = !user && main.length === 0 && logs.length > 0
 
   if (body.length === 0 && !msg) return null
 
   return (
-    <article className={`${css.msg} ${user ? css.user : css.ai}`}>
-      {user ? (
-        <div className={css.avatar}>
-          <UserRound size={14} />
-        </div>
-      ) : null}
+    <article className={`${css.msg} ${user ? css.user : css.ai} ${trace ? css.trace : ""}`}>
+      <div className={css.avatar}>{user ? "我" : <Bot size={14} />}</div>
       <div className={css.card}>
         <Process parts={logs} onOpenDiff={props.onOpenDiff} />
         {main.map((part) => (
