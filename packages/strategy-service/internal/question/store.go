@@ -18,7 +18,7 @@ func (s *store) load() (Index, error) {
 	idx := Index{}
 	for rows.Next() {
 		var row Entry
-		if err := rows.Scan(&row.ID, &row.WorkspacePath, &row.SessionID, &row.MessageID, &row.Text, &row.CreatedAt); err != nil {
+		if err := rows.Scan(&row.ID, &row.WorkspacePath, &row.SessionID, &row.MessageID, &row.Body, &row.CreatedAt); err != nil {
 			return Index{}, err
 		}
 		idx.Questions = append(idx.Questions, row)
@@ -40,7 +40,7 @@ func (s *store) save(idx Index) error {
 		return err
 	}
 	for _, row := range idx.Questions {
-		_, err := tx.Exec("insert into questions(id, workspace_path, session_id, message_id, text, created_at) values (?, ?, ?, ?, ?, ?)", row.ID, row.WorkspacePath, row.SessionID, row.MessageID, row.Text, row.CreatedAt)
+		_, err := tx.Exec("insert into questions(id, workspace_path, session_id, message_id, text, created_at) values (?, ?, ?, ?, ?, ?)", row.ID, row.WorkspacePath, row.SessionID, row.MessageID, row.Body, row.CreatedAt)
 		if err != nil {
 			_ = tx.Rollback()
 			return err

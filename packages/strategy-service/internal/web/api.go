@@ -76,11 +76,14 @@ func NewAPI(run *rt.Service, op *oc.Service, cfg *cfg.Store, sx *smartx.Service,
 		bench:    workbench.NewService(op),
 	}
 	api.socketHandlers = map[string]socketHandlerFunc{
-		"session.create": api.handleSessionCreate,
-		"session.delete": api.handleSessionDelete,
-		"session.detail": api.handleSessionDetail,
-		"session.list":   api.handleSessionList,
-		"session.update": api.handleSessionUpdate,
+		"question.append": api.handleQuestionAppend,
+		"question.delete": api.handleQuestionDelete,
+		"question.list":   api.handleQuestionList,
+		"session.create":  api.handleSessionCreate,
+		"session.delete":  api.handleSessionDelete,
+		"session.detail":  api.handleSessionDetail,
+		"session.list":    api.handleSessionList,
+		"session.update":  api.handleSessionUpdate,
 	}
 	api.event.handle = api.socket
 	return api
@@ -113,10 +116,6 @@ func (a *API) Register(r *gin.Engine) {
 	ws.GET("/files", a.workspaceFiles)
 	ws.GET("/file-content", a.workspaceFileGet)
 	ws.PUT("/file-content", a.workspaceFilePut)
-
-	q := api.Group("/question")
-	q.GET("", a.questionList)
-	q.POST("", a.questionAppend)
 
 	sum := api.Group("/summary")
 	sum.GET("/session", a.summaryGet)
