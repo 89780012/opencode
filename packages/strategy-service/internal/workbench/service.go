@@ -32,23 +32,19 @@ func (s *Service) CreateSession(ctx context.Context, req SessionCreate) (json.Ra
 	if req.WorkspacePath == "" {
 		return nil, fmt.Errorf("workspacePath is required")
 	}
-
-	body := io.Reader(nil)
-	if req.Title != "" {
-		data, err := json.Marshal(map[string]string{"title": req.Title})
-		if err != nil {
-			return nil, err
-		}
-		body = bytes.NewReader(data)
+	if req.Title == "" {
+		req.Title = SessionTitle
 	}
-
-	call, err := http.NewRequestWithContext(ctx, http.MethodPost, s.addr("/session", req.WorkspacePath), body)
+	body, err := json.Marshal(map[string]string{"title": req.Title})
 	if err != nil {
 		return nil, err
 	}
-	if body != nil {
-		call.Header.Set("Content-Type", "application/json")
+
+	call, err := http.NewRequestWithContext(ctx, http.MethodPost, s.addr("/session", req.WorkspacePath), bytes.NewReader(body))
+	if err != nil {
+		return nil, err
 	}
+	call.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(call)
 	if err != nil {

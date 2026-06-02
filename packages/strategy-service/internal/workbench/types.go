@@ -2,6 +2,8 @@ package workbench
 
 import "encoding/json"
 
+const SessionTitle = "新建策略会话"
+
 type SessionCreate struct {
 	WorkspacePath string `json:"workspacePath"`
 	Title         string `json:"title,omitempty"`
