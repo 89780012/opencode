@@ -2,13 +2,33 @@ import { Bot, CheckCircle2, ChevronDown, CircleAlert, Copy, Download, FileCode2,
 import { memo, useEffect, useRef, useState, type ReactNode } from "react"
 import { Response } from "@/components/ai-elements/response"
 import { selectSessionParts, useAppSelector } from "@/store"
-import type { ChatMessageInfo, ChatPart, ChatStatus, ChatToolPart } from "@/types/chat"
+import type { ChatAssistantMessage, ChatMessageInfo, ChatPart, ChatStatus, ChatToolPart } from "@/types/chat"
 import common from "../../styles/session/session-common.module.css"
 import css from "../../styles/session/session-chat.module.css"
 
 const empty: ChatPart[] = []
 const ansi = /\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g
 type Retry = Extract<ChatStatus, { type: "retry" }>
+type Entry =
+  | {
+      type: "item"
+      info: ChatMessageInfo
+    }
+  | {
+      type: "group"
+      parent: string
+      infos: ChatAssistantMessage[]
+    }
+type Block =
+  | {
+      type: "part"
+      part: ChatPart
+    }
+  | {
+      type: "proc"
+      key: string
+      parts: ChatPart[]
+    }
 
 function clean(value?: string) {
   return value?.replace(ansi, "") ?? ""
@@ -32,8 +52,60 @@ function internal(part: ChatPart) {
     part.type === "tool" ||
     part.type === "retry" ||
     part.type === "compaction" ||
-    part.type === "agent"
+    part.type === "agent" ||
+    part.type === "step-start" ||
+    part.type === "step-finish"
   )
+}
+
+function shown(part: ChatPart) {
+  return part.type !== "step-start" && part.type !== "step-finish"
+}
+
+function entries(messages: ChatMessageInfo[]) {
+  return messages.reduce<Entry[]>((list, info) => {
+    if (info.role !== "assistant") return list.concat({ type: "item", info })
+    const last = list.at(-1)
+    if (last?.type === "group" && last.parent === info.parentID) {
+      last.infos.push(info)
+      return list
+    }
+    return list.concat({ type: "group", parent: info.parentID, infos: [info] })
+  }, [])
+}
+
+function blocks(parts: ChatPart[], role: ChatMessageInfo["role"]) {
+  const body = parts.filter(shown)
+  if (role !== "assistant") return body.map((part): Block => ({ type: "part", part }))
+  const done = body.reduce<{ list: Block[]; logs: ChatPart[] }>(
+    (state, part) => {
+      if (internal(part)) {
+        return {
+          list: state.list,
+          logs: state.logs.concat(part),
+        }
+      }
+      const list =
+        state.logs.length === 0
+          ? state.list
+          : state.list.concat({
+              type: "proc",
+              key: state.logs.map((item) => item.id).join(":"),
+              parts: state.logs,
+            })
+      return {
+        list: list.concat({ type: "part", part }),
+        logs: [],
+      }
+    },
+    { list: [], logs: [] },
+  )
+  if (done.logs.length === 0) return done.list
+  return done.list.concat({
+    type: "proc",
+    key: done.logs.map((item) => item.id).join(":"),
+    parts: done.logs,
+  })
 }
 
 function time(value?: { start: number; end?: number }) {
@@ -146,8 +218,9 @@ function Markdown(props: { children: string; className?: string }) {
 }
 
 function proc(parts: ChatPart[]) {
+  const body = parts.filter(shown)
   if (
-    parts.some(
+    body.some(
       (part) =>
         (part.type === "tool" && (part.state.status === "running" || part.state.status === "pending")) ||
         (part.type === "reasoning" && !part.time.end),
@@ -155,25 +228,27 @@ function proc(parts: ChatPart[]) {
   ) {
     return "running"
   }
-  if (parts.some((part) => (part.type === "tool" && part.state.status === "error") || part.type === "retry")) {
+  if (body.some((part) => (part.type === "tool" && part.state.status === "error") || part.type === "retry")) {
     return "error"
   }
   return "done"
 }
 
 function meta(parts: ChatPart[]) {
-  const tools = parts.filter((part): part is ChatToolPart => part.type === "tool").length
-  if (!tools) return `${parts.length} 步`
-  return `${parts.length} 步 · ${tools} 个工具`
+  const body = parts.filter(shown)
+  const tools = body.filter((part): part is ChatToolPart => part.type === "tool").length
+  if (!tools) return `${body.length} 步`
+  return `${body.length} 步 · ${tools} 个工具`
 }
 
 function Process(props: { parts: ChatPart[]; onOpenDiff?: (file: string) => void }) {
-  if (props.parts.length === 0) return null
+  const parts = props.parts.filter(shown)
+  if (parts.length === 0) return null
 
   return (
     <Fold title="执行过程" line={false} meta={meta(props.parts)} state={proc(props.parts)}>
       <div className={css.process}>
-        {props.parts.map((part) => (
+        {parts.map((part) => (
           <Part key={part.id} part={part} role="assistant" onOpenDiff={props.onOpenDiff} />
         ))}
       </div>
@@ -256,19 +331,60 @@ const Item = memo(function Item(props: { info: ChatMessageInfo; onOpenDiff?: (fi
   const body = parts.length > 0 ? parts : empty
   const msg = err(props.info)
   const user = props.info.role === "user"
-  const main = user ? body : body.filter((part) => !internal(part))
-  const logs = user ? empty : body.filter(internal)
-  const trace = !user && main.length === 0 && logs.length > 0
+  const list = blocks(body, props.info.role)
+  const trace = !user && list.length === 1 && list[0]?.type === "proc"
 
-  if (body.length === 0 && !msg) return null
+  if (list.length === 0 && !msg) return null
 
   return (
     <article className={`${css.msg} ${user ? css.user : css.ai} ${trace ? css.trace : ""}`}>
       <div className={css.avatar}>{user ? "我" : <Bot size={14} />}</div>
       <div className={css.card}>
-        <Process parts={logs} onOpenDiff={props.onOpenDiff} />
-        {main.map((part) => (
-          <Part key={part.id} part={part} role={props.info.role} onOpenDiff={props.onOpenDiff} />
+        {list.map((item) => (
+          item.type === "proc" ? (
+            <Process key={item.key} parts={item.parts} onOpenDiff={props.onOpenDiff} />
+          ) : (
+            <Part key={item.part.id} part={item.part} role={props.info.role} onOpenDiff={props.onOpenDiff} />
+          )
+        ))}
+        {msg ? (
+          <Fold title="回复失败" state="error">
+            <div className={css.warn}>{msg}</div>
+          </Fold>
+        ) : null}
+      </div>
+    </article>
+  )
+})
+
+const Group = memo(function Group(props: { infos: ChatAssistantMessage[]; onOpenDiff?: (file: string) => void }) {
+  const data = useAppSelector((state) =>
+    props.infos.map((info) => ({
+      info,
+      parts: selectSessionParts(state, info.id),
+    })),
+  )
+  const body = data.flatMap((item) => item.parts)
+  const list = blocks(body, "assistant")
+  const msg = data
+    .map((item) => err(item.info))
+    .filter((item) => item)
+    .at(-1)
+
+  if (list.length === 0 && !msg) return null
+
+  return (
+    <article className={`${css.msg} ${css.ai} ${css.group}`}>
+      <div className={css.avatar}>
+        <Bot size={14} />
+      </div>
+      <div className={css.card}>
+        {list.map((item) => (
+          item.type === "proc" ? (
+            <Process key={item.key} parts={item.parts} onOpenDiff={props.onOpenDiff} />
+          ) : (
+            <Part key={item.part.id} part={item.part} role="assistant" onOpenDiff={props.onOpenDiff} />
+          )
         ))}
         {msg ? (
           <Fold title="回复失败" state="error">
@@ -331,8 +447,16 @@ export function SessionMessageList(props: {
             <LoaderCircle className={common.spin} size={20} />
           </div>
         ) : null}
-        {props.messages.map((info) => (
-          <Item key={info.id} info={info} onOpenDiff={props.onOpenDiff} />
+        {entries(props.messages).map((item) => (
+          item.type === "group" ? (
+            <Group
+              key={`${item.parent}:${item.infos.map((info) => info.id).join(",")}`}
+              infos={item.infos}
+              onOpenDiff={props.onOpenDiff}
+            />
+          ) : (
+            <Item key={item.info.id} info={item.info} onOpenDiff={props.onOpenDiff} />
+          )
         ))}
         {props.status.type !== "idle" ? (
           <div className={`${css.status} ${note ? css.statusRetry : ""}`}>

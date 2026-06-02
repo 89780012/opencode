@@ -169,6 +169,10 @@
   display: flex;
 }
 
+.group .card {
+  width: min(100%, 52rem);
+}
+
 .trace {
   display: block;
   padding-left: 2.02rem;
