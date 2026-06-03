@@ -4,8 +4,8 @@
   --panel: #f9fafb;
   --panel-soft: #f3f4f6;
   --panel-strong: #e5e7eb;
-  --text: #1f2937;
-  --text-soft: #6b7280;
+  --text: #111827;
+  --text-soft: #4b5563;
   --text-dim: #9ca3af;
   flex: 1;
   min-width: 0;
@@ -294,7 +294,7 @@
   border: 1px solid #d1d5db;
   border-radius: 0.3rem;
   background: #f3f4f6;
-  color: #374151;
+  color: #111827;
   font-size: 0.78em;
   padding: 0.06rem 0.28rem;
 }
@@ -352,7 +352,7 @@
   width: 100%;
   min-height: 2.05rem;
   border-radius: 0 !important;
-  color: #374151 !important;
+  color: #111827 !important;
   font-size: 0.78rem !important;
   padding: 0.48rem 0.7rem !important;
 }
@@ -402,21 +402,21 @@
 
 .markdown :global([data-streamdown="table-header-cell"]) {
   border-bottom: 1px solid #e5e7eb;
-  color: #374151;
+  color: #111827;
   font-size: 0.74rem;
   font-weight: 700;
   padding: 0.56rem 0.72rem;
 }
 
 .markdown :global([data-streamdown="table-cell"]) {
-  color: #4b5563;
+  color: #111827;
   padding: 0.52rem 0.72rem;
 }
 
 .markdown :global([data-streamdown="table-cell"] code) {
   border-color: #d1d5db;
   background: #f3f4f6;
-  color: #374151;
+  color: #111827;
 }
 
 .markdown :global([data-streamdown="table-body"] tr:hover) {
@@ -461,12 +461,12 @@
 
 :global([data-streamdown="table-fullscreen"] th) {
   border-bottom: 1px solid #e5e7eb !important;
-  color: #374151 !important;
+  color: #111827 !important;
   font-size: 0.78rem;
 }
 
 :global([data-streamdown="table-fullscreen"] td) {
-  color: #4b5563 !important;
+  color: #111827 !important;
 }
 
 :global([data-streamdown="table-fullscreen"] .relative > div) {
@@ -484,7 +484,7 @@
   width: 100%;
   min-height: 2.05rem;
   border-radius: 0 !important;
-  color: #374151 !important;
+  color: #111827 !important;
   font-size: 0.78rem !important;
   padding: 0.48rem 0.7rem !important;
 }
@@ -606,7 +606,7 @@
   margin: 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  color: #4b5563;
+  color: #111827;
   font-size: 0.74rem;
   line-height: 1.55;
 }
@@ -644,7 +644,7 @@
 }
 
 .thought {
-  color: #374151;
+  color: #111827;
   font-size: 0.82rem;
   line-height: 1.68;
   font-weight: 450;
@@ -652,7 +652,7 @@
 
 .thought :global(p),
 .thought :global(li) {
-  color: #374151;
+  color: #111827;
 }
 
 .muted {
@@ -707,7 +707,7 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: #111827;
+  color: #030712;
   font-size: 0.83rem;
   line-height: 1.66;
   padding: 0.7rem 0.84rem 0.84rem;
@@ -729,7 +729,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  color: #1f2937;
+  color: #111827;
   font-size: 0.74rem;
   font-weight: 700;
 }
@@ -765,7 +765,7 @@
   border: 1px solid #d1d5db;
   border-radius: 0.64rem;
   background: #ffffff;
-  color: #374151;
+  color: #111827;
   font-size: 0.72rem;
   padding: 0.38rem 0.58rem;
 }
