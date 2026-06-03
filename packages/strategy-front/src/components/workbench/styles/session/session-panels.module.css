@@ -4,10 +4,10 @@
 }
 
 .panel {
-  border: 1px solid #e2e8f0;
+  border: 1px solid #e5e7eb;
   border-radius: 0.65rem;
-  background: #f8fafc;
-  color: #334155;
+  background: #f9fafb;
+  color: #374151;
   padding: 0.68rem;
   box-shadow: none;
 }
@@ -20,15 +20,26 @@
   margin-bottom: 0.7rem;
 }
 
+.headCompact {
+  margin-bottom: 0;
+}
+
+.headtools {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+}
+
 .title {
-  color: #0f172a;
+  color: #111827;
   font-size: 0.85rem;
   font-weight: 800;
 }
 
 .desc {
   margin-top: 0.22rem;
-  color: #64748b;
+  color: #6b7280;
   font-size: 0.74rem;
   line-height: 1.5;
 }
@@ -36,11 +47,36 @@
 .pill {
   flex: none;
   border-radius: 999px;
-  background: #f1f5f9;
-  color: #64748b;
+  background: #f3f4f6;
+  color: #6b7280;
   font-size: 0.66rem;
   font-weight: 700;
   padding: 0.16rem 0.48rem;
+}
+
+.iconbtn {
+  width: 1.45rem;
+  height: 1.45rem;
+  border: 0;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: #6b7280;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease,
+    transform 0.16s ease;
+}
+
+.iconbtn:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.iconbtnOpen svg {
+  transform: rotate(180deg);
 }
 
 .paths {
@@ -52,8 +88,8 @@
 
 .code {
   border-radius: 0.4rem;
-  background: #f1f5f9;
-  color: #475569;
+  background: #f3f4f6;
+  color: #4b5563;
   font-size: 0.7rem;
   padding: 0.18rem 0.38rem;
 }
@@ -69,9 +105,9 @@
 .question {
   display: grid;
   gap: 0.55rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #e5e7eb;
   border-radius: 0.75rem;
-  background: #f8fafc;
+  background: #f9fafb;
   padding: 0.7rem;
 }
 
@@ -79,17 +115,17 @@
   width: 100%;
   display: flex;
   gap: 0.55rem;
-  border: 1px solid #dbe3ee;
+  border: 1px solid #e5e7eb;
   border-radius: 0.65rem;
   background: #ffffff;
-  color: #334155;
+  color: #374151;
   padding: 0.55rem 0.65rem;
   text-align: left;
 }
 
 .opton {
-  border-color: #0f172a;
-  background: #f1f5f9;
+  border-color: #111827;
+  background: #f3f4f6;
 }
 
 .mark {
@@ -97,14 +133,14 @@
   width: 0.9rem;
   height: 0.9rem;
   margin-top: 0.18rem;
-  border: 1px solid #94a3b8;
+  border: 1px solid #9ca3af;
   border-radius: 999px;
   background: #ffffff;
 }
 
 .opton .mark {
-  border-color: #0f172a;
-  background: #0f172a;
+  border-color: #111827;
+  background: #111827;
   box-shadow: inset 0 0 0 3px #ffffff;
 }
 
@@ -115,22 +151,22 @@
 }
 
 .opttext strong {
-  color: #0f172a;
+  color: #111827;
   font-size: 0.76rem;
 }
 
 .opttext span {
-  color: #64748b;
+  color: #6b7280;
   font-size: 0.7rem;
   line-height: 1.45;
 }
 
 .input {
   width: 100%;
-  border: 1px solid #dbe3ee;
+  border: 1px solid #e5e7eb;
   border-radius: 0.55rem;
   background: #ffffff;
-  color: #0f172a;
+  color: #111827;
   font: inherit;
   font-size: 0.76rem;
   padding: 0.48rem 0.58rem;
@@ -148,12 +184,12 @@
   display: flex;
   align-items: flex-start;
   gap: 0.45rem;
-  color: #334155;
+  color: #374151;
   font-size: 0.74rem;
   line-height: 1.45;
 }
 
 .done {
-  color: #94a3b8;
+  color: #9ca3af;
   text-decoration: line-through;
 }

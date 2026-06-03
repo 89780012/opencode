@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle, LoaderCircle, MinusCircle, ShieldAlert } from "lucide-react"
+import { CheckCircle2, ChevronDown, Circle, LoaderCircle, MinusCircle, ShieldAlert } from "lucide-react"
 import { useState } from "react"
 import type { ChatQuestionAnswer, ChatQuestionRequest, ChatTodo, PermissionRequest } from "@/types/chat"
 import common from "../../styles/session/session-common.module.css"
@@ -152,27 +152,41 @@ export function WorkbenchQuestionPanel(props: {
 }
 
 export function WorkbenchTodoPanel(props: { todos: ChatTodo[]; preview?: string }) {
+  const [fold, setFold] = useState(false)
   if (props.todos.length === 0) return null
   const done = props.todos.filter((item) => item.status === "completed").length
   return (
     <div className={css.panel}>
-      <div className={css.head}>
+      <div className={`${css.head} ${fold ? css.headCompact : ""}`}>
         <div>
           <div className={css.title}>待办</div>
           <div className={css.desc}>{props.preview || "正在跟踪当前任务"}</div>
         </div>
-        <span className={css.pill}>
-          {done} / {props.todos.length}
-        </span>
+        <div className={css.headtools}>
+          <span className={css.pill}>
+            {done} / {props.todos.length}
+          </span>
+          <button
+            type="button"
+            className={`${css.iconbtn} ${fold ? "" : css.iconbtnOpen}`}
+            aria-label={fold ? "展开待办" : "收起待办"}
+            title={fold ? "展开待办" : "收起待办"}
+            onClick={() => setFold((value) => !value)}
+          >
+            <ChevronDown size={14} />
+          </button>
+        </div>
       </div>
-      <div className={css.todos}>
-        {props.todos.map((item, idx) => (
-          <div key={`${item.content}:${idx}`} className={`${css.todo} ${item.status === "completed" ? css.done : ""}`}>
-            <TodoIcon status={item.status} />
-            <span>{item.content}</span>
-          </div>
-        ))}
-      </div>
+      {fold ? null : (
+        <div className={css.todos}>
+          {props.todos.map((item, idx) => (
+            <div key={`${item.content}:${idx}`} className={`${css.todo} ${item.status === "completed" ? css.done : ""}`}>
+              <TodoIcon status={item.status} />
+              <span>{item.content}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

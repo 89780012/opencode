@@ -1,7 +1,7 @@
 .root {
   flex: none;
-  border-top: 1px solid #e8edf4;
-  background: #ffffff;
+  border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
   padding: 0.72rem 0.9rem 0.82rem;
 }
 
@@ -22,10 +22,10 @@
   min-height: 3.2rem;
   max-height: 7.5rem;
   resize: none;
-  border: 1px solid #dbe3ee;
+  border: 1px solid #e5e7eb;
   border-radius: 0.92rem;
-  background: #fbfdff;
-  color: #172033;
+  background: #ffffff;
+  color: #1f2937;
   font: inherit;
   font-size: 0.875rem;
   line-height: 1.5;
@@ -37,14 +37,14 @@
 }
 
 .input::placeholder {
-  color: #7a8aa0;
+  color: #9ca3af;
 }
 
 .input:focus {
   outline: 0;
-  border-color: #94a3b8;
+  border-color: #9ca3af;
   background: #ffffff;
-  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.07);
+  box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.08);
 }
 
 .input:focus-visible {
@@ -56,8 +56,8 @@
 }
 
 .input:disabled {
-  background: #f8fafc;
-  color: #94a3b8;
+  background: #f3f4f6;
+  color: #9ca3af;
 }
 
 .controls {
@@ -77,8 +77,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #dce5f0;
-  color: #334155;
+  background: #e5e7eb;
+  color: #4b5563;
   transition:
     background 0.16s ease,
     color 0.16s ease,
@@ -86,23 +86,23 @@
 }
 
 .send {
-  background: #0f172a;
+  background: #111827;
   color: #ffffff;
   box-shadow: none;
 }
 
 .send:hover:not(:disabled) {
-  background: #1e293b;
+  background: #1f2937;
   transform: translateY(-1px);
 }
 
 .reviewsend {
-  background: #4f46e5;
+  background: #374151;
   color: #ffffff;
 }
 
 .reviewsend:hover:not(:disabled) {
-  background: #4338ca;
+  background: #111827;
   transform: translateY(-1px);
 }
 
@@ -118,8 +118,8 @@
 
 .action:disabled {
   cursor: not-allowed;
-  background: #e8edf4;
-  color: #9aa7b8;
+  background: #f3f4f6;
+  color: #9ca3af;
   box-shadow: none;
 }
 
