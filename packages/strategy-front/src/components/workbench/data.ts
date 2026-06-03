@@ -65,7 +65,6 @@ export interface SessionItem {
   backtestResults: BacktestResult | null
   backtestHistory: BacktestRecord[]
   timelineEvents: TimelineEvent[]
-  sections: Record<string, boolean>
 }
 
 export const code = `class DualMA:
@@ -235,14 +234,6 @@ export function createSessions(): SessionItem[] {
         },
       ],
       timelineEvents: createTimeline("趋势跟踪策略"),
-      sections: {
-        sessions: true,
-        issues: true,
-        requirements: true,
-        logic: true,
-        progress: true,
-        backtest: true,
-      },
     },
     {
       id: "sess-2",
@@ -265,14 +256,6 @@ export function createSessions(): SessionItem[] {
       backtestResults: null,
       backtestHistory: [],
       timelineEvents: createTimeline("震荡突破策略"),
-      sections: {
-        sessions: true,
-        issues: true,
-        requirements: true,
-        logic: true,
-        progress: true,
-        backtest: true,
-      },
     },
     {
       id: "sess-3",
@@ -292,14 +275,6 @@ export function createSessions(): SessionItem[] {
       backtestResults: createBacktest(),
       backtestHistory: [],
       timelineEvents: createTimeline("多因子选股策略"),
-      sections: {
-        sessions: true,
-        issues: true,
-        requirements: true,
-        logic: true,
-        progress: true,
-        backtest: true,
-      },
     },
   ]
 }

@@ -9,7 +9,6 @@ import {
   send as post,
   setActive,
   showBacktest,
-  toggle as fold,
   view as flip,
 } from "@/store/workbench-slice"
 import { createReviewSteps } from "../data"
@@ -84,7 +83,6 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
     risk,
     hint,
     setActive: (id: string) => dispatch(setActive(id)),
-    toggle: (key: string) => dispatch(fold(key)),
     send,
     review,
     backtest,

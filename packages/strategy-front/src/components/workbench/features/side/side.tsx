@@ -5,9 +5,20 @@ import css from "../../styles/side/side.module.css"
 import { RequirementsTab, SessionsTab } from "./side-tabs"
 import { useWorkbench } from "../../hooks/use-workbench"
 
+const init = {
+  sessions: true,
+  issues: true,
+  requirements: true,
+  logic: true,
+  progress: true,
+  backtest: true,
+}
+
 export function Side(props: { onCreate?: () => void }) {
   const app = useWorkbench()
   const [tab, setTab] = useState<SidebarTab>("requirements")
+  const [open, setOpen] = useState<Record<string, boolean>>(init)
+  const flip = (key: string) => setOpen((state) => ({ ...state, [key]: !state[key] }))
 
   return (
     <aside className={css.root}>
@@ -33,15 +44,22 @@ export function Side(props: { onCreate?: () => void }) {
 
       {tab === "sessions" ? (
         <SessionsTab
-          cur={app.cur}
-          onToggle={app.toggle}
+          open={open}
+          onToggle={flip}
           onCreate={() => {
             props.onCreate?.()
             setTab("requirements")
           }}
         />
       ) : (
-        <RequirementsTab cur={app.cur} risk={app.risk} hint={app.hint} onToggle={app.toggle} onBacktest={app.show} />
+        <RequirementsTab
+          cur={app.cur}
+          open={open}
+          risk={app.risk}
+          hint={app.hint}
+          onToggle={flip}
+          onBacktest={app.show}
+        />
       )}
     </aside>
   )

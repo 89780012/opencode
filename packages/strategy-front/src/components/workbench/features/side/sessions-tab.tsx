@@ -10,7 +10,6 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import type { ReactNode } from "react"
-import type { SessionItem } from "../../data"
 import { useWorkbenchQuestion } from "../../hooks/use-workbench-question"
 import { useWorkbenchSession } from "../../hooks/use-workbench-session"
 import { Modal } from "../modal"
@@ -51,7 +50,7 @@ function Fold(props: {
 }
 
 export function SessionsTab(props: {
-  cur: SessionItem
+  open: Record<string, boolean>
   onToggle: (key: string) => void
   onCreate?: () => void
 }) {
@@ -61,7 +60,7 @@ export function SessionsTab(props: {
   return (
     <div className={css.stack} style={{ fontSize: 12 }}>
       <Fold
-        open={props.cur.sections.sessions}
+        open={props.open.sessions}
         icon={FolderTree}
         title="策略会话"
         count={session.sessions.length}
@@ -119,7 +118,7 @@ export function SessionsTab(props: {
       </Fold>
 
       <Fold
-        open={props.cur.sections.issues}
+        open={props.open.issues}
         icon={HelpCircle}
         title="问题清单"
         count={question.questions.length}

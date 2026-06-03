@@ -72,6 +72,7 @@ function Progress(props: { cur: SessionItem }) {
 
 export function RequirementsTab(props: {
   cur: SessionItem
+  open: Record<string, boolean>
   risk: string
   hint: string
   onToggle: (key: string) => void
@@ -82,7 +83,7 @@ export function RequirementsTab(props: {
   return (
     <div className={css.stack}>
       <Compact
-        open={props.cur.sections.requirements}
+        open={props.open.requirements}
         icon={FileText}
         title="需求理解"
         onToggle={() => props.onToggle("requirements")}
@@ -98,7 +99,7 @@ export function RequirementsTab(props: {
       </Compact>
 
       <Compact
-        open={props.cur.sections.logic}
+        open={props.open.logic}
         icon={Workflow}
         title="策略逻辑蓝图"
         onToggle={() => props.onToggle("logic")}
@@ -120,7 +121,7 @@ export function RequirementsTab(props: {
       </Compact>
 
       <Compact
-        open={props.cur.sections.progress}
+        open={props.open.progress}
         icon={Clock3}
         title="进度追踪"
         onToggle={() => props.onToggle("progress")}
@@ -135,7 +136,7 @@ export function RequirementsTab(props: {
       </Compact>
 
       <Compact
-        open={props.cur.sections.backtest}
+        open={props.open.backtest}
         icon={ChartColumn}
         title="回测记录"
         onToggle={() => props.onToggle("backtest")}

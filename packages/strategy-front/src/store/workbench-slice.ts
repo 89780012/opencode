@@ -72,11 +72,6 @@ const slice = createSlice({
     setActive(state, action: PayloadAction<string>) {
       state.active = action.payload
     },
-    toggle(state, action: PayloadAction<string>) {
-      const item = find(state, state.active)
-      if (!item) return
-      item.sections[action.payload] = !item.sections[action.payload]
-    },
     send(state, action: PayloadAction<{ body: string; start: boolean }>) {
       const item = find(state, state.active)
       if (!item) return
@@ -217,7 +212,6 @@ export const {
   setSessions,
   setStage,
   showBacktest,
-  toggle,
   upsertSession,
   view,
 } = slice.actions
