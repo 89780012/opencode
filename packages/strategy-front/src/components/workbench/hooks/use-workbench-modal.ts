@@ -1,0 +1,182 @@
+import { useEffect, useState } from "react"
+import { type Analyze, type Hit, workbenchApi } from "@/api/modules/workbench"
+
+const seed = "新建策略会话"
+const line = ["请描述你的策略需求"]
+const defs = [
+  { key: "strategy", label: "策略类型", note: "决定要生成哪一类策略骨架" },
+  { key: "market", label: "交易市场", note: "缺失市场会影响标的和数据接口选择" },
+  { key: "direction", label: "交易方向", note: "缺失方向会影响开平仓逻辑" },
+  { key: "period", label: "运行周期", note: "缺失周期会影响 K 线与调度配置" },
+  { key: "entry", label: "开仓条件", note: "缺失开仓条件会影响信号生成" },
+  { key: "exit", label: "平仓条件", note: "缺失平仓条件会影响离场逻辑" },
+  { key: "position", label: "仓位规则", note: "缺失仓位规则会影响资金分配" },
+  { key: "stop_loss", label: "止损规则", note: "缺失止损规则会削弱风险控制" },
+  { key: "risk_control", label: "风控约束", note: "缺失风控约束会影响过滤和保护条件" },
+  { key: "indicator", label: "指标依据", note: "缺失指标依据会影响参数和计算过程" },
+  { key: "other", label: "其他约束", note: "补充特殊规则，减少生成歧义" },
+] as const
+
+type Row = {
+  text: string
+  tags: string[]
+}
+
+type Dim = {
+  key: string
+  label: string
+  note: string
+  list: string[]
+  miss: boolean
+}
+
+function slim(value: string) {
+  return value.trim().replace(/\s+/g, "").toLowerCase()
+}
+
+function same(left: string, right: string) {
+  const a = slim(left)
+  const b = slim(right)
+  if (!a || !b) return false
+  return a.includes(b) || b.includes(a)
+}
+
+function take(list?: Hit[]) {
+  return (list ?? [])
+    .map((item) => item.normalized_text.trim() || item.source_text.trim())
+    .filter(Boolean)
+}
+
+function mark(text: string, dims?: Record<string, Hit[]>) {
+  return defs.flatMap((item) =>
+    (dims?.[item.key] ?? []).some((hit) => same(text, hit.source_text) || same(text, hit.normalized_text)) ? [item.label] : [],
+  )
+}
+
+export function useWorkbenchModal(props: { create: (title: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const [step, setStep] = useState(1)
+  const [busy, setBusy] = useState(false)
+  const [title, setTitle] = useState(seed)
+  const [reqs, setReqs] = useState<string[]>(line)
+  const [data, setData] = useState<Analyze | null>(null)
+  const [err, setErr] = useState("")
+
+  useEffect(() => {
+    if (!open) return
+
+    const key = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape" && !busy) {
+        setOpen(false)
+      }
+    }
+
+    window.addEventListener("keydown", key)
+    return () => window.removeEventListener("keydown", key)
+  }, [busy, open])
+
+  const reset = () => {
+    setOpen(false)
+    setStep(1)
+    setBusy(false)
+    setTitle(seed)
+    setReqs(line)
+    setData(null)
+    setErr("")
+  }
+
+  const analyze = async (keep = false) => {
+    const body = reqs.map((item) => item.trim()).filter(Boolean).join("\n")
+    setStep(2)
+    if (!body) {
+      setErr("请先填写策略需求，再进行 AI 分析。")
+      setData(null)
+      return
+    }
+
+    setBusy(true)
+    setErr("")
+
+    try {
+      const next = await workbenchApi.identify(body)
+      setData(next)
+      if (!keep && next.title.trim()) {
+        setTitle(next.title.trim())
+      }
+      setReqs(next.requirement_items.length ? next.requirement_items : reqs)
+    } catch (error) {
+      setData(null)
+      setErr(error instanceof Error ? error.message : "AI 分析失败，请稍后重试。")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const submit = async () => {
+    if (step === 1) {
+      await analyze()
+      return
+    }
+
+    if (step === 2) {
+      setStep(3)
+      return
+    }
+
+    props.create(title)
+    reset()
+  }
+
+  const rows: Row[] = reqs.map((text) => ({
+    text,
+    tags: mark(text, data?.dimensions),
+  }))
+
+  const dims: Dim[] = defs.map((item) => {
+    const list = take(data?.dimensions[item.key])
+    return {
+      key: item.key,
+      label: item.label,
+      note: item.note,
+      list,
+      miss: list.length === 0,
+    }
+  })
+
+  const warn = data
+    ? dims
+        .filter((item) => item.miss)
+        .map((item) => `未识别「${item.label}」：${item.note}，缺失可能影响后续代码生成，但你仍可以继续下一步。`)
+    : []
+
+  return {
+    open,
+    openModal: () => {
+      setOpen(true)
+      setStep(1)
+      setBusy(false)
+      setTitle(seed)
+      setReqs(line)
+      setData(null)
+      setErr("")
+    },
+    close: () => {
+      if (busy) return
+      reset()
+    },
+    step,
+    setStep,
+    busy,
+    title,
+    setTitle,
+    reqs,
+    setReqs,
+    rows,
+    dims,
+    warn,
+    err,
+    data,
+    analyze,
+    submit,
+  }
+}

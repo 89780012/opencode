@@ -59,7 +59,7 @@ func bad(c *gin.Context, err error) {
 }
 
 // NewAPI 组装 API 所需的各类底层服务。
-func NewAPI(run *rt.Service, op *oc.Service, cfg *cfg.Store, sx *smartx.Service, question *question.Service, summary *summary.Service, chain *modelchain.Service) *API {
+func NewAPI(run *rt.Service, op *oc.Service, cfg *cfg.Store, sx *smartx.Service, question *question.Service, summary *summary.Service, chain *modelchain.Service, smartURL string) *API {
 	if chain == nil {
 		chain = modelchain.NewService(op)
 	}
@@ -73,7 +73,7 @@ func NewAPI(run *rt.Service, op *oc.Service, cfg *cfg.Store, sx *smartx.Service,
 		question: question,
 		summary:  summary,
 		chain:    chain,
-		bench:    workbench.NewService(op),
+		bench:    workbench.NewService(op, smartURL),
 	}
 	api.socketHandlers = map[string]socketHandlerFunc{
 		"question.append": api.handleQuestionAppend,
@@ -116,6 +116,9 @@ func (a *API) Register(r *gin.Engine) {
 	ws.GET("/files", a.workspaceFiles)
 	ws.GET("/file-content", a.workspaceFileGet)
 	ws.PUT("/file-content", a.workspaceFilePut)
+
+	bench := api.Group("/workbench")
+	bench.POST("/requirements/identify", a.workbenchIdentify)
 
 	sum := api.Group("/summary")
 	sum.GET("/session", a.summaryGet)

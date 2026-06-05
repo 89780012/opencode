@@ -71,7 +71,7 @@ func New(cfg Config) (*Service, error) {
 		Account:  cfg.Account,
 		WindowId: cfg.WindowId,
 		LogDir:   cfg.LogDir,
-	}), question.NewService(), summary.NewService(op, chain), chain)
+	}), question.NewService(), summary.NewService(op, chain), chain, cfg.SmartURL)
 
 	gin.SetMode(gin.ReleaseMode)
 	mux := gin.New()

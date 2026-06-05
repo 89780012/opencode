@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -16,11 +17,19 @@ import (
 )
 
 type Service struct {
-	op *oc.Service
+	op   *oc.Service
+	base string
+	cli  *http.Client
 }
 
-func NewService(op *oc.Service) *Service {
-	return &Service{op: op}
+func NewService(op *oc.Service, base string) *Service {
+	return &Service{
+		op:   op,
+		base: strings.TrimRight(strings.TrimSpace(base), "/"),
+		cli: &http.Client{
+			Timeout: 60 * time.Second,
+		},
+	}
 }
 
 func (s *Service) CreateSession(ctx context.Context, req SessionCreate) (json.RawMessage, error) {
@@ -159,6 +168,56 @@ func (s *Service) DetailSession(ctx context.Context, req SessionDetail) (Session
 	return loadSession(ctx, doc, req.ID)
 }
 
+func (s *Service) Identify(ctx context.Context, req IdentifyReq) (IdentifyRes, error) {
+	req.Message = strings.TrimSpace(req.Message)
+	if req.Message == "" {
+		return IdentifyRes{}, fmt.Errorf("message is required")
+	}
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return IdentifyRes{}, err
+	}
+
+	call, err := http.NewRequestWithContext(ctx, http.MethodPost, s.path("/ai/strategy/requirements/identify"), bytes.NewReader(body))
+	if err != nil {
+		return IdentifyRes{}, err
+	}
+	call.Header.Set("Accept", "application/json")
+	call.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.cli.Do(call)
+	if err != nil {
+		return IdentifyRes{}, err
+	}
+	defer resp.Body.Close()
+
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+	if err != nil {
+		return IdentifyRes{}, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return IdentifyRes{}, fmt.Errorf("identify failed: %s %s", resp.Status, strings.TrimSpace(string(data)))
+	}
+
+	out := IdentifyRes{}
+	if err := json.Unmarshal(data, &out); err != nil {
+		return IdentifyRes{}, err
+	}
+
+	out.Title = strings.TrimSpace(out.Title)
+	out.Summary = strings.TrimSpace(out.Summary)
+	out.Model = strings.TrimSpace(out.Model)
+	out.Items = clean(out.Items)
+	if out.Dims == nil {
+		out.Dims = map[string][]Hit{}
+	}
+	for key, list := range out.Dims {
+		out.Dims[key] = cleanHits(list)
+	}
+	return out, nil
+}
+
 func (s *Service) put(ctx context.Context, req SessionCreate, session json.RawMessage) error {
 	meta := struct {
 		ID    string `json:"id"`
@@ -203,4 +262,48 @@ func loadSession(ctx context.Context, doc *sql.DB, id string) (SessionRow, error
 		return SessionRow{}, db.ErrNotFound
 	}
 	return row, err
+}
+
+func clean(list []string) []string {
+	out := list[:0]
+	for _, item := range list {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out
+}
+
+func cleanHits(list []Hit) []Hit {
+	out := list[:0]
+	for _, item := range list {
+		item.Source = strings.TrimSpace(item.Source)
+		item.Text = strings.TrimSpace(item.Text)
+		if item.Source == "" && item.Text == "" {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out
+}
+
+func (s *Service) path(raw string) string {
+	baseURL := s.base
+	if baseURL == "" {
+		baseURL = "https://smarttest.ztqft.com"
+	}
+	if strings.HasPrefix(raw, "http://") || strings.HasPrefix(raw, "https://") {
+		return raw
+	}
+	base, err := url.Parse(baseURL)
+	if err != nil {
+		return baseURL + raw
+	}
+	ref, err := url.Parse(raw)
+	if err != nil {
+		return baseURL + raw
+	}
+	return base.ResolveReference(ref).String()
 }

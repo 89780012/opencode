@@ -10,6 +10,7 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import type { ReactNode } from "react"
+import { useWorkbenchModal } from "../../hooks/use-workbench-modal"
 import { useWorkbenchQuestion } from "../../hooks/use-workbench-question"
 import { useWorkbenchSession } from "../../hooks/use-workbench-session"
 import { Modal } from "../modal"
@@ -55,6 +56,9 @@ export function SessionsTab(props: {
   onCreate?: () => void
 }) {
   const session = useWorkbenchSession({ onCreate: props.onCreate })
+  const modal = useWorkbenchModal({
+    create: session.create,
+  })
   const question = useWorkbenchQuestion()
 
   return (
@@ -71,7 +75,7 @@ export function SessionsTab(props: {
             className={css.headbtn}
             onClick={(event) => {
               event.stopPropagation()
-              session.setOpen(true)
+              modal.openModal()
             }}
             aria-label="新建会话"
           >
@@ -155,16 +159,22 @@ export function SessionsTab(props: {
       </Fold>
 
       <Modal
-        open={session.open}
-        busy={session.busy}
-        step={session.step}
-        title={session.title}
-        reqs={session.reqs}
-        onClose={() => session.setOpen(false)}
-        onStep={session.setStep}
-        onTitle={session.setTitle}
-        onReqs={session.setReqs}
-        onSubmit={() => void session.submit()}
+        open={modal.open}
+        busy={modal.busy}
+        step={modal.step}
+        title={modal.title}
+        reqs={modal.reqs}
+        rows={modal.rows}
+        dims={modal.dims}
+        warn={modal.warn}
+        err={modal.err}
+        data={modal.data}
+        onClose={modal.close}
+        onStep={modal.setStep}
+        onTitle={modal.setTitle}
+        onReqs={modal.setReqs}
+        onAnalyze={() => void modal.analyze(true)}
+        onSubmit={() => void modal.submit()}
       />
     </div>
   )

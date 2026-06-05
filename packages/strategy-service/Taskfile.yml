@@ -8,6 +8,7 @@ env:
   HOST: '{{default "127.0.0.1" .HOST}}'
   PORT: '{{default "5000" .PORT}}'
   STRATEGY_FRONT_DIST: '{{default "../strategy-front/dist" .STRATEGY_FRONT_DIST}}'
+  STRATEGY_REQUIREMENT_BASE_URL: '{{default "https://smarttest.ztqft.com/" .STRATEGY_REQUIREMENT_BASE_URL}}'
   PLATFORM: "windows"
   ACCOUNT: "53191000978"
   WINDOWID: "1"
@@ -29,6 +30,7 @@ tasks:
       - echo HOST={{.HOST}}
       - echo PORT={{.PORT}}
       - echo STRATEGY_FRONT_DIST={{.STRATEGY_FRONT_DIST}}
+      - echo STRATEGY_REQUIREMENT_BASE_URL={{.STRATEGY_REQUIREMENT_BASE_URL}}
       - echo PLATFORM={{.PLATFORM}}
       - echo ACCOUNT={{.ACCOUNT}}
       - echo WINDOWID={{.WINDOWID}}

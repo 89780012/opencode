@@ -49,3 +49,21 @@ type SessionListResult struct {
 type SessionResult struct {
 	Session SessionRow `json:"session"`
 }
+
+type IdentifyReq struct {
+	Message string `json:"message"`
+}
+
+type Hit struct {
+	Source string  `json:"source_text"`
+	Text   string  `json:"normalized_text"`
+	Score  float64 `json:"confidence"`
+}
+
+type IdentifyRes struct {
+	Title   string           `json:"title"`
+	Summary string           `json:"summary"`
+	Items   []string         `json:"requirement_items"`
+	Dims    map[string][]Hit `json:"dimensions"`
+	Model   string           `json:"model"`
+}

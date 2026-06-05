@@ -13,6 +13,7 @@ type Config struct {
 	Host     string         // 服务监听地址
 	Port     string         // 服务监听端口
 	Dist     string         // 前端静态资源目录
+	SmartURL string         // AI 需求分析服务地址
 	Opencode OpencodeConfig //opencode配置
 	Platform string         // 运行平台
 	Account  string         // 资金账号
@@ -35,6 +36,7 @@ func LoadConfig() Config {
 	host := text("HOST", "127.0.0.1")
 	port := text("PORT", "5000")
 	dist := text("STRATEGY_FRONT_DIST", "../strategy-front/dist")
+	smartURL := text("STRATEGY_REQUIREMENT_BASE_URL", "https://smarttest.ztqft.com/")
 	platform := text("PLATFORM", runtime.GOOS)
 	account := text("ACCOUNT", "")
 	windowId := text("WINDOWID", "")
@@ -44,6 +46,7 @@ func LoadConfig() Config {
 		Host:     host,
 		Port:     port,
 		Dist:     dist,
+		SmartURL: smartURL,
 		Platform: platform,
 		LogDir:   logDir,
 		Opencode: OpencodeConfig{
