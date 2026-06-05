@@ -6,9 +6,8 @@ import {
   useMemo,
   useReducer,
   useRef,
-  useState,
 } from "react"
-import { agentApi, mcpApi, providerApi, skillApi, workspaceApi } from "@/api/modules"
+import { agentApi, mcpApi, providerApi, skillApi } from "@/api/modules"
 import { note } from "@/lib/error"
 import { latestModels, modelKey, modelVisible, normalizeModelChain, readModelVisibility } from "@/lib/model-catalog"
 import type { GlobalAgentCatalog, RuntimeAgent } from "@/types/agent"
@@ -16,9 +15,8 @@ import type { ComposerModel, ProviderCatalogState } from "@/types/composer"
 import type { McpDoc, McpMap } from "@/types/mcp"
 import type { AuthMap, Config, List } from "@/types/provider"
 import type { GlobalSkillCatalog, RuntimeSkill } from "@/types/skill"
-import type { LocalWorkspace } from "@/types/workspace"
 
-type Key = "agent" | "provider" | "mcp" | "skill" | "workspace"
+type Key = "agent" | "provider" | "mcp" | "skill"
 
 type Box<T> = {
   data: T
@@ -48,17 +46,11 @@ type SkillData = {
   cfg: GlobalSkillCatalog
 }
 
-type WorkspaceData = {
-  basePath: string
-  workspaces: LocalWorkspace[]
-}
-
 type DataMap = {
   agent: AgentData
   provider: ProviderData
   mcp: McpData
   skill: SkillData
-  workspace: WorkspaceData
 }
 
 type State = {
@@ -66,7 +58,6 @@ type State = {
   provider: Box<ProviderData>
   mcp: Box<McpData>
   skill: Box<SkillData>
-  workspace: Box<WorkspaceData>
 }
 
 type Action =
@@ -80,11 +71,6 @@ type Ctx = State & {
   refreshMany: (keys: Key[]) => Promise<void>
   invalidate: (key: Key) => void
   syncProvider: () => void
-  clearWorkspace: () => void
-  selectWorkspace: (item: LocalWorkspace) => void
-  workspace: State["workspace"] & {
-    selected: LocalWorkspace | null
-  }
 }
 
 type Out<T> = {
@@ -126,11 +112,6 @@ const emptySkill: SkillData = {
   },
 }
 
-const emptyWorkspace: WorkspaceData = {
-  basePath: "",
-  workspaces: [],
-}
-
 export const Ctx = createContext<Ctx | null>(null)
 
 function item<T>(data: T): Box<T> {
@@ -150,7 +131,6 @@ function initState(): State {
     provider: item(emptyProvider),
     mcp: item(emptyMcp),
     skill: item(emptySkill),
-    workspace: item(emptyWorkspace),
   }
 }
 
@@ -192,29 +172,6 @@ function normSkillCfg(input?: Partial<GlobalSkillCatalog> | null): GlobalSkillCa
   return {
     root: typeof input?.root === "string" ? input.root : "",
     skills: Array.isArray(input?.skills) ? input.skills : [],
-  }
-}
-
-function normWorkspace(item: LocalWorkspace): LocalWorkspace {
-  return {
-    ...item,
-    type:
-      item.type === "smartx" || item.type === "python" || item.type === "js" || item.type === "other"
-        ? item.type
-        : undefined,
-    template: typeof item.template === "string" ? item.template : undefined,
-    entry_file: typeof item.entry_file === "string" ? item.entry_file : undefined,
-    keywords: item.keywords ?? [],
-    source:
-      item.source === "default_plugin" ||
-      item.source === "user_created" ||
-      item.source === "imported" ||
-      item.source === "external"
-        ? item.source
-        : undefined,
-    managed: !!item.managed,
-    missing: !!item.missing,
-    updated_at: typeof item.updated_at === "number" ? item.updated_at : 0,
   }
 }
 
@@ -368,19 +325,7 @@ async function loadSkill(): Promise<Out<SkillData>> {
   }
 }
 
-async function loadWorkspace(): Promise<Out<WorkspaceData>> {
-  const data = await workspaceApi.getLocalWorkspaces()
-  return {
-    data: {
-      basePath: data.base_path,
-      workspaces: (data.workspaces ?? []).map(normWorkspace),
-    },
-    err: "",
-  }
-}
-
 export function useGlobalDataValue() {
-  const [selected, setSelected] = useState<string | null>(null)
   const [state, dispatch] = useReducer(reduce, undefined, initState)
   const ref = useRef(state)
   const seq = useRef<Record<Key, number>>({
@@ -388,7 +333,6 @@ export function useGlobalDataValue() {
     provider: 0,
     mcp: 0,
     skill: 0,
-    workspace: 0,
   })
   const wait = useRef<Partial<Record<Key, Promise<Box<DataMap[Key]>>>>>({})
 
@@ -412,9 +356,7 @@ export function useGlobalDataValue() {
           ? loadProvider()
           : key === "mcp"
             ? loadMcp()
-            : key === "skill"
-              ? loadSkill()
-              : loadWorkspace()
+            : loadSkill()
     )
       .then((out) => {
         const next = {
@@ -500,18 +442,9 @@ export function useGlobalDataValue() {
     })
   }, [])
 
-  const selectWorkspace = useCallback((item: LocalWorkspace) => {
-    setSelected(item.path)
-  }, [])
-
-  const clearWorkspace = useCallback(() => {
-    setSelected(null)
-  }, [])
-
   useEffect(() => {
     void ensure("provider")
     void ensure("agent")
-    void ensure("workspace")
 
     let idle: number | undefined
 
@@ -535,11 +468,6 @@ export function useGlobalDataValue() {
     }
   }, [ensure])
 
-  const current = useMemo(
-    () => (selected ? (state.workspace.data.workspaces.find((item) => item.path === selected) ?? null) : null),
-    [selected, state.workspace.data.workspaces],
-  )
-
   return useMemo(
     () => ({
       ...state,
@@ -548,14 +476,8 @@ export function useGlobalDataValue() {
       refreshMany,
       invalidate,
       syncProvider,
-      clearWorkspace,
-      selectWorkspace,
-      workspace: {
-        ...state.workspace,
-        selected: current,
-      },
     }),
-    [clearWorkspace, current, ensure, invalidate, refresh, refreshMany, selectWorkspace, state, syncProvider],
+    [ensure, invalidate, refresh, refreshMany, state, syncProvider],
   )
 }
 
@@ -668,43 +590,6 @@ export function useProviderList() {
       data.provider.err,
       data.provider.load,
       data.syncProvider,
-      refresh,
-    ],
-  )
-}
-
-export function useWorkspaceList() {
-  const data = useGlobalData()
-  const ensure = data.ensure
-  const refresh = data.refresh
-
-  useEffect(() => {
-    void ensure("workspace")
-  }, [ensure])
-
-  return useMemo(
-    () => ({
-      basePath: data.workspace.data.basePath,
-      clear: data.clearWorkspace,
-      error: data.workspace.err || null,
-      loaded: data.workspace.ready,
-      loading: data.workspace.load,
-      refresh: async () => {
-        await refresh("workspace")
-      },
-      select: data.selectWorkspace,
-      selected: data.workspace.selected,
-      workspaces: data.workspace.data.workspaces,
-    }),
-    [
-      data.clearWorkspace,
-      data.selectWorkspace,
-      data.workspace.data.basePath,
-      data.workspace.data.workspaces,
-      data.workspace.err,
-      data.workspace.load,
-      data.workspace.ready,
-      data.workspace.selected,
       refresh,
     ],
   )

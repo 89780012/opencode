@@ -3,7 +3,6 @@ import { createBrowserRouter, Navigate, RouterProvider, useLocation } from "reac
 
 const AppShellPage = lazy(() => import("@/pages/app-shell"))
 const IndexPage = lazy(() => import("@/pages/index"))
-const StrategiesPage = lazy(() => import("@/pages/strategies"))
 const SettingsPage = lazy(() => import("@/pages/settings"))
 const SettingsAppearancePage = lazy(() => import("@/pages/settings-appearance"))
 const SettingsRuntimePage = lazy(() => import("@/pages/settings-runtime"))
@@ -39,10 +38,6 @@ const router = createBrowserRouter([
       {
         index: true,
         element: <IndexPage />,
-      },
-      {
-        path: "strategies",
-        element: <StrategiesPage />,
       },
       {
         path: "providers",
@@ -128,7 +123,7 @@ const router = createBrowserRouter([
   },
   {
     path: "*",
-    element: <Navigate to="/app/strategies" replace />,
+    element: <Navigate to="/app" replace />,
   },
 ])
 

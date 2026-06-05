@@ -18,7 +18,7 @@ import {
 const nav = [
   {
     title: "策略",
-    url: "/app/strategies",
+    url: "/app",
     icon: MessageSquareText,
   },
   {
@@ -51,7 +51,7 @@ const nav = [
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const route = useLocation()
   const path = route.pathname
-  const pick = (url: string) => path.startsWith(url)
+  const pick = (url: string) => (url === "/app" ? path === url : path.startsWith(url))
 
   return (
     <Sidebar collapsible="icon" {...props}>

@@ -4,11 +4,6 @@
 .in-iframe #root {
   background: #eef3f8;
 }
-.in-iframe .workspace-detail-pane,
-.in-iframe .workspace-sidepane,
-.in-iframe .workspace-tree,
-.in-iframe .workspace-tabs,
-.in-iframe .workspace-tabs-side,
 .in-iframe .chat-scroll,
 .in-iframe .conversation-scroll {
   background-image: none !important;
@@ -33,11 +28,6 @@
   -webkit-backface-visibility: visible !important;
   backface-visibility: visible !important;
 }
-.in-iframe .workspace-detail-pane {
-  border-color: #d8e1ea !important;
-  background-color: #f8fafc !important;
-}
-
 .in-iframe .chat-fold,
 .in-iframe .chat-inline-card {
   border-color: #d8e1ea !important;
@@ -104,62 +94,6 @@
   line-height: 1.6 !important;
 }
 
-.in-iframe .workspace-sidepane,
-.in-iframe .workspace-tree {
-  border-color: #d8e1ea !important;
-  background-color: #eef3f7 !important;
-}
-
-.in-iframe .workspace-tabs,
-.in-iframe .workspace-tabs-side,
-.in-iframe .workspace-filter {
-  border-color: #d8e1ea !important;
-  background-color: #f8fafc !important;
-  box-shadow: none !important;
-}
-
-.in-iframe .workspace-tab,
-.in-iframe .workspace-tree-row {
-  box-shadow: none !important;
-  text-shadow: none !important;
-  background-image: none !important;
-}
-
-.in-iframe .workspace-tab[data-active],
-.in-iframe .workspace-tree-row[data-active] {
-  border-color: #d7dee8 !important;
-  background: #ffffff !important;
-  color: #0f172a !important;
-}
-
-.in-iframe .workspace-tab:not([data-active]) {
-  border-color: #d8e1ea !important;
-  background: #eef3f7 !important;
-  color: #475569 !important;
-}
-
-.in-iframe .workspace-tree-row:not([data-active]) {
-  border-color: transparent !important;
-  background: transparent !important;
-  color: #475569 !important;
-}
-
-.in-iframe .workspace-tree-row:hover {
-  border-color: #d8e1ea !important;
-  background: #e7edf5 !important;
-  color: #0f172a !important;
-}
-
-.in-iframe .workspace-tree-item {
-  background: transparent !important;
-}
-
-.in-iframe .workspace-tree button,
-.in-iframe .workspace-tabs button,
-.in-iframe .workspace-filter button {
-  box-shadow: none !important;
-}
-
 .in-iframe [role="separator"][aria-orientation="vertical"]::before {
   background: #d8e1ea !important;
 }
@@ -186,13 +120,6 @@
   backdrop-filter: none !important;
 }
 
-.in-iframe .dark .workspace-filter button,
-.dark.in-iframe .workspace-filter button {
-  appearance: none !important;
-  background-image: none !important;
-  box-shadow: none !important;
-}
-
 .in-iframe .dark .chat-fold-trigger,
 .dark.in-iframe .chat-fold-trigger {
   appearance: none !important;
@@ -204,12 +131,6 @@
 .in-iframe .dark .chat-empty-title,
 .dark.in-iframe .chat-empty-title {
   color: #f3f7f4 !important;
-}
-
-.in-iframe .dark .workspace-filter-option:focus,
-.dark.in-iframe .workspace-filter-option:focus {
-  outline: none !important;
-  box-shadow: none !important;
 }
 
 .in-iframe .dark [role="separator"][aria-orientation="vertical"]::before,
@@ -245,12 +166,6 @@
 .dark.in-iframe #root {
   background: var(--shell-dark-bg) !important;
 }
-.dark .workspace-detail-pane,
-.in-iframe .dark .workspace-detail-pane,
-.dark.in-iframe .workspace-detail-pane {
-  border-color: var(--shell-dark-border) !important;
-}
-
 .dark [data-slot="button"][data-variant="outline"],
 .dark [data-slot="select-trigger"],
 .in-iframe .dark [data-slot="button"][data-variant="outline"],
@@ -1033,139 +948,6 @@
 .dark.in-iframe .response-body [data-streamdown="table-fullscreen"] > div > div:first-child > .relative > div {
   border-color: var(--shell-dark-border) !important;
   background: var(--shell-dark-panel-2) !important;
-}
-
-.dark .workspace-detail-pane,
-.in-iframe .dark .workspace-detail-pane,
-.dark.in-iframe .workspace-detail-pane {
-  background: linear-gradient(180deg, #0f1114, #0d1014) !important;
-}
-
-.dark .workspace-sidepane,
-.dark .workspace-tabs,
-.dark .workspace-tree,
-.in-iframe .dark .workspace-sidepane,
-.in-iframe .dark .workspace-tabs,
-.in-iframe .dark .workspace-tree,
-.dark.in-iframe .workspace-sidepane,
-.dark.in-iframe .workspace-tabs,
-.dark.in-iframe .workspace-tree {
-  border-color: var(--shell-dark-border) !important;
-  background: var(--shell-dark-panel) !important;
-}
-
-.dark .workspace-tabs-side,
-.dark .workspace-filter,
-.in-iframe .dark .workspace-tabs-side,
-.in-iframe .dark .workspace-filter,
-.dark.in-iframe .workspace-tabs-side,
-.dark.in-iframe .workspace-filter {
-  border-color: var(--shell-dark-border) !important;
-  background: var(--shell-dark-panel-2) !important;
-}
-
-.dark .workspace-pane-tabs-list,
-.in-iframe .dark .workspace-pane-tabs-list,
-.dark.in-iframe .workspace-pane-tabs-list {
-  border-color: var(--shell-dark-border) !important;
-  background: var(--shell-dark-panel-2) !important;
-}
-
-.dark .workspace-pane-tab,
-.in-iframe .dark .workspace-pane-tab,
-.dark.in-iframe .workspace-pane-tab {
-  border-color: transparent !important;
-  background: transparent !important;
-  color: var(--shell-dark-muted) !important;
-  box-shadow: none !important;
-}
-
-.dark .workspace-pane-tab:hover,
-.in-iframe .dark .workspace-pane-tab:hover,
-.dark.in-iframe .workspace-pane-tab:hover {
-  background: var(--shell-dark-panel-2) !important;
-  color: var(--shell-dark-text-soft) !important;
-}
-
-.dark .workspace-pane-tab[data-state="active"],
-.in-iframe .dark .workspace-pane-tab[data-state="active"],
-.dark.in-iframe .workspace-pane-tab[data-state="active"] {
-  border-color: var(--shell-dark-border) !important;
-  background: var(--shell-dark-panel-3) !important;
-  color: var(--shell-dark-text) !important;
-}
-
-.dark .workspace-filter-option,
-.in-iframe .dark .workspace-filter-option,
-.dark.in-iframe .workspace-filter-option {
-  border: 1px solid transparent !important;
-  background: transparent !important;
-  color: var(--shell-dark-muted) !important;
-  box-shadow: none !important;
-}
-
-.dark .workspace-filter-option:hover,
-.in-iframe .dark .workspace-filter-option:hover,
-.dark.in-iframe .workspace-filter-option:hover {
-  background: var(--shell-dark-panel-3) !important;
-  color: var(--shell-dark-text) !important;
-}
-
-.dark .workspace-filter-option.bg-slate-900,
-.in-iframe .dark .workspace-filter-option.bg-slate-900,
-.dark.in-iframe .workspace-filter-option.bg-slate-900 {
-  border-color: var(--shell-dark-border) !important;
-  background: #e8edf3 !important;
-  color: #10141a !important;
-}
-
-.dark .workspace-pane-refresh,
-.in-iframe .dark .workspace-pane-refresh,
-.dark.in-iframe .workspace-pane-refresh {
-  border-color: var(--shell-dark-border) !important;
-  background: var(--shell-dark-panel) !important;
-  color: var(--shell-dark-text) !important;
-  box-shadow: none !important;
-}
-
-.dark .workspace-pane-refresh:hover,
-.in-iframe .dark .workspace-pane-refresh:hover,
-.dark.in-iframe .workspace-pane-refresh:hover {
-  background: var(--shell-dark-panel-2) !important;
-  color: var(--shell-dark-text) !important;
-}
-
-.dark .workspace-tab[data-active],
-.dark .workspace-tree-row[data-active],
-.in-iframe .dark .workspace-tab[data-active],
-.in-iframe .dark .workspace-tree-row[data-active],
-.dark.in-iframe .workspace-tab[data-active],
-.dark.in-iframe .workspace-tree-row[data-active] {
-  border-color: var(--shell-dark-border) !important;
-  background: var(--shell-dark-panel-3) !important;
-  color: var(--shell-dark-text) !important;
-}
-
-.dark .workspace-tab:not([data-active]),
-.in-iframe .dark .workspace-tab:not([data-active]),
-.dark.in-iframe .workspace-tab:not([data-active]) {
-  border-color: var(--shell-dark-border) !important;
-  background: var(--shell-dark-panel-2) !important;
-  color: var(--shell-dark-muted) !important;
-}
-
-.dark .workspace-tree-row:not([data-active]),
-.in-iframe .dark .workspace-tree-row:not([data-active]),
-.dark.in-iframe .workspace-tree-row:not([data-active]) {
-  color: var(--shell-dark-muted) !important;
-}
-
-.dark .workspace-tree-row:hover,
-.in-iframe .dark .workspace-tree-row:hover,
-.dark.in-iframe .workspace-tree-row:hover {
-  border-color: var(--shell-dark-border) !important;
-  background: var(--shell-dark-panel-2) !important;
-  color: var(--shell-dark-text) !important;
 }
 
 .dark .review-file-list,
