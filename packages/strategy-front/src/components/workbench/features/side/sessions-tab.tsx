@@ -9,7 +9,7 @@ import {
   Trash2,
   type LucideIcon,
 } from "lucide-react"
-import type { ReactNode } from "react"
+import { useState, type ReactNode } from "react"
 import { useWorkbenchModal } from "../../hooks/use-workbench-modal"
 import { useWorkbenchQuestion } from "../../hooks/use-workbench-question"
 import { Modal } from "../modal"
@@ -49,9 +49,94 @@ function Fold(props: {
   )
 }
 
+type SessionAction = { type: "edit"; id: string; title: string } | { type: "delete"; id: string; title: string } | null
+
+function ActionDialog(props: {
+  action: SessionAction
+  value: string
+  locked: boolean
+  onValue: (value: string) => void
+  onClose: () => void
+  onConfirm: () => void
+}) {
+  if (!props.action) return null
+
+  const edit = props.action.type === "edit"
+  const title = edit ? "编辑会话名称" : "删除策略会话"
+  const desc = edit ? "修改后会立即同步到左侧会话列表。" : "删除后该策略会话将从当前工作区移除，此操作不可撤销。"
+
+  return (
+    <div className={css.dialogback} onClick={props.onClose}>
+      <div
+        className={css.dialog}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className={css.dialoghead}>
+          <strong>{title}</strong>
+          <span>{desc}</span>
+        </div>
+        <div className={css.dialogbody}>
+          {edit ? (
+            <label className={css.dialogfield}>
+              <span>会话名称</span>
+              <input value={props.value} onChange={(event) => props.onValue(event.target.value)} autoFocus />
+            </label>
+          ) : (
+            <div className={css.dialogwarn}>
+              <Trash2 size={18} />
+              <div>
+                <strong>{props.action.title}</strong>
+                <p>请确认是否删除该会话。</p>
+              </div>
+            </div>
+          )}
+        </div>
+        <div className={css.dialogfoot}>
+          <button type="button" className={css.cancel} onClick={props.onClose}>
+            取消
+          </button>
+          <button
+            type="button"
+            className={edit ? css.confirm : css.confirmdanger}
+            onClick={props.onConfirm}
+            disabled={edit ? !props.value.trim() : props.locked}
+          >
+            {edit ? "保存修改" : props.locked ? "至少保留一个会话" : "确认删除"}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function SessionsTab(props: { open: Record<string, boolean>; onToggle: (key: string) => void }) {
   const modal = useWorkbenchModal()
   const question = useWorkbenchQuestion()
+  const [action, setAction] = useState<SessionAction>(null)
+  const [name, setName] = useState("")
+
+  const edit = (id: string, title: string) => {
+    setName(title)
+    setAction({ type: "edit", id, title })
+  }
+
+  const remove = (id: string, title: string) => {
+    setAction({ type: "delete", id, title })
+  }
+
+  const confirm = () => {
+    if (!action) return
+    if (action.type === "edit") {
+      modal.rename(action.id, name)
+      setAction(null)
+      return
+    }
+    modal.remove(action.id)
+    setAction(null)
+  }
 
   return (
     <div className={css.stack} style={{ fontSize: 12 }}>
@@ -77,22 +162,17 @@ export function SessionsTab(props: { open: Record<string, boolean>; onToggle: (k
       >
         <div className={`${css.sessionlist} ${ui.scroll}`}>
           {modal.sessions.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={`${css.session} ${item.id === modal.active ? css.sessionon : ""}`}
-              onClick={() => modal.setActive(item.id)}
-            >
-              <span className={css.name}>{item.title}</span>
+            <div key={item.id} className={`${css.session} ${item.id === modal.active ? css.sessionon : ""}`}>
+              <button type="button" className={css.sessionmain} onClick={() => modal.setActive(item.id)}>
+                <span className={css.name}>{item.title}</span>
+              </button>
               <span className={css.actions}>
                 <button
                   type="button"
                   className={css.iconbtn}
                   aria-label="编辑会话"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    modal.rename(item.id)
-                  }}
+                  title="编辑会话"
+                  onClick={() => edit(item.id, item.title)}
                 >
                   <Pencil size={12} />
                 </button>
@@ -100,15 +180,13 @@ export function SessionsTab(props: { open: Record<string, boolean>; onToggle: (k
                   type="button"
                   className={`${css.iconbtn} ${css.danger}`}
                   aria-label="删除会话"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    modal.remove(item.id)
-                  }}
+                  title="删除会话"
+                  onClick={() => remove(item.id, item.title)}
                 >
                   <Trash2 size={12} />
                 </button>
               </span>
-            </button>
+            </div>
           ))}
         </div>
       </Fold>
@@ -149,6 +227,15 @@ export function SessionsTab(props: { open: Record<string, boolean>; onToggle: (k
           )}
         </div>
       </Fold>
+
+      <ActionDialog
+        action={action}
+        value={name}
+        locked={modal.sessions.length === 1}
+        onValue={setName}
+        onClose={() => setAction(null)}
+        onConfirm={confirm}
+      />
 
       <Modal
         open={modal.open}

@@ -215,16 +215,21 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.375rem;
-  border: 0;
+  border: 1px solid transparent;
   background: transparent;
-  padding: 0.375rem 0.5rem;
-  border-radius: 0.375rem;
+  padding: 0.3rem 0.38rem;
+  border-radius: 0.45rem;
   text-align: left;
 }
 
 .session:hover,
 .log:hover {
-  background: #f9fafb;
+  background: #f8fafc;
+}
+
+.session:hover {
+  border-color: #e2e8f0;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
 }
 
 .issue:hover {
@@ -233,9 +238,20 @@
 }
 
 .sessionon {
-  background: #f3f4f6;
-  border-left: 3px solid #0f172a;
-  padding-left: calc(0.5rem - 3px);
+  border-color: #dbe3ec;
+  background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+  box-shadow: inset 3px 0 0 #0f172a;
+}
+
+.sessionmain {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  padding: 0.08rem 0.12rem;
+  text-align: left;
 }
 
 .name {
@@ -449,6 +465,172 @@
 .logtitle {
   color: #0f172a;
   font-weight: 500;
+}
+
+.dialogback {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(3px);
+}
+
+.dialog {
+  width: min(420px, 100%);
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: #ffffff;
+  box-shadow: 0 22px 55px rgba(15, 23, 42, 0.18);
+}
+
+.dialoghead,
+.dialogbody,
+.dialogfoot {
+  padding: 0.82rem;
+}
+
+.dialoghead {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  border-bottom: 1px solid #eef2f7;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.dialoghead strong {
+  color: #0f172a;
+  font-size: 0.92rem;
+  line-height: 1.2;
+}
+
+.dialoghead span,
+.dialogfield,
+.dialogwarn p {
+  color: #64748b;
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.dialogbody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.dialogfield {
+  display: flex;
+  flex-direction: column;
+  gap: 0.32rem;
+  font-weight: 600;
+}
+
+.dialogfield input {
+  border: 1px solid #dbe3ec;
+  border-radius: 0.5rem;
+  background: #ffffff;
+  color: #0f172a;
+  font: inherit;
+  font-size: 0.82rem;
+  outline: 0;
+  padding: 0.58rem 0.65rem;
+}
+
+.dialogfield input:focus {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgba(191, 219, 254, 0.55);
+}
+
+.dialogwarn {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.58rem;
+  border: 1px solid #fecaca;
+  border-radius: 0.55rem;
+  background: #fef2f2;
+  color: #dc2626;
+  padding: 0.68rem;
+}
+
+.dialogwarn strong {
+  display: block;
+  max-width: 19rem;
+  overflow: hidden;
+  color: #7f1d1d;
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dialogwarn p {
+  margin: 0.18rem 0 0;
+  color: #991b1b;
+}
+
+.dialogfoot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  border-top: 1px solid #eef2f7;
+  background: #f8fafc;
+}
+
+.cancel,
+.confirm,
+.confirmdanger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.45rem;
+  font: inherit;
+  font-size: 0.76rem;
+  padding: 0.45rem 0.72rem;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.cancel {
+  border: 1px solid #dbe3ec;
+  background: #ffffff;
+  color: #475569;
+}
+
+.cancel:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.confirm {
+  border: 1px solid #0f172a;
+  background: #0f172a;
+  color: #ffffff;
+}
+
+.confirmdanger {
+  border: 1px solid #dc2626;
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.confirm:hover,
+.confirmdanger:hover {
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+}
+
+.confirm:disabled,
+.confirmdanger:disabled {
+  cursor: not-allowed;
+  border-color: #cbd5e1;
+  background: #e2e8f0;
+  color: #94a3b8;
+  box-shadow: none;
 }
 
 @media (max-width: 920px) {

@@ -138,18 +138,16 @@ export function useWorkbenchModal() {
     reset()
   }
 
-  const rename = (id: string) => {
+  const rename = (id: string, title: string) => {
     const item = state.sessions.find((entry) => entry.id === id)
-    if (!item) return
-    const next = window.prompt("新名称", item.title)?.trim()
-    if (!next) return
+    const next = title.trim()
+    if (!item || !next || next === item.title) return
 
     socket.emit("session.update", { id, title: next })
   }
 
   const remove = (id: string) => {
     if (state.sessions.length === 1) return
-    if (!window.confirm("确定删除这个策略会话吗？")) return
 
     socket.emit("session.delete", { id })
   }
