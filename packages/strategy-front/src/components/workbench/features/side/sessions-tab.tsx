@@ -12,7 +12,6 @@ import {
 import type { ReactNode } from "react"
 import { useWorkbenchModal } from "../../hooks/use-workbench-modal"
 import { useWorkbenchQuestion } from "../../hooks/use-workbench-question"
-import { useWorkbenchSession } from "../../hooks/use-workbench-session"
 import { Modal } from "../modal"
 import ui from "../../../shared/styles/ui.module.css"
 import css from "../../styles/side/side.module.css"
@@ -50,15 +49,8 @@ function Fold(props: {
   )
 }
 
-export function SessionsTab(props: {
-  open: Record<string, boolean>
-  onToggle: (key: string) => void
-  onCreate?: () => void
-}) {
-  const session = useWorkbenchSession({ onCreate: props.onCreate })
-  const modal = useWorkbenchModal({
-    create: session.create,
-  })
+export function SessionsTab(props: { open: Record<string, boolean>; onToggle: (key: string) => void }) {
+  const modal = useWorkbenchModal()
   const question = useWorkbenchQuestion()
 
   return (
@@ -67,7 +59,7 @@ export function SessionsTab(props: {
         open={props.open.sessions}
         icon={FolderTree}
         title="策略会话"
-        count={session.sessions.length}
+        count={modal.sessions.length}
         onToggle={() => props.onToggle("sessions")}
         action={
           <button
@@ -84,12 +76,12 @@ export function SessionsTab(props: {
         }
       >
         <div className={`${css.sessionlist} ${ui.scroll}`}>
-          {session.sessions.map((item) => (
+          {modal.sessions.map((item) => (
             <button
               key={item.id}
               type="button"
-              className={`${css.session} ${item.id === session.active ? css.sessionon : ""}`}
-              onClick={() => session.setActive(item.id)}
+              className={`${css.session} ${item.id === modal.active ? css.sessionon : ""}`}
+              onClick={() => modal.setActive(item.id)}
             >
               <span className={css.name}>{item.title}</span>
               <span className={css.actions}>
@@ -99,7 +91,7 @@ export function SessionsTab(props: {
                   aria-label="编辑会话"
                   onClick={(event) => {
                     event.stopPropagation()
-                    session.rename(item.id)
+                    modal.rename(item.id)
                   }}
                 >
                   <Pencil size={12} />
@@ -110,7 +102,7 @@ export function SessionsTab(props: {
                   aria-label="删除会话"
                   onClick={(event) => {
                     event.stopPropagation()
-                    session.remove(item.id)
+                    modal.remove(item.id)
                   }}
                 >
                   <Trash2 size={12} />

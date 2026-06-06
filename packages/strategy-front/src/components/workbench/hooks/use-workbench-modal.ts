@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react"
+import { useSearchParams } from "react-router-dom"
 import { type Analyze, type Hit, workbenchApi } from "@/api/modules/workbench"
+import { socket } from "@/lib/socket-bus"
+import { selectWorkbench, useAppDispatch, useAppSelector } from "@/store"
+import { setActive } from "@/store/workbench-slice"
 
 const seed = "新建策略会话"
 const line = ["请描述你的策略需求"]
@@ -42,18 +46,22 @@ function same(left: string, right: string) {
 }
 
 function take(list?: Hit[]) {
-  return (list ?? [])
-    .map((item) => item.normalized_text.trim() || item.source_text.trim())
-    .filter(Boolean)
+  return (list ?? []).map((item) => item.normalized_text.trim() || item.source_text.trim()).filter(Boolean)
 }
 
 function mark(text: string, dims?: Record<string, Hit[]>) {
   return defs.flatMap((item) =>
-    (dims?.[item.key] ?? []).some((hit) => same(text, hit.source_text) || same(text, hit.normalized_text)) ? [item.label] : [],
+    (dims?.[item.key] ?? []).some((hit) => same(text, hit.source_text) || same(text, hit.normalized_text))
+      ? [item.label]
+      : [],
   )
 }
 
-export function useWorkbenchModal(props: { create: (title: string) => void }) {
+export function useWorkbenchModal() {
+  const dispatch = useAppDispatch()
+  const state = useAppSelector(selectWorkbench)
+  const [search] = useSearchParams()
+  const path = search.get("path")?.trim() ?? ""
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState(1)
   const [busy, setBusy] = useState(false)
@@ -86,7 +94,10 @@ export function useWorkbenchModal(props: { create: (title: string) => void }) {
   }
 
   const analyze = async (keep = false) => {
-    const body = reqs.map((item) => item.trim()).filter(Boolean).join("\n")
+    const body = reqs
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .join("\n")
     setStep(2)
     if (!body) {
       setErr("请先填写策略需求，再进行 AI 分析。")
@@ -123,8 +134,29 @@ export function useWorkbenchModal(props: { create: (title: string) => void }) {
       return
     }
 
-    props.create(title)
+    create(title)
     reset()
+  }
+
+  const rename = (id: string) => {
+    const item = state.sessions.find((entry) => entry.id === id)
+    if (!item) return
+    const next = window.prompt("新名称", item.title)?.trim()
+    if (!next) return
+
+    socket.emit("session.update", { id, title: next })
+  }
+
+  const remove = (id: string) => {
+    if (state.sessions.length === 1) return
+    if (!window.confirm("确定删除这个策略会话吗？")) return
+
+    socket.emit("session.delete", { id })
+  }
+
+  const create = (title: string) => {
+    if (!path) return
+    socket.emit("session.create", { workspacePath: path, title })
   }
 
   const rows: Row[] = reqs.map((text) => ({
@@ -150,6 +182,12 @@ export function useWorkbenchModal(props: { create: (title: string) => void }) {
     : []
 
   return {
+    sessions: state.sessions,
+    active: state.active,
+    setActive: (id: string) => dispatch(setActive(id)),
+    rename,
+    remove,
+    create,
     open,
     openModal: () => {
       setOpen(true)

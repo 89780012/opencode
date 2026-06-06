@@ -14,7 +14,7 @@ const init = {
   backtest: true,
 }
 
-export function Side(props: { onCreate?: () => void }) {
+export function Side() {
   const app = useWorkbench()
   const [tab, setTab] = useState<SidebarTab>("requirements")
   const [open, setOpen] = useState<Record<string, boolean>>(init)
@@ -43,14 +43,7 @@ export function Side(props: { onCreate?: () => void }) {
       </div>
 
       {tab === "sessions" ? (
-        <SessionsTab
-          open={open}
-          onToggle={flip}
-          onCreate={() => {
-            props.onCreate?.()
-            setTab("requirements")
-          }}
-        />
+        <SessionsTab open={open} onToggle={flip} />
       ) : (
         <RequirementsTab
           cur={app.cur}

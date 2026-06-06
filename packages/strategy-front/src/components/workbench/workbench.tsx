@@ -3,11 +3,14 @@ import { Review } from "./features/review"
 import { Side } from "./features/side"
 import { StageView } from "./features/stage"
 import { usePanels } from "./hooks/use-panels"
+import { useWorkbenchSessionSync } from "./hooks/use-workbench-session-sync"
 import { Handle } from "./layout/handle"
 import { Topbar } from "./layout/topbar"
 import shell from "./styles/layout/shell.module.css"
 
 export function Workbench() {
+  useWorkbenchSessionSync()
+
   const panel = usePanels()
 
   return (
@@ -22,7 +25,7 @@ export function Workbench() {
             } as CSSProperties
           }
         >
-          <Side onCreate={() => panel.right.setOpen(true)} />
+          <Side />
 
           <Handle
             onDown={panel.left.onDown}
