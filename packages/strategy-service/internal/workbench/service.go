@@ -38,6 +38,7 @@ func (s *Service) CreateSession(ctx context.Context, req SessionCreate) (json.Ra
 	}
 	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
 	req.Title = strings.TrimSpace(req.Title)
+	req.Requirements = clean(req.Requirements)
 	if req.WorkspacePath == "" {
 		return nil, fmt.Errorf("workspacePath is required")
 	}
@@ -134,18 +135,23 @@ func (s *Service) ListSessions(ctx context.Context, req SessionList) (SessionLis
 		return SessionListResult{}, err
 	}
 
+	reqs, err := loadReqs(ctx, doc, req.WorkspacePath)
+	if err != nil {
+		return SessionListResult{}, err
+	}
+
 	var rows *sql.Rows
 	if req.WorkspacePath == "" {
-		rows, err = doc.QueryContext(ctx, "select id, workspace_path, title, body, created_at, updated_at from sessions order by updated_at desc")
+		rows, err = doc.QueryContext(ctx, "select id, workspace_path, title, body, analysis, created_at, updated_at from sessions order by updated_at desc")
 	} else {
-		rows, err = doc.QueryContext(ctx, "select id, workspace_path, title, body, created_at, updated_at from sessions where workspace_path = ? order by updated_at desc", req.WorkspacePath)
+		rows, err = doc.QueryContext(ctx, "select id, workspace_path, title, body, analysis, created_at, updated_at from sessions where workspace_path = ? order by updated_at desc", req.WorkspacePath)
 	}
 	if err != nil {
 		return SessionListResult{}, err
 	}
 	defer rows.Close()
 
-	out := SessionListResult{WorkspacePath: req.WorkspacePath}
+	out := SessionListResult{WorkspacePath: req.WorkspacePath, Requirements: reqs}
 	for rows.Next() {
 		row, err := scanSession(rows)
 		if err != nil {
@@ -236,10 +242,20 @@ func (s *Service) put(ctx context.Context, req SessionCreate, session json.RawMe
 	if err != nil {
 		return err
 	}
-	_, err = doc.ExecContext(ctx, `insert into sessions(id, workspace_path, title, body, created_at, updated_at) values (?, ?, ?, ?, ?, ?)
-on conflict(id) do update set workspace_path = excluded.workspace_path, title = excluded.title, body = excluded.body, updated_at = excluded.updated_at`,
-		meta.ID, req.WorkspacePath, meta.Title, string(session), now, now)
-	return err
+	analysis := ""
+	if len(req.Analysis) > 0 {
+		analysis = string(req.Analysis)
+	}
+	_, err = doc.ExecContext(ctx, `insert into sessions(id, workspace_path, title, body, analysis, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?)
+on conflict(id) do update set workspace_path = excluded.workspace_path, title = excluded.title, body = excluded.body, analysis = excluded.analysis, updated_at = excluded.updated_at`,
+		meta.ID, req.WorkspacePath, meta.Title, string(session), analysis, now, now)
+	if err != nil {
+		return err
+	}
+	if req.Requirements == nil {
+		return nil
+	}
+	return saveReqs(ctx, doc, req.WorkspacePath, req.Requirements, now)
 }
 
 type scanner interface {
@@ -249,19 +265,53 @@ type scanner interface {
 func scanSession(rows scanner) (SessionRow, error) {
 	var row SessionRow
 	var body string
-	if err := rows.Scan(&row.ID, &row.WorkspacePath, &row.Title, &body, &row.CreatedAt, &row.UpdatedAt); err != nil {
+	var analysis string
+	if err := rows.Scan(&row.ID, &row.WorkspacePath, &row.Title, &body, &analysis, &row.CreatedAt, &row.UpdatedAt); err != nil {
 		return SessionRow{}, err
 	}
 	row.Session = json.RawMessage(body)
+	if strings.TrimSpace(analysis) != "" {
+		row.Analysis = json.RawMessage(analysis)
+	}
 	return row, nil
 }
 
 func loadSession(ctx context.Context, doc *sql.DB, id string) (SessionRow, error) {
-	row, err := scanSession(doc.QueryRowContext(ctx, "select id, workspace_path, title, body, created_at, updated_at from sessions where id = ?", id))
+	row, err := scanSession(doc.QueryRowContext(ctx, "select id, workspace_path, title, body, analysis, created_at, updated_at from sessions where id = ?", id))
 	if err == sql.ErrNoRows {
 		return SessionRow{}, db.ErrNotFound
 	}
 	return row, err
+}
+
+func loadReqs(ctx context.Context, doc *sql.DB, workspace string) ([]string, error) {
+	workspace = strings.TrimSpace(workspace)
+	if workspace == "" {
+		return []string{}, nil
+	}
+	var body string
+	err := doc.QueryRowContext(ctx, "select items from workspace_requirements where workspace_path = ?", workspace).Scan(&body)
+	if err == sql.ErrNoRows {
+		return []string{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	if err := json.Unmarshal([]byte(body), &out); err != nil {
+		return nil, err
+	}
+	return clean(out), nil
+}
+
+func saveReqs(ctx context.Context, doc *sql.DB, workspace string, reqs []string, now int64) error {
+	body, err := json.Marshal(clean(reqs))
+	if err != nil {
+		return err
+	}
+	_, err = doc.ExecContext(ctx, `insert into workspace_requirements(workspace_path, items, updated_at) values (?, ?, ?)
+on conflict(workspace_path) do update set items = excluded.items, updated_at = excluded.updated_at`, workspace, string(body), now)
+	return err
 }
 
 func clean(list []string) []string {

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	_ "modernc.org/sqlite"
@@ -74,6 +75,11 @@ func initdb(db *sql.DB) error {
 			return err
 		}
 	}
+	for _, stmt := range migrations {
+		if _, err := db.ExecContext(ctx, stmt); err != nil && !strings.Contains(err.Error(), "duplicate column name") {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -114,7 +120,13 @@ var schema = []string{
 	workspace_path text not null,
 	title text not null,
 	body text not null,
+	analysis text not null default '',
 	created_at integer not null,
+	updated_at integer not null
+)`,
+	`create table if not exists workspace_requirements (
+	workspace_path text primary key,
+	items text not null,
 	updated_at integer not null
 )`,
 	`create table if not exists questions (
@@ -144,4 +156,8 @@ var schema = []string{
 	model_id text not null,
 	updated_at integer not null
 )`,
+}
+
+var migrations = []string{
+	`alter table sessions add column analysis text not null default ''`,
 }

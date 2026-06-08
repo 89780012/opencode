@@ -3,27 +3,58 @@ import { selectWorkbench, useAppDispatch, useAppSelector } from "@/store"
 import {
   backtestFinish,
   backtestStart,
+  flipView,
   reviewFinish,
   reviewStart,
   reviewStep,
   send as post,
   setActive,
   showBacktest,
-  view as flip,
 } from "@/store/workbench-slice"
-import { createReviewSteps } from "../data"
+import { code, createReviewSteps, type SessionItem } from "../data"
 import { sleep } from "../lib"
 
 const time = () => new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })
 
+function empty(): SessionItem {
+  return {
+    id: "",
+    name: "",
+    currentRequirement: "",
+    analyzedRequirements: [],
+    codeContent: code,
+    messages: [],
+    reviewStatus: "idle",
+    reviewRound: 0,
+    reviewView: "current",
+    reviewHistory: [],
+    reviewProgress: null,
+    flowchartStatus: "idle",
+    flowchartCode: "",
+    backtestStatus: "idle",
+    backtestResults: null,
+    backtestHistory: [],
+    timelineEvents: [],
+  }
+}
+
 export function useWorkbench(setRight?: (open: boolean) => void) {
   const dispatch = useAppDispatch()
   const state = useAppSelector(selectWorkbench)
-
-  const cur = useMemo(
-    () => state.demo.find((session) => session.id === state.active) ?? state.demo[0],
-    [state.active, state.demo],
-  )
+  const cur = useMemo(() => {
+    const session = state.sessions.find((item) => item.id === state.active) ?? state.sessions[0]
+    if (!session) return empty()
+    const view = state.ui[session.id]
+    const reqs = state.requirements.length ? state.requirements : []
+    return {
+      ...empty(),
+      ...view,
+      id: session.id,
+      name: session.title,
+      currentRequirement: reqs[0] ?? "",
+      analyzedRequirements: reqs,
+    }
+  }, [state.active, state.requirements, state.sessions, state.ui])
   const last = cur.reviewHistory.at(-1) ?? null
   const risk = useMemo(() => {
     if (cur.reviewStatus === "passed") return "审查已通过"
@@ -87,6 +118,6 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
     review,
     backtest,
     show: (idx: number) => dispatch(showBacktest({ id: state.active, idx })),
-    view: () => dispatch(flip()),
+    view: () => dispatch(flipView()),
   }
 }

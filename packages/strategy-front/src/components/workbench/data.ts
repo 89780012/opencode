@@ -97,7 +97,7 @@ export function createReviewSteps() {
   }))
 }
 
-function createTimeline(name: string): TimelineEvent[] {
+export function createTimeline(name: string): TimelineEvent[] {
   return [
     {
       id: "evt-req-1",
@@ -155,7 +155,7 @@ function createTimeline(name: string): TimelineEvent[] {
   ]
 }
 
-function createFlowchart() {
+export function createFlowchart() {
   return `flowchart TD
   A[读取行情] --> B{5EMA > 20EMA?}
   B -- 是 --> C[检查仓位与风险]
@@ -175,106 +175,4 @@ export function createBacktest(): BacktestResult {
     maxDrawdown: "6.7%",
     winRate: "57.2%",
   }
-}
-
-export function createSessions(): SessionItem[] {
-  return [
-    {
-      id: "sess-1",
-      name: "趋势跟踪策略",
-      currentRequirement: "双均线上穿买入，下穿卖出，并带固定止盈止损。",
-      analyzedRequirements: [
-        "双均线上穿开仓，下穿平仓，支持日线回测。",
-        "固定 2% 止损和 5% 止盈，并附带仓位控制。",
-        "输出代码、流程图、审查记录和回测结论。",
-      ],
-      codeContent: code,
-      messages: [
-        {
-          role: "ai",
-          body: "我已经根据你的要求生成了双均线策略骨架，并补上了止损、止盈和手续费入口。",
-        },
-        {
-          role: "user",
-          body: "把审查重点放在风控和边界条件上，回测阶段先保留日线数据。",
-        },
-        {
-          role: "ai",
-          body: "收到。我会优先检查仓位暴露、连续信号过滤，以及空仓状态下的止盈止损分支。",
-        },
-      ],
-      reviewStatus: "idle",
-      reviewRound: 1,
-      reviewView: "current",
-      reviewHistory: [
-        {
-          round: 1,
-          status: "failed",
-          time: "11:10",
-          steps: [
-            { text: "语法检查", status: "done" },
-            { text: "逻辑完整性", status: "done" },
-            { text: "止损 / 止盈", status: "done" },
-            { text: "风控规则", status: "error" },
-            { text: "边界条件", status: "error" },
-            { text: "代码规范", status: "done" },
-          ],
-          suggestions: ["优先判断空仓状态", "补充最大回撤保护", "修复边界条件分支"],
-        },
-      ],
-      reviewProgress: null,
-      flowchartStatus: "done",
-      flowchartCode: createFlowchart(),
-      backtestStatus: "done",
-      backtestResults: createBacktest(),
-      backtestHistory: [
-        {
-          time: "09:42",
-          results: createBacktest(),
-        },
-      ],
-      timelineEvents: createTimeline("趋势跟踪策略"),
-    },
-    {
-      id: "sess-2",
-      name: "震荡突破策略",
-      currentRequirement: "震荡区间突破开仓，结合成交量过滤与追踪止盈。",
-      analyzedRequirements: ["突破近 20 根 K 线区间上沿时开仓。", "引入成交量放大过滤与移动止盈。"],
-      codeContent: code,
-      messages: [
-        { role: "user", body: "这个策略在震荡行情里误触发有点多，帮我看看过滤逻辑。" },
-        { role: "ai", body: "可以在突破确认前叠加量能阈值和二次确认，降低假突破。" },
-      ],
-      reviewStatus: "failed",
-      reviewRound: 1,
-      reviewView: "current",
-      reviewHistory: [],
-      reviewProgress: null,
-      flowchartStatus: "idle",
-      flowchartCode: createFlowchart(),
-      backtestStatus: "idle",
-      backtestResults: null,
-      backtestHistory: [],
-      timelineEvents: createTimeline("震荡突破策略"),
-    },
-    {
-      id: "sess-3",
-      name: "多因子选股策略",
-      currentRequirement: "动量、质量、估值三因子组合评分，按周调仓。",
-      analyzedRequirements: ["每周更新因子打分，输出持仓清单。", "控制单票权重与行业暴露。"],
-      codeContent: code,
-      messages: [{ role: "ai", body: "这个策略已归档，保留历史结果与配置供复用。" }],
-      reviewStatus: "passed",
-      reviewRound: 2,
-      reviewView: "current",
-      reviewHistory: [],
-      reviewProgress: null,
-      flowchartStatus: "done",
-      flowchartCode: createFlowchart(),
-      backtestStatus: "done",
-      backtestResults: createBacktest(),
-      backtestHistory: [],
-      timelineEvents: createTimeline("多因子选股策略"),
-    },
-  ]
 }

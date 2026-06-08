@@ -1,52 +1,86 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit"
 import {
+  type BacktestResult,
   createBacktest,
-  createSessions,
+  type ReviewRecord,
   type ReviewStatus,
-  type SessionItem,
   type Stage,
   type Step,
+  type TimelineEvent,
 } from "@/components/workbench/data"
-
-type Create = {
-  id: string
-  title: string
-  reqs: string[]
-}
 
 export type WorkbenchSession = {
   id: string
   title: string
   workspacePath: string
   session?: unknown
+  analysis?: unknown
   createdAt: number
   updatedAt: number
 }
 
+export type WorkbenchUI = {
+  messages: { role: "ai" | "user"; body: string }[]
+  reviewStatus: ReviewStatus
+  reviewRound: number
+  reviewView: "current" | "history"
+  reviewHistory: ReviewRecord[]
+  reviewProgress: Step[] | null
+  flowchartStatus: "idle" | "generating" | "done"
+  flowchartCode: string
+  backtestStatus: "idle" | "running" | "done"
+  backtestResults: BacktestResult | null
+  backtestHistory: { time: string; results: BacktestResult }[]
+  timelineEvents: TimelineEvent[]
+}
+
 type State = {
-  demo: SessionItem[]
   sessions: WorkbenchSession[]
+  requirements: string[]
   active: string
   stage: Stage
+  ui: Record<string, WorkbenchUI | undefined>
 }
 
 const initialState: State = {
-  demo: createSessions(),
   sessions: [],
-  active: "sess-1",
+  requirements: [],
+  active: "",
   stage: "session",
+  ui: {},
 }
 
-function find(state: State, id: string) {
-  return state.demo.find((item) => item.id === id) ?? state.demo[0]
+function fresh(title = ""): WorkbenchUI {
+  return {
+    messages: title ? [{ role: "ai", body: `Session "${title}" is ready.` }] : [],
+    reviewStatus: "idle",
+    reviewRound: 0,
+    reviewView: "current",
+    reviewHistory: [],
+    reviewProgress: null,
+    flowchartStatus: "idle",
+    flowchartCode: "",
+    backtestStatus: "idle",
+    backtestResults: null,
+    backtestHistory: [],
+    timelineEvents: [],
+  }
+}
+
+function view(state: State, id: string) {
+  state.ui[id] ??= fresh(state.sessions.find((item) => item.id === id)?.title)
+  return state.ui[id]
 }
 
 const slice = createSlice({
   name: "workbench",
   initialState,
   reducers: {
-    setSessions(state, action: PayloadAction<{ sessions: WorkbenchSession[] }>) {
+    setSessions(state, action: PayloadAction<{ sessions: WorkbenchSession[]; requirements?: string[] }>) {
       state.sessions = action.payload.sessions
+      if (action.payload.requirements) {
+        state.requirements = action.payload.requirements
+      }
       if (state.sessions.some((item) => item.id === state.active)) return
       state.active = state.sessions[0]?.id ?? ""
     },
@@ -61,8 +95,12 @@ const slice = createSlice({
         state.active = action.payload.session.id
       }
     },
+    setRequirements(state, action: PayloadAction<{ requirements: string[] }>) {
+      state.requirements = action.payload.requirements
+    },
     deleteSession(state, action: PayloadAction<{ id: string }>) {
       state.sessions = state.sessions.filter((item) => item.id !== action.payload.id)
+      delete state.ui[action.payload.id]
       if (state.active !== action.payload.id) return
       state.active = state.sessions[0]?.id ?? ""
     },
@@ -73,40 +111,34 @@ const slice = createSlice({
       state.active = action.payload
     },
     send(state, action: PayloadAction<{ body: string; start: boolean }>) {
-      const item = find(state, state.active)
+      const item = view(state, state.active)
       if (!item) return
-
       item.messages.push(
         { role: "user", body: action.payload.body },
         {
           role: "ai",
           body: action.payload.start
-            ? `已记录审查意见：“${action.payload.body}”。下一轮审查会重点关注这个问题。`
-            : `已收到修改意见：“${action.payload.body}”。我会同步更新策略代码与说明。`,
+            ? `Review note recorded: ${action.payload.body}`
+            : `Change note recorded: ${action.payload.body}`,
         },
       )
-      item.codeContent = `${item.codeContent}\n\n# ${action.payload.body}`
     },
     reviewStart(state, action: PayloadAction<{ id: string; round: number; steps: Step[] }>) {
-      const item = find(state, action.payload.id)
+      const item = view(state, action.payload.id)
       if (!item) return
-
       item.reviewStatus = "running"
       item.reviewView = "current"
       item.reviewRound = action.payload.round
       item.reviewProgress = action.payload.steps
     },
     reviewStep(state, action: PayloadAction<{ id: string; idx: number; status: Step["status"] }>) {
-      const item = find(state, action.payload.id)
-      const step = item?.reviewProgress?.[action.payload.idx]
+      const step = view(state, action.payload.id)?.reviewProgress?.[action.payload.idx]
       if (!step) return
-
       step.status = action.payload.status
     },
     reviewFinish(state, action: PayloadAction<{ id: string; round: number; time: string }>) {
-      const item = find(state, action.payload.id)
+      const item = view(state, action.payload.id)
       if (!item) return
-
       const steps = item.reviewProgress ?? []
       const status: ReviewStatus = steps.some((entry) => entry.status === "error") ? "failed" : "passed"
       item.reviewStatus = status
@@ -117,20 +149,18 @@ const slice = createSlice({
         status,
         time: action.payload.time,
         steps,
-        suggestions: status === "failed" ? ["优先检查空仓保护", "补充最大回撤保护", "修复边界条件分支"] : [],
+        suggestions: status === "failed" ? ["Check empty positions", "Add max drawdown guard", "Fix edge cases"] : [],
       })
     },
     backtestStart(state, action: PayloadAction<string>) {
-      const item = find(state, action.payload)
+      const item = view(state, action.payload)
       if (!item) return
-
       state.stage = "backtest"
       item.backtestStatus = "running"
     },
     backtestFinish(state, action: PayloadAction<{ id: string; time: string }>) {
-      const item = find(state, action.payload.id)
+      const item = view(state, action.payload.id)
       if (!item) return
-
       const result = createBacktest()
       item.backtestStatus = "done"
       item.backtestResults = result
@@ -140,58 +170,16 @@ const slice = createSlice({
       })
     },
     showBacktest(state, action: PayloadAction<{ id: string; idx: number }>) {
-      const item = find(state, action.payload.id)
+      const item = view(state, action.payload.id)
       const record = item?.backtestHistory[action.payload.idx]
       if (!item || !record) return
-
       item.backtestResults = record.results
       item.backtestStatus = "done"
       state.stage = "backtest"
     },
-    create(state, action: PayloadAction<Create>) {
-      const name = action.payload.title.trim() || "新建策略会话"
-      const reqs = action.payload.reqs.map((item) => item.trim()).filter(Boolean)
-      const item: SessionItem = {
-        ...createSessions()[0],
-        id: action.payload.id,
-        name,
-        currentRequirement: reqs[0] ?? "请描述你的策略需求",
-        analyzedRequirements: reqs.length ? reqs : ["请描述你的策略需求"],
-        messages: [
-          {
-            role: "ai",
-            body: `会话《${name}》已创建。你可以继续补充需求，或直接发起审查。`,
-          },
-        ],
-        reviewStatus: "idle",
-        reviewRound: 0,
-        reviewView: "current",
-        reviewHistory: [],
-        reviewProgress: null,
-      }
-
-      state.demo.unshift(item)
-      state.active = item.id
-      state.stage = "session"
-    },
-    rename(state, action: PayloadAction<{ id: string; name: string }>) {
-      const item = find(state, action.payload.id)
+    flipView(state) {
+      const item = view(state, state.active)
       if (!item) return
-
-      item.name = action.payload.name
-    },
-    remove(state, action: PayloadAction<string>) {
-      if (state.demo.length === 1) return
-
-      state.demo = state.demo.filter((item) => item.id !== action.payload)
-      if (state.active !== action.payload) return
-
-      state.active = state.demo[0]?.id ?? ""
-    },
-    view(state) {
-      const item = find(state, state.active)
-      if (!item) return
-
       item.reviewView = item.reviewView === "current" ? "history" : "current"
     },
   },
@@ -200,20 +188,18 @@ const slice = createSlice({
 export const {
   backtestFinish,
   backtestStart,
-  create,
   deleteSession,
-  remove,
-  rename,
+  flipView,
   reviewFinish,
   reviewStart,
   reviewStep,
   send,
   setActive,
+  setRequirements,
   setSessions,
   setStage,
   showBacktest,
   upsertSession,
-  view,
 } = slice.actions
 
 export const workbenchReducer = slice.reducer

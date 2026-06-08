@@ -57,6 +57,10 @@ function mark(text: string, dims?: Record<string, Hit[]>) {
   )
 }
 
+function clean(list: string[]) {
+  return list.map((item) => item.trim()).filter(Boolean)
+}
+
 export function useWorkbenchModal() {
   const dispatch = useAppDispatch()
   const state = useAppSelector(selectWorkbench)
@@ -154,7 +158,7 @@ export function useWorkbenchModal() {
 
   const create = (title: string) => {
     if (!path) return
-    socket.emit("session.create", { workspacePath: path, title })
+    socket.emit("session.create", { workspacePath: path, title, requirements: clean(reqs), analysis: data })
   }
 
   const rows: Row[] = reqs.map((text) => ({
@@ -192,7 +196,7 @@ export function useWorkbenchModal() {
       setStep(1)
       setBusy(false)
       setTitle(seed)
-      setReqs(line)
+      setReqs(state.requirements.length ? state.requirements : line)
       setData(null)
       setErr("")
     },

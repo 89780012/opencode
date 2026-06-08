@@ -5,8 +5,10 @@ import "encoding/json"
 const SessionTitle = "新建策略会话"
 
 type SessionCreate struct {
-	WorkspacePath string `json:"workspacePath"`
-	Title         string `json:"title,omitempty"`
+	WorkspacePath string          `json:"workspacePath"`
+	Title         string          `json:"title,omitempty"`
+	Requirements  []string        `json:"requirements,omitempty"`
+	Analysis      json.RawMessage `json:"analysis,omitempty"`
 }
 
 type SessionCreated struct {
@@ -19,6 +21,7 @@ type SessionRow struct {
 	WorkspacePath string          `json:"workspacePath"`
 	Title         string          `json:"title"`
 	Session       json.RawMessage `json:"session"`
+	Analysis      json.RawMessage `json:"analysis,omitempty"`
 	CreatedAt     int64           `json:"createdAt"`
 	UpdatedAt     int64           `json:"updatedAt"`
 }
@@ -44,6 +47,7 @@ type SessionDetail struct {
 type SessionListResult struct {
 	WorkspacePath string       `json:"workspacePath,omitempty"`
 	Sessions      []SessionRow `json:"sessions"`
+	Requirements  []string     `json:"requirements"`
 }
 
 type SessionResult struct {
