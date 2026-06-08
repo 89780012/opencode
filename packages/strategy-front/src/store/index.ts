@@ -140,3 +140,9 @@ export function selectQuestionRecordStamp(state: RootState) {
 export function selectWorkbench(state: RootState) {
   return state.workbench
 }
+
+export function selectWorkbenchQuestions(state: RootState, path?: string | null) {
+  if (!path) return empty
+  if (state.workbench.questionPath !== path) return empty
+  return state.workbench.questions
+}

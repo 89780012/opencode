@@ -3,6 +3,7 @@ import { Review } from "./features/review"
 import { Side } from "./features/side"
 import { StageView } from "./features/stage"
 import { usePanels } from "./hooks/use-panels"
+import { useWorkbenchQuestionSync } from "./hooks/use-workbench-question"
 import { useWorkbenchSessionSync } from "./hooks/use-workbench-session-sync"
 import { Handle } from "./layout/handle"
 import { Topbar } from "./layout/topbar"
@@ -10,6 +11,7 @@ import shell from "./styles/layout/shell.module.css"
 
 export function Workbench() {
   useWorkbenchSessionSync()
+  useWorkbenchQuestionSync()
 
   const panel = usePanels()
 

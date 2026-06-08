@@ -1,20 +1,7 @@
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { selectWorkbench, useAppDispatch, useAppSelector } from "@/store"
-import {
-  backtestFinish,
-  backtestStart,
-  flipView,
-  reviewFinish,
-  reviewStart,
-  reviewStep,
-  send as post,
-  setActive,
-  showBacktest,
-} from "@/store/workbench-slice"
-import { code, createReviewSteps, type SessionItem } from "../data"
-import { sleep } from "../lib"
-
-const time = () => new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })
+import { setActive, setStage } from "@/store/workbench-slice"
+import { code, createBacktest, createFlowchart, createReviewSteps, createTimeline, type SessionItem } from "../data"
 
 function empty(): SessionItem {
   return {
@@ -41,20 +28,43 @@ function empty(): SessionItem {
 export function useWorkbench(setRight?: (open: boolean) => void) {
   const dispatch = useAppDispatch()
   const state = useAppSelector(selectWorkbench)
-  const cur = useMemo(() => {
+  const [view, setView] = useState<"current" | "history">("current")
+  const cur = useMemo<SessionItem>(() => {
     const session = state.sessions.find((item) => item.id === state.active) ?? state.sessions[0]
     if (!session) return empty()
-    const view = state.ui[session.id]
     const reqs = state.requirements.length ? state.requirements : []
+    const steps = createReviewSteps().map((item, idx) => ({
+      ...item,
+      status: idx === 3 || idx === 4 ? ("error" as const) : ("done" as const),
+    }))
+    const back = createBacktest()
     return {
       ...empty(),
-      ...view,
       id: session.id,
       name: session.title,
       currentRequirement: reqs[0] ?? "",
       analyzedRequirements: reqs,
+      messages: [{ role: "ai", body: `Session "${session.title}" is ready.` }],
+      reviewStatus: "failed",
+      reviewRound: 1,
+      reviewView: view,
+      reviewHistory: [
+        {
+          round: 1,
+          status: "failed",
+          time: "09:30",
+          steps,
+          suggestions: ["Check empty positions", "Add max drawdown guard", "Fix edge cases"],
+        },
+      ],
+      flowchartStatus: "done",
+      flowchartCode: createFlowchart(),
+      backtestStatus: "done",
+      backtestResults: back,
+      backtestHistory: [{ time: "09:45", results: back }],
+      timelineEvents: createTimeline(session.title),
     }
-  }, [state.active, state.requirements, state.sessions, state.ui])
+  }, [state.active, state.requirements, state.sessions, view])
   const last = cur.reviewHistory.at(-1) ?? null
   const risk = useMemo(() => {
     if (cur.reviewStatus === "passed") return "审查已通过"
@@ -70,40 +80,19 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
   }, [cur.backtestResults, cur.backtestStatus, cur.flowchartStatus, risk])
 
   const review = async () => {
-    if (cur.reviewStatus === "running") return
-
-    const id = state.active
-    const round = cur.reviewHistory.length + 1
-
-    dispatch(reviewStart({ id, round, steps: createReviewSteps() }))
     setRight?.(true)
-
-    for (let i = 0; i < 6; i += 1) {
-      await sleep(160)
-      dispatch(reviewStep({ id, idx: i, status: "running" }))
-      await sleep(220)
-      dispatch(reviewStep({ id, idx: i, status: i === 3 || i === 4 ? "error" : "done" }))
-    }
-
-    dispatch(reviewFinish({ id, round, time: time() }))
   }
 
   const send = (text: string, start = false) => {
-    const body = text.trim()
-    if (!body) return
+    if (!text.trim()) return
 
-    dispatch(post({ body, start }))
-
-    if (start) void review()
+    if (start) {
+      void review()
+    }
   }
 
   const backtest = async () => {
-    if (cur.backtestStatus === "running") return
-
-    const id = state.active
-    dispatch(backtestStart(id))
-    await sleep(650)
-    dispatch(backtestFinish({ id, time: time() }))
+    dispatch(setStage("backtest"))
   }
 
   return {
@@ -117,7 +106,7 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
     send,
     review,
     backtest,
-    show: (idx: number) => dispatch(showBacktest({ id: state.active, idx })),
-    view: () => dispatch(flipView()),
+    show: () => dispatch(setStage("backtest")),
+    view: () => setView((item) => (item === "current" ? "history" : "current")),
   }
 }

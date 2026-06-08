@@ -1,18 +1,10 @@
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
 import { useSearchParams } from "react-router-dom"
 import { socket, type SocketEvent } from "@/lib/socket-bus"
-import { useAppDispatch } from "@/store"
-import { setActive } from "@/store/workbench-slice"
+import { selectWorkbenchQuestions, useAppDispatch, useAppSelector } from "@/store"
+import { deleteQuestion, setActive, setQuestions, type WorkbenchQuestion } from "@/store/workbench-slice"
 
-export type WorkbenchQuestion = {
-  id: string
-  workspacePath: string
-  sessionId: string
-  messageId: string
-  body: string
-  createdAt: number
-  name?: string
-}
+export type { WorkbenchQuestion } from "@/store/workbench-slice"
 
 function obj(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object"
@@ -53,11 +45,10 @@ function parseDelete(value: unknown) {
   }
 }
 
-export function useWorkbenchQuestion() {
+export function useWorkbenchQuestionSync() {
   const dispatch = useAppDispatch()
   const [search] = useSearchParams()
   const path = search.get("path")?.trim() ?? ""
-  const [questions, setQuestions] = useState<WorkbenchQuestion[]>([])
 
   useEffect(() => {
     const send = () => {
@@ -75,10 +66,10 @@ export function useWorkbenchQuestion() {
       const data = parseList(event.payload)
       if (!data) return
       if (data.workspacePath && data.workspacePath !== path) return
-      setQuestions(data.questions)
+      dispatch(setQuestions({ workspacePath: data.workspacePath || path, questions: data.questions }))
     }
     return socket.on("question.listed", fn)
-  }, [path])
+  }, [dispatch, path])
 
   useEffect(() => {
     const refresh = () => {
@@ -96,10 +87,17 @@ export function useWorkbenchQuestion() {
     const fn = (event: SocketEvent) => {
       const data = parseDelete(event.payload)
       if (!data) return
-      setQuestions((list) => list.filter((item) => item.id !== data.id || item.sessionId !== data.sessionId))
+      dispatch(deleteQuestion(data))
     }
     return socket.on("question.deleted", fn)
-  }, [])
+  }, [dispatch])
+}
+
+export function useWorkbenchQuestion() {
+  const dispatch = useAppDispatch()
+  const [search] = useSearchParams()
+  const path = search.get("path")?.trim() ?? ""
+  const questions = useAppSelector((state) => selectWorkbenchQuestions(state, path))
 
   return {
     questions,

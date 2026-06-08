@@ -1,13 +1,5 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit"
-import {
-  type BacktestResult,
-  createBacktest,
-  type ReviewRecord,
-  type ReviewStatus,
-  type Stage,
-  type Step,
-  type TimelineEvent,
-} from "@/components/workbench/data"
+import { type Stage } from "@/components/workbench/data"
 
 export type WorkbenchSession = {
   id: string
@@ -19,57 +11,32 @@ export type WorkbenchSession = {
   updatedAt: number
 }
 
-export type WorkbenchUI = {
-  messages: { role: "ai" | "user"; body: string }[]
-  reviewStatus: ReviewStatus
-  reviewRound: number
-  reviewView: "current" | "history"
-  reviewHistory: ReviewRecord[]
-  reviewProgress: Step[] | null
-  flowchartStatus: "idle" | "generating" | "done"
-  flowchartCode: string
-  backtestStatus: "idle" | "running" | "done"
-  backtestResults: BacktestResult | null
-  backtestHistory: { time: string; results: BacktestResult }[]
-  timelineEvents: TimelineEvent[]
+export type WorkbenchQuestion = {
+  id: string
+  workspacePath: string
+  sessionId: string
+  messageId: string
+  body: string
+  createdAt: number
+  name?: string
 }
 
 type State = {
   sessions: WorkbenchSession[]
+  questions: WorkbenchQuestion[]
+  questionPath: string
   requirements: string[]
   active: string
   stage: Stage
-  ui: Record<string, WorkbenchUI | undefined>
 }
 
 const initialState: State = {
   sessions: [],
+  questions: [],
+  questionPath: "",
   requirements: [],
   active: "",
   stage: "session",
-  ui: {},
-}
-
-function fresh(title = ""): WorkbenchUI {
-  return {
-    messages: title ? [{ role: "ai", body: `Session "${title}" is ready.` }] : [],
-    reviewStatus: "idle",
-    reviewRound: 0,
-    reviewView: "current",
-    reviewHistory: [],
-    reviewProgress: null,
-    flowchartStatus: "idle",
-    flowchartCode: "",
-    backtestStatus: "idle",
-    backtestResults: null,
-    backtestHistory: [],
-    timelineEvents: [],
-  }
-}
-
-function view(state: State, id: string) {
-  state.ui[id] ??= fresh(state.sessions.find((item) => item.id === id)?.title)
-  return state.ui[id]
 }
 
 const slice = createSlice({
@@ -83,6 +50,10 @@ const slice = createSlice({
       }
       if (state.sessions.some((item) => item.id === state.active)) return
       state.active = state.sessions[0]?.id ?? ""
+    },
+    setQuestions(state, action: PayloadAction<{ workspacePath: string; questions: WorkbenchQuestion[] }>) {
+      state.questionPath = action.payload.workspacePath
+      state.questions = action.payload.questions
     },
     upsertSession(state, action: PayloadAction<{ session: WorkbenchSession }>) {
       const idx = state.sessions.findIndex((item) => item.id === action.payload.session.id)
@@ -100,9 +71,13 @@ const slice = createSlice({
     },
     deleteSession(state, action: PayloadAction<{ id: string }>) {
       state.sessions = state.sessions.filter((item) => item.id !== action.payload.id)
-      delete state.ui[action.payload.id]
       if (state.active !== action.payload.id) return
       state.active = state.sessions[0]?.id ?? ""
+    },
+    deleteQuestion(state, action: PayloadAction<{ id: string; sessionId: string }>) {
+      state.questions = state.questions.filter(
+        (item) => item.id !== action.payload.id || item.sessionId !== action.payload.sessionId,
+      )
     },
     setStage(state, action: PayloadAction<Stage>) {
       state.stage = action.payload
@@ -110,95 +85,17 @@ const slice = createSlice({
     setActive(state, action: PayloadAction<string>) {
       state.active = action.payload
     },
-    send(state, action: PayloadAction<{ body: string; start: boolean }>) {
-      const item = view(state, state.active)
-      if (!item) return
-      item.messages.push(
-        { role: "user", body: action.payload.body },
-        {
-          role: "ai",
-          body: action.payload.start
-            ? `Review note recorded: ${action.payload.body}`
-            : `Change note recorded: ${action.payload.body}`,
-        },
-      )
-    },
-    reviewStart(state, action: PayloadAction<{ id: string; round: number; steps: Step[] }>) {
-      const item = view(state, action.payload.id)
-      if (!item) return
-      item.reviewStatus = "running"
-      item.reviewView = "current"
-      item.reviewRound = action.payload.round
-      item.reviewProgress = action.payload.steps
-    },
-    reviewStep(state, action: PayloadAction<{ id: string; idx: number; status: Step["status"] }>) {
-      const step = view(state, action.payload.id)?.reviewProgress?.[action.payload.idx]
-      if (!step) return
-      step.status = action.payload.status
-    },
-    reviewFinish(state, action: PayloadAction<{ id: string; round: number; time: string }>) {
-      const item = view(state, action.payload.id)
-      if (!item) return
-      const steps = item.reviewProgress ?? []
-      const status: ReviewStatus = steps.some((entry) => entry.status === "error") ? "failed" : "passed"
-      item.reviewStatus = status
-      item.reviewView = "current"
-      item.reviewProgress = null
-      item.reviewHistory.push({
-        round: action.payload.round,
-        status,
-        time: action.payload.time,
-        steps,
-        suggestions: status === "failed" ? ["Check empty positions", "Add max drawdown guard", "Fix edge cases"] : [],
-      })
-    },
-    backtestStart(state, action: PayloadAction<string>) {
-      const item = view(state, action.payload)
-      if (!item) return
-      state.stage = "backtest"
-      item.backtestStatus = "running"
-    },
-    backtestFinish(state, action: PayloadAction<{ id: string; time: string }>) {
-      const item = view(state, action.payload.id)
-      if (!item) return
-      const result = createBacktest()
-      item.backtestStatus = "done"
-      item.backtestResults = result
-      item.backtestHistory.unshift({
-        time: action.payload.time,
-        results: result,
-      })
-    },
-    showBacktest(state, action: PayloadAction<{ id: string; idx: number }>) {
-      const item = view(state, action.payload.id)
-      const record = item?.backtestHistory[action.payload.idx]
-      if (!item || !record) return
-      item.backtestResults = record.results
-      item.backtestStatus = "done"
-      state.stage = "backtest"
-    },
-    flipView(state) {
-      const item = view(state, state.active)
-      if (!item) return
-      item.reviewView = item.reviewView === "current" ? "history" : "current"
-    },
   },
 })
 
 export const {
-  backtestFinish,
-  backtestStart,
+  deleteQuestion,
   deleteSession,
-  flipView,
-  reviewFinish,
-  reviewStart,
-  reviewStep,
-  send,
   setActive,
+  setQuestions,
   setRequirements,
   setSessions,
   setStage,
-  showBacktest,
   upsertSession,
 } = slice.actions
 
