@@ -201,6 +201,13 @@ export function Modal(props: {
                 </div>
               ) : null}
 
+              {props.err ? (
+                <div className={`${css.alert} ${css.alertwarn}`}>
+                  <AlertTriangle size={14} />
+                  <span>{props.err}</span>
+                </div>
+              ) : null}
+
               <div className={css.preview}>
                 <p>{props.title}</p>
                 {props.reqs.map((item, idx) => (

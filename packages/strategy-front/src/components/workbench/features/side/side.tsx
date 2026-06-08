@@ -1,5 +1,7 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { useSearchParams } from "react-router-dom"
 import { ClipboardList, MessageSquareMore, Sparkles } from "lucide-react"
+import { selectWorkbench, useAppSelector } from "@/store"
 import { type SidebarTab } from "../../data"
 import css from "../../styles/side/side.module.css"
 import { RequirementsTab, SessionsTab } from "./side-tabs"
@@ -16,9 +18,19 @@ const init = {
 
 export function Side() {
   const app = useWorkbench()
+  const state = useAppSelector(selectWorkbench)
+  const [search] = useSearchParams()
+  const path = search.get("path")?.trim() ?? ""
   const [tab, setTab] = useState<SidebarTab>("requirements")
   const [open, setOpen] = useState<Record<string, boolean>>(init)
   const flip = (key: string) => setOpen((state) => ({ ...state, [key]: !state[key] }))
+
+  useEffect(() => {
+    if (!path) return
+    if (state.sessionPath !== path) return
+    if (state.sessions.length > 0) return
+    setTab("sessions")
+  }, [path, state.sessionPath, state.sessions.length])
 
   return (
     <aside className={css.root}>

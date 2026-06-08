@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 import { type Analyze, type Hit, workbenchApi } from "@/api/modules/workbench"
 import { socket } from "@/lib/socket-bus"
@@ -66,13 +66,35 @@ export function useWorkbenchModal() {
   const state = useAppSelector(selectWorkbench)
   const [search] = useSearchParams()
   const path = search.get("path")?.trim() ?? ""
+  const empty = !!path && state.sessionPath === path && state.sessions.length === 0
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState(1)
   const [busy, setBusy] = useState(false)
+  const [shown, setShown] = useState("")
   const [title, setTitle] = useState(seed)
   const [reqs, setReqs] = useState<string[]>(line)
   const [data, setData] = useState<Analyze | null>(null)
   const [err, setErr] = useState("")
+
+  const openModal = useCallback(() => {
+    setOpen(true)
+    setStep(1)
+    setBusy(false)
+    setTitle(seed)
+    setReqs(state.requirements.length ? state.requirements : line)
+    setData(null)
+    setErr("")
+  }, [state.requirements])
+
+  const reset = useCallback(() => {
+    setOpen(false)
+    setStep(1)
+    setBusy(false)
+    setTitle(seed)
+    setReqs(line)
+    setData(null)
+    setErr("")
+  }, [])
 
   useEffect(() => {
     if (!open) return
@@ -87,15 +109,16 @@ export function useWorkbenchModal() {
     return () => window.removeEventListener("keydown", key)
   }, [busy, open])
 
-  const reset = () => {
-    setOpen(false)
-    setStep(1)
-    setBusy(false)
-    setTitle(seed)
-    setReqs(line)
-    setData(null)
-    setErr("")
-  }
+  useEffect(() => {
+    if (!empty) {
+      setShown("")
+      return
+    }
+    if (shown === path) return
+    if (open) return
+    setShown(path)
+    openModal()
+  }, [empty, open, openModal, path, shown])
 
   const analyze = async (keep = false) => {
     const body = reqs
@@ -128,6 +151,7 @@ export function useWorkbenchModal() {
   }
 
   const submit = async () => {
+    setErr("")
     if (step === 1) {
       await analyze()
       return
@@ -138,7 +162,10 @@ export function useWorkbenchModal() {
       return
     }
 
-    create(title)
+    if (!create(title)) {
+      setErr("创建会话请求发送失败，请检查连接后重试。")
+      return
+    }
     reset()
   }
 
@@ -151,14 +178,12 @@ export function useWorkbenchModal() {
   }
 
   const remove = (id: string) => {
-    if (state.sessions.length === 1) return
-
     socket.emit("session.delete", { id })
   }
 
   const create = (title: string) => {
-    if (!path) return
-    socket.emit("session.create", { workspacePath: path, title, requirements: clean(reqs), analysis: data })
+    if (!path) return false
+    return socket.emit("session.create", { workspacePath: path, title, requirements: clean(reqs), analysis: data })
   }
 
   const rows: Row[] = reqs.map((text) => ({
@@ -191,15 +216,7 @@ export function useWorkbenchModal() {
     remove,
     create,
     open,
-    openModal: () => {
-      setOpen(true)
-      setStep(1)
-      setBusy(false)
-      setTitle(seed)
-      setReqs(state.requirements.length ? state.requirements : line)
-      setData(null)
-      setErr("")
-    },
+    openModal,
     close: () => {
       if (busy) return
       reset()

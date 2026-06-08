@@ -54,7 +54,6 @@ type SessionAction = { type: "edit"; id: string; title: string } | { type: "dele
 function SessionDialog(props: {
   session: SessionAction
   value: string
-  locked: boolean
   onValue: (value: string) => void
   onClose: () => void
   onConfirm: () => void
@@ -102,9 +101,9 @@ function SessionDialog(props: {
             type="button"
             className={edit ? css.confirm : css.confirmdanger}
             onClick={props.onConfirm}
-            disabled={edit ? !props.value.trim() : props.locked}
+            disabled={edit && !props.value.trim()}
           >
-            {edit ? "保存修改" : props.locked ? "至少保留一个会话" : "确认删除"}
+            {edit ? "保存修改" : "确认删除"}
           </button>
         </div>
       </div>
@@ -276,7 +275,6 @@ export function SessionsTab(props: { open: Record<string, boolean>; onToggle: (k
       <SessionDialog
         session={session}
         value={name}
-        locked={modal.sessions.length === 1}
         onValue={setName}
         onClose={() => setSession(null)}
         onConfirm={confirm}

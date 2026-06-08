@@ -23,6 +23,7 @@ export type WorkbenchQuestion = {
 
 type State = {
   sessions: WorkbenchSession[]
+  sessionPath: string
   questions: WorkbenchQuestion[]
   questionPath: string
   requirements: string[]
@@ -32,6 +33,7 @@ type State = {
 
 const initialState: State = {
   sessions: [],
+  sessionPath: "",
   questions: [],
   questionPath: "",
   requirements: [],
@@ -43,8 +45,12 @@ const slice = createSlice({
   name: "workbench",
   initialState,
   reducers: {
-    setSessions(state, action: PayloadAction<{ sessions: WorkbenchSession[]; requirements?: string[] }>) {
+    setSessions(
+      state,
+      action: PayloadAction<{ sessions: WorkbenchSession[]; workspacePath: string; requirements?: string[] }>,
+    ) {
       state.sessions = action.payload.sessions
+      state.sessionPath = action.payload.workspacePath
       if (action.payload.requirements) {
         state.requirements = action.payload.requirements
       }
