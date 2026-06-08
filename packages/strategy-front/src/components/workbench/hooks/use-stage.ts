@@ -24,7 +24,6 @@ export function useStage() {
     setTab,
     stage: app.stage,
     diff,
-    send: app.send,
     backtest: app.backtest,
   }
 }

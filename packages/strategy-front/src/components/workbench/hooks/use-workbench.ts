@@ -83,14 +83,6 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
     setRight?.(true)
   }
 
-  const send = (text: string, start = false) => {
-    if (!text.trim()) return
-
-    if (start) {
-      void review()
-    }
-  }
-
   const backtest = async () => {
     dispatch(setStage("backtest"))
   }
@@ -103,7 +95,6 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
     risk,
     hint,
     setActive: (id: string) => dispatch(setActive(id)),
-    send,
     review,
     backtest,
     show: () => dispatch(setStage("backtest")),

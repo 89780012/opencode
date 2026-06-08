@@ -65,9 +65,9 @@ export function StageView() {
         mode={session ? mode : "narrow"}
         onAbort={session ? () => void real.abort() : undefined}
         onChange={session ? chat.draft.setText : setDraft}
-        onSend={(text, review) => {
+        onSend={(text) => {
           if (!session) {
-            stage.send(text, review)
+            //非session 面板先置空
             setDraft("")
             return
           }

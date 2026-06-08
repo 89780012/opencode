@@ -64,7 +64,7 @@ export function Modal(props: {
                 <span>原始描述</span>
                 <textarea
                   rows={8}
-                  value={props.reqs.join("\n")}
+                  // value={props.reqs.join("\n")}
                   onChange={(event) => props.onReqs(event.target.value.split("\n").filter(Boolean))}
                   placeholder="例如：A 股 15 分钟网格策略，保留 20% 底仓，下跌 2% 买入，上涨 2% 卖出，浮亏 10% 清仓。"
                 />
@@ -223,7 +223,12 @@ export function Modal(props: {
 
         <div className={css.foot}>
           {props.step > 1 ? (
-            <button type="button" className={css.btn} onClick={() => props.onStep(props.step - 1)} disabled={props.busy}>
+            <button
+              type="button"
+              className={css.btn}
+              onClick={() => props.onStep(props.step - 1)}
+              disabled={props.busy}
+            >
               <ChevronRight size={14} className={css.flip} />
               <span>上一步</span>
             </button>
@@ -238,7 +243,9 @@ export function Modal(props: {
             ) : (
               <Sparkles size={14} />
             )}
-            <span>{props.step === 3 ? "确认创建" : props.busy ? "分析中..." : props.step === 1 ? "开始分析" : "继续预览"}</span>
+            <span>
+              {props.step === 3 ? "确认创建" : props.busy ? "分析中..." : props.step === 1 ? "开始分析" : "继续预览"}
+            </span>
           </button>
         </div>
       </div>

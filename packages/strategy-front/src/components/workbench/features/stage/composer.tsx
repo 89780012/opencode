@@ -7,16 +7,15 @@ export function Composer(props: {
   busy?: boolean
   disabled?: boolean
   submitting?: boolean
-  review?: boolean
   placeholder?: string
   mode?: "narrow" | "full"
   onAbort?: () => void
   onChange: (value: string) => void
-  onSend: (text: string, review: boolean) => void
+  onSend: (text: string) => void
 }) {
-  const send = (review: boolean) => {
+  const send = () => {
     if (!props.value.trim()) return
-    props.onSend(props.value, review)
+    props.onSend(props.value)
   }
 
   const key = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -27,7 +26,7 @@ export function Composer(props: {
       props.onAbort?.()
       return
     }
-    send(false)
+    send()
   }
 
   const label = props.busy ? "停止" : props.submitting ? "发送中" : "发送"
@@ -60,7 +59,7 @@ export function Composer(props: {
           <button
             type="button"
             className={`${css.action} ${css.send}`}
-            onClick={() => send(false)}
+            onClick={send}
             aria-label={label}
             title={label}
             disabled={locked || !props.value.trim()}
@@ -70,7 +69,7 @@ export function Composer(props: {
           <button
             type="button"
             className={`${css.action} ${css.reviewsend}`}
-            onClick={() => send(true)}
+            onClick={() => void 0}
             aria-label="发送并审查"
             title="发送并审查"
             disabled={locked || !props.value.trim()}
