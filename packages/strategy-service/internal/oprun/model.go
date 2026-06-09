@@ -10,6 +10,7 @@ type Config struct {
 	Port         int
 	Cwd          string
 	StartTimeout time.Duration
+	ServiceURL   string
 }
 
 type State struct {

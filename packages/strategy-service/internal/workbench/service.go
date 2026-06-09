@@ -224,6 +224,81 @@ func (s *Service) Identify(ctx context.Context, req IdentifyReq) (IdentifyRes, e
 	return out, nil
 }
 
+func (s *Service) SaveAnalysis(ctx context.Context, req AnalysisReq) (AnalysisRow, error) {
+	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
+	req.WorktreePath = strings.TrimSpace(req.WorktreePath)
+	req.Text = strings.TrimSpace(req.Text)
+	req.Items = clean(req.Items)
+	if req.WorkspacePath == "" {
+		return AnalysisRow{}, fmt.Errorf("workspacePath is required")
+	}
+	if req.WorktreePath == "" {
+		req.WorktreePath = req.WorkspacePath
+	}
+	if len(req.Items) == 0 {
+		req.Items = items(req.Text)
+	}
+	if req.Text == "" {
+		req.Text = numbered(req.Items)
+	}
+	if len(req.Items) == 0 || req.Text == "" {
+		return AnalysisRow{}, fmt.Errorf("analysis is required")
+	}
+
+	body, err := json.Marshal(req.Items)
+	if err != nil {
+		return AnalysisRow{}, err
+	}
+	now := time.Now().UnixMilli()
+	doc, err := db.Open()
+	if err != nil {
+		return AnalysisRow{}, err
+	}
+	_, err = doc.ExecContext(ctx, `insert into workspace_analysis(workspace_path, worktree_path, items, text, updated_at) values (?, ?, ?, ?, ?)
+on conflict(workspace_path, worktree_path) do update set items = excluded.items, text = excluded.text, updated_at = excluded.updated_at`,
+		req.WorkspacePath, req.WorktreePath, string(body), req.Text, now)
+	if err != nil {
+		return AnalysisRow{}, err
+	}
+	return AnalysisRow{
+		WorkspacePath: req.WorkspacePath,
+		WorktreePath:  req.WorktreePath,
+		Items:         req.Items,
+		Text:          req.Text,
+		UpdatedAt:     now,
+	}, nil
+}
+
+func (s *Service) GetAnalysis(ctx context.Context, req AnalysisGet) (AnalysisRow, error) {
+	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
+	req.WorktreePath = strings.TrimSpace(req.WorktreePath)
+	if req.WorkspacePath == "" {
+		return AnalysisRow{}, fmt.Errorf("workspacePath is required")
+	}
+	if req.WorktreePath == "" {
+		req.WorktreePath = req.WorkspacePath
+	}
+	doc, err := db.Open()
+	if err != nil {
+		return AnalysisRow{}, err
+	}
+	var row AnalysisRow
+	var body string
+	err = doc.QueryRowContext(ctx, `select workspace_path, worktree_path, items, text, updated_at from workspace_analysis where workspace_path = ? and worktree_path = ?`,
+		req.WorkspacePath, req.WorktreePath).Scan(&row.WorkspacePath, &row.WorktreePath, &body, &row.Text, &row.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return AnalysisRow{}, db.ErrNotFound
+	}
+	if err != nil {
+		return AnalysisRow{}, err
+	}
+	if err := json.Unmarshal([]byte(body), &row.Items); err != nil {
+		return AnalysisRow{}, err
+	}
+	row.Items = clean(row.Items)
+	return row, nil
+}
+
 func (s *Service) put(ctx context.Context, req SessionCreate, session json.RawMessage) error {
 	meta := struct {
 		ID    string `json:"id"`
@@ -337,6 +412,41 @@ func cleanHits(list []Hit) []Hit {
 		out = append(out, item)
 	}
 	return out
+}
+
+func items(text string) []string {
+	out := []string{}
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if idx := strings.Index(line, "."); idx > 0 {
+			head := strings.TrimSpace(line[:idx])
+			ok := true
+			for _, char := range head {
+				if char < '0' || char > '9' {
+					ok = false
+					break
+				}
+			}
+			if ok {
+				line = strings.TrimSpace(line[idx+1:])
+			}
+		}
+		if line != "" {
+			out = append(out, line)
+		}
+	}
+	return clean(out)
+}
+
+func numbered(list []string) string {
+	out := []string{}
+	for i, item := range clean(list) {
+		out = append(out, fmt.Sprintf("%d.\n%s", i+1, item))
+	}
+	return strings.Join(out, "\n\n")
 }
 
 func (s *Service) path(raw string) string {

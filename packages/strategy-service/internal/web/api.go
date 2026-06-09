@@ -119,6 +119,8 @@ func (a *API) Register(r *gin.Engine) {
 
 	bench := api.Group("/workbench")
 	bench.POST("/requirements/identify", a.workbenchIdentify)
+	bench.GET("/analysis", a.workbenchAnalysisGet)
+	bench.POST("/analysis", a.workbenchAnalysisPut)
 
 	sum := api.Group("/summary")
 	sum.GET("/session", a.summaryGet)

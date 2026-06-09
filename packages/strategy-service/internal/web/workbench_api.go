@@ -1,6 +1,9 @@
 package web
 
 import (
+	"errors"
+
+	"strategy-service/internal/db"
 	"strategy-service/internal/workbench"
 
 	"github.com/gin-gonic/gin"
@@ -14,6 +17,42 @@ func (a *API) workbenchIdentify(c *gin.Context) {
 	}
 
 	data, err := a.bench.Identify(c.Request.Context(), body)
+	if err != nil {
+		bad(c, err)
+		return
+	}
+
+	ok(c, data)
+}
+
+func (a *API) workbenchAnalysisGet(c *gin.Context) {
+	req := workbench.AnalysisGet{}
+	if err := c.ShouldBindQuery(&req); err != nil {
+		bad(c, err)
+		return
+	}
+
+	data, err := a.bench.GetAnalysis(c.Request.Context(), req)
+	if errors.Is(err, db.ErrNotFound) {
+		ok(c, nil)
+		return
+	}
+	if err != nil {
+		bad(c, err)
+		return
+	}
+
+	ok(c, data)
+}
+
+func (a *API) workbenchAnalysisPut(c *gin.Context) {
+	body := workbench.AnalysisReq{}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		bad(c, err)
+		return
+	}
+
+	data, err := a.bench.SaveAnalysis(c.Request.Context(), body)
 	if err != nil {
 		bad(c, err)
 		return

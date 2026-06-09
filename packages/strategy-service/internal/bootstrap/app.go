@@ -63,7 +63,16 @@ func New(cfg Config) (*Service, error) {
 	cfg = resolveOpencode(run, cfg)
 	cfg = resolveGit(run, cfg)
 
-	mgr := oprun.New(oprun.Config(cfg.Opencode))
+	mgr := oprun.New(oprun.Config{
+		Enabled:      cfg.Opencode.Enabled,
+		Bin:          cfg.Opencode.Bin,
+		GitBin:       cfg.Opencode.GitBin,
+		Host:         cfg.Opencode.Host,
+		Port:         cfg.Opencode.Port,
+		Cwd:          cfg.Opencode.Cwd,
+		StartTimeout: cfg.Opencode.StartTimeout,
+		ServiceURL:   serviceURL(cfg),
+	})
 	op := oc.New(mgr)
 	chain := modelchain.NewService(op)
 	api := web.NewAPI(run, op, &conf.Store{}, smartx.New(smartx.Config{
@@ -190,6 +199,14 @@ func (s *Service) activate(addr string) {
 }
 
 // port 从起始端口开始寻找当前主机上的空闲端口。
+func serviceURL(cfg Config) string {
+	host := strings.TrimSpace(cfg.Host)
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		host = "127.0.0.1"
+	}
+	return "http://" + net.JoinHostPort(host, cfg.Port)
+}
+
 func port(host string, start int) (int, error) {
 	if start <= 0 {
 		return 0, fmt.Errorf("invalid port: %d", start)

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { fresh, note, seen, touch } from "../src/state.js"
+import { doneAnalysis, fresh, freshAnalysis, note, requestAnalysis, seen, touch, validAnalysis } from "../src/state.js"
 
 describe("smartx workflow state", () => {
   test("tracks smartx_start aliases", () => {
@@ -50,13 +50,19 @@ describe("smartx workflow state", () => {
     expect(seen({ tool: "skill", args: { name: "other" } })).toBe(false)
   })
 
+  test("validates workspace analysis by state", () => {
+    expect(validAnalysis(requestAnalysis("f:/repo"))).toBe(false)
+    expect(validAnalysis(freshAnalysis("f:/repo"))).toBe(true)
+    expect(validAnalysis(doneAnalysis("f:/repo"))).toBe(true)
+  })
+
   test("builds the log reminder", () => {
-    expect(note({ ...fresh("s1"), logs: 2 }).includes("smartx_logs")).toBe(true)
-    expect(note({ ...fresh("s1"), logs: 2 }).includes("还需要再调用 2 次")).toBe(true)
+    expect(note({ ...fresh("s1"), logs: 2 })).toContain("smartx_logs")
+    expect(note({ ...fresh("s1"), logs: 2 })).toContain("还需要再调用 2 次")
   })
 
   test("builds the debug reminder", () => {
-    expect(note({ ...fresh("s1"), debug: 2 }).includes("smartx-debug")).toBe(true)
-    expect(note({ ...fresh("s1"), debug: 2 }).includes("还需要再调用 2 次")).toBe(true)
+    expect(note({ ...fresh("s1"), debug: 2 })).toContain("smartx-debug")
+    expect(note({ ...fresh("s1"), debug: 2 })).toContain("还需要再调用 2 次")
   })
 })

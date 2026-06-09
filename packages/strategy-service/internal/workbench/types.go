@@ -71,3 +71,23 @@ type IdentifyRes struct {
 	Dims    map[string][]Hit `json:"dimensions"`
 	Model   string           `json:"model"`
 }
+
+type AnalysisReq struct {
+	WorkspacePath string   `json:"workspacePath"`
+	WorktreePath  string   `json:"worktreePath"`
+	Items         []string `json:"items"`
+	Text          string   `json:"text"`
+}
+
+type AnalysisGet struct {
+	WorkspacePath string `form:"workspacePath"`
+	WorktreePath  string `form:"worktreePath"`
+}
+
+type AnalysisRow struct {
+	WorkspacePath string   `json:"workspacePath"`
+	WorktreePath  string   `json:"worktreePath"`
+	Items         []string `json:"items"`
+	Text          string   `json:"text"`
+	UpdatedAt     int64    `json:"updatedAt"`
+}
