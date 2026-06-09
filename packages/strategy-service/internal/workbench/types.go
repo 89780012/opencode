@@ -22,6 +22,7 @@ type SessionRow struct {
 	Title         string          `json:"title"`
 	Session       json.RawMessage `json:"session"`
 	Analysis      json.RawMessage `json:"analysis,omitempty"`
+	Requirements  []string        `json:"requirements"`
 	CreatedAt     int64           `json:"createdAt"`
 	UpdatedAt     int64           `json:"updatedAt"`
 }
@@ -47,7 +48,6 @@ type SessionDetail struct {
 type SessionListResult struct {
 	WorkspacePath string       `json:"workspacePath,omitempty"`
 	Sessions      []SessionRow `json:"sessions"`
-	Requirements  []string     `json:"requirements"`
 }
 
 type SessionResult struct {

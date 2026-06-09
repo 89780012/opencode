@@ -81,10 +81,10 @@ export function useWorkbenchModal() {
     setStep(1)
     setBusy(false)
     setTitle(seed)
-    setReqs(state.requirements.length ? state.requirements : line)
+    setReqs(line)
     setData(null)
     setErr("")
-  }, [state.requirements])
+  }, [])
 
   const reset = useCallback(() => {
     setOpen(false)

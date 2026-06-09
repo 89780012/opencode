@@ -33,7 +33,7 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
   const cur = useMemo<SessionItem>(() => {
     const session = state.sessions.find((item) => item.id === state.active) ?? state.sessions[0]
     if (!session) return empty()
-    const reqs = state.requirements.length ? state.requirements : []
+    const reqs = session.requirements
     const steps = createReviewSteps().map((item, idx) => ({
       ...item,
       status: idx === 3 || idx === 4 ? ("error" as const) : ("done" as const),
@@ -66,7 +66,7 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
       backtestHistory: [{ time: "09:45", results: back }],
       timelineEvents: createTimeline(session.title),
     }
-  }, [flow, state.active, state.requirements, state.sessions, view])
+  }, [flow, state.active, state.sessions, view])
   const last = cur.reviewHistory.at(-1) ?? null
   const risk = useMemo(() => {
     if (cur.reviewStatus === "passed") return "审查已通过"

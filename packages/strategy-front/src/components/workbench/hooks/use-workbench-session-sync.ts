@@ -19,6 +19,9 @@ function parseSession(value: unknown): WorkbenchSession | null {
     workspacePath: value.workspacePath,
     session: value.session,
     analysis: value.analysis,
+    requirements: Array.isArray(value.requirements)
+      ? value.requirements.filter((item): item is string => typeof item === "string")
+      : [],
     createdAt: typeof value.createdAt === "number" ? value.createdAt : 0,
     updatedAt: typeof value.updatedAt === "number" ? value.updatedAt : 0,
   }
@@ -30,9 +33,6 @@ function parseSessionList(value: unknown) {
   return {
     workspacePath: typeof value.workspacePath === "string" ? value.workspacePath : "",
     sessions: (value.sessions ?? []).map(parseSession).filter((session): session is WorkbenchSession => !!session),
-    requirements: Array.isArray(value.requirements)
-      ? value.requirements.filter((item): item is string => typeof item === "string")
-      : [],
   }
 }
 
@@ -71,7 +71,6 @@ export function useWorkbenchSessionSync() {
         setSessions({
           sessions: data.sessions,
           workspacePath: data.workspacePath || path,
-          requirements: data.requirements,
         }),
       )
     }

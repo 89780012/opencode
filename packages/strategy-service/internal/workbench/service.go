@@ -127,17 +127,13 @@ func (s *Service) DeleteSession(ctx context.Context, req SessionDelete) error {
 	if count == 0 {
 		return db.ErrNotFound
 	}
-	return nil
+	_, err = doc.ExecContext(ctx, "delete from workspace_requirements where session_id = ?", req.ID)
+	return err
 }
 
 func (s *Service) ListSessions(ctx context.Context, req SessionList) (SessionListResult, error) {
 	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
 	doc, err := db.Open()
-	if err != nil {
-		return SessionListResult{}, err
-	}
-
-	reqs, err := loadReqs(ctx, doc, req.WorkspacePath)
 	if err != nil {
 		return SessionListResult{}, err
 	}
@@ -153,12 +149,17 @@ func (s *Service) ListSessions(ctx context.Context, req SessionList) (SessionLis
 	}
 	defer rows.Close()
 
-	out := SessionListResult{WorkspacePath: req.WorkspacePath, Requirements: reqs}
+	out := SessionListResult{WorkspacePath: req.WorkspacePath}
 	for rows.Next() {
 		row, err := scanSession(rows)
 		if err != nil {
 			return SessionListResult{}, err
 		}
+		reqs, err := loadReqs(ctx, doc, row.WorkspacePath, row.ID)
+		if err != nil {
+			return SessionListResult{}, err
+		}
+		row.Requirements = reqs
 		out.Sessions = append(out.Sessions, row)
 	}
 	return out, rows.Err()
@@ -431,7 +432,7 @@ on conflict(id) do update set workspace_path = excluded.workspace_path, title = 
 	if req.Requirements == nil {
 		return nil
 	}
-	return saveReqs(ctx, doc, req.WorkspacePath, req.Requirements, now)
+	return saveReqs(ctx, doc, req.WorkspacePath, meta.ID, req.Requirements, now)
 }
 
 type scanner interface {
@@ -457,16 +458,21 @@ func loadSession(ctx context.Context, doc *sql.DB, id string) (SessionRow, error
 	if err == sql.ErrNoRows {
 		return SessionRow{}, db.ErrNotFound
 	}
+	if err != nil {
+		return SessionRow{}, err
+	}
+	row.Requirements, err = loadReqs(ctx, doc, row.WorkspacePath, row.ID)
 	return row, err
 }
 
-func loadReqs(ctx context.Context, doc *sql.DB, workspace string) ([]string, error) {
+func loadReqs(ctx context.Context, doc *sql.DB, workspace string, id string) ([]string, error) {
 	workspace = strings.TrimSpace(workspace)
-	if workspace == "" {
+	id = strings.TrimSpace(id)
+	if workspace == "" || id == "" {
 		return []string{}, nil
 	}
 	var body string
-	err := doc.QueryRowContext(ctx, "select items from workspace_requirements where workspace_path = ?", workspace).Scan(&body)
+	err := doc.QueryRowContext(ctx, "select items from workspace_requirements where workspace_path = ? and session_id = ?", workspace, id).Scan(&body)
 	if err == sql.ErrNoRows {
 		return []string{}, nil
 	}
@@ -480,13 +486,13 @@ func loadReqs(ctx context.Context, doc *sql.DB, workspace string) ([]string, err
 	return clean(out), nil
 }
 
-func saveReqs(ctx context.Context, doc *sql.DB, workspace string, reqs []string, now int64) error {
+func saveReqs(ctx context.Context, doc *sql.DB, workspace string, id string, reqs []string, now int64) error {
 	body, err := json.Marshal(clean(reqs))
 	if err != nil {
 		return err
 	}
-	_, err = doc.ExecContext(ctx, `insert into workspace_requirements(workspace_path, items, updated_at) values (?, ?, ?)
-on conflict(workspace_path) do update set items = excluded.items, updated_at = excluded.updated_at`, workspace, string(body), now)
+	_, err = doc.ExecContext(ctx, `insert into workspace_requirements(workspace_path, session_id, items, updated_at) values (?, ?, ?, ?)
+on conflict(workspace_path, session_id) do update set items = excluded.items, updated_at = excluded.updated_at`, workspace, id, string(body), now)
 	return err
 }
 

@@ -186,12 +186,16 @@ export function RequirementsTab(props: {
         onToggle={() => props.onToggle("requirements")}
       >
         <div className={css.reqbox}>
-          {props.cur.analyzedRequirements.map((item, idx) => (
-            <div key={item} className={css.reqrow}>
-              <span>{idx + 1}.</span>
-              <p>{item}</p>
-            </div>
-          ))}
+          {props.cur.analyzedRequirements.length ? (
+            props.cur.analyzedRequirements.map((item, idx) => (
+              <div key={item} className={css.reqrow}>
+                <span>{idx + 1}.</span>
+                <p>{item}</p>
+              </div>
+            ))
+          ) : (
+            <div className={ui.empty}>暂无需求理解</div>
+          )}
         </div>
       </Compact>
 

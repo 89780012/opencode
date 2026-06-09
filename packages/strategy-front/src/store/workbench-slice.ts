@@ -7,6 +7,7 @@ export type WorkbenchSession = {
   workspacePath: string
   session?: unknown
   analysis?: unknown
+  requirements: string[]
   createdAt: number
   updatedAt: number
 }
@@ -48,7 +49,6 @@ type State = {
   analysisPath: string
   flowchart: WorkbenchFlowchart | null
   flowchartPath: string
-  requirements: string[]
   active: string
   stage: Stage
 }
@@ -62,7 +62,6 @@ const initialState: State = {
   analysisPath: "",
   flowchart: null,
   flowchartPath: "",
-  requirements: [],
   active: "",
   stage: "session",
 }
@@ -71,15 +70,9 @@ const slice = createSlice({
   name: "workbench",
   initialState,
   reducers: {
-    setSessions(
-      state,
-      action: PayloadAction<{ sessions: WorkbenchSession[]; workspacePath: string; requirements?: string[] }>,
-    ) {
+    setSessions(state, action: PayloadAction<{ sessions: WorkbenchSession[]; workspacePath: string }>) {
       state.sessions = action.payload.sessions
       state.sessionPath = action.payload.workspacePath
-      if (action.payload.requirements) {
-        state.requirements = action.payload.requirements
-      }
       if (state.sessions.some((item) => item.id === state.active)) return
       state.active = state.sessions[0]?.id ?? ""
     },
@@ -105,9 +98,6 @@ const slice = createSlice({
       if (!state.active) {
         state.active = action.payload.session.id
       }
-    },
-    setRequirements(state, action: PayloadAction<{ requirements: string[] }>) {
-      state.requirements = action.payload.requirements
     },
     deleteSession(state, action: PayloadAction<{ id: string }>) {
       state.sessions = state.sessions.filter((item) => item.id !== action.payload.id)
@@ -135,7 +125,6 @@ export const {
   setActive,
   setFlowchart,
   setQuestions,
-  setRequirements,
   setSessions,
   setStage,
   upsertSession,

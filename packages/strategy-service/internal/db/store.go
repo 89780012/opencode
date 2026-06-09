@@ -119,9 +119,11 @@ var schema = []string{
 	updated_at integer not null
 )`,
 	`create table if not exists workspace_requirements (
-	workspace_path text primary key,
+	workspace_path text not null,
+	session_id text not null,
 	items text not null,
-	updated_at integer not null
+	updated_at integer not null,
+	primary key(workspace_path, session_id)
 )`,
 	`create table if not exists workspace_analysis (
 	workspace_path text not null,
