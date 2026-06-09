@@ -127,6 +127,8 @@
 .groupbody {
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   padding: 0.5rem;
 }
@@ -314,6 +316,11 @@
 
 .issue {
   margin-bottom: 0.25rem;
+}
+
+.issuelist {
+  margin-right: -0.5rem;
+  padding-right: 0.5rem;
 }
 
 .rowtop {
