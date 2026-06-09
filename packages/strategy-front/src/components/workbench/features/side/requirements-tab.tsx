@@ -11,7 +11,7 @@ import {
   Workflow,
 } from "lucide-react"
 import { useAppDispatch } from "@/store"
-import { setStage, type WorkbenchAnalysis } from "@/store/workbench-slice"
+import { setStage, type WorkbenchAnalysis, type WorkbenchFlowchart } from "@/store/workbench-slice"
 import { type SessionItem } from "../../data"
 import { Compact } from "../../layout/compact"
 import ui from "../../../shared/styles/ui.module.css"
@@ -70,6 +70,59 @@ function Progress(props: { cur: SessionItem }) {
   )
 }
 
+type Mark = {
+  key: string
+  label: string
+  tone: "pending" | "running" | "done" | "error"
+}
+
+function FlowStateIcon(props: { tone: Mark["tone"] }) {
+  if (props.tone === "done") return <CheckCircle2 size={13} />
+  if (props.tone === "running") return <LoaderCircle size={13} className={ui.spin} />
+  if (props.tone === "error") return <CircleAlert size={13} />
+  return <Clock3 size={13} />
+}
+
+function FlowState(props: { analysis: WorkbenchAnalysis | null; flowchart: WorkbenchFlowchart | null }) {
+  const marks: Mark[] = [
+    {
+      key: "analysis",
+      label: props.analysis?.state === "done" ? "分析完成" : props.analysis?.state === "running" ? "分析中" : "等待分析",
+      tone: props.analysis?.state === "done" ? "done" : props.analysis?.state === "running" ? "running" : "pending",
+    },
+    {
+      key: "flowchart",
+      label:
+        props.flowchart?.state === "done"
+          ? "流程图完成"
+          : props.flowchart?.state === "generating"
+            ? "正在生成流程图"
+            : props.flowchart?.state === "error"
+              ? "流程图异常"
+              : "等待流程图",
+      tone:
+        props.flowchart?.state === "done"
+          ? "done"
+          : props.flowchart?.state === "generating"
+            ? "running"
+            : props.flowchart?.state === "error"
+              ? "error"
+              : "pending",
+    },
+  ]
+
+  return (
+    <div className={css.flowstate}>
+      {marks.map((item) => (
+        <div key={item.key} className={`${css.flowmark} ${css[`flowmark_${item.tone}`]}`}>
+          <FlowStateIcon tone={item.tone} />
+          <span>{item.label}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function Logic(props: { analysis: WorkbenchAnalysis | null }) {
   if (!props.analysis) {
     return (
@@ -115,6 +168,7 @@ function Logic(props: { analysis: WorkbenchAnalysis | null }) {
 export function RequirementsTab(props: {
   cur: SessionItem
   analysis: WorkbenchAnalysis | null
+  flowchart: WorkbenchFlowchart | null
   open: Record<string, boolean>
   risk: string
   hint: string
@@ -154,6 +208,7 @@ export function RequirementsTab(props: {
         }
       >
         <div className={css.logicbox}>
+          <FlowState analysis={props.analysis} flowchart={props.flowchart} />
           <Logic analysis={props.analysis} />
         </div>
       </Compact>

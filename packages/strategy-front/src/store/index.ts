@@ -152,3 +152,9 @@ export function selectWorkbenchAnalysis(state: RootState, path?: string | null) 
   if (state.workbench.analysisPath !== path) return null
   return state.workbench.analysis
 }
+
+export function selectWorkbenchFlowchart(state: RootState, path?: string | null) {
+  if (!path) return null
+  if (state.workbench.flowchartPath !== path) return null
+  return state.workbench.flowchart
+}

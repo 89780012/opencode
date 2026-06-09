@@ -394,6 +394,61 @@
   font-weight: 600;
 }
 
+.flowstate {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem;
+  margin-bottom: 0.1rem;
+}
+
+.flowmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  min-width: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.45rem;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 0.66rem;
+  font-weight: 600;
+  line-height: 1rem;
+  padding: 0.28rem 0.38rem;
+}
+
+.flowmark svg {
+  flex: none;
+}
+
+.flowmark span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flowmark_done {
+  border-color: #bbf7d0;
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.flowmark_running {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.flowmark_error {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.flowmark_pending {
+  color: #94a3b8;
+}
+
 .logic {
   color: #475569;
   font-size: 0.72rem;
