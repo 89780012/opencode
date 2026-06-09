@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react"
 import { selectWorkbench, useAppDispatch, useAppSelector } from "@/store"
 import { setActive, setStage } from "@/store/workbench-slice"
-import { code, createBacktest, createFlowchart, createReviewSteps, createTimeline, type SessionItem } from "../data"
+import { code, createBacktest, createReviewSteps, createTimeline, type FlowStatus, type SessionItem } from "../data"
 
 function empty(): SessionItem {
   return {
@@ -29,6 +29,7 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
   const dispatch = useAppDispatch()
   const state = useAppSelector(selectWorkbench)
   const [view, setView] = useState<"current" | "history">("current")
+  const flow = state.flowchart?.workspacePath === state.sessionPath ? state.flowchart : null
   const cur = useMemo<SessionItem>(() => {
     const session = state.sessions.find((item) => item.id === state.active) ?? state.sessions[0]
     if (!session) return empty()
@@ -57,14 +58,15 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
           suggestions: ["Check empty positions", "Add max drawdown guard", "Fix edge cases"],
         },
       ],
-      flowchartStatus: "done",
-      flowchartCode: createFlowchart(),
+      flowchartStatus:
+        flow?.state === "generating" ? "generating" : flow?.state === "done" && flow.code ? "done" : ("idle" as FlowStatus),
+      flowchartCode: flow?.state === "done" ? flow.code : "",
       backtestStatus: "done",
       backtestResults: back,
       backtestHistory: [{ time: "09:45", results: back }],
       timelineEvents: createTimeline(session.title),
     }
-  }, [state.active, state.requirements, state.sessions, view])
+  }, [flow, state.active, state.requirements, state.sessions, view])
   const last = cur.reviewHistory.at(-1) ?? null
   const risk = useMemo(() => {
     if (cur.reviewStatus === "passed") return "审查已通过"

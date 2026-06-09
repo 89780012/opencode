@@ -62,3 +62,40 @@ func (a *API) workbenchAnalysisPut(c *gin.Context) {
 	a.event.emitBroadcast("analysis.updated", utils.Pack(data))
 	ok(c, data)
 }
+
+func (a *API) workbenchFlowchartGet(c *gin.Context) {
+	req := workbench.FlowchartGet{}
+	if err := c.ShouldBindQuery(&req); err != nil {
+		bad(c, err)
+		return
+	}
+
+	data, err := a.bench.GetFlowchart(c.Request.Context(), req)
+	if errors.Is(err, db.ErrNotFound) {
+		ok(c, nil)
+		return
+	}
+	if err != nil {
+		bad(c, err)
+		return
+	}
+
+	ok(c, data)
+}
+
+func (a *API) workbenchFlowchartPut(c *gin.Context) {
+	body := workbench.FlowchartReq{}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		bad(c, err)
+		return
+	}
+
+	data, err := a.bench.SaveFlowchart(c.Request.Context(), body)
+	if err != nil {
+		bad(c, err)
+		return
+	}
+
+	a.event.emitBroadcast("flowchart.updated", utils.Pack(data))
+	ok(c, data)
+}

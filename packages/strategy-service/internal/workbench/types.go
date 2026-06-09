@@ -93,3 +93,27 @@ type AnalysisRow struct {
 	Text          string   `json:"text"`
 	UpdatedAt     int64    `json:"updatedAt"`
 }
+
+type FlowchartReq struct {
+	WorkspacePath string `json:"workspacePath"`
+	WorktreePath  string `json:"worktreePath"`
+	State         string `json:"state,omitempty"`
+	Code          string `json:"code"`
+	Err           string `json:"err,omitempty"`
+	AnalysisHash  string `json:"analysisHash,omitempty"`
+}
+
+type FlowchartGet struct {
+	WorkspacePath string `form:"workspacePath" json:"workspacePath"`
+	WorktreePath  string `form:"worktreePath" json:"worktreePath"`
+}
+
+type FlowchartRow struct {
+	WorkspacePath string `json:"workspacePath"`
+	WorktreePath  string `json:"worktreePath"`
+	State         string `json:"state"`
+	Code          string `json:"code"`
+	Err           string `json:"err,omitempty"`
+	AnalysisHash  string `json:"analysisHash,omitempty"`
+	UpdatedAt     int64  `json:"updatedAt"`
+}

@@ -232,8 +232,8 @@ describe("smartx workflow hooks", () => {
       {
         client: stub(rows),
         project: {} as never,
-        directory: "f:/code/opencode",
-        worktree: "f:/code/opencode",
+        directory: "",
+        worktree: "",
         serverUrl: new URL("http://localhost:4096"),
         $: {} as never,
       },

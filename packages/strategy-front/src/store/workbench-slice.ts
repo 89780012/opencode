@@ -30,6 +30,15 @@ export type WorkbenchAnalysis = {
   updatedAt: number
 }
 
+export type WorkbenchFlowchart = {
+  workspacePath: string
+  worktreePath: string
+  state: "idle" | "generating" | "done" | "error"
+  code: string
+  err: string
+  updatedAt: number
+}
+
 type State = {
   sessions: WorkbenchSession[]
   sessionPath: string
@@ -37,6 +46,8 @@ type State = {
   questionPath: string
   analysis: WorkbenchAnalysis | null
   analysisPath: string
+  flowchart: WorkbenchFlowchart | null
+  flowchartPath: string
   requirements: string[]
   active: string
   stage: Stage
@@ -49,6 +60,8 @@ const initialState: State = {
   questionPath: "",
   analysis: null,
   analysisPath: "",
+  flowchart: null,
+  flowchartPath: "",
   requirements: [],
   active: "",
   stage: "session",
@@ -77,6 +90,10 @@ const slice = createSlice({
     setAnalysis(state, action: PayloadAction<{ workspacePath: string; analysis: WorkbenchAnalysis | null }>) {
       state.analysisPath = action.payload.workspacePath
       state.analysis = action.payload.analysis
+    },
+    setFlowchart(state, action: PayloadAction<{ workspacePath: string; flowchart: WorkbenchFlowchart | null }>) {
+      state.flowchartPath = action.payload.workspacePath
+      state.flowchart = action.payload.flowchart
     },
     upsertSession(state, action: PayloadAction<{ session: WorkbenchSession }>) {
       const idx = state.sessions.findIndex((item) => item.id === action.payload.session.id)
@@ -116,6 +133,7 @@ export const {
   deleteSession,
   setAnalysis,
   setActive,
+  setFlowchart,
   setQuestions,
   setRequirements,
   setSessions,

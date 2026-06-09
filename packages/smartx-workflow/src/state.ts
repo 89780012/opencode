@@ -13,6 +13,15 @@ export type Analysis = {
   updated: number
 }
 
+export type Chart = {
+  workspace: string
+  worktree: string
+  state: "requested" | "generating" | "done" | "error"
+  code: string
+  err: string
+  updated: number
+}
+
 export type Call = {
   tool: string
   args?: {
@@ -26,6 +35,7 @@ const log = new Set(["smartx_logs", "smartx_log"])
 const dev = "smartx-develop"
 const dbg = "smartx-debug"
 const analyzer = "workspace-analyzer"
+const chart = "strategy-flowchart-generator"
 
 function item(input: Call | string): Call {
   if (typeof input === "string") return { tool: input }
@@ -58,6 +68,12 @@ export function analyze(input: Call | string) {
   const call = item(input)
   if (call.tool !== "task") return false
   return call.args?.subagent_type === analyzer
+}
+
+export function flowchart(input: Call | string) {
+  const call = item(input)
+  if (call.tool !== "task") return false
+  return call.args?.subagent_type === chart
 }
 
 export function key(workspace: string, worktree = workspace) {
@@ -123,6 +139,39 @@ export function doneAnalysis(workspace: string, worktree = workspace, text = "",
   }
 }
 
+export function requestChart(workspace: string, worktree = workspace): Chart {
+  return {
+    workspace,
+    worktree,
+    state: "requested",
+    code: "",
+    err: "",
+    updated: Date.now(),
+  }
+}
+
+export function freshChart(workspace: string, worktree = workspace): Chart {
+  return {
+    workspace,
+    worktree,
+    state: "generating",
+    code: "",
+    err: "",
+    updated: Date.now(),
+  }
+}
+
+export function doneChart(workspace: string, worktree = workspace, code = ""): Chart {
+  return {
+    workspace,
+    worktree,
+    state: "done",
+    code,
+    err: "",
+    updated: Date.now(),
+  }
+}
+
 export function result(text: string) {
   const match = text.match(/<task_result>\s*([\s\S]*?)\s*<\/task_result>/)
   return (match?.[1] ?? text).trim()
@@ -153,6 +202,19 @@ export function validAnalysis(input: Analysis) {
   return input.state === "running" || input.state === "done"
 }
 
+export function validChart(input: Chart) {
+  return input.state === "requested" || input.state === "generating" || input.state === "done" || input.state === "error"
+}
+
+export function mermaid(text: string) {
+  let out = result(text).trim()
+  out = out.replace(/^```mermaid\s*/i, "").replace(/^```\s*/, "").replace(/\s*```$/g, "").trim()
+  const idx = out.indexOf("flowchart")
+  if (idx > 0) out = out.slice(idx).trim()
+  if (!out.startsWith("flowchart")) return ""
+  return out
+}
+
 export function noteAnalysis() {
   return [
     "当前工作区还没有完成策略运行逻辑分析。",
@@ -161,5 +223,21 @@ export function noteAnalysis() {
     "子 agent 只负责输出可画成流程图的精简编号策略运行逻辑条目，不要读取 requirements，不要描述项目结构、版本、UI、构建方式或文件职责，不要修改文件，不要给实现方案。",
     "如果当前工作区只是模板骨架或没有完整策略算法，子 agent 必须明确输出已发现的实际运行行为和缺失的入场、退出、仓位、风控规则。",
     "子 agent 返回后，先基于它的结论继续当前任务；不要把这段系统提示复述给用户。",
+  ].join("\n")
+}
+
+export function noteChart(input: Analysis) {
+  return [
+    "workspace-analyzer 已经完成当前工作区的策略运行逻辑分析。现在必须先生成策略逻辑流程图，再继续其它实现或总结。",
+    "请立即调用 `task` 工具启动 `strategy-flowchart-generator` 子 agent。",
+    "调用参数要求：`subagent_type` 必须是 `strategy-flowchart-generator`，`description` 使用 `Generate strategy flowchart`。",
+    "传给子 agent 的 prompt 必须包含下面的 workspace-analyzer 结果，并要求它只读当前工作区源码进行校验、修正和补偿。",
+    "子 agent 可以读取源码、列目录和搜索文本；不能修改文件，不能执行命令，不能调用其它子 agent。",
+    "不要加入 requirements、用户愿望清单或未来实现计划作为流程图来源。",
+    "子 agent 必须只返回 Mermaid flowchart，第一行是 `flowchart TD`，不要 markdown 代码块，不要解释。",
+    "子 agent 返回后，继续当前任务；不要把这段系统提示复述给用户。",
+    "",
+    "workspace-analyzer 结果：",
+    input.text,
   ].join("\n")
 }

@@ -29,3 +29,23 @@ func (a *API) handleAnalysisGet(ctx context.Context, client *socketClient, evt s
 	}
 	client.reply(evt.ID, "analysis.got", utils.Pack(data))
 }
+
+func (a *API) handleFlowchartGet(ctx context.Context, client *socketClient, evt socketEvent) {
+	req := workbench.FlowchartGet{}
+	if len(evt.Payload) > 0 {
+		if err := json.Unmarshal(evt.Payload, &req); err != nil {
+			client.reply(evt.ID, "flowchart.get.error", utils.Pack(socketError{Message: err.Error()}))
+			return
+		}
+	}
+	data, err := a.bench.GetFlowchart(ctx, req)
+	if errors.Is(err, db.ErrNotFound) {
+		client.reply(evt.ID, "flowchart.got", nil)
+		return
+	}
+	if err != nil {
+		client.reply(evt.ID, "flowchart.get.error", utils.Pack(socketError{WorkspacePath: req.WorkspacePath, Message: err.Error()}))
+		return
+	}
+	client.reply(evt.ID, "flowchart.got", utils.Pack(data))
+}

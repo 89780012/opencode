@@ -3,7 +3,9 @@ package workbench
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -322,6 +324,82 @@ func (s *Service) GetAnalysis(ctx context.Context, req AnalysisGet) (AnalysisRow
 	return row, nil
 }
 
+func (s *Service) GetFlowchart(ctx context.Context, req FlowchartGet) (FlowchartRow, error) {
+	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
+	req.WorktreePath = strings.TrimSpace(req.WorktreePath)
+	if req.WorkspacePath == "" {
+		return FlowchartRow{}, fmt.Errorf("workspacePath is required")
+	}
+	if req.WorktreePath == "" {
+		req.WorktreePath = req.WorkspacePath
+	}
+	doc, err := db.Open()
+	if err != nil {
+		return FlowchartRow{}, err
+	}
+	var row FlowchartRow
+	err = doc.QueryRowContext(ctx, `select workspace_path, worktree_path, analysis_hash, state, code, err, updated_at from workspace_flowcharts where workspace_path = ? and worktree_path = ?`,
+		req.WorkspacePath, req.WorktreePath).Scan(&row.WorkspacePath, &row.WorktreePath, &row.AnalysisHash, &row.State, &row.Code, &row.Err, &row.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return FlowchartRow{}, db.ErrNotFound
+	}
+	return row, err
+}
+
+func (s *Service) SaveFlowchart(ctx context.Context, req FlowchartReq) (FlowchartRow, error) {
+	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
+	req.WorktreePath = strings.TrimSpace(req.WorktreePath)
+	req.State = strings.TrimSpace(req.State)
+	req.Code = mermaid(req.Code)
+	req.Err = strings.TrimSpace(req.Err)
+	if req.WorkspacePath == "" {
+		return FlowchartRow{}, fmt.Errorf("workspacePath is required")
+	}
+	if req.WorktreePath == "" {
+		req.WorktreePath = req.WorkspacePath
+	}
+	if req.State == "" {
+		req.State = "done"
+	}
+	if req.State == "done" && req.Code == "" {
+		return FlowchartRow{}, fmt.Errorf("code is required")
+	}
+	if req.State != "generating" && req.State != "done" && req.State != "error" {
+		return FlowchartRow{}, fmt.Errorf("invalid flowchart state")
+	}
+	sum := strings.TrimSpace(req.AnalysisHash)
+	if sum == "" {
+		analysis, err := s.GetAnalysis(ctx, AnalysisGet{WorkspacePath: req.WorkspacePath, WorktreePath: req.WorktreePath})
+		if err == nil {
+			sum = hash(analysis.Text)
+		}
+	}
+	row := FlowchartRow{
+		WorkspacePath: req.WorkspacePath,
+		WorktreePath:  req.WorktreePath,
+		State:         req.State,
+		Code:          req.Code,
+		Err:           req.Err,
+		AnalysisHash:  sum,
+		UpdatedAt:     time.Now().UnixMilli(),
+	}
+	if err := s.saveFlow(ctx, row); err != nil {
+		return FlowchartRow{}, err
+	}
+	return row, nil
+}
+
+func (s *Service) saveFlow(ctx context.Context, row FlowchartRow) error {
+	doc, err := db.Open()
+	if err != nil {
+		return err
+	}
+	_, err = doc.ExecContext(ctx, `insert into workspace_flowcharts(workspace_path, worktree_path, analysis_hash, state, code, err, updated_at) values (?, ?, ?, ?, ?, ?, ?)
+on conflict(workspace_path, worktree_path) do update set analysis_hash = excluded.analysis_hash, state = excluded.state, code = excluded.code, err = excluded.err, updated_at = excluded.updated_at`,
+		row.WorkspacePath, row.WorktreePath, row.AnalysisHash, row.State, row.Code, row.Err, row.UpdatedAt)
+	return err
+}
+
 func (s *Service) put(ctx context.Context, req SessionCreate, session json.RawMessage) error {
 	meta := struct {
 		ID    string `json:"id"`
@@ -470,6 +548,27 @@ func numbered(list []string) string {
 		out = append(out, fmt.Sprintf("%d.\n%s", i+1, item))
 	}
 	return strings.Join(out, "\n\n")
+}
+
+func mermaid(text string) string {
+	text = strings.TrimSpace(text)
+	text = strings.TrimPrefix(text, "```mermaid")
+	text = strings.TrimPrefix(text, "```")
+	text = strings.TrimSuffix(text, "```")
+	text = strings.TrimSpace(text)
+	idx := strings.Index(text, "flowchart")
+	if idx > 0 {
+		text = strings.TrimSpace(text[idx:])
+	}
+	if !strings.HasPrefix(text, "flowchart") {
+		return ""
+	}
+	return text
+}
+
+func hash(text string) string {
+	sum := sha256.Sum256([]byte(strings.TrimSpace(text)))
+	return hex.EncodeToString(sum[:])
 }
 
 func (s *Service) path(raw string) string {

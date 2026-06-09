@@ -4,6 +4,7 @@ import { Side } from "./features/side"
 import { StageView } from "./features/stage"
 import { usePanels } from "./hooks/use-panels"
 import { useWorkbenchAnalysisSync } from "./hooks/use-workbench-analysis"
+import { useWorkbenchFlowchartSync } from "./hooks/use-workbench-flowchart"
 import { useWorkbenchQuestionSync } from "./hooks/use-workbench-question"
 import { useWorkbenchSessionSync } from "./hooks/use-workbench-session-sync"
 import { Handle } from "./layout/handle"
@@ -14,6 +15,7 @@ export function Workbench() {
   useWorkbenchSessionSync()
   useWorkbenchQuestionSync()
   useWorkbenchAnalysisSync()
+  useWorkbenchFlowchartSync()
 
   const panel = usePanels()
 
