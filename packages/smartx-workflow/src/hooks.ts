@@ -28,6 +28,7 @@ type Dep = {
 type Save = {
   workspacePath: string
   worktreePath: string
+  state?: "running" | "done"
   items: string[]
   text: string
 }
@@ -94,6 +95,19 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
       if (!workspace || !id) return
       if (!analyze({ tool: input.tool, args: output.args })) return
       workspaces.set(id, freshAnalysis(workspace, worktree))
+      await save({
+        workspacePath: workspace,
+        worktreePath: worktree,
+        state: "running",
+        items: [],
+        text: "",
+      }).catch((err) =>
+        write("workspace analysis running notify failed", {
+          workspace,
+          worktree,
+          error: err instanceof Error ? err.message : String(err),
+        }),
+      )
       await write("workspace analysis started", {
         sessionID: input.sessionID,
         workspace,
@@ -105,20 +119,19 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
         const list = items(output.output)
         const text = numbered(list)
         workspaces.set(id, doneAnalysis(workspace, worktree, text, list))
-        if (list.length > 0) {
-          await save({
-            workspacePath: workspace,
-            worktreePath: worktree,
-            items: list,
-            text,
-          }).catch((err) =>
-            write("workspace analysis save failed", {
-              workspace,
-              worktree,
-              error: err instanceof Error ? err.message : String(err),
-            }),
-          )
-        }
+        await save({
+          workspacePath: workspace,
+          worktreePath: worktree,
+          state: "done",
+          items: list,
+          text,
+        }).catch((err) =>
+          write("workspace analysis save failed", {
+            workspace,
+            worktree,
+            error: err instanceof Error ? err.message : String(err),
+          }),
+        )
         await write("workspace analysis completed", {
           sessionID: input.sessionID,
           workspace,

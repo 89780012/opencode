@@ -227,6 +227,7 @@ func (s *Service) Identify(ctx context.Context, req IdentifyReq) (IdentifyRes, e
 func (s *Service) SaveAnalysis(ctx context.Context, req AnalysisReq) (AnalysisRow, error) {
 	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
 	req.WorktreePath = strings.TrimSpace(req.WorktreePath)
+	req.State = strings.TrimSpace(req.State)
 	req.Text = strings.TrimSpace(req.Text)
 	req.Items = clean(req.Items)
 	if req.WorkspacePath == "" {
@@ -235,6 +236,19 @@ func (s *Service) SaveAnalysis(ctx context.Context, req AnalysisReq) (AnalysisRo
 	if req.WorktreePath == "" {
 		req.WorktreePath = req.WorkspacePath
 	}
+	if req.State == "" {
+		req.State = "done"
+	}
+	if req.State != "done" {
+		return AnalysisRow{
+			WorkspacePath: req.WorkspacePath,
+			WorktreePath:  req.WorktreePath,
+			State:         req.State,
+			Items:         req.Items,
+			Text:          req.Text,
+			UpdatedAt:     time.Now().UnixMilli(),
+		}, nil
+	}
 	if len(req.Items) == 0 {
 		req.Items = items(req.Text)
 	}
@@ -242,7 +256,14 @@ func (s *Service) SaveAnalysis(ctx context.Context, req AnalysisReq) (AnalysisRo
 		req.Text = numbered(req.Items)
 	}
 	if len(req.Items) == 0 || req.Text == "" {
-		return AnalysisRow{}, fmt.Errorf("analysis is required")
+		return AnalysisRow{
+			WorkspacePath: req.WorkspacePath,
+			WorktreePath:  req.WorktreePath,
+			State:         "done",
+			Items:         req.Items,
+			Text:          req.Text,
+			UpdatedAt:     time.Now().UnixMilli(),
+		}, nil
 	}
 
 	body, err := json.Marshal(req.Items)
@@ -263,6 +284,7 @@ on conflict(workspace_path, worktree_path) do update set items = excluded.items,
 	return AnalysisRow{
 		WorkspacePath: req.WorkspacePath,
 		WorktreePath:  req.WorktreePath,
+		State:         "done",
 		Items:         req.Items,
 		Text:          req.Text,
 		UpdatedAt:     now,
@@ -296,6 +318,7 @@ func (s *Service) GetAnalysis(ctx context.Context, req AnalysisGet) (AnalysisRow
 		return AnalysisRow{}, err
 	}
 	row.Items = clean(row.Items)
+	row.State = "done"
 	return row, nil
 }
 

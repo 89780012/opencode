@@ -76,10 +76,7 @@ export function useWorkbenchQuestionSync() {
       if (!path) return
       socket.emit("question.list", { workspacePath: path })
     }
-    const off = [
-      socket.on("question.appended", refresh),
-      socket.on("session.updated", refresh),
-    ]
+    const off = [socket.on("question.appended", refresh), socket.on("session.updated", refresh)]
     return () => off.forEach((fn) => fn())
   }, [path])
 

@@ -11,7 +11,7 @@ import {
   Workflow,
 } from "lucide-react"
 import { useAppDispatch } from "@/store"
-import { setStage } from "@/store/workbench-slice"
+import { setStage, type WorkbenchAnalysis } from "@/store/workbench-slice"
 import { type SessionItem } from "../../data"
 import { Compact } from "../../layout/compact"
 import ui from "../../../shared/styles/ui.module.css"
@@ -70,8 +70,51 @@ function Progress(props: { cur: SessionItem }) {
   )
 }
 
+function Logic(props: { analysis: WorkbenchAnalysis | null }) {
+  if (!props.analysis) {
+    return (
+      <>
+        <p className={css.warn}>
+          <CircleAlert size={14} />
+          <span>暂未分析</span>
+        </p>
+        <p className={css.logic}>工作区策略逻辑分析尚未开始。</p>
+      </>
+    )
+  }
+  if (props.analysis.state === "running") {
+    return (
+      <>
+        <p className={css.warn}>
+          <LoaderCircle size={14} className={ui.spin} />
+          <span>正在分析</span>
+        </p>
+        <p className={css.logic}>workspace-analyzer 正在梳理当前工作区的策略运行逻辑。</p>
+      </>
+    )
+  }
+  if (props.analysis.items.length === 0) {
+    return (
+      <>
+        <p className={css.warn}>
+          <CircleAlert size={14} />
+          <span>暂无条目</span>
+        </p>
+        <p className={css.logic}>分析已完成，但没有返回可展示的策略逻辑条目。</p>
+      </>
+    )
+  }
+  return props.analysis.items.map((item, idx) => (
+    <div key={`${idx}-${item}`} className={css.reqrow}>
+      <span>{idx + 1}.</span>
+      <p>{item}</p>
+    </div>
+  ))
+}
+
 export function RequirementsTab(props: {
   cur: SessionItem
+  analysis: WorkbenchAnalysis | null
   open: Record<string, boolean>
   risk: string
   hint: string
@@ -111,12 +154,7 @@ export function RequirementsTab(props: {
         }
       >
         <div className={css.logicbox}>
-          <p className={css.warn}>
-            <CircleAlert size={14} />
-            <span>{props.risk}</span>
-          </p>
-          <p className={css.logic}>{props.hint}</p>
-          <p className={css.logic}>需求：{props.cur.currentRequirement}</p>
+          <Logic analysis={props.analysis} />
         </div>
       </Compact>
 
@@ -155,7 +193,7 @@ export function RequirementsTab(props: {
                   <span>{item.time}</span>
                 </div>
                 <p className={css.logic}>
-                  收益: {item.results.totalReturn} · 夏普: {item.results.sharpe}
+                  收益: {item.results.totalReturn} / 夏普: {item.results.sharpe}
                 </p>
               </button>
             ))

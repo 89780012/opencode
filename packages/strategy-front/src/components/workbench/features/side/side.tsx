@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 import { ClipboardList, MessageSquareMore, Sparkles } from "lucide-react"
-import { selectWorkbench, useAppSelector } from "@/store"
+import { selectWorkbench, selectWorkbenchAnalysis, useAppSelector } from "@/store"
 import { type SidebarTab } from "../../data"
 import css from "../../styles/side/side.module.css"
 import { RequirementsTab, SessionsTab } from "./side-tabs"
@@ -21,6 +21,7 @@ export function Side() {
   const state = useAppSelector(selectWorkbench)
   const [search] = useSearchParams()
   const path = search.get("path")?.trim() ?? ""
+  const analysis = useAppSelector((state) => selectWorkbenchAnalysis(state, path))
   const [tab, setTab] = useState<SidebarTab>("requirements")
   const [open, setOpen] = useState<Record<string, boolean>>(init)
   const flip = (key: string) => setOpen((state) => ({ ...state, [key]: !state[key] }))
@@ -59,6 +60,7 @@ export function Side() {
       ) : (
         <RequirementsTab
           cur={app.cur}
+          analysis={analysis}
           open={open}
           risk={app.risk}
           hint={app.hint}

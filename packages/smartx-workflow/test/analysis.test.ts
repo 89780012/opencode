@@ -118,6 +118,14 @@ describe("smartx workspace analysis", () => {
       {
         workspacePath: "f:/repo",
         worktreePath: "f:/repo",
+        state: "running",
+        items: [],
+        text: "",
+      },
+      {
+        workspacePath: "f:/repo",
+        worktreePath: "f:/repo",
+        state: "done",
         items: ["交易市场为A股。", "策略核心逻辑为网格交易。"],
         text: ["1.", "交易市场为A股。", "", "2.", "策略核心逻辑为网格交易。"].join("\n"),
       },

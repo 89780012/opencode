@@ -146,3 +146,9 @@ export function selectWorkbenchQuestions(state: RootState, path?: string | null)
   if (state.workbench.questionPath !== path) return empty
   return state.workbench.questions
 }
+
+export function selectWorkbenchAnalysis(state: RootState, path?: string | null) {
+  if (!path) return null
+  if (state.workbench.analysisPath !== path) return null
+  return state.workbench.analysis
+}

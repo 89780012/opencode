@@ -21,11 +21,22 @@ export type WorkbenchQuestion = {
   name?: string
 }
 
+export type WorkbenchAnalysis = {
+  workspacePath: string
+  worktreePath: string
+  state: "idle" | "running" | "done"
+  items: string[]
+  text: string
+  updatedAt: number
+}
+
 type State = {
   sessions: WorkbenchSession[]
   sessionPath: string
   questions: WorkbenchQuestion[]
   questionPath: string
+  analysis: WorkbenchAnalysis | null
+  analysisPath: string
   requirements: string[]
   active: string
   stage: Stage
@@ -36,6 +47,8 @@ const initialState: State = {
   sessionPath: "",
   questions: [],
   questionPath: "",
+  analysis: null,
+  analysisPath: "",
   requirements: [],
   active: "",
   stage: "session",
@@ -60,6 +73,10 @@ const slice = createSlice({
     setQuestions(state, action: PayloadAction<{ workspacePath: string; questions: WorkbenchQuestion[] }>) {
       state.questionPath = action.payload.workspacePath
       state.questions = action.payload.questions
+    },
+    setAnalysis(state, action: PayloadAction<{ workspacePath: string; analysis: WorkbenchAnalysis | null }>) {
+      state.analysisPath = action.payload.workspacePath
+      state.analysis = action.payload.analysis
     },
     upsertSession(state, action: PayloadAction<{ session: WorkbenchSession }>) {
       const idx = state.sessions.findIndex((item) => item.id === action.payload.session.id)
@@ -97,6 +114,7 @@ const slice = createSlice({
 export const {
   deleteQuestion,
   deleteSession,
+  setAnalysis,
   setActive,
   setQuestions,
   setRequirements,

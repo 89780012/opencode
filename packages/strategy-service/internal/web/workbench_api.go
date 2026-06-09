@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"strategy-service/internal/db"
+	"strategy-service/internal/utils"
 	"strategy-service/internal/workbench"
 
 	"github.com/gin-gonic/gin"
@@ -58,5 +59,6 @@ func (a *API) workbenchAnalysisPut(c *gin.Context) {
 		return
 	}
 
+	a.event.emitBroadcast("analysis.updated", utils.Pack(data))
 	ok(c, data)
 }

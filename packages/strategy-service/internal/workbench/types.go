@@ -75,18 +75,20 @@ type IdentifyRes struct {
 type AnalysisReq struct {
 	WorkspacePath string   `json:"workspacePath"`
 	WorktreePath  string   `json:"worktreePath"`
+	State         string   `json:"state,omitempty"`
 	Items         []string `json:"items"`
 	Text          string   `json:"text"`
 }
 
 type AnalysisGet struct {
-	WorkspacePath string `form:"workspacePath"`
-	WorktreePath  string `form:"worktreePath"`
+	WorkspacePath string `form:"workspacePath" json:"workspacePath"`
+	WorktreePath  string `form:"worktreePath" json:"worktreePath"`
 }
 
 type AnalysisRow struct {
 	WorkspacePath string   `json:"workspacePath"`
 	WorktreePath  string   `json:"worktreePath"`
+	State         string   `json:"state"`
 	Items         []string `json:"items"`
 	Text          string   `json:"text"`
 	UpdatedAt     int64    `json:"updatedAt"`
