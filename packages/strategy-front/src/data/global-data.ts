@@ -7,7 +7,7 @@ import {
   useReducer,
   useRef,
 } from "react"
-import { agentApi, mcpApi, providerApi, skillApi } from "@/api/modules"
+import { agentApi, mcpApi, modelChainApi, providerApi, skillApi } from "@/api/modules"
 import { note } from "@/lib/error"
 import { latestModels, modelKey, modelVisible, normalizeModelChain, readModelVisibility } from "@/lib/model-catalog"
 import type { GlobalAgentCatalog, RuntimeAgent } from "@/types/agent"
@@ -328,6 +328,7 @@ async function loadSkill(): Promise<Out<SkillData>> {
 export function useGlobalDataValue() {
   const [state, dispatch] = useReducer(reduce, undefined, initState)
   const ref = useRef(state)
+  const chain = useRef("")
   const seq = useRef<Record<Key, number>>({
     agent: 0,
     provider: 0,
@@ -467,6 +468,28 @@ export function useGlobalDataValue() {
       clearTimeout(timer)
     }
   }, [ensure])
+
+  useEffect(() => {
+    if (!state.provider.ready) return
+
+    const list = state.provider.data.chainModels.map((item) => ({
+      providerID: item.provider.id,
+      modelID: item.id,
+    }))
+    const sig = list.map((item) => `${item.providerID}:${item.modelID}`).join("|")
+    if (!sig || chain.current === sig) return
+
+    chain.current = sig
+    void modelChainApi
+      .get()
+      .then((cfg) => {
+        if (cfg.chain.length > 0) return
+        return modelChainApi.save({ chain: list })
+      })
+      .catch(() => {
+        chain.current = ""
+      })
+  }, [state.provider.data.chainModels, state.provider.ready])
 
   return useMemo(
     () => ({

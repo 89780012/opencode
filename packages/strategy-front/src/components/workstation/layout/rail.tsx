@@ -24,7 +24,7 @@ export function Rail(props: { page: "bench" | "settings"; onPage: (page: "bench"
           aria-pressed={props.page === "settings"}
         >
           <Settings size={16} />
-          {/*<span className={shell.navtxt}>设置</span>*/}
+          <span className={shell.navtxt}>设置</span>
         </button>
       </div>
     </aside>

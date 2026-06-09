@@ -228,17 +228,15 @@ function proc(parts: ChatPart[]) {
   ) {
     return "running"
   }
-  if (body.some((part) => (part.type === "tool" && part.state.status === "error") || part.type === "retry")) {
-    return "error"
-  }
   return "done"
 }
 
 function meta(parts: ChatPart[]) {
   const body = parts.filter(shown)
   const tools = body.filter((part): part is ChatToolPart => part.type === "tool").length
+  const fail = body.filter((part) => (part.type === "tool" && part.state.status === "error") || part.type === "retry").length
   if (!tools) return `${body.length} 步`
-  return `${body.length} 步 · ${tools} 个工具`
+  return `${body.length} 步 · ${tools} 个工具${fail ? ` · ${fail} 个失败` : ""}`
 }
 
 function Process(props: { parts: ChatPart[]; onOpenDiff?: (file: string) => void }) {
@@ -246,7 +244,7 @@ function Process(props: { parts: ChatPart[]; onOpenDiff?: (file: string) => void
   if (parts.length === 0) return null
 
   return (
-    <Fold title="执行过程" line={false} meta={meta(props.parts)} state={proc(props.parts)}>
+    <Fold title="执行过程" meta={meta(props.parts)} state={proc(props.parts)}>
       <div className={css.process}>
         {parts.map((part) => (
           <Part key={part.id} part={part} role="assistant" onOpenDiff={props.onOpenDiff} />

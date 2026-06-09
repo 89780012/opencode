@@ -290,6 +290,28 @@
   margin: 0.18rem 0;
 }
 
+.markdown :global(blockquote) {
+  margin: 0.4rem 0 0.72rem;
+  border-left: 3px solid #64748b;
+  border-radius: 0.36rem;
+  background: #eef2f7;
+  color: #1f2937;
+  padding: 0.52rem 0.72rem;
+}
+
+.markdown :global(blockquote p),
+.markdown :global(blockquote li) {
+  color: #1f2937;
+}
+
+.markdown :global(blockquote strong) {
+  color: #111827;
+}
+
+.markdown :global(blockquote:last-child) {
+  margin-bottom: 0;
+}
+
 .markdown :global(code) {
   border: 1px solid #d1d5db;
   border-radius: 0.3rem;
@@ -641,6 +663,10 @@
 
 .process .foldbody {
   margin-top: 0.22rem;
+}
+
+.fold > .foldbody > .process {
+  margin-left: 0;
 }
 
 .thought {
