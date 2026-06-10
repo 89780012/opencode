@@ -19,6 +19,8 @@ function parse(value: unknown): WorkbenchFlowchart | null {
     state,
     code: typeof value.code === "string" ? value.code : "",
     err: typeof value.err === "string" ? value.err : "",
+    manual: value.manual === true,
+    source: value.source === "manual" ? "manual" : "ai",
     updatedAt: typeof value.updatedAt === "number" ? value.updatedAt : 0,
   }
 }

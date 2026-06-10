@@ -141,6 +141,8 @@ var schema = []string{
 	state text not null,
 	code text not null,
 	err text not null,
+	manual integer not null default 0,
+	source text not null default 'ai',
 	updated_at integer not null,
 	primary key(workspace_path, worktree_path)
 )`,

@@ -43,7 +43,13 @@ export function StageView() {
         )
       ) : null}
       {stage.stage === "flowchart" ? (
-        <Flow cur={stage.cur} id={stage.active} onRun={() => void stage.backtest()} />
+        <Flow
+          cur={stage.cur}
+          flow={stage.flowchart}
+          id={stage.active}
+          onRun={() => void stage.backtest()}
+          onSave={stage.saveFlowchart}
+        />
       ) : null}
       {stage.stage === "code" ? (
         <CodePanel

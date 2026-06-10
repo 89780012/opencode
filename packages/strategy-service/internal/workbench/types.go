@@ -101,6 +101,8 @@ type FlowchartReq struct {
 	Code          string `json:"code"`
 	Err           string `json:"err,omitempty"`
 	AnalysisHash  string `json:"analysisHash,omitempty"`
+	Manual        bool   `json:"manual,omitempty"`
+	Source        string `json:"source,omitempty"`
 }
 
 type FlowchartGet struct {
@@ -115,5 +117,7 @@ type FlowchartRow struct {
 	Code          string `json:"code"`
 	Err           string `json:"err,omitempty"`
 	AnalysisHash  string `json:"analysisHash,omitempty"`
+	Manual        bool   `json:"manual"`
+	Source        string `json:"source"`
 	UpdatedAt     int64  `json:"updatedAt"`
 }

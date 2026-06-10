@@ -14,8 +14,31 @@ export type Analyze = {
   model: string
 }
 
+export type Flowchart = {
+  workspacePath: string
+  worktreePath: string
+  state: "generating" | "done" | "error"
+  code: string
+  err?: string
+  manual: boolean
+  source: "ai" | "manual"
+  updatedAt: number
+}
+
+export type FlowchartSave = {
+  workspacePath: string
+  worktreePath: string
+  state?: "done"
+  code: string
+  manual: true
+  source: "manual"
+}
+
 export const workbenchApi = {
   identify(message: string) {
     return request.post<Analyze, { message: string }>("/workbench/requirements/identify", { message }, { timeout: 60000 })
+  },
+  saveFlowchart(input: FlowchartSave) {
+    return request.post<Flowchart, FlowchartSave>("/workbench/flowchart", { ...input, state: input.state ?? "done" })
   },
 }

@@ -37,6 +37,8 @@ export type WorkbenchFlowchart = {
   state: "idle" | "generating" | "done" | "error"
   code: string
   err: string
+  manual: boolean
+  source: "ai" | "manual"
   updatedAt: number
 }
 

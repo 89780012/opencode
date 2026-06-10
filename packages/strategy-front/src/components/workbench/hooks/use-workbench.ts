@@ -92,6 +92,7 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
   return {
     active: state.active,
     stage: state.stage,
+    flow,
     cur,
     last,
     risk,

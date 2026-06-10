@@ -50,6 +50,42 @@
   gap: 0.4rem;
 }
 
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  height: 1.75rem;
+  padding: 0.16rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  background: #f8fafc;
+}
+
+.switch button {
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  border: 0;
+  border-radius: 0.34rem;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0 0.42rem;
+  white-space: nowrap;
+}
+
+.switch button:hover {
+  color: #0f172a;
+  background: #ffffff;
+}
+
+.switch .switch_on {
+  color: #ffffff;
+  background: #0f172a;
+}
+
 .toolbtn {
   display: inline-flex;
   align-items: center;
@@ -61,7 +97,9 @@
   background: #ffffff;
   color: #475569;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
 }
 
 .toolbtn:hover {
@@ -76,6 +114,71 @@
   font-size: 0.72rem;
   font-weight: 600;
   color: #475569;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  height: 1.1rem;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.62rem;
+  font-style: normal;
+  font-weight: 600;
+  padding: 0 0.44rem;
+  white-space: nowrap;
+}
+
+.sourcebox {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #d7e1ed;
+  border-radius: 0.75rem;
+  background: #111827;
+}
+
+.source {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  resize: none;
+  border: 0;
+  outline: 0;
+  background: #111827;
+  color: #dbeafe;
+  font-family: var(--font-code);
+  font-size: 0.78rem;
+  line-height: 1.7;
+  padding: 1rem 1.1rem;
+  tab-size: 2;
+}
+
+.status {
+  min-height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.22);
+  background: #0f172a;
+  color: #94a3b8;
+  font-size: 0.68rem;
+  padding: 0.42rem 0.68rem;
+}
+
+.status strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #fecaca;
+  font-size: 0.68rem;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .metrics {

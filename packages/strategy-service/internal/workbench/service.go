@@ -342,10 +342,15 @@ func (s *Service) GetFlowchart(ctx context.Context, req FlowchartGet) (Flowchart
 		return FlowchartRow{}, err
 	}
 	var row FlowchartRow
-	err = doc.QueryRowContext(ctx, `select workspace_path, worktree_path, analysis_hash, state, code, err, updated_at from workspace_flowcharts where workspace_path = ? and worktree_path = ?`,
-		req.WorkspacePath, req.WorktreePath).Scan(&row.WorkspacePath, &row.WorktreePath, &row.AnalysisHash, &row.State, &row.Code, &row.Err, &row.UpdatedAt)
+	var manual int
+	err = doc.QueryRowContext(ctx, `select workspace_path, worktree_path, analysis_hash, state, code, err, manual, source, updated_at from workspace_flowcharts where workspace_path = ? and worktree_path = ?`,
+		req.WorkspacePath, req.WorktreePath).Scan(&row.WorkspacePath, &row.WorktreePath, &row.AnalysisHash, &row.State, &row.Code, &row.Err, &manual, &row.Source, &row.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return FlowchartRow{}, db.ErrNotFound
+	}
+	row.Manual = manual != 0
+	if row.Source == "" {
+		row.Source = "ai"
 	}
 	return row, err
 }
@@ -356,6 +361,7 @@ func (s *Service) SaveFlowchart(ctx context.Context, req FlowchartReq) (Flowchar
 	req.State = strings.TrimSpace(req.State)
 	req.Code = mermaid(req.Code)
 	req.Err = strings.TrimSpace(req.Err)
+	req.Source = strings.TrimSpace(req.Source)
 	if req.WorkspacePath == "" {
 		return FlowchartRow{}, fmt.Errorf("workspacePath is required")
 	}
@@ -371,6 +377,11 @@ func (s *Service) SaveFlowchart(ctx context.Context, req FlowchartReq) (Flowchar
 	if req.State != "generating" && req.State != "done" && req.State != "error" {
 		return FlowchartRow{}, fmt.Errorf("invalid flowchart state")
 	}
+	manual := req.Manual || req.Source == "manual"
+	source := "ai"
+	if manual {
+		source = "manual"
+	}
 	sum := strings.TrimSpace(req.AnalysisHash)
 	if sum == "" {
 		analysis, err := s.GetAnalysis(ctx, AnalysisGet{WorkspacePath: req.WorkspacePath, WorktreePath: req.WorktreePath})
@@ -385,6 +396,8 @@ func (s *Service) SaveFlowchart(ctx context.Context, req FlowchartReq) (Flowchar
 		Code:          req.Code,
 		Err:           req.Err,
 		AnalysisHash:  sum,
+		Manual:        manual,
+		Source:        source,
 		UpdatedAt:     time.Now().UnixMilli(),
 	}
 	if err := s.saveFlow(ctx, row); err != nil {
@@ -398,9 +411,9 @@ func (s *Service) saveFlow(ctx context.Context, row FlowchartRow) error {
 	if err != nil {
 		return err
 	}
-	_, err = doc.ExecContext(ctx, `insert into workspace_flowcharts(workspace_path, worktree_path, analysis_hash, state, code, err, updated_at) values (?, ?, ?, ?, ?, ?, ?)
-on conflict(workspace_path, worktree_path) do update set analysis_hash = excluded.analysis_hash, state = excluded.state, code = excluded.code, err = excluded.err, updated_at = excluded.updated_at`,
-		row.WorkspacePath, row.WorktreePath, row.AnalysisHash, row.State, row.Code, row.Err, row.UpdatedAt)
+	_, err = doc.ExecContext(ctx, `insert into workspace_flowcharts(workspace_path, worktree_path, analysis_hash, state, code, err, manual, source, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+on conflict(workspace_path, worktree_path) do update set analysis_hash = excluded.analysis_hash, state = excluded.state, code = excluded.code, err = excluded.err, manual = excluded.manual, source = excluded.source, updated_at = excluded.updated_at`,
+		row.WorkspacePath, row.WorktreePath, row.AnalysisHash, row.State, row.Code, row.Err, row.Manual, row.Source, row.UpdatedAt)
 	return err
 }
 
