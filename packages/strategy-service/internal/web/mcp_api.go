@@ -1,13 +1,18 @@
 package web
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"strategy-service/internal/db"
 	"strategy-service/internal/smartx"
+	"strategy-service/internal/utils"
+	"strategy-service/internal/workbench"
 
 	"github.com/gin-gonic/gin"
 )
@@ -53,7 +58,7 @@ func (a *API) mcpPost(c *gin.Context) {
 				"name":    "strategy-service",
 				"version": "dev",
 			},
-			"instructions": "Use start to launch SmartX strategies and logs to inspect recent strategy logs.",
+			"instructions": "Use start/logs for SmartX runtime work and save_analysis/save_flowchart to persist workspace analysis results.",
 		})
 	case "notifications/initialized":
 		c.Status(202)
@@ -103,6 +108,53 @@ func (a *API) mcpPost(c *gin.Context) {
 						"additionalProperties": false,
 					},
 				},
+				{
+					"name":        "save_analysis",
+					"description": "Persist workspace strategy analysis results. Always provide both items and text, and write all analysis content in Chinese.",
+					"inputSchema": schema(map[string]any{
+						"workspacePath": prop("string", "Workspace path."),
+						"worktreePath":  prop("string", "Worktree path. Defaults to workspacePath."),
+						"state":         prop("string", "Analysis state: running or done."),
+						"items": map[string]any{
+							"type":        "array",
+							"description": "Required Chinese analysis items. Use concise Chinese strings.",
+							"items": map[string]any{
+								"type": "string",
+							},
+						},
+						"text": prop("string", "Required serialized analysis text in Chinese. Keep it consistent with items."),
+					}, []string{"workspacePath", "items", "text"}),
+				},
+				{
+					"name":        "get_analysis",
+					"description": "Read persisted workspace strategy analysis.",
+					"inputSchema": schema(map[string]any{
+						"workspacePath": prop("string", "Workspace path."),
+						"worktreePath":  prop("string", "Worktree path. Defaults to workspacePath."),
+					}, []string{"workspacePath"}),
+				},
+				{
+					"name":        "save_flowchart",
+					"description": "Persist workspace strategy flowchart Mermaid code.",
+					"inputSchema": schema(map[string]any{
+						"workspacePath": prop("string", "Workspace path."),
+						"worktreePath":  prop("string", "Worktree path. Defaults to workspacePath."),
+						"state":         prop("string", "Flowchart state: generating, done, or error."),
+						"code":          prop("string", "Mermaid flowchart code."),
+						"err":           prop("string", "Error text when state is error."),
+						"analysisHash":  prop("string", "Optional analysis hash."),
+						"manual":        prop("boolean", "Whether this flowchart was manually edited."),
+						"source":        prop("string", "Flowchart source."),
+					}, []string{"workspacePath"}),
+				},
+				{
+					"name":        "get_flowchart",
+					"description": "Read persisted workspace strategy flowchart.",
+					"inputSchema": schema(map[string]any{
+						"workspacePath": prop("string", "Workspace path."),
+						"worktreePath":  prop("string", "Worktree path. Defaults to workspacePath."),
+					}, []string{"workspacePath"}),
+				},
 			},
 		})
 	case "tools/call":
@@ -141,11 +193,85 @@ func (a *API) mcpPost(c *gin.Context) {
 				"logs":    out.Logs,
 			}
 			mcpToolResult(c, req.ID, jsonText(body), body, false)
+		case "save_analysis":
+			mcpWorkbench(c.Request.Context(), req.ID, c, func(ctx context.Context) (any, error) {
+				data, err := a.bench.SaveAnalysis(ctx, workbench.AnalysisReq{
+					WorkspacePath: text(args["workspacePath"]),
+					WorktreePath:  text(args["worktreePath"]),
+					State:         text(args["state"]),
+					Items:         texts(args["items"]),
+					Text:          text(args["text"]),
+				})
+				if err == nil {
+					a.event.emitBroadcast("analysis.updated", utils.Pack(data))
+				}
+				return data, err
+			})
+		case "get_analysis":
+			mcpWorkbench(c.Request.Context(), req.ID, c, func(ctx context.Context) (any, error) {
+				return a.bench.GetAnalysis(ctx, workbench.AnalysisGet{
+					WorkspacePath: text(args["workspacePath"]),
+					WorktreePath:  text(args["worktreePath"]),
+				})
+			})
+		case "save_flowchart":
+			mcpWorkbench(c.Request.Context(), req.ID, c, func(ctx context.Context) (any, error) {
+				data, err := a.bench.SaveFlowchart(ctx, workbench.FlowchartReq{
+					WorkspacePath: text(args["workspacePath"]),
+					WorktreePath:  text(args["worktreePath"]),
+					State:         text(args["state"]),
+					Code:          text(args["code"]),
+					Err:           text(args["err"]),
+					AnalysisHash:  text(args["analysisHash"]),
+					Manual:        boolean(args["manual"]),
+					Source:        text(args["source"]),
+				})
+				if err == nil {
+					a.event.emitBroadcast("flowchart.updated", utils.Pack(data))
+				}
+				return data, err
+			})
+		case "get_flowchart":
+			mcpWorkbench(c.Request.Context(), req.ID, c, func(ctx context.Context) (any, error) {
+				return a.bench.GetFlowchart(ctx, workbench.FlowchartGet{
+					WorkspacePath: text(args["workspacePath"]),
+					WorktreePath:  text(args["worktreePath"]),
+				})
+			})
 		default:
 			mcpError(c, req.ID, -32601, "Method not found")
 		}
 	default:
 		mcpError(c, req.ID, -32601, "Method not found")
+	}
+}
+
+func mcpWorkbench(ctx context.Context, id any, c *gin.Context, run func(context.Context) (any, error)) {
+	body, err := run(ctx)
+	if errors.Is(err, db.ErrNotFound) {
+		mcpToolResult(c, id, "null", nil, false)
+		return
+	}
+	if err != nil {
+		mcpToolResult(c, id, err.Error(), nil, true)
+		return
+	}
+	mcpToolResult(c, id, jsonText(body), body, false)
+}
+
+func schema(props map[string]any, required []string) map[string]any {
+	return map[string]any{
+		"type":                 "object",
+		"properties":           props,
+		"required":             required,
+		"additionalProperties": false,
+	}
+}
+
+func prop(kind string, desc string) map[string]any {
+	return map[string]any{
+		"type":        kind,
+		"description": desc,
 	}
 }
 
@@ -195,6 +321,29 @@ func text(v any) string {
 		return strings.TrimSpace(x)
 	default:
 		return ""
+	}
+}
+
+func texts(v any) []string {
+	list, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(list))
+	for _, item := range list {
+		out = append(out, text(item))
+	}
+	return out
+}
+
+func boolean(v any) bool {
+	switch x := v.(type) {
+	case bool:
+		return x
+	case string:
+		return strings.EqualFold(strings.TrimSpace(x), "true")
+	default:
+		return false
 	}
 }
 

@@ -90,7 +90,7 @@ function blocks(parts: ChatPart[], role: ChatMessageInfo["role"]) {
           ? state.list
           : state.list.concat({
               type: "proc",
-              key: state.logs.map((item) => item.id).join(":"),
+              key: state.logs[0]?.id ?? "",
               parts: state.logs,
             })
       return {
@@ -103,7 +103,7 @@ function blocks(parts: ChatPart[], role: ChatMessageInfo["role"]) {
   if (done.logs.length === 0) return done.list
   return done.list.concat({
     type: "proc",
-    key: done.logs.map((item) => item.id).join(":"),
+    key: done.logs[0]?.id ?? "",
     parts: done.logs,
   })
 }
@@ -448,7 +448,7 @@ export function SessionMessageList(props: {
         {entries(props.messages).map((item) => (
           item.type === "group" ? (
             <Group
-              key={`${item.parent}:${item.infos.map((info) => info.id).join(",")}`}
+              key={`${item.parent}:${item.infos[0]?.id ?? ""}`}
               infos={item.infos}
               onOpenDiff={props.onOpenDiff}
             />

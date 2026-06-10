@@ -1,11 +1,11 @@
 import type { Hooks } from "@opencode-ai/plugin"
 import {
   analyze,
-  doneChart,
   doneAnalysis,
+  doneChart,
   flowchart,
-  freshChart,
   freshAnalysis,
+  freshChart,
   items,
   mermaid,
   noteAnalysis,
@@ -22,6 +22,7 @@ import {
 type System = NonNullable<Hooks["experimental.chat.system.transform"]>
 type Before = NonNullable<Hooks["tool.execute.before"]>
 type After = NonNullable<Hooks["tool.execute.after"]>
+type Log = (message: string, extra?: Record<string, unknown>) => Promise<void>
 
 export type Save = {
   workspacePath: string
@@ -47,31 +48,122 @@ type ChartRow = SaveChart & {
   updatedAt: number
 }
 
-type Log = (message: string, extra?: Record<string, unknown>) => Promise<void>
+export type Pending =
+  | {
+      kind: "analysis"
+      workspacePath: string
+      worktreePath: string
+      items: string[]
+      text: string
+    }
+  | {
+      kind: "flowchart"
+      workspacePath: string
+      worktreePath: string
+      state: "done" | "error"
+      code: string
+      err: string
+    }
 
 type Opt = {
   workspaces: Map<string, Analysis>
   charts: Map<string, Chart>
+  pending: Map<string, Pending>
   workspace: string
   worktree: string
   id: string
-  save: (input: Save) => Promise<void>
-  chart: (input: SaveChart) => Promise<void>
   load: (workspace: string, worktree: string) => Promise<Analysis | undefined>
   loadChart: (workspace: string, worktree: string) => Promise<Chart | undefined>
   write: Log
 }
 
+function mcp(input: { tool: string }, name: string) {
+  return input.tool === name || input.tool.endsWith("_" + name)
+}
+
+function ok(output: unknown) {
+  if (!output || typeof output !== "object") return true
+  if (!("isError" in output)) return true
+  return output.isError !== true
+}
+
+function same(input: unknown, workspace: string, worktree: string) {
+  if (!input || typeof input !== "object") return false
+  const args = input as Record<string, unknown>
+  return (
+    args.workspacePath === workspace && (args.worktreePath === worktree || (!args.worktreePath && worktree === workspace))
+  )
+}
+
+function noteSave(input: Pending) {
+  if (input.kind === "analysis") {
+    return [
+      "The workspace analysis task has completed. Before continuing, call the strategy-service MCP tool `smartx_save_analysis` with exactly this JSON argument:",
+      JSON.stringify(
+        {
+          workspacePath: input.workspacePath,
+          worktreePath: input.worktreePath,
+          state: "done",
+          items: input.items,
+          text: input.text,
+        },
+        null,
+        2,
+      ),
+      "After the MCP tool succeeds, continue with the current task.",
+    ].join("\n")
+  }
+  return [
+    "The strategy flowchart task has completed. Before continuing, call the strategy-service MCP tool `smartx_save_flowchart` with exactly this JSON argument:",
+    JSON.stringify(
+      {
+        workspacePath: input.workspacePath,
+        worktreePath: input.worktreePath,
+        state: input.state,
+        code: input.code,
+        err: input.err,
+      },
+      null,
+      2,
+    ),
+    "After the MCP tool succeeds, continue with the current task.",
+  ].join("\n")
+}
+
 export function createWorkspace(opt: Opt) {
   return {
-    transform: async (input: Parameters<System>[0], output: Parameters<System>[1]) => {
+    system: async (input: Parameters<System>[0], output: Parameters<System>[1]) => {
       if (!opt.workspace || !opt.id) return false
 
-      // 工作区门禁是跨 session 的：同一个 workspace/worktree 只需要先完成一次 analyzer。
       const found = opt.workspaces.get(opt.id) ?? (await opt.load(opt.workspace, opt.worktree).catch(() => undefined))
       if (found && validAnalysis(found)) opt.workspaces.set(opt.id, found)
       if (found && !validAnalysis(found)) opt.workspaces.delete(opt.id)
+
       const analysis = opt.workspaces.get(opt.id)
+      const row =
+        analysis?.state === "done"
+          ? (opt.charts.get(opt.id) ?? (await opt.loadChart(opt.workspace, opt.worktree).catch(() => undefined)))
+          : undefined
+      if (row && validChart(row)) opt.charts.set(opt.id, row)
+      if (row && !validChart(row)) opt.charts.delete(opt.id)
+
+      const wait = opt.pending.get(opt.id)
+
+      // true 情况 1：子 agent 已产出结果，但还没通过 strategy-service MCP 持久化。
+      // 这时优先提示主 agent 调用 save_analysis/save_flowchart，避免继续推进后续门禁。
+      if (wait) {
+        await opt.write("workspace mcp save reminder injected", {
+          sessionID: input.sessionID,
+          workspace: opt.workspace,
+          worktree: opt.worktree,
+          kind: wait.kind,
+        })
+        output.system.push(noteSave(wait))
+        return true
+      }
+
+      // true 情况 2：当前 workspace/worktree 还没有完成策略运行逻辑分析。
+      // 注入 workspace-analyzer 门禁，让主 agent 先启动分析子 agent。
       if (!analysis || analysis.state === "requested") {
         if (!analysis) opt.workspaces.set(opt.id, requestAnalysis(opt.workspace, opt.worktree))
         await opt.write("workspace analysis gate injected", {
@@ -84,42 +176,30 @@ export function createWorkspace(opt: Opt) {
         return true
       }
 
-      if (analysis.state !== "done") return false
-
-      // analyzer 完成后，flowchart 是第二道门禁；它优先于普通日志/debug 配对提醒。
-      const row = opt.charts.get(opt.id) ?? (await opt.loadChart(opt.workspace, opt.worktree).catch(() => undefined))
-      if (row && validChart(row)) opt.charts.set(opt.id, row)
-      if (row && !validChart(row)) opt.charts.delete(opt.id)
+      // true 情况 3：分析已完成，但流程图还没有生成或处于 requested。
+      // 注入 strategy-flowchart-generator 门禁，让主 agent 生成 Mermaid 流程图。
       const chart = opt.charts.get(opt.id)
-      if (chart && chart.state !== "requested") return false
-      if (!chart) opt.charts.set(opt.id, requestChart(opt.workspace, opt.worktree))
-      await opt.write("workspace flowchart gate injected", {
-        sessionID: input.sessionID,
-        workspace: opt.workspace,
-        worktree: opt.worktree,
-        state: chart?.state ?? "missing",
-      })
-      output.system.push(noteChart(analysis))
-      return true
+      if (analysis.state === "done" && (!chart || chart.state === "requested")) {
+        if (!chart) opt.charts.set(opt.id, requestChart(opt.workspace, opt.worktree))
+        await opt.write("workspace flowchart gate injected", {
+          sessionID: input.sessionID,
+          workspace: opt.workspace,
+          worktree: opt.worktree,
+          state: chart?.state ?? "missing",
+        })
+        output.system.push(noteChart(analysis))
+        return true
+      }
+
+      return false
     },
     before: async (input: Parameters<Before>[0], output: Parameters<Before>[1]) => {
       if (!opt.workspace || !opt.id) return false
+
+      // true 情况 1：主 agent 正在启动流程图子 agent。
+      // 记录 flowchart 进入 generating 状态，后续 after 会接收子 agent 输出。
       if (flowchart({ tool: input.tool, args: output.args })) {
         opt.charts.set(opt.id, freshChart(opt.workspace, opt.worktree))
-        await opt
-          .chart({
-            workspacePath: opt.workspace,
-            worktreePath: opt.worktree,
-            state: "generating",
-            code: "",
-          })
-          .catch((err) =>
-            opt.write("workspace flowchart generating notify failed", {
-              workspace: opt.workspace,
-              worktree: opt.worktree,
-              error: err instanceof Error ? err.message : String(err),
-            }),
-          )
         await opt.write("workspace flowchart started", {
           sessionID: input.sessionID,
           workspace: opt.workspace,
@@ -127,32 +207,50 @@ export function createWorkspace(opt: Opt) {
         })
         return true
       }
-      if (!analyze({ tool: input.tool, args: output.args })) return false
-      opt.workspaces.set(opt.id, freshAnalysis(opt.workspace, opt.worktree))
-      await opt
-        .save({
-          workspacePath: opt.workspace,
-          worktreePath: opt.worktree,
-          state: "running",
-          items: [],
-          text: "",
+
+      // true 情况 2：主 agent 正在启动分析子 agent。
+      // 记录 analysis 进入 running 状态，避免系统提示重复要求启动 analyzer。
+      if (analyze({ tool: input.tool, args: output.args })) {
+        opt.workspaces.set(opt.id, freshAnalysis(opt.workspace, opt.worktree))
+        await opt.write("workspace analysis started", {
+          sessionID: input.sessionID,
+          workspace: opt.workspace,
+          worktree: opt.worktree,
         })
-        .catch((err) =>
-          opt.write("workspace analysis running notify failed", {
-            workspace: opt.workspace,
-            worktree: opt.worktree,
-            error: err instanceof Error ? err.message : String(err),
-          }),
-        )
-      await opt.write("workspace analysis started", {
-        sessionID: input.sessionID,
-        workspace: opt.workspace,
-        worktree: opt.worktree,
-      })
-      return true
+        return true
+      }
+
+      return false
     },
     after: async (input: Parameters<After>[0], output: Parameters<After>[1]) => {
       if (!opt.workspace || !opt.id) return false
+
+      // true 情况 1：主 agent 已成功调用 MCP 保存 analysis。
+      // 清理 analysis pending，下一轮 system 才能继续推进 flowchart 门禁。
+      if (mcp(input, "save_analysis") && same(input.args, opt.workspace, opt.worktree) && ok(output)) {
+        if (opt.pending.get(opt.id)?.kind === "analysis") opt.pending.delete(opt.id)
+        await opt.write("workspace analysis saved through mcp", {
+          sessionID: input.sessionID,
+          workspace: opt.workspace,
+          worktree: opt.worktree,
+        })
+        return true
+      }
+
+      // true 情况 2：主 agent 已成功调用 MCP 保存 flowchart。
+      // 清理 flowchart pending，workspace 门禁链路到这里就完成。
+      if (mcp(input, "save_flowchart") && same(input.args, opt.workspace, opt.worktree) && ok(output)) {
+        if (opt.pending.get(opt.id)?.kind === "flowchart") opt.pending.delete(opt.id)
+        await opt.write("workspace flowchart saved through mcp", {
+          sessionID: input.sessionID,
+          workspace: opt.workspace,
+          worktree: opt.worktree,
+        })
+        return true
+      }
+
+      // true 情况 3：流程图子 agent 调用结束。
+      // 解析 Mermaid，记录到本地缓存，并生成待 MCP 保存任务。
       if (flowchart(input)) {
         const code = mermaid(output.output)
         const state = code ? ("done" as const) : ("error" as const)
@@ -164,21 +262,14 @@ export function createWorkspace(opt: Opt) {
               err: "flowchart result is empty",
             }
         opt.charts.set(opt.id, next)
-        await opt
-          .chart({
-            workspacePath: opt.workspace,
-            worktreePath: opt.worktree,
-            state,
-            code: next.code,
-            err: next.err,
-          })
-          .catch((err) =>
-            opt.write("workspace flowchart save failed", {
-              workspace: opt.workspace,
-              worktree: opt.worktree,
-              error: err instanceof Error ? err.message : String(err),
-            }),
-          )
+        opt.pending.set(opt.id, {
+          kind: "flowchart",
+          workspacePath: opt.workspace,
+          worktreePath: opt.worktree,
+          state,
+          code: next.code,
+          err: next.err,
+        })
         await opt.write("workspace flowchart completed", {
           sessionID: input.sessionID,
           workspace: opt.workspace,
@@ -187,33 +278,31 @@ export function createWorkspace(opt: Opt) {
         })
         return true
       }
-      if (!analyze(input)) return false
-      const list = items(output.output)
-      const text = serial(list)
-      opt.workspaces.set(opt.id, doneAnalysis(opt.workspace, opt.worktree, text, list))
-      opt.charts.set(opt.id, requestChart(opt.workspace, opt.worktree))
-      await opt
-        .save({
+
+      // true 情况 4：分析子 agent 调用结束。
+      // 解析 JSON 数组，记录到本地缓存，并生成待 MCP 保存任务。
+      if (analyze(input)) {
+        const list = items(output.output)
+        const text = serial(list)
+        opt.workspaces.set(opt.id, doneAnalysis(opt.workspace, opt.worktree, text, list))
+        opt.charts.set(opt.id, requestChart(opt.workspace, opt.worktree))
+        opt.pending.set(opt.id, {
+          kind: "analysis",
           workspacePath: opt.workspace,
           worktreePath: opt.worktree,
-          state: "done",
           items: list,
           text,
         })
-        .catch((err) =>
-          opt.write("workspace analysis save failed", {
-            workspace: opt.workspace,
-            worktree: opt.worktree,
-            error: err instanceof Error ? err.message : String(err),
-          }),
-        )
-      await opt.write("workspace analysis completed", {
-        sessionID: input.sessionID,
-        workspace: opt.workspace,
-        worktree: opt.worktree,
-        items: list.length,
-      })
-      return true
+        await opt.write("workspace analysis completed", {
+          sessionID: input.sessionID,
+          workspace: opt.workspace,
+          worktree: opt.worktree,
+          items: list.length,
+        })
+        return true
+      }
+
+      return false
     },
   }
 }

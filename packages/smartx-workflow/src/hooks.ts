@@ -1,23 +1,14 @@
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 import { createPairing } from "./pairing.js"
 import { key, type Analysis, type Chart, type Flow } from "./state.js"
-import {
-  createWorkspace,
-  loadChartRemote,
-  loadRemote,
-  saveChartRemote,
-  saveRemote,
-  type Save,
-  type SaveChart,
-} from "./workspace.js"
+import { createWorkspace, loadChartRemote, loadRemote, type Pending } from "./workspace.js"
 
 type Dep = {
   mem?: Map<string, Flow>
   workspaces?: Map<string, Analysis>
   charts?: Map<string, Chart>
+  pending?: Map<string, Pending>
   service?: string
-  save?: (input: Save) => Promise<void>
-  saveChart?: (input: SaveChart) => Promise<void>
   load?: (workspace: string, worktree: string) => Promise<Analysis | undefined>
   loadChart?: (workspace: string, worktree: string) => Promise<Chart | undefined>
 }
@@ -26,6 +17,7 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
   const mem = dep.mem ?? new Map<string, Flow>()
   const workspaces = dep.workspaces ?? new Map<string, Analysis>()
   const charts = dep.charts ?? new Map<string, Chart>()
+  const pending = dep.pending ?? new Map<string, Pending>()
   const workspace = ctx.directory
   const worktree = ctx.worktree || ctx.directory
   const id = workspace ? key(workspace, worktree) : ""
@@ -45,18 +37,17 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
   const workspaceFlow = createWorkspace({
     workspaces,
     charts,
+    pending,
     workspace,
     worktree,
     id,
-    save: dep.save ?? ((input) => saveRemote(service, input)),
-    chart: dep.saveChart ?? ((input) => saveChartRemote(service, input)),
     load: dep.load ?? ((workspace, worktree) => loadRemote(service, workspace, worktree)),
     loadChart: dep.loadChart ?? ((workspace, worktree) => loadChartRemote(service, workspace, worktree)),
     write,
   })
   const pairing = createPairing({ mem, write })
 
-  void write("插件已加载", {
+  void write("plugin loaded", {
     directory: ctx.directory,
     worktree: ctx.worktree,
   })
@@ -65,15 +56,16 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
     "experimental.chat.system.transform": async (input, output) => {
       if (!input.sessionID) return
 
-      // 工作区门禁优先：先 analyzer，再 flowchart；命中后本轮不再追加配对提示，避免主 agent 收到两个“下一步”。
-      if (await workspaceFlow.transform(input, output)) return
+      const handled = await workspaceFlow.system(input, output)
+      if (handled) return
+
       await pairing.transform(input, output)
     },
     "tool.execute.before": async (input, output) => {
       await workspaceFlow.before(input, output)
     },
     "tool.execute.after": async (input, output) => {
-      if (await workspaceFlow.after(input, output)) return
+      await workspaceFlow.after(input, output)
       await pairing.after(input)
     },
   }
