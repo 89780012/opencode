@@ -250,31 +250,14 @@ func (s *Service) SaveAnalysis(ctx context.Context, req AnalysisReq) (AnalysisRo
 	if req.State == "" {
 		req.State = "done"
 	}
-	if req.State != "done" {
-		return AnalysisRow{
-			WorkspacePath: req.WorkspacePath,
-			WorktreePath:  req.WorktreePath,
-			State:         req.State,
-			Items:         req.Items,
-			Text:          req.Text,
-			UpdatedAt:     time.Now().UnixMilli(),
-		}, nil
+	if req.State != "running" && req.State != "done" {
+		return AnalysisRow{}, fmt.Errorf("invalid analysis state")
 	}
 	if len(req.Items) == 0 {
 		req.Items = items(req.Text)
 	}
 	if req.Text == "" {
 		req.Text = numbered(req.Items)
-	}
-	if len(req.Items) == 0 || req.Text == "" {
-		return AnalysisRow{
-			WorkspacePath: req.WorkspacePath,
-			WorktreePath:  req.WorktreePath,
-			State:         "done",
-			Items:         req.Items,
-			Text:          req.Text,
-			UpdatedAt:     time.Now().UnixMilli(),
-		}, nil
 	}
 
 	body, err := json.Marshal(req.Items)
@@ -286,16 +269,16 @@ func (s *Service) SaveAnalysis(ctx context.Context, req AnalysisReq) (AnalysisRo
 	if err != nil {
 		return AnalysisRow{}, err
 	}
-	_, err = doc.ExecContext(ctx, `insert into workspace_analysis(workspace_path, worktree_path, items, text, updated_at) values (?, ?, ?, ?, ?)
-on conflict(workspace_path, worktree_path) do update set items = excluded.items, text = excluded.text, updated_at = excluded.updated_at`,
-		req.WorkspacePath, req.WorktreePath, string(body), req.Text, now)
+	_, err = doc.ExecContext(ctx, `insert into workspace_analysis(workspace_path, worktree_path, state, items, text, updated_at) values (?, ?, ?, ?, ?, ?)
+on conflict(workspace_path, worktree_path) do update set state = excluded.state, items = excluded.items, text = excluded.text, updated_at = excluded.updated_at`,
+		req.WorkspacePath, req.WorktreePath, req.State, string(body), req.Text, now)
 	if err != nil {
 		return AnalysisRow{}, err
 	}
 	return AnalysisRow{
 		WorkspacePath: req.WorkspacePath,
 		WorktreePath:  req.WorktreePath,
-		State:         "done",
+		State:         req.State,
 		Items:         req.Items,
 		Text:          req.Text,
 		UpdatedAt:     now,
@@ -317,8 +300,8 @@ func (s *Service) GetAnalysis(ctx context.Context, req AnalysisGet) (AnalysisRow
 	}
 	var row AnalysisRow
 	var body string
-	err = doc.QueryRowContext(ctx, `select workspace_path, worktree_path, items, text, updated_at from workspace_analysis where workspace_path = ? and worktree_path = ?`,
-		req.WorkspacePath, req.WorktreePath).Scan(&row.WorkspacePath, &row.WorktreePath, &body, &row.Text, &row.UpdatedAt)
+	err = doc.QueryRowContext(ctx, `select workspace_path, worktree_path, state, items, text, updated_at from workspace_analysis where workspace_path = ? and worktree_path = ?`,
+		req.WorkspacePath, req.WorktreePath).Scan(&row.WorkspacePath, &row.WorktreePath, &row.State, &body, &row.Text, &row.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return AnalysisRow{}, db.ErrNotFound
 	}
@@ -329,7 +312,6 @@ func (s *Service) GetAnalysis(ctx context.Context, req AnalysisGet) (AnalysisRow
 		return AnalysisRow{}, err
 	}
 	row.Items = clean(row.Items)
-	row.State = "done"
 	return row, nil
 }
 

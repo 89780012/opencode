@@ -128,6 +128,7 @@ var schema = []string{
 	`create table if not exists workspace_analysis (
 	workspace_path text not null,
 	worktree_path text not null,
+	state text not null default 'done',
 	items text not null,
 	text text not null,
 	updated_at integer not null,

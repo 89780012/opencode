@@ -11,11 +11,11 @@ function obj(value: unknown): value is Record<string, unknown> {
 function parse(value: unknown): WorkbenchAnalysis | null {
   if (!obj(value)) return null
   if (typeof value.workspacePath !== "string") return null
-  const state = value.state === "running" || value.state === "done" ? value.state : "done"
+  if (value.state !== "running" && value.state !== "done") return null
   return {
     workspacePath: value.workspacePath,
     worktreePath: typeof value.worktreePath === "string" ? value.worktreePath : value.workspacePath,
-    state,
+    state: value.state,
     items: Array.isArray(value.items) ? value.items.filter((item): item is string => typeof item === "string") : [],
     text: typeof value.text === "string" ? value.text : "",
     updatedAt: typeof value.updatedAt === "number" ? value.updatedAt : 0,

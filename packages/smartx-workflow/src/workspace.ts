@@ -250,7 +250,7 @@ export async function loadRemote(service: string, workspace: string, worktree: s
   return {
     workspace: body.data.workspacePath,
     worktree: body.data.worktreePath,
-    state: "done" as const,
+    state: body.data.state ?? "done",
     items: body.data.items ?? [],
     text: body.data.text ?? "",
     updated: body.data.updatedAt ?? Date.now(),

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { build } from "../src/hooks.js"
+import { loadRemote } from "../src/workspace.js"
 import {
   analyze,
   flowchart,
@@ -54,6 +55,30 @@ describe("smartx workspace analysis", () => {
     expect(freshAnalysis("f:/repo").state).toBe("running")
     expect(doneAnalysis("f:/repo").state).toBe("done")
     expect(requestChart("f:/repo").state).toBe("requested")
+  })
+
+  test("loads remote workspace analysis state from service", async () => {
+    const prev = globalThis.fetch
+    try {
+      globalThis.fetch = (async () =>
+        Response.json({
+          data: {
+            workspacePath: "f:/repo",
+            worktreePath: "f:/repo",
+            state: "running",
+            items: [],
+            text: "",
+            updatedAt: 12,
+          },
+        })) satisfies typeof fetch
+
+      const row = await loadRemote("http://localhost:4096", "f:/repo", "f:/repo")
+
+      expect(row?.state).toBe("running")
+      expect(row?.updated).toBe(12)
+    } finally {
+      globalThis.fetch = prev
+    }
   })
 
   test("builds a hidden system gate reminder", () => {
