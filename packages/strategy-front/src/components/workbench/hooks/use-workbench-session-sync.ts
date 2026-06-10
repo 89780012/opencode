@@ -2,7 +2,8 @@ import { useEffect } from "react"
 import { useSearchParams } from "react-router-dom"
 import { socket, type SocketEvent } from "@/lib/socket-bus"
 import { useAppDispatch } from "@/store"
-import { deleteSession, setSessions, upsertSession, type WorkbenchSession } from "@/store/workbench-slice"
+import { setSelectedWorkspaceSession } from "@/store/chat-session-slice"
+import { deleteSession, setActive, setSessions, upsertSession, type WorkbenchSession } from "@/store/workbench-slice"
 
 function obj(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object"
@@ -44,6 +45,17 @@ function parseSessionResult(value: unknown) {
 function parseID(value: unknown) {
   if (!obj(value)) return ""
   return typeof value.id === "string" ? value.id : ""
+}
+
+function parseCreated(value: unknown) {
+  if (!obj(value)) return null
+  if (typeof value.workspacePath !== "string") return null
+  if (!obj(value.session)) return null
+  if (typeof value.session.id !== "string") return null
+  return {
+    workspacePath: value.workspacePath,
+    id: value.session.id,
+  }
 }
 
 export function useWorkbenchSessionSync() {
@@ -99,10 +111,15 @@ export function useWorkbenchSessionSync() {
   }, [dispatch])
 
   useEffect(() => {
-    const fn = () => {
+    const fn = (event: SocketEvent) => {
       if (!path) return
+      const data = parseCreated(event.payload)
+      if (data && data.workspacePath === path) {
+        dispatch(setActive(data.id))
+        dispatch(setSelectedWorkspaceSession({ workspace: path, sessionId: data.id }))
+      }
       socket.emit("session.list", { workspacePath: path })
     }
     return socket.on("session.created", fn)
-  }, [path])
+  }, [dispatch, path])
 }

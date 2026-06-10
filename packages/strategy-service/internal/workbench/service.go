@@ -15,19 +15,28 @@ import (
 	"time"
 
 	"strategy-service/internal/db"
+	"strategy-service/internal/modelchain"
 	oc "strategy-service/internal/opencode"
+	"strategy-service/internal/question"
 )
 
 type Service struct {
-	op   *oc.Service
-	base string
-	cli  *http.Client
+	op    *oc.Service
+	chain *modelchain.Service
+	q     *question.Service
+	base  string
+	cli   *http.Client
 }
 
-func NewService(op *oc.Service, base string) *Service {
+func NewService(op *oc.Service, chain *modelchain.Service, q *question.Service, base string) *Service {
+	if chain == nil {
+		chain = modelchain.NewService(op)
+	}
 	return &Service{
-		op:   op,
-		base: strings.TrimRight(strings.TrimSpace(base), "/"),
+		op:    op,
+		chain: chain,
+		q:     q,
+		base:  strings.TrimRight(strings.TrimSpace(base), "/"),
 		cli: &http.Client{
 			Timeout: 60 * time.Second,
 		},
@@ -429,7 +438,7 @@ on conflict(id) do update set workspace_path = excluded.workspace_path, title = 
 }
 
 func (s *Service) submit(ctx context.Context, req SessionCreate, session json.RawMessage) error {
-	if len(req.Requirements) == 0 {
+	if len(req.Requirements) == 0 || s.chain == nil {
 		return nil
 	}
 	meta := struct {
@@ -442,31 +451,26 @@ func (s *Service) submit(ctx context.Context, req SessionCreate, session json.Ra
 	if meta.ID == "" {
 		return fmt.Errorf("session id is required")
 	}
-	body, err := json.Marshal(map[string]any{
-		"parts": []map[string]string{{
+	msg := brief(req.Requirements)
+	prompt := modelchain.Prompt{
+		WorkspacePath: req.WorkspacePath,
+		SessionID:     meta.ID,
+		Agent:         "smartx-helper",
+		Parts: []map[string]any{{
 			"type": "text",
-			"text": brief(req.Requirements),
+			"text": msg,
 		}},
-	})
-	if err != nil {
+	}
+	if err := s.chain.Prompt(ctx, prompt); err != nil {
 		return err
 	}
-	call, err := http.NewRequestWithContext(ctx, http.MethodPost, s.addr("/session/"+url.PathEscape(meta.ID)+"/prompt_async", req.WorkspacePath), bytes.NewReader(body))
-	if err != nil {
-		return err
-	}
-	call.Header.Set("Content-Type", "application/json")
-	resp, err := s.cli.Do(call)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	data, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("opencode requirements submit failed: %s %s", resp.Status, strings.TrimSpace(string(data)))
+	if s.q != nil {
+		_, _ = s.q.Append(question.Entry{
+			WorkspacePath: req.WorkspacePath,
+			SessionID:     meta.ID,
+			MessageID:     prompt.MessageID,
+			Body:          msg,
+		})
 	}
 	return nil
 }

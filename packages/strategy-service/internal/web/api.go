@@ -73,7 +73,7 @@ func NewAPI(run *rt.Service, op *oc.Service, cfg *cfg.Store, sx *smartx.Service,
 		question: question,
 		summary:  summary,
 		chain:    chain,
-		bench:    workbench.NewService(op, smartURL),
+		bench:    workbench.NewService(op, chain, question, smartURL),
 	}
 	api.socketHandlers = map[string]socketHandlerFunc{
 		"analysis.get":    api.handleAnalysisGet,

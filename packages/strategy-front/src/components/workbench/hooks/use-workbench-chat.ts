@@ -4,7 +4,7 @@ import { toast } from "sonner"
 import { useStrategySession } from "@/hooks/use-strategy-session"
 import { useWorkspaceEntry } from "@/hooks/use-workspace-entry"
 import { log } from "@/lib/error"
-import { useAppDispatch } from "@/store"
+import { useAppDispatch, useAppSelector } from "@/store"
 import { updateSessionAbortStatus } from "@/store/chat-session-slice"
 
 export function useWorkbenchChat() {
@@ -14,12 +14,22 @@ export function useWorkbenchChat() {
   const entry = useWorkspaceEntry(path) //主要做工作区初始化
   const workspace = entry.workspace
   const chat = useStrategySession(workspace?.path)
+  const active = useAppSelector((state) =>
+    workspace?.path && state.workbench.sessionPath === workspace.path ? state.workbench.active : "",
+  )
   const init = useRef<string | null>(null)
 
   useEffect(() => {
     if (init.current === workspace?.path) return
     init.current = null
   }, [workspace?.path])
+
+  useEffect(() => {
+    if (!workspace?.path) return
+    if (!active) return
+    if (chat.selectedSessionId === active) return
+    chat.selectSession(active)
+  }, [active, chat, workspace?.path])
 
   useEffect(() => {
     if (!workspace?.path) return
