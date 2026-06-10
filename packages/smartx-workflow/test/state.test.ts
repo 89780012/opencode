@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { doneAnalysis, fresh, freshAnalysis, note, requestAnalysis, seen, touch, validAnalysis } from "../src/state.js"
+import { doneAnalysis, fresh, freshAnalysis, items, note, requestAnalysis, seen, touch, validAnalysis } from "../src/state.js"
 
 describe("smartx workflow state", () => {
   test("tracks smartx_start aliases", () => {
@@ -54,6 +54,13 @@ describe("smartx workflow state", () => {
     expect(validAnalysis(requestAnalysis("f:/repo"))).toBe(false)
     expect(validAnalysis(freshAnalysis("f:/repo"))).toBe(true)
     expect(validAnalysis(doneAnalysis("f:/repo"))).toBe(true)
+  })
+
+  test("parses workspace analysis JSON items", () => {
+    expect(items('<task_result>["采用网格交易策略。","未发现退出规则。"]</task_result>')).toEqual([
+      "采用网格交易策略。",
+      "未发现退出规则。",
+    ])
   })
 
   test("builds the log reminder", () => {

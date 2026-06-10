@@ -138,7 +138,7 @@ describe("smartx workspace analysis", () => {
       },
       {
         title: "",
-        output: ["<task_result>", "1.", "交易市场为A股。", "", "2.", "策略核心逻辑为网格交易。", "</task_result>"].join("\n"),
+        output: ['<task_result>', '["交易市场为A股。","策略核心逻辑为网格交易。"]', "</task_result>"].join("\n"),
         metadata: {},
       },
     )
@@ -158,7 +158,7 @@ describe("smartx workspace analysis", () => {
         worktreePath: "f:/repo",
         state: "done",
         items: ["交易市场为A股。", "策略核心逻辑为网格交易。"],
-        text: ["1.", "交易市场为A股。", "", "2.", "策略核心逻辑为网格交易。"].join("\n"),
+        text: JSON.stringify(["交易市场为A股。", "策略核心逻辑为网格交易。"], null, 2),
       },
     ])
 

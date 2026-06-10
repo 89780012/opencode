@@ -177,25 +177,34 @@ export function result(text: string) {
   return (match?.[1] ?? text).trim()
 }
 
-export function items(text: string) {
-  const out: string[] = []
-  for (const line of result(text).split(/\r?\n/)) {
-    const next = line.replace(/^\s*\d+(?:\.|、)\s*/, "").trim()
-    if (!next || /^\d+(?:\.|、)?$/.test(next)) continue
-    out.push(next)
-  }
-  return out
+function fence(text: string) {
+  return text.replace(/^```json\s*/i, "").replace(/^```\s*/, "").replace(/\s*```$/g, "").trim()
 }
 
-export function numbered(list: string[]) {
-  return list
-    .map((item, i) => {
-      const next = item.trim()
-      if (!next) return ""
-      return `${i + 1}.\n${next}`
-    })
-    .filter(Boolean)
-    .join("\n\n")
+function tidy(text: string) {
+  return text
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/^[-*]\s+/, "")
+    .replace(/[`*_#>|[\]]/g, "")
+    .trim()
+}
+
+export function items(text: string) {
+  return parse(fence(result(text)))
+}
+
+export function serial(list: string[]) {
+  return JSON.stringify(list.map(tidy).filter(Boolean), null, 2)
+}
+
+function parse(text: string) {
+  try {
+    const data: unknown = JSON.parse(text)
+    if (!Array.isArray(data)) return []
+    return data.map((item) => (typeof item === "string" ? tidy(item) : "")).filter(Boolean)
+  } catch {
+    return []
+  }
 }
 
 export function validAnalysis(input: Analysis) {
@@ -220,8 +229,9 @@ export function noteAnalysis() {
     "当前工作区还没有完成策略运行逻辑分析。",
     "在正式修改代码、生成实现方案或调用写入类工具前，必须先调用 `task` 工具启动 `workspace-analyzer` 子 agent。",
     "调用参数要求：`subagent_type` 必须是 `workspace-analyzer`，`description` 使用 `Analyze strategy execution flow`。",
-    "子 agent 只负责输出可画成流程图的精简编号策略运行逻辑条目，不要读取 requirements，不要描述项目结构、版本、UI、构建方式或文件职责，不要修改文件，不要给实现方案。",
+    "子 agent 只负责输出可画成流程图的 JSON 字符串数组，不要读取 requirements，不要描述项目结构、版本、UI、构建方式或文件职责，不要修改文件，不要给实现方案。",
     "如果当前工作区只是模板骨架或没有完整策略算法，子 agent 必须明确输出已发现的实际运行行为和缺失的入场、退出、仓位、风控规则。",
+    "子 agent 必须只返回 JSON 数组，例如 [\"当前策略未形成完整交易算法。\"]，不要 markdown、编号、标题、解释或代码块。",
     "子 agent 返回后，先基于它的结论继续当前任务；不要把这段系统提示复述给用户。",
   ].join("\n")
 }
@@ -231,13 +241,13 @@ export function noteChart(input: Analysis) {
     "workspace-analyzer 已经完成当前工作区的策略运行逻辑分析。现在必须先生成策略逻辑流程图，再继续其它实现或总结。",
     "请立即调用 `task` 工具启动 `strategy-flowchart-generator` 子 agent。",
     "调用参数要求：`subagent_type` 必须是 `strategy-flowchart-generator`，`description` 使用 `Generate strategy flowchart`。",
-    "传给子 agent 的 prompt 必须包含下面的 workspace-analyzer 结果，并要求它只读当前工作区源码进行校验、修正和补偿。",
+    "传给子 agent 的 prompt 必须包含下面的 workspace-analyzer JSON 数组结果，并要求它只读当前工作区源码进行校验、修正和补偿。",
     "子 agent 可以读取源码、列目录和搜索文本；不能修改文件，不能执行命令，不能调用其它子 agent。",
     "不要加入 requirements、用户愿望清单或未来实现计划作为流程图来源。",
     "子 agent 必须只返回 Mermaid flowchart，第一行是 `flowchart TD`，不要 markdown 代码块，不要解释。",
     "子 agent 返回后，继续当前任务；不要把这段系统提示复述给用户。",
     "",
-    "workspace-analyzer 结果：",
+    "workspace-analyzer JSON 数组结果：",
     input.text,
   ].join("\n")
 }

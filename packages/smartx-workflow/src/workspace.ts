@@ -10,9 +10,9 @@ import {
   mermaid,
   noteAnalysis,
   noteChart,
-  numbered,
   requestAnalysis,
   requestChart,
+  serial,
   validAnalysis,
   validChart,
   type Analysis,
@@ -189,7 +189,7 @@ export function createWorkspace(opt: Opt) {
       }
       if (!analyze(input)) return false
       const list = items(output.output)
-      const text = numbered(list)
+      const text = serial(list)
       opt.workspaces.set(opt.id, doneAnalysis(opt.workspace, opt.worktree, text, list))
       opt.charts.set(opt.id, requestChart(opt.workspace, opt.worktree))
       await opt
@@ -247,12 +247,13 @@ export async function loadRemote(service: string, workspace: string, worktree: s
   if (!resp.ok) return undefined
   const body = (await resp.json()) as { data?: Row | null }
   if (!body.data) return undefined
+  const list = body.data.items?.length ? body.data.items : items(body.data.text ?? "")
   return {
     workspace: body.data.workspacePath,
     worktree: body.data.worktreePath,
     state: body.data.state ?? "done",
-    items: body.data.items ?? [],
-    text: body.data.text ?? "",
+    items: list,
+    text: serial(list),
     updated: body.data.updatedAt ?? Date.now(),
   }
 }

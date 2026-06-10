@@ -268,8 +268,9 @@ func (s *Service) SaveAnalysis(ctx context.Context, req AnalysisReq) (AnalysisRo
 	if len(req.Items) == 0 {
 		req.Items = items(req.Text)
 	}
-	if req.Text == "" {
-		req.Text = numbered(req.Items)
+	req.Items = logic(req.Items)
+	if len(req.Items) > 0 {
+		req.Text = serial(req.Items)
 	}
 
 	body, err := json.Marshal(req.Items)
@@ -562,30 +563,36 @@ func cleanHits(list []Hit) []Hit {
 }
 
 func items(text string) []string {
-	out := []string{}
-	for _, line := range strings.Split(text, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
+	var arr []string
+	text = strings.TrimSpace(text)
+	text = strings.TrimPrefix(text, "```json")
+	text = strings.TrimPrefix(text, "```")
+	text = strings.TrimSuffix(text, "```")
+	text = strings.TrimSpace(text)
+	if err := json.Unmarshal([]byte(text), &arr); err == nil {
+		return logic(arr)
+	}
+	return []string{}
+}
+
+func logic(list []string) []string {
+	out := list[:0]
+	for _, item := range list {
+		item = plain(item)
+		if item == "" {
 			continue
 		}
-		if idx := strings.Index(line, "."); idx > 0 {
-			head := strings.TrimSpace(line[:idx])
-			ok := true
-			for _, char := range head {
-				if char < '0' || char > '9' {
-					ok = false
-					break
-				}
-			}
-			if ok {
-				line = strings.TrimSpace(line[idx+1:])
-			}
-		}
-		if line != "" {
-			out = append(out, line)
-		}
+		out = append(out, item)
 	}
-	return clean(out)
+	return out
+}
+
+func plain(text string) string {
+	text = strings.TrimSpace(text)
+	text = strings.TrimPrefix(text, "- ")
+	text = strings.TrimPrefix(text, "* ")
+	text = strings.NewReplacer("`", "", "*", "", "_", "", "#", "", ">", "", "|", "", "[", "", "]", "").Replace(text)
+	return strings.TrimSpace(text)
 }
 
 func numbered(list []string) string {
@@ -594,6 +601,14 @@ func numbered(list []string) string {
 		out = append(out, fmt.Sprintf("%d.\n%s", i+1, item))
 	}
 	return strings.Join(out, "\n\n")
+}
+
+func serial(list []string) string {
+	body, err := json.MarshalIndent(logic(list), "", "  ")
+	if err != nil {
+		return "[]"
+	}
+	return string(body)
 }
 
 func brief(list []string) string {
