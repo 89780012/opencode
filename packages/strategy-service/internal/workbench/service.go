@@ -155,14 +155,22 @@ func (s *Service) ListSessions(ctx context.Context, req SessionList) (SessionLis
 		if err != nil {
 			return SessionListResult{}, err
 		}
-		reqs, err := loadReqs(ctx, doc, row.WorkspacePath, row.ID)
+		out.Sessions = append(out.Sessions, row)
+	}
+	if err := rows.Err(); err != nil {
+		return SessionListResult{}, err
+	}
+	if err := rows.Close(); err != nil {
+		return SessionListResult{}, err
+	}
+	for idx := range out.Sessions {
+		reqs, err := loadReqs(ctx, doc, out.Sessions[idx].WorkspacePath, out.Sessions[idx].ID)
 		if err != nil {
 			return SessionListResult{}, err
 		}
-		row.Requirements = reqs
-		out.Sessions = append(out.Sessions, row)
+		out.Sessions[idx].Requirements = reqs
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func (s *Service) DetailSession(ctx context.Context, req SessionDetail) (SessionRow, error) {
