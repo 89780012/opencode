@@ -74,6 +74,9 @@ func (s *Service) CreateSession(ctx context.Context, req SessionCreate) (json.Ra
 	if err := s.put(ctx, req, data); err != nil {
 		return nil, err
 	}
+	if err := s.submit(ctx, req, data); err != nil {
+		return nil, err
+	}
 	return data, nil
 }
 
@@ -425,6 +428,49 @@ on conflict(id) do update set workspace_path = excluded.workspace_path, title = 
 	return saveReqs(ctx, doc, req.WorkspacePath, meta.ID, req.Requirements, now)
 }
 
+func (s *Service) submit(ctx context.Context, req SessionCreate, session json.RawMessage) error {
+	if len(req.Requirements) == 0 {
+		return nil
+	}
+	meta := struct {
+		ID string `json:"id"`
+	}{}
+	if err := json.Unmarshal(session, &meta); err != nil {
+		return err
+	}
+	meta.ID = strings.TrimSpace(meta.ID)
+	if meta.ID == "" {
+		return fmt.Errorf("session id is required")
+	}
+	body, err := json.Marshal(map[string]any{
+		"parts": []map[string]string{{
+			"type": "text",
+			"text": brief(req.Requirements),
+		}},
+	})
+	if err != nil {
+		return err
+	}
+	call, err := http.NewRequestWithContext(ctx, http.MethodPost, s.addr("/session/"+url.PathEscape(meta.ID)+"/prompt_async", req.WorkspacePath), bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	call.Header.Set("Content-Type", "application/json")
+	resp, err := s.cli.Do(call)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("opencode requirements submit failed: %s %s", resp.Status, strings.TrimSpace(string(data)))
+	}
+	return nil
+}
+
 type scanner interface {
 	Scan(...any) error
 }
@@ -544,6 +590,12 @@ func numbered(list []string) string {
 		out = append(out, fmt.Sprintf("%d.\n%s", i+1, item))
 	}
 	return strings.Join(out, "\n\n")
+}
+
+func brief(list []string) string {
+	return strings.TrimSpace(`请根据以下策略需求开始工作：
+
+` + numbered(list))
 }
 
 func mermaid(text string) string {
