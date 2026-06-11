@@ -752,7 +752,7 @@ func plain(text string) string {
 func numbered(list []string) string {
 	out := []string{}
 	for i, item := range clean(list) {
-		out = append(out, fmt.Sprintf("%d.\n%s", i+1, item))
+		out = append(out, fmt.Sprintf("%d. %s", i+1, item))
 	}
 	return strings.Join(out, "\n\n")
 }
