@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { chatApi, permissionApi, questionApi } from "@/api/modules"
 import { toast } from "sonner"
 import { buildRequestParts } from "@/lib/build-request-parts"
@@ -19,11 +19,13 @@ import {
   hydrateSessionMessages,
   setPendingPermissions,
   setPendingQuestions,
+  setSessionStatus,
   setSessionTodos,
 } from "@/store/chat-session-slice"
 import type {
   ChatEvent,
   ChatQuestionAnswer,
+  ChatSessionSummary,
   ChatStatus,
   ChatTodo,
   PermissionRequest,
@@ -71,6 +73,8 @@ function path(base: string) {
   return `${base}/event`
 }
 
+const sessions: ChatSessionSummary[] = []
+
 function readDrafts() {
   if (typeof window === "undefined") return {}
 
@@ -117,6 +121,8 @@ function pick(list: { content: string; status: string }[]) {
 
 function useEvents(workspacePath?: string | null) {
   const dispatch = useAppDispatch()
+  const list = useAppSelector((state) => (workspacePath ? (state.chatSession.sessions[workspacePath] ?? sessions) : sessions))
+  const key = useRef("")
 
   useEffect(() => {
     if (!workspacePath || typeof window === "undefined") {
@@ -139,6 +145,16 @@ function useEvents(workspacePath?: string | null) {
       src.close()
     }
   }, [dispatch, workspacePath])
+
+  useEffect(() => {
+    if (!workspacePath || list.length === 0) return
+    const ids = list.map((item) => item.id).join("\0")
+    if (key.current === ids) return
+    key.current = ids
+    void chatApi.getSessionStatus(workspacePath).then((status) => {
+      dispatch(setSessionStatus({ sessions: list.map((item) => item.id), status }))
+    })
+  }, [dispatch, list, workspacePath])
 }
 
 function useDraft(workspacePath?: string | null, sessionId?: string | null) {

@@ -14,6 +14,7 @@ import type {
   ChatMessageRecord,
   ChatQuestionRequest,
   ChatSessionSummary,
+  ChatStatus,
   ChatTodo,
   PermissionRequest,
 } from "@/types/chat"
@@ -82,6 +83,11 @@ const slice = createSlice({
     setSessionDetailLoading(state, action: PayloadAction<{ sessionId: string; loading: boolean }>) {
       state.detailLoading[action.payload.sessionId] = action.payload.loading
     },
+    setSessionStatus(state, action: PayloadAction<{ sessions: string[]; status: Record<string, ChatStatus> }>) {
+      action.payload.sessions.forEach((id) => {
+        state.status[id] = action.payload.status[id] ?? { type: "idle" }
+      })
+    },
     hydrateSessionDiff(state, action: PayloadAction<{ sessionId: string; diffs: ChatFileDiff[] }>) {
       state.sessionDiffs[action.payload.sessionId] = action.payload.diffs
     },
@@ -117,6 +123,7 @@ export const {
   setSelectedWorkspaceSession,
   hydrateSessionMessages,
   setSessionDetailLoading,
+  setSessionStatus,
   hydrateSessionDiff,
   setSessionTodos,
   setPendingQuestions,

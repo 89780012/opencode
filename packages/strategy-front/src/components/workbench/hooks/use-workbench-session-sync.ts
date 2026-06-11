@@ -1,8 +1,9 @@
 import { useEffect } from "react"
 import { useSearchParams } from "react-router-dom"
+import { chatApi } from "@/api/modules"
 import { socket, type SocketEvent } from "@/lib/socket-bus"
 import { useAppDispatch } from "@/store"
-import { setSelectedWorkspaceSession } from "@/store/chat-session-slice"
+import { setSelectedWorkspaceSession, setSessionStatus } from "@/store/chat-session-slice"
 import { deleteSession, setActive, setSessions, upsertSession, type WorkbenchSession } from "@/store/workbench-slice"
 
 function obj(value: unknown): value is Record<string, unknown> {
@@ -85,6 +86,11 @@ export function useWorkbenchSessionSync() {
           workspacePath: data.workspacePath || path,
         }),
       )
+      const dir = data.workspacePath || path
+      if (!dir) return
+      void chatApi.getSessionStatus(dir).then((status) => {
+        dispatch(setSessionStatus({ sessions: data.sessions.map((item) => item.id), status }))
+      })
     }
     return socket.on("session.listed", fn)
   }, [dispatch, path])

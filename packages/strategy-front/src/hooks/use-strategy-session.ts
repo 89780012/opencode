@@ -16,6 +16,7 @@ import {
 import {
   setSelectedWorkspaceSession,
   setSessionDetailLoading,
+  setSessionStatus,
   setWorkspaceSessionCreating,
   setWorkspaceSessions,
   upsertWorkspaceSession,
@@ -46,8 +47,10 @@ export function useChatSessions(path?: string | null) {
     if (!path) {
       return
     }
-    await refreshSessions()
-  }, [path, refreshSessions])
+    const [sessions, status] = await Promise.all([chatApi.listSessions(path), chatApi.getSessionStatus(path)])
+    dispatch(setWorkspaceSessions({ workspace: path, sessions }))
+    dispatch(setSessionStatus({ sessions: sessions.map((item) => item.id), status }))
+  }, [dispatch, path])
 
   // 创建会话
   const createSession = useCallback(async () => {

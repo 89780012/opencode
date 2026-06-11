@@ -1,6 +1,6 @@
 import { modelChainApi } from "@/api/modules/model-chain"
 import { opencode } from "@/api/opencode"
-import type { ChatFileDiff, ChatMessageRecord, ChatPromptBody, ChatSessionSummary, ChatTodo } from "@/types/chat"
+import type { ChatFileDiff, ChatMessageRecord, ChatPromptBody, ChatSessionSummary, ChatStatus, ChatTodo } from "@/types/chat"
 
 export const chatApi = {
   listSessions(workspacePath: string) {
@@ -14,6 +14,14 @@ export const chatApi = {
 
   createSession(workspacePath: string) {
     return opencode.post<ChatSessionSummary>("/session", undefined, {
+      params: {
+        directory: workspacePath,
+      },
+    })
+  },
+
+  getSessionStatus(workspacePath: string) {
+    return opencode.get<Record<string, ChatStatus>>("/session/status", {
       params: {
         directory: workspacePath,
       },
