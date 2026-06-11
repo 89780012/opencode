@@ -269,7 +269,9 @@ export function noteReview(input: { workspace: string; worktree: string; session
     "6. `smartx_save_review` 的 `summary`、`items`、`items[].name`、`items[].detail`、`items[].suggestion`、`suggestions` 必须使用中文。",
     "7. MCP 保存成功后，再用中文简短回复用户审查结果。",
     "",
-    "审查范围必须覆盖：需求覆盖情况、语法检查、策略逻辑完整性、入场/退出、仓位管理、风控规则、边界条件、代码可维护性。",
+    "审查结果必须固化为以下检查项，保存到 `smartx_save_review.items` 时也尽量使用这些 name：需求覆盖情况、语法与运行时错误、策略逻辑完整性、入场逻辑、退出逻辑、仓位管理、风控规则、边界条件、订单管理、状态管理、生命周期管理、代码可维护性。",
+    "其中“策略逻辑完整性”必须针对第 1 步获取的用户需求清单逐条检查：说明每条需求是否被代码实现、关键数据链路是否闭环、信号到下单/持仓/退出/风控的流程是否一致；如果发现缺口，要在 detail 中写清对应需求和代码表现，在 suggestion 中给出具体修复方向。",
+    "其它检查项也要给出明确证据，避免只写笼统结论；如果某项无异常，status 使用 passed，detail 简述通过依据，suggestion 留空或给出低优先级建议。",
     "如果需求清单为空，也必须继续审查代码，但要在保存结果的 summary 或 suggestions 中说明缺少需求上下文。",
   ].join("\n")
 }

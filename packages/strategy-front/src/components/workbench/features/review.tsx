@@ -1,10 +1,44 @@
-import { ClipboardCheck, Clock3, History, X } from "lucide-react"
-import type { CSSProperties, KeyboardEvent, PointerEvent } from "react"
+import { ChevronDown, ClipboardCheck, Clock3, History, X } from "lucide-react"
+import { useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react"
+import type { Step } from "../data"
 import { useWorkbench } from "../hooks/use-workbench"
 import { badge, lead, stepText, text, tone } from "../lib"
 import { Handle } from "../layout/handle"
 import ui from "../../shared/styles/ui.module.css"
 import css from "../styles/review/review.module.css"
+
+function Row(props: { item: Step }) {
+  const [open, setOpen] = useState(false)
+  const Icon = badge(props.item.status)
+  const more = !!props.item.detail || !!props.item.suggestion
+
+  return (
+    <div className={css.step}>
+      <button
+        type="button"
+        className={css.stephead}
+        onClick={() => more && setOpen((item) => !item)}
+        aria-expanded={open}
+        disabled={!more}
+      >
+        <span className={css.stepmain}>
+          <Icon size={15} className={`${css.stepicon} ${css[`stepicon_${tone(props.item.status)}`]}`} />
+          <strong>{props.item.text}</strong>
+        </span>
+        <span className={css.stepright}>
+          <em>{stepText(props.item.status)}</em>
+          {more ? <ChevronDown size={14} className={`${css.chevron} ${open ? css.chevron_open : ""}`} /> : null}
+        </span>
+      </button>
+      {open && more ? (
+        <div className={css.stepcopy}>
+          {props.item.detail ? <p>{props.item.detail}</p> : null}
+          {props.item.suggestion ? <p className={css.fix}>{props.item.suggestion}</p> : null}
+        </div>
+      ) : null}
+    </div>
+  )
+}
 
 export function Review(props: {
   open: boolean
@@ -65,44 +99,18 @@ export function Review(props: {
                       <p className={css.status}>
                         第 {app.cur.reviewRound} 轮 / {lead(app.cur.reviewStatus)} {text(app.cur.reviewStatus)}
                       </p>
-                      {app.cur.reviewProgress.map((item) => {
-                        const Icon = badge(item.status)
-                        return (
-                          <div key={item.text} className={css.step}>
-                            <div className={css.stepcopy}>
-                              <div className={css.stepmain}>
-                                <Icon size={15} className={`${css.stepicon} ${css[`stepicon_${tone(item.status)}`]}`} />
-                                <strong>{item.text}</strong>
-                              </div>
-                              {item.detail ? <p>{item.detail}</p> : null}
-                              {item.suggestion ? <p className={css.fix}>{item.suggestion}</p> : null}
-                            </div>
-                            <em>{stepText(item.status)}</em>
-                          </div>
-                        )
-                      })}
+                      {app.cur.reviewProgress.map((item) => (
+                        <Row key={item.text} item={item} />
+                      ))}
                     </div>
                   ) : app.last ? (
                     <div className={css.box}>
                       <p className={css.status}>
                         第 {app.last.round} 轮 / {lead(app.last.status)} {text(app.last.status)}
                       </p>
-                      {app.last.steps.map((item) => {
-                        const Icon = badge(item.status)
-                        return (
-                          <div key={item.text} className={css.step}>
-                            <div className={css.stepcopy}>
-                              <div className={css.stepmain}>
-                                <Icon size={15} className={`${css.stepicon} ${css[`stepicon_${tone(item.status)}`]}`} />
-                                <strong>{item.text}</strong>
-                              </div>
-                              {item.detail ? <p>{item.detail}</p> : null}
-                              {item.suggestion ? <p className={css.fix}>{item.suggestion}</p> : null}
-                            </div>
-                            <em>{stepText(item.status)}</em>
-                          </div>
-                        )
-                      })}
+                      {app.last.steps.map((item) => (
+                        <Row key={item.text} item={item} />
+                      ))}
                       {app.last.suggestions.length ? (
                         <div className={css.advice}>
                           <p>{app.last.suggestions.join(", ")}</p>

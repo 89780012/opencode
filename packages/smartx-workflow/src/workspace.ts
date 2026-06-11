@@ -155,6 +155,8 @@ function noteSave(input: Pending) {
       "Rules:",
       "- Keep every natural-language field in Chinese.",
       "- Faithfully convert the report and do not invent extra issues.",
+      "- Preserve these fixed review item names when present: 需求覆盖情况、语法与运行时错误、策略逻辑完整性、入场逻辑、退出逻辑、仓位管理、风控规则、边界条件、订单管理、状态管理、生命周期管理、代码可维护性。",
+      "- Keep 策略逻辑完整性 detailed and requirement-oriented; it must mention the relevant user requirements, implementation evidence, and missing logic when the report includes them.",
       "- Use item status only from: passed, warning, failed, error.",
       "- If the report says the review cannot be completed, keep the overall state as error.",
       "",

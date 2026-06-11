@@ -2,11 +2,14 @@
   position: relative;
   display: flex;
   align-items: stretch;
+  min-height: 0;
+  height: 100%;
   background: #ffffff;
 }
 
 .panel {
   width: var(--side);
+  height: 100%;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -123,6 +126,7 @@
 
 .body {
   flex: 1;
+  min-height: 0;
   min-width: 0;
   overflow: auto;
   padding: 1rem;
@@ -142,16 +146,37 @@
 }
 
 .step {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.25rem 0;
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.15rem 0;
   border-bottom: 1px solid #eef2f7;
 }
 
 .step:last-child {
   border-bottom: 0;
+}
+
+.stephead {
+  min-width: 0;
+  width: 100%;
+  min-height: 1.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border: 0;
+  border-radius: 0.25rem;
+  background: transparent;
+  padding: 0.15rem 0;
+  text-align: left;
+}
+
+.stephead:hover:not(:disabled) {
+  background: #f8fafc;
+}
+
+.stephead:disabled {
+  cursor: default;
 }
 
 .stepmain {
@@ -161,10 +186,18 @@
   gap: 0.5rem;
 }
 
+.stepright {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
 .stepcopy {
   min-width: 0;
   display: grid;
   gap: 0.15rem;
+  padding: 0 0 0.35rem 1.45rem;
 }
 
 .stepcopy p {
@@ -205,11 +238,20 @@
   color: #94a3b8;
 }
 
-.step em {
+.stepright em {
   color: #64748b;
   font-size: 0.625rem;
   font-style: normal;
   flex: none;
+}
+
+.chevron {
+  color: #94a3b8;
+  transition: transform 0.16s ease;
+}
+
+.chevron_open {
+  transform: rotate(180deg);
 }
 
 .advice {

@@ -326,11 +326,11 @@ func (a *API) mcpPost(c *gin.Context) {
 func mcpWorkbench(ctx context.Context, id any, c *gin.Context, run func(context.Context) (any, error)) {
 	body, err := run(ctx)
 	if errors.Is(err, db.ErrNotFound) {
-		mcpToolResult(c, id, "null", nil, false)
+		mcpToolResult(c, id, "null", map[string]any{}, false)
 		return
 	}
 	if err != nil {
-		mcpToolResult(c, id, err.Error(), nil, true)
+		mcpToolResult(c, id, err.Error(), map[string]any{"error": err.Error()}, true)
 		return
 	}
 	mcpToolResult(c, id, jsonText(body), body, false)
@@ -372,6 +372,9 @@ func mcpError(c *gin.Context, id any, code int, msg string) {
 }
 
 func mcpToolResult(c *gin.Context, id any, text string, body any, bad bool) {
+	if body == nil {
+		body = map[string]any{}
+	}
 	mcpResult(c, id, map[string]any{
 		"content": []map[string]any{
 			{
