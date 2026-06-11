@@ -99,3 +99,40 @@ func (a *API) workbenchFlowchartPut(c *gin.Context) {
 	a.event.emitBroadcast("flowchart.updated", utils.Pack(data))
 	ok(c, data)
 }
+
+func (a *API) workbenchReviewGet(c *gin.Context) {
+	req := workbench.ReviewGet{}
+	if err := c.ShouldBindQuery(&req); err != nil {
+		bad(c, err)
+		return
+	}
+
+	data, err := a.bench.GetReview(c.Request.Context(), req)
+	if errors.Is(err, db.ErrNotFound) {
+		ok(c, nil)
+		return
+	}
+	if err != nil {
+		bad(c, err)
+		return
+	}
+
+	ok(c, data)
+}
+
+func (a *API) workbenchReviewPut(c *gin.Context) {
+	body := workbench.ReviewReq{}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		bad(c, err)
+		return
+	}
+
+	data, err := a.bench.SaveReview(c.Request.Context(), body)
+	if err != nil {
+		bad(c, err)
+		return
+	}
+
+	a.event.emitBroadcast("review.updated", utils.Pack(data))
+	ok(c, data)
+}

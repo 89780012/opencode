@@ -146,6 +146,16 @@ var schema = []string{
 	updated_at integer not null,
 	primary key(workspace_path, worktree_path)
 )`,
+	`create table if not exists workspace_reviews (
+	workspace_path text not null,
+	worktree_path text not null,
+	state text not null,
+	summary text not null,
+	items text not null,
+	suggestions text not null,
+	updated_at integer not null,
+	primary key(workspace_path, worktree_path)
+)`,
 	`create table if not exists questions (
 	id text primary key,
 	workspace_path text not null,

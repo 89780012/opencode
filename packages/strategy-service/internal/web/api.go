@@ -78,6 +78,7 @@ func NewAPI(run *rt.Service, op *oc.Service, cfg *cfg.Store, sx *smartx.Service,
 	api.socketHandlers = map[string]socketHandlerFunc{
 		"analysis.get":    api.handleAnalysisGet,
 		"flowchart.get":   api.handleFlowchartGet,
+		"review.get":      api.handleReviewGet,
 		"question.append": api.handleQuestionAppend,
 		"question.delete": api.handleQuestionDelete,
 		"question.list":   api.handleQuestionList,
@@ -125,6 +126,8 @@ func (a *API) Register(r *gin.Engine) {
 	bench.POST("/analysis", a.workbenchAnalysisPut)
 	bench.GET("/flowchart", a.workbenchFlowchartGet)
 	bench.POST("/flowchart", a.workbenchFlowchartPut)
+	bench.GET("/review", a.workbenchReviewGet)
+	bench.POST("/review", a.workbenchReviewPut)
 
 	sum := api.Group("/summary")
 	sum.GET("/session", a.summaryGet)

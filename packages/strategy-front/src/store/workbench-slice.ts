@@ -42,6 +42,23 @@ export type WorkbenchFlowchart = {
   updatedAt: number
 }
 
+export type WorkbenchReviewItem = {
+  name: string
+  status: "passed" | "failed" | "warning" | "running" | "error"
+  detail: string
+  suggestion: string
+}
+
+export type WorkbenchReview = {
+  workspacePath: string
+  worktreePath: string
+  state: "idle" | "running" | "passed" | "failed" | "error"
+  summary: string
+  items: WorkbenchReviewItem[]
+  suggestions: string[]
+  updatedAt: number
+}
+
 type State = {
   sessions: WorkbenchSession[]
   sessionPath: string
@@ -51,6 +68,8 @@ type State = {
   analysisPath: string
   flowchart: WorkbenchFlowchart | null
   flowchartPath: string
+  review: WorkbenchReview | null
+  reviewPath: string
   active: string
   stage: Stage
 }
@@ -64,6 +83,8 @@ const initialState: State = {
   analysisPath: "",
   flowchart: null,
   flowchartPath: "",
+  review: null,
+  reviewPath: "",
   active: "",
   stage: "session",
 }
@@ -89,6 +110,10 @@ const slice = createSlice({
     setFlowchart(state, action: PayloadAction<{ workspacePath: string; flowchart: WorkbenchFlowchart | null }>) {
       state.flowchartPath = action.payload.workspacePath
       state.flowchart = action.payload.flowchart
+    },
+    setReview(state, action: PayloadAction<{ workspacePath: string; review: WorkbenchReview | null }>) {
+      state.reviewPath = action.payload.workspacePath
+      state.review = action.payload.review
     },
     upsertSession(state, action: PayloadAction<{ session: WorkbenchSession }>) {
       const idx = state.sessions.findIndex((item) => item.id === action.payload.session.id)
@@ -127,6 +152,7 @@ export const {
   setActive,
   setFlowchart,
   setQuestions,
+  setReview,
   setSessions,
   setStage,
   upsertSession,

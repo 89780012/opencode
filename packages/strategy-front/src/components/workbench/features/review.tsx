@@ -69,9 +69,13 @@ export function Review(props: {
                         const Icon = badge(item.status)
                         return (
                           <div key={item.text} className={css.step}>
-                            <div className={css.stepmain}>
-                              <Icon size={15} className={`${css.stepicon} ${css[`stepicon_${tone(item.status)}`]}`} />
-                              <strong>{item.text}</strong>
+                            <div className={css.stepcopy}>
+                              <div className={css.stepmain}>
+                                <Icon size={15} className={`${css.stepicon} ${css[`stepicon_${tone(item.status)}`]}`} />
+                                <strong>{item.text}</strong>
+                              </div>
+                              {item.detail ? <p>{item.detail}</p> : null}
+                              {item.suggestion ? <p className={css.fix}>{item.suggestion}</p> : null}
                             </div>
                             <em>{stepText(item.status)}</em>
                           </div>
@@ -87,9 +91,13 @@ export function Review(props: {
                         const Icon = badge(item.status)
                         return (
                           <div key={item.text} className={css.step}>
-                            <div className={css.stepmain}>
-                              <Icon size={15} className={`${css.stepicon} ${css[`stepicon_${tone(item.status)}`]}`} />
-                              <strong>{item.text}</strong>
+                            <div className={css.stepcopy}>
+                              <div className={css.stepmain}>
+                                <Icon size={15} className={`${css.stepicon} ${css[`stepicon_${tone(item.status)}`]}`} />
+                                <strong>{item.text}</strong>
+                              </div>
+                              {item.detail ? <p>{item.detail}</p> : null}
+                              {item.suggestion ? <p className={css.fix}>{item.suggestion}</p> : null}
                             </div>
                             <em>{stepText(item.status)}</em>
                           </div>

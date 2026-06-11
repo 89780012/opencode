@@ -15,6 +15,8 @@ export interface Msg {
 export interface Step {
   text: string
   status: StepStatus
+  detail?: string
+  suggestion?: string
 }
 
 export interface ReviewRecord {

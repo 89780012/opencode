@@ -10,8 +10,12 @@ import {
   mermaid,
   noteAnalysis,
   noteChart,
+  noteReview,
   requestAnalysis,
   requestChart,
+  review,
+  reviewState,
+  reviewText,
   serial,
   validAnalysis,
   validChart,
@@ -48,6 +52,22 @@ type ChartRow = SaveChart & {
   updatedAt: number
 }
 
+export type ReviewItem = {
+  name: string
+  status: string
+  detail: string
+  suggestion: string
+}
+
+export type SaveReview = {
+  workspacePath: string
+  worktreePath: string
+  state?: "running" | "passed" | "failed" | "error"
+  summary: string
+  items: ReviewItem[]
+  suggestions: string[]
+}
+
 export type Pending =
   | {
       kind: "analysis"
@@ -64,11 +84,19 @@ export type Pending =
       code: string
       err: string
     }
+  | {
+      kind: "review"
+      workspacePath: string
+      worktreePath: string
+      state: "passed" | "failed" | "error"
+      text: string
+    }
 
 type Opt = {
   workspaces: Map<string, Analysis>
   charts: Map<string, Chart>
   pending: Map<string, Pending>
+  reviewRequests: Set<string>
   workspace: string
   worktree: string
   id: string
@@ -110,6 +138,28 @@ function noteSave(input: Pending) {
         null,
         2,
       ),
+      "After the MCP tool succeeds, continue with the current task.",
+    ].join("\n")
+  }
+  if (input.kind === "review") {
+    return [
+      "The strategy review task has completed. Before continuing, convert the following Chinese review report into a strict JSON argument for the strategy-service MCP tool `smartx_save_review`.",
+      "Required fixed fields:",
+      `- workspacePath: ${input.workspacePath}`,
+      `- worktreePath: ${input.worktreePath}`,
+      `- state: ${input.state}`,
+      "Required generated fields:",
+      "- summary: concise Chinese review summary",
+      "- items: Chinese review items, each with name, status, detail, suggestion",
+      "- suggestions: Chinese suggestion list",
+      "Rules:",
+      "- Keep every natural-language field in Chinese.",
+      "- Faithfully convert the report and do not invent extra issues.",
+      "- Use item status only from: passed, warning, failed, error.",
+      "- If the report says the review cannot be completed, keep the overall state as error.",
+      "",
+      "Review report:",
+      input.text,
       "After the MCP tool succeeds, continue with the current task.",
     ].join("\n")
   }
@@ -162,6 +212,21 @@ export function createWorkspace(opt: Opt) {
         return true
       }
 
+      const sessionID = input.sessionID
+      if (sessionID) {
+        const requestID = opt.id + "\x00" + sessionID
+        if (opt.reviewRequests.has(requestID)) {
+          opt.reviewRequests.delete(requestID)
+          await opt.write("workspace review gate injected", {
+            sessionID,
+            workspace: opt.workspace,
+            worktree: opt.worktree,
+          })
+          output.system.push(noteReview({ workspace: opt.workspace, worktree: opt.worktree, sessionID }))
+          return true
+        }
+      }
+
       // true 情况 2：当前 workspace/worktree 还没有完成策略运行逻辑分析。
       // 注入 workspace-analyzer 门禁，让主 agent 先启动分析子 agent。
       if (!analysis || analysis.state === "requested") {
@@ -208,7 +273,16 @@ export function createWorkspace(opt: Opt) {
         return true
       }
 
-      // true 情况 2：主 agent 正在启动分析子 agent。
+      if (review({ tool: input.tool, args: output.args })) {
+        await opt.write("workspace review started", {
+          sessionID: input.sessionID,
+          workspace: opt.workspace,
+          worktree: opt.worktree,
+        })
+        return true
+      }
+
+      // true 情况 3：主 agent 正在启动分析子 agent。
       // 记录 analysis 进入 running 状态，避免系统提示重复要求启动 analyzer。
       if (analyze({ tool: input.tool, args: output.args })) {
         opt.workspaces.set(opt.id, freshAnalysis(opt.workspace, opt.worktree))
@@ -249,6 +323,16 @@ export function createWorkspace(opt: Opt) {
         return true
       }
 
+      if (mcp(input, "save_review") && same(input.args, opt.workspace, opt.worktree) && ok(output)) {
+        if (opt.pending.get(opt.id)?.kind === "review") opt.pending.delete(opt.id)
+        await opt.write("workspace review saved through mcp", {
+          sessionID: input.sessionID,
+          workspace: opt.workspace,
+          worktree: opt.worktree,
+        })
+        return true
+      }
+
       // true 情况 3：流程图子 agent 调用结束。
       // 解析 Mermaid，记录到本地缓存，并生成待 MCP 保存任务。
       if (flowchart(input)) {
@@ -275,6 +359,25 @@ export function createWorkspace(opt: Opt) {
           workspace: opt.workspace,
           worktree: opt.worktree,
           state: next.state,
+        })
+        return true
+      }
+
+      if (review(input)) {
+        const text = reviewText(output.output) || "审查报告为空。"
+        const state = reviewState(text)
+        opt.pending.set(opt.id, {
+          kind: "review",
+          workspacePath: opt.workspace,
+          worktreePath: opt.worktree,
+          state,
+          text,
+        })
+        await opt.write("workspace review completed", {
+          sessionID: input.sessionID,
+          workspace: opt.workspace,
+          worktree: opt.worktree,
+          state,
         })
         return true
       }

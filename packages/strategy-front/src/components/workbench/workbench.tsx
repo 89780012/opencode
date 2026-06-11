@@ -6,6 +6,7 @@ import { usePanels } from "./hooks/use-panels"
 import { useWorkbenchAnalysisSync } from "./hooks/use-workbench-analysis"
 import { useWorkbenchFlowchartSync } from "./hooks/use-workbench-flowchart"
 import { useWorkbenchQuestionSync } from "./hooks/use-workbench-question"
+import { useWorkbenchReviewSync } from "./hooks/use-workbench-review"
 import { useWorkbenchSessionSync } from "./hooks/use-workbench-session-sync"
 import { Handle } from "./layout/handle"
 import { Topbar } from "./layout/topbar"
@@ -16,6 +17,7 @@ export function Workbench() {
   useWorkbenchQuestionSync()
   useWorkbenchAnalysisSync()
   useWorkbenchFlowchartSync()
+  useWorkbenchReviewSync()
 
   const panel = usePanels()
 

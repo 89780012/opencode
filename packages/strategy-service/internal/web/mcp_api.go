@@ -58,7 +58,7 @@ func (a *API) mcpPost(c *gin.Context) {
 				"name":    "strategy-service",
 				"version": "dev",
 			},
-			"instructions": "Use start/logs for SmartX runtime work and save_analysis/save_flowchart to persist workspace analysis results.",
+			"instructions": "Use start/logs for SmartX runtime work, get_requirements for workspace requirements, and save_analysis/save_flowchart/save_review to persist workspace analysis results.",
 		})
 	case "notifications/initialized":
 		c.Status(202)
@@ -134,6 +134,14 @@ func (a *API) mcpPost(c *gin.Context) {
 					}, []string{"workspacePath"}),
 				},
 				{
+					"name":        "get_requirements",
+					"description": "Read the requirement list identified for a SmartX workspace session.",
+					"inputSchema": schema(map[string]any{
+						"workspacePath": prop("string", "Workspace path."),
+						"sessionId":     prop("string", "Workbench session id."),
+					}, []string{"workspacePath", "sessionId"}),
+				},
+				{
 					"name":        "save_flowchart",
 					"description": "Persist workspace strategy flowchart Mermaid code.",
 					"inputSchema": schema(map[string]any{
@@ -150,6 +158,46 @@ func (a *API) mcpPost(c *gin.Context) {
 				{
 					"name":        "get_flowchart",
 					"description": "Read persisted workspace strategy flowchart.",
+					"inputSchema": schema(map[string]any{
+						"workspacePath": prop("string", "Workspace path."),
+						"worktreePath":  prop("string", "Worktree path. Defaults to workspacePath."),
+					}, []string{"workspacePath"}),
+				},
+				{
+					"name":        "save_review",
+					"description": "Persist workspace strategy review results. Always write summary, items, and suggestions in Chinese.",
+					"inputSchema": schema(map[string]any{
+						"workspacePath": prop("string", "Workspace path."),
+						"worktreePath":  prop("string", "Worktree path. Defaults to workspacePath."),
+						"state":         prop("string", "Review state: running, passed, failed, or error."),
+						"summary":       prop("string", "Required Chinese review summary."),
+						"items": map[string]any{
+							"type":        "array",
+							"description": "Required Chinese review items.",
+							"items": map[string]any{
+								"type": "object",
+								"properties": map[string]any{
+									"name":       prop("string", "Chinese review item name."),
+									"status":     prop("string", "Item status: passed, failed, warning, running, or error."),
+									"detail":     prop("string", "Chinese review detail."),
+									"suggestion": prop("string", "Chinese fix suggestion."),
+								},
+								"required":             []string{"name", "status", "detail"},
+								"additionalProperties": false,
+							},
+						},
+						"suggestions": map[string]any{
+							"type":        "array",
+							"description": "Chinese follow-up suggestions.",
+							"items": map[string]any{
+								"type": "string",
+							},
+						},
+					}, []string{"workspacePath", "summary", "items", "suggestions"}),
+				},
+				{
+					"name":        "get_review",
+					"description": "Read persisted workspace strategy review.",
 					"inputSchema": schema(map[string]any{
 						"workspacePath": prop("string", "Workspace path."),
 						"worktreePath":  prop("string", "Worktree path. Defaults to workspacePath."),
@@ -214,6 +262,13 @@ func (a *API) mcpPost(c *gin.Context) {
 					WorktreePath:  text(args["worktreePath"]),
 				})
 			})
+		case "get_requirements":
+			mcpWorkbench(c.Request.Context(), req.ID, c, func(ctx context.Context) (any, error) {
+				return a.bench.GetRequirements(ctx, workbench.RequirementsGet{
+					WorkspacePath: text(args["workspacePath"]),
+					SessionID:     text(args["sessionId"]),
+				})
+			})
 		case "save_flowchart":
 			mcpWorkbench(c.Request.Context(), req.ID, c, func(ctx context.Context) (any, error) {
 				data, err := a.bench.SaveFlowchart(ctx, workbench.FlowchartReq{
@@ -234,6 +289,28 @@ func (a *API) mcpPost(c *gin.Context) {
 		case "get_flowchart":
 			mcpWorkbench(c.Request.Context(), req.ID, c, func(ctx context.Context) (any, error) {
 				return a.bench.GetFlowchart(ctx, workbench.FlowchartGet{
+					WorkspacePath: text(args["workspacePath"]),
+					WorktreePath:  text(args["worktreePath"]),
+				})
+			})
+		case "save_review":
+			mcpWorkbench(c.Request.Context(), req.ID, c, func(ctx context.Context) (any, error) {
+				data, err := a.bench.SaveReview(ctx, workbench.ReviewReq{
+					WorkspacePath: text(args["workspacePath"]),
+					WorktreePath:  text(args["worktreePath"]),
+					State:         text(args["state"]),
+					Summary:       text(args["summary"]),
+					Items:         reviewItems(args["items"]),
+					Suggestions:   texts(args["suggestions"]),
+				})
+				if err == nil {
+					a.event.emitBroadcast("review.updated", utils.Pack(data))
+				}
+				return data, err
+			})
+		case "get_review":
+			mcpWorkbench(c.Request.Context(), req.ID, c, func(ctx context.Context) (any, error) {
+				return a.bench.GetReview(ctx, workbench.ReviewGet{
 					WorkspacePath: text(args["workspacePath"]),
 					WorktreePath:  text(args["worktreePath"]),
 				})
@@ -332,6 +409,27 @@ func texts(v any) []string {
 	out := make([]string, 0, len(list))
 	for _, item := range list {
 		out = append(out, text(item))
+	}
+	return out
+}
+
+func reviewItems(v any) []workbench.ReviewItem {
+	list, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]workbench.ReviewItem, 0, len(list))
+	for _, item := range list {
+		row, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		out = append(out, workbench.ReviewItem{
+			Name:       text(row["name"]),
+			Status:     text(row["status"]),
+			Detail:     text(row["detail"]),
+			Suggestion: text(row["suggestion"]),
+		})
 	}
 	return out
 }

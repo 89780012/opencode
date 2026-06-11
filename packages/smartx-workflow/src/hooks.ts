@@ -1,6 +1,6 @@
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 import { createPairing } from "./pairing.js"
-import { key, type Analysis, type Chart, type Flow } from "./state.js"
+import { key, wantsReview, type Analysis, type Chart, type Flow } from "./state.js"
 import { createWorkspace, loadChartRemote, loadRemote, type Pending } from "./workspace.js"
 
 type Dep = {
@@ -8,6 +8,7 @@ type Dep = {
   workspaces?: Map<string, Analysis>
   charts?: Map<string, Chart>
   pending?: Map<string, Pending>
+  reviewRequests?: Set<string>
   service?: string
   load?: (workspace: string, worktree: string) => Promise<Analysis | undefined>
   loadChart?: (workspace: string, worktree: string) => Promise<Chart | undefined>
@@ -18,6 +19,7 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
   const workspaces = dep.workspaces ?? new Map<string, Analysis>()
   const charts = dep.charts ?? new Map<string, Chart>()
   const pending = dep.pending ?? new Map<string, Pending>()
+  const reviewRequests = dep.reviewRequests ?? new Set<string>()
   const workspace = ctx.directory
   const worktree = ctx.worktree || ctx.directory
   const id = workspace ? key(workspace, worktree) : ""
@@ -38,6 +40,7 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
     workspaces,
     charts,
     pending,
+    reviewRequests,
     workspace,
     worktree,
     id,
@@ -53,6 +56,20 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
   })
 
   return {
+    "chat.message": async (input, output) => {
+      if (!id || !input.sessionID) return
+      const text = output.parts
+        .filter((part): part is typeof part & { type: "text"; text: string } => part.type === "text" && typeof part.text === "string")
+        .map((part) => part.text)
+        .join("\n")
+      if (!wantsReview(text)) return
+      reviewRequests.add(id + "\x00" + input.sessionID)
+      await write("workspace review requested", {
+        sessionID: input.sessionID,
+        workspace,
+        worktree,
+      })
+    },
     "experimental.chat.system.transform": async (input, output) => {
       if (!input.sessionID) return
 

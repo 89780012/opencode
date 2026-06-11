@@ -247,6 +247,30 @@ func (s *Service) Identify(ctx context.Context, req IdentifyReq) (IdentifyRes, e
 	return out, nil
 }
 
+func (s *Service) GetRequirements(ctx context.Context, req RequirementsGet) (RequirementsRow, error) {
+	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
+	req.SessionID = strings.TrimSpace(req.SessionID)
+	if req.WorkspacePath == "" {
+		return RequirementsRow{}, fmt.Errorf("workspacePath is required")
+	}
+	if req.SessionID == "" {
+		return RequirementsRow{}, fmt.Errorf("sessionId is required")
+	}
+	doc, err := db.Open()
+	if err != nil {
+		return RequirementsRow{}, err
+	}
+	reqs, err := loadReqs(ctx, doc, req.WorkspacePath, req.SessionID)
+	if err != nil {
+		return RequirementsRow{}, err
+	}
+	return RequirementsRow{
+		WorkspacePath: req.WorkspacePath,
+		SessionID:     req.SessionID,
+		Requirements:  reqs,
+	}, nil
+}
+
 func (s *Service) SaveAnalysis(ctx context.Context, req AnalysisReq) (AnalysisRow, error) {
 	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
 	req.WorktreePath = strings.TrimSpace(req.WorktreePath)
@@ -404,6 +428,90 @@ func (s *Service) SaveFlowchart(ctx context.Context, req FlowchartReq) (Flowchar
 		return FlowchartRow{}, err
 	}
 	return row, nil
+}
+
+func (s *Service) GetReview(ctx context.Context, req ReviewGet) (ReviewRow, error) {
+	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
+	req.WorktreePath = strings.TrimSpace(req.WorktreePath)
+	if req.WorkspacePath == "" {
+		return ReviewRow{}, fmt.Errorf("workspacePath is required")
+	}
+	if req.WorktreePath == "" {
+		req.WorktreePath = req.WorkspacePath
+	}
+	doc, err := db.Open()
+	if err != nil {
+		return ReviewRow{}, err
+	}
+	var row ReviewRow
+	var items string
+	var suggestions string
+	err = doc.QueryRowContext(ctx, `select workspace_path, worktree_path, state, summary, items, suggestions, updated_at from workspace_reviews where workspace_path = ? and worktree_path = ?`,
+		req.WorkspacePath, req.WorktreePath).Scan(&row.WorkspacePath, &row.WorktreePath, &row.State, &row.Summary, &items, &suggestions, &row.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return ReviewRow{}, db.ErrNotFound
+	}
+	if err != nil {
+		return ReviewRow{}, err
+	}
+	if err := json.Unmarshal([]byte(items), &row.Items); err != nil {
+		return ReviewRow{}, err
+	}
+	if err := json.Unmarshal([]byte(suggestions), &row.Suggestions); err != nil {
+		return ReviewRow{}, err
+	}
+	row.Items = reviewItems(row.Items)
+	row.Suggestions = clean(row.Suggestions)
+	return row, nil
+}
+
+func (s *Service) SaveReview(ctx context.Context, req ReviewReq) (ReviewRow, error) {
+	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
+	req.WorktreePath = strings.TrimSpace(req.WorktreePath)
+	req.State = strings.TrimSpace(req.State)
+	req.Summary = strings.TrimSpace(req.Summary)
+	req.Items = reviewItems(req.Items)
+	req.Suggestions = clean(req.Suggestions)
+	if req.WorkspacePath == "" {
+		return ReviewRow{}, fmt.Errorf("workspacePath is required")
+	}
+	if req.WorktreePath == "" {
+		req.WorktreePath = req.WorkspacePath
+	}
+	if req.State == "" {
+		req.State = reviewState(req.Items)
+	}
+	if req.State != "running" && req.State != "passed" && req.State != "failed" && req.State != "error" {
+		return ReviewRow{}, fmt.Errorf("invalid review state")
+	}
+	body, err := json.Marshal(req.Items)
+	if err != nil {
+		return ReviewRow{}, err
+	}
+	tips, err := json.Marshal(req.Suggestions)
+	if err != nil {
+		return ReviewRow{}, err
+	}
+	now := time.Now().UnixMilli()
+	doc, err := db.Open()
+	if err != nil {
+		return ReviewRow{}, err
+	}
+	_, err = doc.ExecContext(ctx, `insert into workspace_reviews(workspace_path, worktree_path, state, summary, items, suggestions, updated_at) values (?, ?, ?, ?, ?, ?, ?)
+on conflict(workspace_path, worktree_path) do update set state = excluded.state, summary = excluded.summary, items = excluded.items, suggestions = excluded.suggestions, updated_at = excluded.updated_at`,
+		req.WorkspacePath, req.WorktreePath, req.State, req.Summary, string(body), string(tips), now)
+	if err != nil {
+		return ReviewRow{}, err
+	}
+	return ReviewRow{
+		WorkspacePath: req.WorkspacePath,
+		WorktreePath:  req.WorktreePath,
+		State:         req.State,
+		Summary:       req.Summary,
+		Items:         req.Items,
+		Suggestions:   req.Suggestions,
+		UpdatedAt:     now,
+	}, nil
 }
 
 func (s *Service) saveFlow(ctx context.Context, row FlowchartRow) error {
@@ -573,6 +681,39 @@ func cleanHits(list []Hit) []Hit {
 		out = append(out, item)
 	}
 	return out
+}
+
+func reviewItems(list []ReviewItem) []ReviewItem {
+	out := list[:0]
+	for _, item := range list {
+		item.Name = strings.TrimSpace(item.Name)
+		item.Status = strings.TrimSpace(item.Status)
+		item.Detail = strings.TrimSpace(item.Detail)
+		item.Suggestion = strings.TrimSpace(item.Suggestion)
+		if item.Name == "" && item.Detail == "" && item.Suggestion == "" {
+			continue
+		}
+		if item.Status != "passed" && item.Status != "failed" && item.Status != "warning" && item.Status != "running" && item.Status != "error" {
+			item.Status = "passed"
+		}
+		out = append(out, item)
+	}
+	return out
+}
+
+func reviewState(list []ReviewItem) string {
+	for _, item := range list {
+		if item.Status == "error" {
+			return "error"
+		}
+		if item.Status == "failed" || item.Status == "warning" {
+			return "failed"
+		}
+		if item.Status == "running" {
+			return "running"
+		}
+	}
+	return "passed"
 }
 
 func items(text string) []string {

@@ -80,6 +80,17 @@ type AnalysisReq struct {
 	Text          string   `json:"text"`
 }
 
+type RequirementsGet struct {
+	WorkspacePath string `form:"workspacePath" json:"workspacePath"`
+	SessionID     string `form:"sessionId" json:"sessionId"`
+}
+
+type RequirementsRow struct {
+	WorkspacePath string   `json:"workspacePath"`
+	SessionID     string   `json:"sessionId"`
+	Requirements  []string `json:"requirements"`
+}
+
 type AnalysisGet struct {
 	WorkspacePath string `form:"workspacePath" json:"workspacePath"`
 	WorktreePath  string `form:"worktreePath" json:"worktreePath"`
@@ -120,4 +131,35 @@ type FlowchartRow struct {
 	Manual        bool   `json:"manual"`
 	Source        string `json:"source"`
 	UpdatedAt     int64  `json:"updatedAt"`
+}
+
+type ReviewItem struct {
+	Name       string `json:"name"`
+	Status     string `json:"status"`
+	Detail     string `json:"detail"`
+	Suggestion string `json:"suggestion,omitempty"`
+}
+
+type ReviewReq struct {
+	WorkspacePath string       `json:"workspacePath"`
+	WorktreePath  string       `json:"worktreePath"`
+	State         string       `json:"state,omitempty"`
+	Summary       string       `json:"summary"`
+	Items         []ReviewItem `json:"items"`
+	Suggestions   []string     `json:"suggestions"`
+}
+
+type ReviewGet struct {
+	WorkspacePath string `form:"workspacePath" json:"workspacePath"`
+	WorktreePath  string `form:"worktreePath" json:"worktreePath"`
+}
+
+type ReviewRow struct {
+	WorkspacePath string       `json:"workspacePath"`
+	WorktreePath  string       `json:"worktreePath"`
+	State         string       `json:"state"`
+	Summary       string       `json:"summary"`
+	Items         []ReviewItem `json:"items"`
+	Suggestions   []string     `json:"suggestions"`
+	UpdatedAt     int64        `json:"updatedAt"`
 }

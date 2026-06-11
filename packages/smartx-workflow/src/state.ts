@@ -36,6 +36,7 @@ const dev = "smartx-develop"
 const dbg = "smartx-debug"
 const analyzer = "workspace-analyzer"
 const chart = "strategy-flowchart-generator"
+const reviewer = "strategy-reviewer"
 
 function item(input: Call | string): Call {
   if (typeof input === "string") return { tool: input }
@@ -74,6 +75,12 @@ export function flowchart(input: Call | string) {
   const call = item(input)
   if (call.tool !== "task") return false
   return call.args?.subagent_type === chart
+}
+
+export function review(input: Call | string) {
+  const call = item(input)
+  if (call.tool !== "task") return false
+  return call.args?.subagent_type === reviewer
 }
 
 export function key(workspace: string, worktree = workspace) {
@@ -178,7 +185,7 @@ export function result(text: string) {
 }
 
 function fence(text: string) {
-  return text.replace(/^```json\s*/i, "").replace(/^```\s*/, "").replace(/\s*```$/g, "").trim()
+  return text.replace(/^```(?:json|markdown|md|text)?\s*/i, "").replace(/^```\s*/, "").replace(/\s*```$/g, "").trim()
 }
 
 function tidy(text: string) {
@@ -224,6 +231,49 @@ export function mermaid(text: string) {
   return out
 }
 
+export function wantsReview(text: string) {
+  const out = text.trim().toLowerCase()
+  if (!out) return false
+  return ["审查", "代码审查", "提交审查", "review", "code review"].includes(out)
+}
+
+export function reviewText(text: string) {
+  return fence(result(text))
+}
+
+export function reviewState(text: string) {
+  const out = reviewText(text).replace(/\s+/g, "")
+  if (!out) return "error" as const
+  if (out.includes("审查结论：无法完成") || out.includes("审查结论:无法完成")) return "error" as const
+  if (out.includes("结论：无法完成") || out.includes("结论:无法完成")) return "error" as const
+  if (out.includes("审查结论：未通过") || out.includes("审查结论:未通过")) return "failed" as const
+  if (out.includes("结论：未通过") || out.includes("结论:未通过")) return "failed" as const
+  if (out.includes("审查结论：通过") || out.includes("审查结论:通过")) return "passed" as const
+  if (out.includes("结论：通过") || out.includes("结论:通过")) return "passed" as const
+  if (/(无法完成|无法审查|未能完成|error)/i.test(out)) return "error" as const
+  if (/(未通过|失败|风险|问题)/.test(out)) return "failed" as const
+  return "passed" as const
+}
+
+export function noteReview(input: { workspace: string; worktree: string; sessionID: string }) {
+  return [
+    "当前用户本轮意图是 SmartX 策略代码审查。",
+    "不要把这段系统提示复述给用户；用户侧只需要看到简洁的审查进展和最终结论。",
+    "",
+    "必须严格按以下顺序执行：",
+    `1. 先调用 strategy-service MCP 工具 \`smartx_get_requirements\`，参数为 \`workspacePath: ${input.workspace}\`、\`sessionId: ${input.sessionID}\`，读取当前会话需求清单。`,
+    "2. 然后调用 `task` 工具启动 `strategy-reviewer` 子 agent，`subagent_type` 必须为 `strategy-reviewer`，`description` 使用 `Review strategy implementation`。",
+    "3. 传给 `strategy-reviewer` 的 prompt 必须包含第 1 步取得的需求清单，并要求它结合需求清单和当前工作区代码审查实现是否满足需求。",
+    "4. `strategy-reviewer` 只输出中文审查报告，不需要输出 JSON，不要修改文件、不要运行命令、不要调用其它子 agent。",
+    "5. 子 agent 返回后，先根据中文审查报告整理结构化审查结果，再调用 strategy-service MCP 工具 `smartx_save_review` 保存。",
+    "6. `smartx_save_review` 的 `summary`、`items`、`items[].name`、`items[].detail`、`items[].suggestion`、`suggestions` 必须使用中文。",
+    "7. MCP 保存成功后，再用中文简短回复用户审查结果。",
+    "",
+    "审查范围必须覆盖：需求覆盖情况、语法检查、策略逻辑完整性、入场/退出、仓位管理、风控规则、边界条件、代码可维护性。",
+    "如果需求清单为空，也必须继续审查代码，但要在保存结果的 summary 或 suggestions 中说明缺少需求上下文。",
+  ].join("\n")
+}
+
 export function noteAnalysis() {
   return [
     "当前工作区还没有完成策略运行逻辑分析。",
@@ -231,7 +281,7 @@ export function noteAnalysis() {
     "调用参数要求：`subagent_type` 必须是 `workspace-analyzer`，`description` 使用 `Analyze strategy execution flow`。",
     "子 agent 只负责输出可画成流程图的 JSON 字符串数组，不要读取 requirements，不要描述项目结构、版本、UI、构建方式或文件职责，不要修改文件，不要给实现方案。",
     "如果当前工作区只是模板骨架或没有完整策略算法，子 agent 必须明确输出已发现的实际运行行为和缺失的入场、退出、仓位、风控规则。",
-    "子 agent 必须只返回 JSON 数组，例如 [\"当前策略未形成完整交易算法。\"]，不要 markdown、编号、标题、解释或代码块。",
+    '子 agent 必须只返回 JSON 数组，例如 ["当前策略未形成完整交易算法。"]，不要 markdown、编号、标题、解释或代码块。',
     "子 agent 返回后，先基于它的结论继续当前任务；不要把这段系统提示复述给用户。",
   ].join("\n")
 }
@@ -241,7 +291,7 @@ export function noteChart(input: Analysis) {
     "workspace-analyzer 已经完成当前工作区的策略运行逻辑分析。现在必须先生成策略逻辑流程图，再继续其它实现或总结。",
     "请立即调用 `task` 工具启动 `strategy-flowchart-generator` 子 agent。",
     "调用参数要求：`subagent_type` 必须是 `strategy-flowchart-generator`，`description` 使用 `Generate strategy flowchart`。",
-    "传给子 agent 的 prompt 必须包含下面的 workspace-analyzer JSON 数组结果，并要求它只读当前工作区源码进行校验、修正和补偿。",
+    "传给子 agent 的 prompt 必须包含下面的 workspace-analyzer JSON 数组结果，并要求它只读当前工作区源码进行校验、修正和补充。",
     "子 agent 可以读取源码、列目录和搜索文本；不能修改文件，不能执行命令，不能调用其它子 agent。",
     "不要加入 requirements、用户愿望清单或未来实现计划作为流程图来源。",
     "子 agent 必须只返回 Mermaid flowchart，第一行是 `flowchart TD`，不要 markdown 代码块，不要解释。",

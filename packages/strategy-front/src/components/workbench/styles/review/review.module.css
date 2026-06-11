@@ -161,6 +161,23 @@
   gap: 0.5rem;
 }
 
+.stepcopy {
+  min-width: 0;
+  display: grid;
+  gap: 0.15rem;
+}
+
+.stepcopy p {
+  margin: 0;
+  color: #475569;
+  font-size: 0.66rem;
+  line-height: 1.45;
+}
+
+.stepcopy .fix {
+  color: #dc2626;
+}
+
 .stepmain strong {
   color: #0f172a;
   font-size: 0.6875rem;
