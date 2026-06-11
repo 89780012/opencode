@@ -730,8 +730,34 @@
 .codeactions {
   display: inline-flex;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.18rem;
   color: #6b7280;
+}
+
+.codeaction {
+  width: 1.42rem;
+  height: 1.42rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 0.32rem;
+  background: transparent;
+  color: #6b7280;
+  padding: 0;
+  transition:
+    background 0.14s ease,
+    color 0.14s ease;
+}
+
+.codeaction:hover {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+.codeaction:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
 }
 
 .codepre {

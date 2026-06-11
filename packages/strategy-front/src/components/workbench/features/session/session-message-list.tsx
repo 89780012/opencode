@@ -1,4 +1,4 @@
-import { Bot, CheckCircle2, ChevronDown, CircleAlert, Copy, Download, FileCode2, LoaderCircle } from "lucide-react"
+import { Bot, Check, CheckCircle2, ChevronDown, CircleAlert, Copy, Download, FileCode2, LoaderCircle } from "lucide-react"
 import { memo, useEffect, useRef, useState, type ReactNode } from "react"
 import { Response } from "@/components/ai-elements/response"
 import { selectSessionParts, useAppSelector } from "@/store"
@@ -152,6 +152,18 @@ function output(part: ChatToolPart) {
   return ""
 }
 
+function ext(lang: string) {
+  const key = lang.toLowerCase()
+  if (key === "shell" || key === "bash" || key === "sh") return "sh"
+  if (key === "javascript" || key === "js") return "js"
+  if (key === "typescript" || key === "ts") return "ts"
+  if (key === "json") return "json"
+  if (key === "markdown" || key === "md") return "md"
+  if (key === "html") return "html"
+  if (key === "css") return "css"
+  return "txt"
+}
+
 function Tool(props: { part: ChatToolPart }) {
   const out = output(props.part)
   const cmd = text(props.part.state.input.command)
@@ -178,13 +190,47 @@ function Tool(props: { part: ChatToolPart }) {
 }
 
 function CodeBlock(props: { lang: string; value: string }) {
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    if (!copied) return
+    const timer = window.setTimeout(() => {
+      setCopied(false)
+    }, 1600)
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [copied])
+
+  const copy = () => {
+    void navigator.clipboard.writeText(props.value).then(
+      () => {
+        setCopied(true)
+      },
+      () => {},
+    )
+  }
+
+  const save = () => {
+    const url = URL.createObjectURL(new Blob([props.value], { type: "text/plain;charset=utf-8" }))
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `code.${ext(props.lang)}`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className={css.codebox}>
       <div className={css.codehead}>
         <span>{props.lang}</span>
         <span className={css.codeactions}>
-          <Download size={13} />
-          <Copy size={13} />
+          <button type="button" className={css.codeaction} aria-label="下载代码块" title="下载" onClick={save}>
+            <Download size={13} />
+          </button>
+          <button type="button" className={css.codeaction} aria-label="复制代码块" title={copied ? "已复制" : "复制"} onClick={copy}>
+            {copied ? <Check size={13} /> : <Copy size={13} />}
+          </button>
         </span>
       </div>
       <pre className={css.codepre}>
