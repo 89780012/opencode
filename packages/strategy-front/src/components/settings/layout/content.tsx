@@ -54,7 +54,6 @@ export function SettingsContent() {
         }}
         onDone={async () => {
           await app.page.refresh()
-          await app.prv.refresh()
         }}
       />
 
@@ -65,7 +64,6 @@ export function SettingsContent() {
         onOpenChange={app.page.setCustomOpen}
         onDone={async () => {
           await app.page.refresh()
-          await app.prv.refresh()
         }}
       />
     </>

@@ -26,6 +26,10 @@ export function modelKey(input: ModelKey) {
   return `${input.providerID}:${input.modelID}`
 }
 
+export function signature(input: ModelKey[]) {
+  return input.map((item) => modelKey(item)).join("|")
+}
+
 function parse(): Store {
   if (typeof window === "undefined") {
     return { user: {}, chain: [], chainTouched: false }

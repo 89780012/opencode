@@ -10,15 +10,12 @@ import {
   normalizeModelChain,
   readModelChain,
   readModelVisibility,
+  signature,
   writeModelCatalog,
   type ModelKey,
 } from "@/lib/model-catalog"
 import { match, sortProvider } from "../logic/catalog"
 import type { Row, Vis } from "../types"
-
-function sig(input: ModelKey[]) {
-  return input.map((item) => modelKey(item)).join("|")
-}
 
 export function useSettings() {
   const page = useProviderPage()
@@ -30,7 +27,7 @@ export function useSettings() {
   const dq = useDeferredValue(q.trim().toLowerCase())
   const sync = useRef(prv.sync)
   const saved = useRef({
-    chain: "",
+    chain: signature(readModelChain().chain),
     touched,
     user: JSON.stringify(user),
   })
@@ -104,7 +101,7 @@ export function useSettings() {
     if (typeof window === "undefined") return
     writeModelCatalog({ user, chain: order, chainTouched: touched })
     const next = {
-      chain: sig(order),
+      chain: signature(order),
       touched,
       user: JSON.stringify(user),
     }

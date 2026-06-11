@@ -9,7 +9,7 @@ import {
 } from "react"
 import { agentApi, mcpApi, modelChainApi, providerApi, skillApi } from "@/api/modules"
 import { note } from "@/lib/error"
-import { latestModels, modelKey, modelVisible, normalizeModelChain, readModelVisibility } from "@/lib/model-catalog"
+import { latestModels, modelKey, modelVisible, normalizeModelChain, readModelVisibility, signature } from "@/lib/model-catalog"
 import type { GlobalAgentCatalog, RuntimeAgent } from "@/types/agent"
 import type { ComposerModel, ProviderCatalogState } from "@/types/composer"
 import type { McpDoc, McpMap } from "@/types/mcp"
@@ -238,6 +238,17 @@ function buildProvider(providers: List, config: Config, auth: AuthMap): Provider
   }
 }
 
+function refs(input: ComposerModel[]) {
+  return input.map((item) => ({
+    providerID: item.provider.id,
+    modelID: item.id,
+  }))
+}
+
+function msig(input: ComposerModel[]) {
+  return signature(refs(input))
+}
+
 async function loadAgent(): Promise<Out<AgentData>> {
   const [run, cfg] = await Promise.allSettled([agentApi.listRuntime(), agentApi.listGlobal()])
   const doc = cfg.status === "fulfilled" ? normAgentCfg(cfg.value) : emptyAgent.cfg
@@ -429,13 +440,16 @@ export function useGlobalDataValue() {
   const syncProvider = useCallback(() => {
     const prev = ref.current.provider
     if (!prev.ready) return
+    const next = buildProvider(prev.data.providers, prev.data.config, prev.data.auth)
+
+    if (msig(prev.data.visibleModels) === msig(next.visibleModels) && msig(prev.data.chainModels) === msig(next.chainModels)) return
 
     dispatch({
       type: "load_done",
       key: "provider",
       box: {
         ...prev,
-        data: buildProvider(prev.data.providers, prev.data.config, prev.data.auth),
+        data: next,
         load: false,
         stale: false,
         stamp: Date.now(),
@@ -469,14 +483,13 @@ export function useGlobalDataValue() {
     }
   }, [ensure])
 
-  useEffect(() => {
-    if (!state.provider.ready) return
+  const list = useMemo(() => (state.provider.ready ? refs(state.provider.data.chainModels) : []), [
+    state.provider.data.chainModels,
+    state.provider.ready,
+  ])
+  const sig = signature(list)
 
-    const list = state.provider.data.chainModels.map((item) => ({
-      providerID: item.provider.id,
-      modelID: item.id,
-    }))
-    const sig = list.map((item) => `${item.providerID}:${item.modelID}`).join("|")
+  useEffect(() => {
     if (!sig || chain.current === sig) return
 
     chain.current = sig
@@ -486,10 +499,8 @@ export function useGlobalDataValue() {
         if (cfg.chain.length > 0) return
         return modelChainApi.save({ chain: list })
       })
-      .catch(() => {
-        chain.current = ""
-      })
-  }, [state.provider.data.chainModels, state.provider.ready])
+      .catch(() => undefined)
+  }, [list, sig])
 
   return useMemo(
     () => ({
