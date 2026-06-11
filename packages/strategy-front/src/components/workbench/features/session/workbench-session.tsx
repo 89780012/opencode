@@ -31,26 +31,22 @@ export function WorkbenchSession(props: {
           <span className={css.topiclabel}>当前问题：</span>
           <span className={css.topictext}>{ask || "暂无提问"}</span>
         </div>
-        <div className={css.modes}>
-          <button
-            type="button"
-            className={`${css.mode} ${props.mode === "narrow" ? css.modeOn : ""}`}
-            aria-label="窄屏会话"
-            title="窄屏会话"
-            onClick={() => props.onMode("narrow")}
-          >
+        <button
+          type="button"
+          className={css.modes}
+          data-mode={props.mode}
+          aria-pressed={props.mode === "full"}
+          aria-label={props.mode === "full" ? "切换到窄屏会话" : "切换到整宽会话"}
+          title={props.mode === "full" ? "切换到窄屏会话" : "切换到整宽会话"}
+          onClick={() => props.onMode(props.mode === "full" ? "narrow" : "full")}
+        >
+          <span className={`${css.mode} ${props.mode === "narrow" ? css.modeOn : ""}`}>
             <Minimize2 size={14} />
-          </button>
-          <button
-            type="button"
-            className={`${css.mode} ${props.mode === "full" ? css.modeOn : ""}`}
-            aria-label="整宽会话"
-            title="整宽会话"
-            onClick={() => props.onMode("full")}
-          >
+          </span>
+          <span className={`${css.mode} ${props.mode === "full" ? css.modeOn : ""}`}>
             <Maximize2 size={14} />
-          </button>
-        </div>
+          </span>
+        </button>
       </div>
       <SessionMessageList
         loading={props.real.chat.detailLoading && !!props.real.chat.selectedSessionId}

@@ -268,44 +268,51 @@
 }
 
 .cardmiss {
-  border-color: #fed7aa;
-  background: #fffaf5;
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.cardmiss span {
+  color: #b91c1c;
 }
 
 .reqbox {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 0.36rem;
 }
 
 .reqitem {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr) auto;
+  grid-template-areas: "idx input del";
+  align-items: center;
   gap: 0.42rem;
   border: 1px solid #eef2f7;
   border-radius: 0.38rem;
-  padding: 0.54rem;
+  padding: 0.36rem 0.42rem;
 }
 
 .reqtop {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.6rem;
+  display: contents;
 }
 
 .idx {
+  grid-area: idx;
   color: #94a3b8;
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.08em;
 }
 
+.reqitem input {
+  grid-area: input;
+  min-width: 0;
+  padding: 0.42rem 0.5rem;
+}
+
 .tags {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.34rem;
+  display: none;
 }
 
 .tag {
@@ -348,10 +355,11 @@
 }
 
 .del {
+  grid-area: del;
   border: 1px solid #fecaca;
   background: #fef2f2;
   color: #b91c1c;
-  padding: 0.34rem 0.52rem;
+  padding: 0.34rem 0.46rem;
 }
 
 .add {

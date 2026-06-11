@@ -59,45 +59,75 @@
 }
 
 .modes {
+  position: relative;
   flex: none;
   display: inline-flex;
   align-items: center;
-  gap: 0.12rem;
-  border: 0;
-  border-radius: 0.45rem;
-  background: transparent;
-  padding: 0;
+  gap: 0;
+  width: 3.96rem;
+  height: 2rem;
+  overflow: hidden;
+  border: 1px solid #dbe2ea;
+  border-radius: 0.78rem;
+  background: #f8fafc;
+  color: inherit;
+  font: inherit;
+  padding: 0.18rem;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+}
+
+.modes::before {
+  content: "";
+  position: absolute;
+  top: 0.18rem;
+  bottom: 0.18rem;
+  left: 0.18rem;
+  width: calc((100% - 0.36rem) / 2);
+  border-radius: 0.6rem;
+  background: #111827;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.22);
+  transition: transform 0.18s ease;
+}
+
+.modes[data-mode="full"]::before {
+  transform: translateX(100%);
+}
+
+.modes:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
 }
 
 .mode {
-  width: 1.72rem;
-  height: 1.72rem;
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  height: 100%;
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: 0.36rem;
-  background: #f3f4f6;
+  border-radius: 0.58rem;
+  background: transparent;
   color: #6b7280;
+  padding: 0;
   transition:
-    background 0.16s ease,
     color 0.16s ease,
-    box-shadow 0.16s ease;
+    transform 0.16s ease;
 }
 
 .mode:hover {
-  background: #e5e7eb;
   color: #111827;
 }
 
 .modeOn {
-  background: #111827;
   color: #ffffff;
-  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.12);
 }
 
 .modeOn:hover {
-  background: #1f2937;
   color: #ffffff;
 }
 
@@ -587,7 +617,16 @@
   color: #059669;
 }
 
+.fold_warn > .foldhead .foldtitle svg,
+.fold_warn .fold_done > .foldhead .foldtitle svg {
+  color: #d97706;
+}
+
 .fold_error .foldtitle svg {
+  color: #dc2626;
+}
+
+.fold_warn .fold_error > .foldhead .foldtitle svg {
   color: #dc2626;
 }
 
@@ -620,6 +659,10 @@
 
 .fold_running .foldbody {
   border-left-color: #d4d4d8;
+}
+
+.fold_warn .foldbody {
+  border-left-color: #fde68a;
 }
 
 .fold_error .foldbody {

@@ -91,23 +91,10 @@ export function Modal(props: {
                 </div>
 
                 {props.data?.summary ? <div className={css.note}>{props.data.summary}</div> : null}
-                {props.data?.model ? <div className={css.meta}>模型：{props.data.model}</div> : null}
-
                 {props.err ? (
                   <div className={`${css.alert} ${css.alertwarn}`}>
                     <AlertTriangle size={14} />
                     <span>{props.err}</span>
-                  </div>
-                ) : null}
-
-                {props.warn.length ? (
-                  <div className={`${css.alert} ${css.alertrisk}`}>
-                    <AlertTriangle size={14} />
-                    <div className={css.stack}>
-                      {props.warn.map((item) => (
-                        <p key={item}>{item}</p>
-                      ))}
-                    </div>
                   </div>
                 ) : null}
 
@@ -143,7 +130,7 @@ export function Modal(props: {
                 </div>
                 <div className={css.reqbox}>
                   {props.rows.map((item, idx) => (
-                    <div key={`${idx}-${item.text}`} className={css.reqitem}>
+                    <div key={`req-${idx}`} className={css.reqitem}>
                       <div className={css.reqtop}>
                         <span className={css.idx}>{String(idx + 1).padStart(2, "0")}</span>
                         <button

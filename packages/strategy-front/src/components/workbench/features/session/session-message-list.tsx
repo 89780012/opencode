@@ -119,7 +119,7 @@ function Fold(props: {
   children: ReactNode
   line?: boolean
   meta?: string
-  state?: "running" | "done" | "error"
+  state?: "running" | "done" | "warn" | "error"
 }) {
   const [open, setOpen] = useState(false)
   const state = props.state ?? "done"
@@ -130,7 +130,7 @@ function Fold(props: {
         <span className={css.foldtitle}>
           {state === "running" ? (
             <LoaderCircle size={15} strokeWidth={2.3} className={common.spin} />
-          ) : state === "error" ? (
+          ) : state === "warn" || state === "error" ? (
             <CircleAlert size={15} strokeWidth={2.3} />
           ) : (
             <CheckCircle2 size={15} strokeWidth={2.3} />
@@ -274,6 +274,7 @@ function proc(parts: ChatPart[]) {
   ) {
     return "running"
   }
+  if (body.some((part) => (part.type === "tool" && part.state.status === "error") || part.type === "retry")) return "warn"
   return "done"
 }
 
