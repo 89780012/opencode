@@ -1,5 +1,6 @@
 import { Bot, Check, CheckCircle2, ChevronDown, CircleAlert, Copy, Download, FileCode2, LoaderCircle } from "lucide-react"
-import { memo, useEffect, useRef, useState, type ReactNode } from "react"
+import { memo, useEffect, useState, type ReactNode } from "react"
+import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation"
 import { Response } from "@/components/ai-elements/response"
 import { selectSessionParts, useAppSelector } from "@/store"
 import type { ChatAssistantMessage, ChatMessageInfo, ChatPart, ChatStatus, ChatToolPart } from "@/types/chat"
@@ -509,19 +510,7 @@ export function SessionMessageList(props: {
   status: ChatStatus
   onOpenDiff?: (file: string) => void
 }) {
-  const body = useRef<HTMLDivElement | null>(null)
   const [retry, setRetry] = useState<Retry | null>(null)
-  const stamp = useAppSelector((state) =>
-    props.messages
-      .map((info) => {
-        const parts = selectSessionParts(state, info.id)
-        const part = parts.at(-1)
-        const size = part?.type === "text" || part?.type === "reasoning" ? part.text.length : 0
-        const status = part?.type === "tool" ? part.state.status : ""
-        return `${info.id}:${parts.length}:${part?.id ?? ""}:${size}:${status}`
-      })
-      .join("|"),
-  )
 
   useEffect(() => {
     setRetry(null)
@@ -537,17 +526,11 @@ export function SessionMessageList(props: {
     }
   }, [props.status])
 
-  useEffect(() => {
-    const node = body.current
-    if (!node) return
-    node.scrollTop = node.scrollHeight
-  }, [props.loading, props.messages.length, props.status.type, retry?.attempt, stamp])
-
   const note = props.status.type === "retry" ? props.status : retry
 
   return (
-    <div ref={body} className={css.body}>
-      <div className={`${css.list} ${props.mode === "full" ? css.listFull : ""}`}>
+    <Conversation className={css.body}>
+      <ConversationContent plain className={`${css.list} ${props.mode === "full" ? css.listFull : ""}`}>
         {props.loading ? (
           <div className={css.load}>
             <LoaderCircle className={common.spin} size={20} />
@@ -573,7 +556,8 @@ export function SessionMessageList(props: {
             </div>
           </div>
         ) : null}
-      </div>
-    </div>
+      </ConversationContent>
+      <ConversationScrollButton />
+    </Conversation>
   )
 }

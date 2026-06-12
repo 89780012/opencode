@@ -165,9 +165,11 @@ export const Conversation = ({ children, className, onScroll, ...props }: Conver
   )
 }
 
-export type ConversationContentProps = ComponentProps<"div">
+export type ConversationContentProps = ComponentProps<"div"> & {
+  plain?: boolean
+}
 
-export const ConversationContent = ({ className, ...props }: ConversationContentProps) => {
+export const ConversationContent = ({ className, plain, ...props }: ConversationContentProps) => {
   const ctx = useConversation()
   const ref = useCallback(
     (node: HTMLDivElement | null) => {
@@ -175,7 +177,7 @@ export const ConversationContent = ({ className, ...props }: ConversationContent
     },
     [ctx],
   )
-  return <div className={cn("conversation-body min-w-0 space-y-4 p-4", className)} ref={ref} {...props} />
+  return <div className={cn("conversation-body min-w-0", plain ? "" : "space-y-4 p-4", className)} ref={ref} {...props} />
 }
 
 export type ConversationEmptyStateProps = ComponentProps<"div"> & {
