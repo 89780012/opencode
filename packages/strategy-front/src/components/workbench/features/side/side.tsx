@@ -12,8 +12,8 @@ const init = {
   issues: true,
   requirements: true,
   logic: true,
-  progress: true,
-  backtest: true,
+  progress: false,
+  backtest: false,
 }
 
 export function Side() {
