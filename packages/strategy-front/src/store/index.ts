@@ -162,5 +162,5 @@ export function selectWorkbenchFlowchart(state: RootState, path?: string | null)
 export function selectWorkbenchReview(state: RootState, path?: string | null) {
   if (!path) return null
   if (state.workbench.reviewPath !== path) return null
-  return state.workbench.review
+  return state.workbench.reviews[0] ?? null
 }

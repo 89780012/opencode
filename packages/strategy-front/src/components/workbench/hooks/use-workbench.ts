@@ -2,7 +2,7 @@ import { useMemo, useState } from "react"
 import { modelChainApi } from "@/api/modules"
 import { toast } from "sonner"
 import { selectWorkbench, useAppDispatch, useAppSelector } from "@/store"
-import { setActive, setReview, setStage } from "@/store/workbench-slice"
+import { setActive, setStage, upsertReview } from "@/store/workbench-slice"
 import { code, createBacktest, createTimeline, type FlowStatus, type ReviewStatus, type SessionItem, type StepStatus } from "../data"
 
 function status(state?: string): ReviewStatus {
@@ -55,7 +55,8 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
   const state = useAppSelector(selectWorkbench)
   const [view, setView] = useState<"current" | "history">("current")
   const flow = state.flowchart?.workspacePath === state.sessionPath ? state.flowchart : null
-  const row = state.review?.workspacePath === state.sessionPath ? state.review : null
+  const rows = state.reviewPath === state.sessionPath ? state.reviews : []
+  const row = rows[0] ?? null
   const cur = useMemo<SessionItem>(() => {
     const session = state.sessions.find((item) => item.id === state.active) ?? state.sessions[0]
     if (!session) return empty()
@@ -68,6 +69,22 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
         detail: item.detail,
         suggestion: item.suggestion,
       })) ?? []
+    const hist = rows
+      .slice()
+      .reverse()
+      .map((item, idx) => ({
+        id: item.id,
+        round: idx + 1,
+        status: status(item.state),
+        time: stamp(item.updatedAt),
+        steps: item.items.map((part) => ({
+          text: part.name || part.detail,
+          status: step(part.status),
+          detail: part.detail,
+          suggestion: part.suggestion,
+        })),
+        suggestions: [item.summary, ...item.suggestions].filter((tip) => tip),
+      }))
     const back = createBacktest()
     return {
       ...empty(),
@@ -77,19 +94,9 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
       analyzedRequirements: reqs,
       messages: [{ role: "ai", body: `Session "${session.title}" is ready.` }],
       reviewStatus,
-      reviewRound: row ? 1 : 0,
+      reviewRound: hist.length,
       reviewView: view,
-      reviewHistory: row
-        ? [
-            {
-              round: 1,
-              status: reviewStatus,
-              time: stamp(row.updatedAt),
-              steps,
-              suggestions: [row.summary, ...row.suggestions].filter((item) => item),
-            },
-          ]
-        : [],
+      reviewHistory: hist,
       reviewProgress: row?.state === "running" ? steps : null,
       flowchartStatus:
         flow?.state === "generating" ? "generating" : flow?.state === "done" && flow.code ? "done" : ("idle" as FlowStatus),
@@ -99,7 +106,7 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
       backtestHistory: [{ time: "09:45", results: back }],
       timelineEvents: createTimeline(session.title),
     }
-  }, [flow, row, state.active, state.sessions, view])
+  }, [flow, row, rows, state.active, state.sessions, view])
   const last = cur.reviewHistory.at(-1) ?? null
   const risk = useMemo(() => {
     if (cur.reviewStatus === "passed") return "审查已通过"
@@ -121,9 +128,10 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
       return
     }
     dispatch(
-      setReview({
+      upsertReview({
         workspacePath: state.sessionPath,
         review: {
+          id: `pending_${Date.now()}`,
           workspacePath: state.sessionPath,
           worktreePath: state.sessionPath,
           state: "running",

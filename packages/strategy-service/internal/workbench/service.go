@@ -443,26 +443,45 @@ func (s *Service) GetReview(ctx context.Context, req ReviewGet) (ReviewRow, erro
 	if err != nil {
 		return ReviewRow{}, err
 	}
-	var row ReviewRow
-	var items string
-	var suggestions string
-	err = doc.QueryRowContext(ctx, `select workspace_path, worktree_path, state, summary, items, suggestions, updated_at from workspace_reviews where workspace_path = ? and worktree_path = ?`,
-		req.WorkspacePath, req.WorktreePath).Scan(&row.WorkspacePath, &row.WorktreePath, &row.State, &row.Summary, &items, &suggestions, &row.UpdatedAt)
+	row, err := scanReview(doc.QueryRowContext(ctx, `select id, workspace_path, worktree_path, state, summary, items, suggestions, updated_at from workspace_reviews where workspace_path = ? and worktree_path = ? order by updated_at desc limit 1`,
+		req.WorkspacePath, req.WorktreePath))
 	if err == sql.ErrNoRows {
 		return ReviewRow{}, db.ErrNotFound
 	}
 	if err != nil {
 		return ReviewRow{}, err
 	}
-	if err := json.Unmarshal([]byte(items), &row.Items); err != nil {
-		return ReviewRow{}, err
-	}
-	if err := json.Unmarshal([]byte(suggestions), &row.Suggestions); err != nil {
-		return ReviewRow{}, err
-	}
-	row.Items = reviewItems(row.Items)
-	row.Suggestions = clean(row.Suggestions)
 	return row, nil
+}
+
+func (s *Service) ListReviews(ctx context.Context, req ReviewGet) ([]ReviewRow, error) {
+	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
+	if req.WorkspacePath == "" {
+		return nil, fmt.Errorf("workspacePath is required")
+	}
+	doc, err := db.Open()
+	if err != nil {
+		return nil, err
+	}
+	rows, err := doc.QueryContext(ctx, `select id, workspace_path, worktree_path, state, summary, items, suggestions, updated_at from workspace_reviews where workspace_path = ? order by updated_at desc`,
+		req.WorkspacePath)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []ReviewRow{}
+	for rows.Next() {
+		row, err := scanReview(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, rows.Close()
 }
 
 func (s *Service) SaveReview(ctx context.Context, req ReviewReq) (ReviewRow, error) {
@@ -497,13 +516,14 @@ func (s *Service) SaveReview(ctx context.Context, req ReviewReq) (ReviewRow, err
 	if err != nil {
 		return ReviewRow{}, err
 	}
-	_, err = doc.ExecContext(ctx, `insert into workspace_reviews(workspace_path, worktree_path, state, summary, items, suggestions, updated_at) values (?, ?, ?, ?, ?, ?, ?)
-on conflict(workspace_path, worktree_path) do update set state = excluded.state, summary = excluded.summary, items = excluded.items, suggestions = excluded.suggestions, updated_at = excluded.updated_at`,
-		req.WorkspacePath, req.WorktreePath, req.State, req.Summary, string(body), string(tips), now)
+	id := "review_" + hash(fmt.Sprintf("%s\x00%s\x00%d\x00%s", req.WorkspacePath, req.WorktreePath, now, req.Summary))
+	_, err = doc.ExecContext(ctx, `insert into workspace_reviews(id, workspace_path, worktree_path, state, summary, items, suggestions, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?)`,
+		id, req.WorkspacePath, req.WorktreePath, req.State, req.Summary, string(body), string(tips), now)
 	if err != nil {
 		return ReviewRow{}, err
 	}
 	return ReviewRow{
+		ID:            id,
 		WorkspacePath: req.WorkspacePath,
 		WorktreePath:  req.WorktreePath,
 		State:         req.State,
@@ -612,6 +632,24 @@ func scanSession(rows scanner) (SessionRow, error) {
 	if strings.TrimSpace(analysis) != "" {
 		row.Analysis = json.RawMessage(analysis)
 	}
+	return row, nil
+}
+
+func scanReview(rows scanner) (ReviewRow, error) {
+	var row ReviewRow
+	var items string
+	var tips string
+	if err := rows.Scan(&row.ID, &row.WorkspacePath, &row.WorktreePath, &row.State, &row.Summary, &items, &tips, &row.UpdatedAt); err != nil {
+		return ReviewRow{}, err
+	}
+	if err := json.Unmarshal([]byte(items), &row.Items); err != nil {
+		return ReviewRow{}, err
+	}
+	if err := json.Unmarshal([]byte(tips), &row.Suggestions); err != nil {
+		return ReviewRow{}, err
+	}
+	row.Items = reviewItems(row.Items)
+	row.Suggestions = clean(row.Suggestions)
 	return row, nil
 }
 

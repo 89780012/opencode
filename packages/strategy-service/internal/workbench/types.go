@@ -155,6 +155,7 @@ type ReviewGet struct {
 }
 
 type ReviewRow struct {
+	ID            string       `json:"id"`
 	WorkspacePath string       `json:"workspacePath"`
 	WorktreePath  string       `json:"worktreePath"`
 	State         string       `json:"state"`

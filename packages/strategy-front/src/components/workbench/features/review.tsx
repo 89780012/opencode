@@ -22,7 +22,10 @@ function Row(props: { item: Step }) {
         disabled={!more}
       >
         <span className={css.stepmain}>
-          <Icon size={15} className={`${css.stepicon} ${css[`stepicon_${tone(props.item.status)}`]}`} />
+          <Icon
+            size={15}
+            className={`${css.stepicon} ${css[`stepicon_${tone(props.item.status)}`]} ${props.item.status === "running" ? css.spin : ""}`}
+          />
           <strong>{props.item.text}</strong>
         </span>
         <span className={css.stepright}>
@@ -50,6 +53,12 @@ export function Review(props: {
   onOpen: () => void
 }) {
   const app = useWorkbench(props.onOpen)
+  const [pick, setPick] = useState("")
+  const hist = app.cur.reviewHistory.find((item) => item.id === pick) ?? null
+  const view = () => {
+    setPick("")
+    app.view()
+  }
 
   return (
     <aside className={css.root}>
@@ -80,7 +89,7 @@ export function Review(props: {
                 <button
                   type="button"
                   className={css.action}
-                  onClick={app.view}
+                  onClick={view}
                   aria-label={app.cur.reviewView === "current" ? "查看历史" : "查看当前"}
                 >
                   {app.cur.reviewView === "current" ? <Clock3 size={14} /> : <History size={14} />}
@@ -128,26 +137,47 @@ export function Review(props: {
                   ) : null}
                 </>
               ) : (
-                <div className={css.list}>
-                  {app.cur.reviewHistory.length ? (
-                    app.cur.reviewHistory
-                      .slice()
-                      .reverse()
-                      .map((item) => (
-                        <div key={`${item.round}-${item.time}`} className={css.item}>
-                          <div className={css.top}>
-                            <span>第 {item.round} 轮</span>
-                            <span>{item.time}</span>
-                          </div>
-                          <p>
-                            {lead(item.status)} {item.status === "passed" ? "已通过" : "未通过"}
-                          </p>
+                <>
+                  {hist ? (
+                    <div className={css.box}>
+                      <p className={css.status}>
+                        第 {hist.round} 轮 / {lead(hist.status)} {text(hist.status)}
+                      </p>
+                      {hist.steps.map((item) => (
+                        <Row key={item.text} item={item} />
+                      ))}
+                      {hist.suggestions.length ? (
+                        <div className={css.advice}>
+                          <p>{hist.suggestions.join(", ")}</p>
                         </div>
-                      ))
+                      ) : null}
+                    </div>
+                  ) : app.cur.reviewHistory.length ? (
+                    <div className={css.list}>
+                      {app.cur.reviewHistory
+                        .slice()
+                        .reverse()
+                        .map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            className={css.item}
+                            onClick={() => setPick(item.id)}
+                          >
+                            <div className={css.top}>
+                              <span>第 {item.round} 轮</span>
+                              <span>{item.time}</span>
+                            </div>
+                            <p>
+                              {lead(item.status)} {item.status === "passed" ? "已通过" : "未通过"}
+                            </p>
+                          </button>
+                        ))}
+                    </div>
                   ) : (
                     <div className={ui.empty}>暂无历史记录</div>
                   )}
-                </div>
+                </>
               )}
             </div>
           </div>

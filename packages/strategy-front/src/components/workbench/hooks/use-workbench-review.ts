@@ -2,7 +2,7 @@ import { useEffect } from "react"
 import { useSearchParams } from "react-router-dom"
 import { socket, type SocketEvent } from "@/lib/socket-bus"
 import { useAppDispatch } from "@/store"
-import { setReview, type WorkbenchReview, type WorkbenchReviewItem } from "@/store/workbench-slice"
+import { setReviews, upsertReview, type WorkbenchReview, type WorkbenchReviewItem } from "@/store/workbench-slice"
 
 function obj(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object"
@@ -39,6 +39,7 @@ function parse(value: unknown): WorkbenchReview | null {
       ? value.state
       : "idle"
   return {
+    id: typeof value.id === "string" ? value.id : `${value.workspacePath}-${typeof value.updatedAt === "number" ? value.updatedAt : 0}`,
     workspacePath: value.workspacePath,
     worktreePath: typeof value.worktreePath === "string" ? value.worktreePath : value.workspacePath,
     state,
@@ -57,7 +58,7 @@ export function useWorkbenchReviewSync() {
   const path = search.get("path")?.trim() ?? ""
 
   useEffect(() => {
-    dispatch(setReview({ workspacePath: path, review: null }))
+    dispatch(setReviews({ workspacePath: path, reviews: [] }))
     const send = () => {
       if (!path) return
       socket.emit("review.get", { workspacePath: path, worktreePath: path })
@@ -69,13 +70,19 @@ export function useWorkbenchReviewSync() {
   }, [dispatch, path])
 
   useEffect(() => {
-    const fn = (event: SocketEvent) => {
+    const got = (event: SocketEvent) => {
+      const list = Array.isArray(event.payload)
+        ? event.payload.map(parse).filter((item): item is WorkbenchReview => !!item)
+        : []
+      dispatch(setReviews({ workspacePath: path, reviews: list.filter((item) => item.workspacePath === path) }))
+    }
+    const updated = (event: SocketEvent) => {
       const data = parse(event.payload)
       if (!data) return
       if (data.workspacePath !== path) return
-      dispatch(setReview({ workspacePath: data.workspacePath, review: data }))
+      dispatch(upsertReview({ workspacePath: data.workspacePath, review: data }))
     }
-    const off = [socket.on("review.got", fn), socket.on("review.updated", fn)]
+    const off = [socket.on("review.got", got), socket.on("review.updated", updated)]
     return () => off.forEach((item) => item())
   }, [dispatch, path])
 }

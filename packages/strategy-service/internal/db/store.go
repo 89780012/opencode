@@ -147,15 +147,16 @@ var schema = []string{
 	primary key(workspace_path, worktree_path)
 )`,
 	`create table if not exists workspace_reviews (
+	id text primary key,
 	workspace_path text not null,
 	worktree_path text not null,
 	state text not null,
 	summary text not null,
 	items text not null,
 	suggestions text not null,
-	updated_at integer not null,
-	primary key(workspace_path, worktree_path)
+	updated_at integer not null
 )`,
+	`create index if not exists idx_workspace_reviews_workspace_updated on workspace_reviews(workspace_path, updated_at)`,
 	`create table if not exists questions (
 	id text primary key,
 	workspace_path text not null,

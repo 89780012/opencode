@@ -50,6 +50,7 @@ export type WorkbenchReviewItem = {
 }
 
 export type WorkbenchReview = {
+  id: string
   workspacePath: string
   worktreePath: string
   state: "idle" | "running" | "passed" | "failed" | "error"
@@ -68,7 +69,7 @@ type State = {
   analysisPath: string
   flowchart: WorkbenchFlowchart | null
   flowchartPath: string
-  review: WorkbenchReview | null
+  reviews: WorkbenchReview[]
   reviewPath: string
   active: string
   stage: Stage
@@ -83,7 +84,7 @@ const initialState: State = {
   analysisPath: "",
   flowchart: null,
   flowchartPath: "",
-  review: null,
+  reviews: [],
   reviewPath: "",
   active: "",
   stage: "session",
@@ -111,9 +112,17 @@ const slice = createSlice({
       state.flowchartPath = action.payload.workspacePath
       state.flowchart = action.payload.flowchart
     },
-    setReview(state, action: PayloadAction<{ workspacePath: string; review: WorkbenchReview | null }>) {
+    setReviews(state, action: PayloadAction<{ workspacePath: string; reviews: WorkbenchReview[] }>) {
       state.reviewPath = action.payload.workspacePath
-      state.review = action.payload.review
+      state.reviews = action.payload.reviews
+    },
+    upsertReview(state, action: PayloadAction<{ workspacePath: string; review: WorkbenchReview }>) {
+      state.reviewPath = action.payload.workspacePath
+      const stale = action.payload.review.state !== "running"
+      state.reviews = [
+        action.payload.review,
+        ...state.reviews.filter((item) => item.id !== action.payload.review.id && !(stale && item.id.startsWith("pending_"))),
+      ].sort((a, b) => b.updatedAt - a.updatedAt)
     },
     upsertSession(state, action: PayloadAction<{ session: WorkbenchSession }>) {
       const idx = state.sessions.findIndex((item) => item.id === action.payload.session.id)
@@ -152,9 +161,10 @@ export const {
   setActive,
   setFlowchart,
   setQuestions,
-  setReview,
+  setReviews,
   setSessions,
   setStage,
+  upsertReview,
   upsertSession,
 } = slice.actions
 

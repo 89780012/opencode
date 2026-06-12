@@ -58,7 +58,7 @@ func (a *API) handleReviewGet(ctx context.Context, client *socketClient, evt soc
 			return
 		}
 	}
-	data, err := a.bench.GetReview(ctx, req)
+	data, err := a.bench.ListReviews(ctx, req)
 	if errors.Is(err, db.ErrNotFound) {
 		client.reply(evt.ID, "review.got", nil)
 		return

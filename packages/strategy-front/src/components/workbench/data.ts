@@ -20,6 +20,7 @@ export interface Step {
 }
 
 export interface ReviewRecord {
+  id: string
   round: number
   status: ReviewStatus
   time: string
