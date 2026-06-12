@@ -152,6 +152,25 @@ function output(part: ChatToolPart) {
   return ""
 }
 
+function json(value: unknown) {
+  if (value === undefined) return ""
+  return JSON.stringify(value, null, 2) ?? ""
+}
+
+function payload(part: ChatToolPart) {
+  const cmd = text(part.state.input.command)
+  if (cmd && Object.keys(part.state.input).length === 1) {
+    return {
+      lang: "shell",
+      value: `$ ${cmd}`,
+    }
+  }
+  return {
+    lang: "json",
+    value: json(part.state.input),
+  }
+}
+
 function ext(lang: string) {
   const key = lang.toLowerCase()
   if (key === "shell" || key === "bash" || key === "sh") return "sh"
@@ -164,9 +183,18 @@ function ext(lang: string) {
   return "txt"
 }
 
+function Panel(props: { title: string; children: ReactNode }) {
+  return (
+    <section className={css.toolpanel}>
+      <div className={css.toollabel}>{props.title}</div>
+      {props.children}
+    </section>
+  )
+}
+
 function Tool(props: { part: ChatToolPart }) {
   const out = output(props.part)
-  const cmd = text(props.part.state.input.command)
+  const body = payload(props.part)
   const title =
     ("title" in props.part.state ? text(props.part.state.title) : "") ||
     text(props.part.state.input.description) ||
@@ -178,12 +206,45 @@ function Tool(props: { part: ChatToolPart }) {
         ? "error"
         : "done"
   const label = state === "running" ? `正在调用 ${props.part.tool}` : state === "error" ? `${props.part.tool} 调用失败` : `已调用 ${props.part.tool}`
+  const data = "metadata" in props.part.state ? props.part.state.metadata : undefined
+  const sid = data && typeof data.sessionId === "string" ? data.sessionId : ""
+  const used = "time" in props.part.state ? time(props.part.state.time) : ""
 
   return (
     <Fold title={label} line={false} meta={title !== props.part.tool ? title : undefined} state={state}>
       <div className={css.toolbody}>
-        {cmd ? <CodeBlock lang="shell" value={`$ ${cmd}`} /> : null}
-        {out ? <CodeBlock lang="text" value={out} /> : <div className={css.muted}>暂无输出</div>}
+        <div className={css.toolmeta}>
+          <span>
+            <b>工具</b>
+            {props.part.tool}
+          </span>
+          <span>
+            <b>状态</b>
+            {props.part.state.status}
+          </span>
+          {used ? (
+            <span>
+              <b>耗时</b>
+              {used.replace("用时 ", "")}
+            </span>
+          ) : null}
+          {sid ? (
+            <span>
+              <b>子任务</b>
+              {sid}
+            </span>
+          ) : null}
+          <span>
+            <b>调用</b>
+            {props.part.callID}
+          </span>
+        </div>
+        <Panel title="输入">
+          {body.value ? <CodeBlock lang={body.lang} value={body.value} /> : <div className={css.muted}>暂无输入</div>}
+        </Panel>
+        <Panel title={props.part.state.status === "error" ? "错误" : "输出"}>
+          {out ? <CodeBlock lang="text" value={out} /> : <div className={css.muted}>暂无输出</div>}
+        </Panel>
       </div>
     </Fold>
   )
