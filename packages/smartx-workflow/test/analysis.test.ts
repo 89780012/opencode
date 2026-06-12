@@ -258,12 +258,13 @@ describe("smartx workspace analysis", () => {
 
     expect(out.system.join("\n")).toContain("smartx_get_requirements")
     expect(out.system.join("\n")).toContain("strategy-reviewer")
-    expect(out.system.join("\n")).toContain("自动修复 3 轮")
+    expect(out.system.join("\n")).toContain("每一轮")
+    expect(out.system.join("\n")).toContain("第 3 轮")
     expect(reviewRequests.size).toBe(0)
     expect(rows.some((item) => item.message === "workspace review requested")).toBe(true)
   })
 
-  test("asks the main agent to fix failed review before saving", async () => {
+  test("saves failed review before asking the main agent to fix it", async () => {
     const rows: Row[] = []
     const pending = new Map()
     const fixes = new Map()
@@ -293,19 +294,45 @@ describe("smartx workspace analysis", () => {
       },
     )
 
+    expect(pending.get(id)?.kind).toBe("review")
+    expect(pending.get(id)?.state).toBe("failed")
+    expect(fixes.get(fixID)?.attempt).toBe(1)
+
+    const save = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, save)
+    expect(save.system.join("\n")).toContain("smartx_save_review")
+    expect(save.system.join("\n")).toContain("审查报告")
+
+    await hooks["tool.execute.after"]?.(
+      {
+        sessionID: "s1",
+        tool: "smartx_save_review",
+        callID: "c2",
+        args: {
+          workspacePath: "f:/repo",
+          worktreePath: "f:/repo",
+          state: "failed",
+          items: [{ name: "风控规则", status: "failed", detail: "未发现止损规则", suggestion: "补充止损" }],
+        },
+      },
+      { title: "", output: "{}", metadata: {} },
+    )
+
     expect(pending.has(id)).toBe(false)
     expect(fixes.get(fixID)?.attempt).toBe(1)
 
     const fix = { system: [] as string[] }
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, fix)
-    expect(fix.system.join("\n")).toContain("main agent")
-    expect(fix.system.join("\n")).toContain("of 3")
+    expect(fix.system.join("\n")).toContain("审查结果已经")
+    expect(fix.system.join("\n")).toContain("主 agent")
+    expect(fix.system.join("\n")).toContain("最多 3 次")
     expect(fix.system.join("\n")).toContain("strategy-reviewer")
+    expect(fix.system.join("\n")).toContain("不要再次调用 `smartx_save_review`")
     expect(fix.system.join("\n")).toContain("未发现止损规则")
     expect(rows.some((item) => item.message === "workspace review needs fix")).toBe(true)
   })
 
-  test("saves review when it passes", async () => {
+  test("reanalyzes and redraws before debug after saving a fully passed review", async () => {
     const rows: Row[] = []
     const workspaces = new Map<string, Analysis>()
     const charts = new Map<string, Chart>()
@@ -348,7 +375,12 @@ describe("smartx workspace analysis", () => {
         sessionID: "s1",
         tool: "smartx_save_review",
         callID: "c2",
-        args: { workspacePath: "f:/repo", worktreePath: "f:/repo" },
+        args: {
+          workspacePath: "f:/repo",
+          worktreePath: "f:/repo",
+          state: "passed",
+          items: [{ name: "需求覆盖情况", status: "passed", detail: "通过", suggestion: "" }],
+        },
       },
       { title: "", output: "{}", metadata: {} },
     )
@@ -357,13 +389,131 @@ describe("smartx workspace analysis", () => {
     expect(workspaces.get(id)?.state).toBe("requested")
     expect(charts.get(id)?.state).toBe("requested")
 
-    const next = { system: [] as string[] }
-    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, next)
-    expect(next.system.join("\n")).toContain("workspace-analyzer")
+    const analysis = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, analysis)
+    expect(analysis.system.join("\n")).toContain("workspace-analyzer")
+
+    await hooks["tool.execute.after"]?.(
+      {
+        sessionID: "s1",
+        tool: "task",
+        callID: "c3",
+        args: { subagent_type: "workspace-analyzer" },
+      },
+      { title: "", output: '<task_result>["新的策略逻辑"]</task_result>', metadata: {} },
+    )
+
+    await hooks["tool.execute.after"]?.(
+      {
+        sessionID: "s1",
+        tool: "smartx_save_analysis",
+        callID: "c4",
+        args: { workspacePath: "f:/repo", worktreePath: "f:/repo" },
+      },
+      { title: "", output: "{}", metadata: {} },
+    )
+
+    const chart = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, chart)
+    expect(chart.system.join("\n")).toContain("strategy-flowchart-generator")
+
+    await hooks["tool.execute.after"]?.(
+      {
+        sessionID: "s1",
+        tool: "task",
+        callID: "c5",
+        args: { subagent_type: "strategy-flowchart-generator" },
+      },
+      { title: "", output: "<task_result>flowchart TD\nA-->B</task_result>", metadata: {} },
+    )
+
+    await hooks["tool.execute.after"]?.(
+      {
+        sessionID: "s1",
+        tool: "smartx_save_flowchart",
+        callID: "c6",
+        args: { workspacePath: "f:/repo", worktreePath: "f:/repo" },
+      },
+      { title: "", output: "{}", metadata: {} },
+    )
+
+    expect(pending.get(id)?.kind).toBe("debug")
+
+    const start = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, start)
+    expect(start.system.join("\n")).toContain("smartx_start")
+
+    await hooks["tool.execute.after"]?.(
+      {
+        sessionID: "s1",
+        tool: "smartx_start",
+        callID: "c7",
+        args: {},
+      },
+      { title: "", output: "{}", metadata: {} },
+    )
+
+    expect(pending.has(id)).toBe(false)
+
+    const logs = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, logs)
+    expect(logs.system.join("\n")).toContain("smartx_logs")
     expect(rows.some((item) => item.message === "workspace review completed")).toBe(true)
+    expect(rows.some((item) => item.message === "workspace review debug started")).toBe(true)
   })
 
-  test("saves failed review after repair limit", async () => {
+  test("fixes saved review when any item is not passed", async () => {
+    const pending = new Map()
+    const fixes = new Map()
+    const hooks = build(ctx("f:/repo"), {
+      pending,
+      fixes,
+    })
+    const id = key("f:/repo", "f:/repo")
+    const fixID = id + "\x00" + "s1"
+
+    await hooks["tool.execute.after"]?.(
+      {
+        sessionID: "s1",
+        tool: "task",
+        callID: "c1",
+        args: { subagent_type: "strategy-reviewer" },
+      },
+      {
+        title: "",
+        output: ["<task_result>", "审查结论：通过\n\n风险：风控规则需要补强。", "</task_result>"].join("\n"),
+        metadata: {},
+      },
+    )
+
+    await hooks["tool.execute.after"]?.(
+      {
+        sessionID: "s1",
+        tool: "smartx_save_review",
+        callID: "c2",
+        args: {
+          workspacePath: "f:/repo",
+          worktreePath: "f:/repo",
+          state: "passed",
+          items: [
+            { name: "需求覆盖情况", status: "passed", detail: "通过", suggestion: "" },
+            { name: "风控规则", status: "warning", detail: "需要补强", suggestion: "补充风控" },
+          ],
+        },
+      },
+      { title: "", output: "{}", metadata: {} },
+    )
+
+    expect(pending.has(id)).toBe(false)
+    expect(fixes.get(fixID)?.attempt).toBe(1)
+
+    const fix = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, fix)
+    expect(fix.system.join("\n")).toContain("需要补强")
+    expect(fix.system.join("\n")).toContain("strategy-reviewer")
+  })
+
+  test("saves third failed review before the final fix", async () => {
     const pending = new Map()
     const fixes = new Map([[key("f:/repo", "f:/repo") + "\x00" + "s1", {
       workspacePath: "f:/repo",
@@ -392,8 +542,35 @@ describe("smartx workspace analysis", () => {
       },
     )
 
-    expect(fixes.has(id + "\x00" + "s1")).toBe(false)
+    expect(fixes.get(id + "\x00" + "s1")?.attempt).toBe(3)
     expect(pending.get(id)?.kind).toBe("review")
     expect(pending.get(id)?.state).toBe("failed")
+
+    const save = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, save)
+    expect(save.system.join("\n")).toContain("smartx_save_review")
+
+    await hooks["tool.execute.after"]?.(
+      {
+        sessionID: "s1",
+        tool: "smartx_save_review",
+        callID: "c2",
+        args: {
+          workspacePath: "f:/repo",
+          worktreePath: "f:/repo",
+          state: "failed",
+          items: [{ name: "风控规则", status: "failed", detail: "仍缺少止损", suggestion: "补充止损" }],
+        },
+      },
+      { title: "", output: "{}", metadata: {} },
+    )
+
+    const fix = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, fix)
+    expect(fix.system.join("\n")).toContain("第 3 次修复")
+    expect(fix.system.join("\n")).toContain("最后一次自动修复")
+    expect(fix.system.join("\n")).toContain("不要再次调用 `strategy-reviewer`")
+    expect(fix.system.join("\n")).toContain("不要调用 `smartx_start`")
+    expect(fixes.has(id + "\x00" + "s1")).toBe(false)
   })
 })

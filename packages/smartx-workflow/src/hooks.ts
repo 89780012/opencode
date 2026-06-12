@@ -10,6 +10,7 @@ type Dep = {
   pending?: Map<string, Pending>
   fixes?: Map<string, Fix>
   reviewRequests?: Set<string>
+  debugs?: Set<string>
   service?: string
   load?: (workspace: string, worktree: string) => Promise<Analysis | undefined>
   loadChart?: (workspace: string, worktree: string) => Promise<Chart | undefined>
@@ -22,6 +23,7 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
   const pending = dep.pending ?? new Map<string, Pending>()
   const fixes = dep.fixes ?? new Map<string, Fix>()
   const reviewRequests = dep.reviewRequests ?? new Set<string>()
+  const debugs = dep.debugs ?? new Set<string>()
   const workspace = ctx.directory
   const worktree = ctx.worktree || ctx.directory
   const id = workspace ? key(workspace, worktree) : ""
@@ -44,6 +46,7 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
     pending,
     fixes,
     reviewRequests,
+    debugs,
     workspace,
     worktree,
     id,
