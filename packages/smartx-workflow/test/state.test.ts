@@ -1,5 +1,16 @@
 import { describe, expect, test } from "bun:test"
-import { doneAnalysis, fresh, freshAnalysis, items, note, requestAnalysis, seen, touch, validAnalysis } from "../src/state.js"
+import {
+  doneAnalysis,
+  fresh,
+  freshAnalysis,
+  items,
+  note,
+  requestAnalysis,
+  reviewState,
+  seen,
+  touch,
+  validAnalysis,
+} from "../src/state.js"
 
 describe("smartx workflow state", () => {
   test("tracks smartx_start aliases", () => {
@@ -61,6 +72,15 @@ describe("smartx workflow state", () => {
       "采用网格交易策略。",
       "未发现退出规则。",
     ])
+  })
+
+  test("detects review state variants", () => {
+    expect(reviewState("审查结论：通过")).toBe("passed")
+    expect(reviewState("审查结果 - 未通过")).toBe("failed")
+    expect(reviewState("结论: 不通过")).toBe("failed")
+    expect(reviewState("review result: failed")).toBe("failed")
+    expect(reviewState("结论：无法完成")).toBe("error")
+    expect(reviewState("没有明确结论，但存在风险和问题。")).toBe("failed")
   })
 
   test("builds the log reminder", () => {

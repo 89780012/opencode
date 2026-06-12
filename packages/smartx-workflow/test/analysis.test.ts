@@ -52,6 +52,11 @@ describe("smartx workspace analysis", () => {
     expect(flowchart({ tool: "task", args: { subagent_type: "strategy-flowchart-generator" } })).toBe(true)
     expect(review({ tool: "task", args: { subagent_type: "strategy-reviewer" } })).toBe(true)
     expect(wantsReview("审查")).toBe(true)
+    expect(wantsReview("请帮我做代码审查")).toBe(true)
+    expect(wantsReview("麻烦 review 一下当前实现")).toBe(true)
+    expect(wantsReview("需要提交审查")).toBe(true)
+    expect(wantsReview("不要审查")).toBe(false)
+    expect(wantsReview("审查结论：通过")).toBe(false)
     expect(wantsReview("请帮我写代码")).toBe(false)
   })
 

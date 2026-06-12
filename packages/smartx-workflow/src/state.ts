@@ -234,7 +234,9 @@ export function mermaid(text: string) {
 export function wantsReview(text: string) {
   const out = text.trim().toLowerCase()
   if (!out) return false
-  return ["审查", "代码审查", "提交审查", "review", "code review"].includes(out)
+  if (/(不要|不用|无需|别|取消|停止|跳过)\s*(做|进行|提交)?\s*(代码)?\s*(审查|review|code\s+review)/i.test(out)) return false
+  if (/审查\s*结论|review\s*(result|conclusion)/i.test(out)) return false
+  return /(代码|提交)?\s*审查|code\s+review|review/i.test(out)
 }
 
 export function reviewText(text: string) {
@@ -242,16 +244,13 @@ export function reviewText(text: string) {
 }
 
 export function reviewState(text: string) {
-  const out = reviewText(text).replace(/\s+/g, "")
+  const out = reviewText(text).trim()
   if (!out) return "error" as const
-  if (out.includes("审查结论：无法完成") || out.includes("审查结论:无法完成")) return "error" as const
-  if (out.includes("结论：无法完成") || out.includes("结论:无法完成")) return "error" as const
-  if (out.includes("审查结论：未通过") || out.includes("审查结论:未通过")) return "failed" as const
-  if (out.includes("结论：未通过") || out.includes("结论:未通过")) return "failed" as const
-  if (out.includes("审查结论：通过") || out.includes("审查结论:通过")) return "passed" as const
-  if (out.includes("结论：通过") || out.includes("结论:通过")) return "passed" as const
+  if (/((审查)?(结论|结果)|review\s*(result|conclusion))\s*[:：\-]?\s*(无法完成|无法审查|未能完成|error)/i.test(out)) return "error" as const
+  if (/((审查)?(结论|结果)|review\s*(result|conclusion))\s*[:：\-]?\s*(未通过|不通过|失败|failed)/i.test(out)) return "failed" as const
+  if (/((审查)?(结论|结果)|review\s*(result|conclusion))\s*[:：\-]?\s*(通过|passed)/i.test(out)) return "passed" as const
   if (/(无法完成|无法审查|未能完成|error)/i.test(out)) return "error" as const
-  if (/(未通过|失败|风险|问题)/.test(out)) return "failed" as const
+  if (/(未通过|不通过|失败|风险|问题|failed)/i.test(out)) return "failed" as const
   return "passed" as const
 }
 
