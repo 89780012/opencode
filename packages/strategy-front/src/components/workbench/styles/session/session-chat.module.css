@@ -716,6 +716,28 @@
   margin-top: 0.22rem;
 }
 
+.process .thought {
+  max-height: 12rem;
+  overflow: auto;
+  padding-right: 0.28rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(163, 163, 163, 0.64) transparent;
+}
+
+.process .thought::-webkit-scrollbar {
+  width: 0.36rem;
+  height: 0.36rem;
+}
+
+.process .thought::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.process .thought::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(163, 163, 163, 0.58);
+}
+
 .fold > .foldbody > .process {
   margin-left: 0;
 }

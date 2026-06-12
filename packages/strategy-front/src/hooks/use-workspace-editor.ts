@@ -73,8 +73,11 @@ export function useWorkspaceEditor(input: Input) {
    * 主动打开一个文件并切到对应标签页。
    */
   const show = useCallback((path: string) => {
+    if (!state.paths.includes(path)) {
+      return
+    }
     dispatch({ type: "tab_opened", path })
-  }, [])
+  }, [state.paths])
 
   /**
    * 切换当前激活的文件标签。
@@ -95,7 +98,7 @@ export function useWorkspaceEditor(input: Input) {
    */
   const read = useCallback(
     async (path: string, force?: boolean) => {
-      if (!input.workspace || state.busy[path] || (state.files[path] && !force)) {
+      if (!input.workspace || !state.paths.includes(path) || state.busy[path] || (state.files[path] && !force)) {
         return
       }
 
@@ -115,15 +118,15 @@ export function useWorkspaceEditor(input: Input) {
         }
       }
     },
-    [input.workspace, state.busy, state.files],
+    [input.workspace, state.busy, state.files, state.paths],
   )
 
   useEffect(() => {
-    if (!state.active || state.files[state.active] || state.busy[state.active]) {
+    if (!state.active || !state.paths.includes(state.active) || state.files[state.active] || state.busy[state.active]) {
       return
     }
     void read(state.active)
-  }, [read, state.active, state.busy, state.files])
+  }, [read, state.active, state.busy, state.files, state.paths])
 
   /**
    * 更新当前文件草稿，并标记是否存在未保存修改。

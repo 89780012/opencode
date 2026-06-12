@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { chatApi } from "@/api/modules"
 import { log } from "@/lib/error"
 import { load, save } from "@/lib/store"
+import { relative } from "@/lib/workspace-path"
 import { hydrateSessionDiff } from "@/store/chat-session-slice"
 import { selectSessionDiffs, useAppDispatch, useAppSelector } from "@/store"
 
@@ -21,7 +22,16 @@ function readMode(): ReviewMode {
 // active 是否刷新
 export function useChatReview(workspacePath?: string | null, sessionId?: string | null, active?: boolean) {
   const dispatch = useAppDispatch()
-  const diffs = useAppSelector((state) => selectSessionDiffs(state, sessionId))
+  const raw = useAppSelector((state) => selectSessionDiffs(state, sessionId))
+  const diffs = useMemo(
+    () =>
+      raw.map((item) => {
+        const file = relative(workspacePath, item.file) ?? item.file
+        if (file === item.file) return item
+        return { ...item, file }
+      }),
+    [raw, workspacePath],
+  )
   const [mode, setModeState] = useState<ReviewMode>(readMode)
   const [file, setFile] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -82,9 +92,12 @@ export function useChatReview(workspacePath?: string | null, sessionId?: string 
     setFile(diffs[0]?.file ?? null)
   }, [diffs, file, sessionId])
 
-  const open = useCallback((path: string) => {
-    setFile(path)
-  }, [])
+  const open = useCallback(
+    (path: string) => {
+      setFile(relative(workspacePath, path) ?? path)
+    },
+    [workspacePath],
+  )
 
   const setMode = useCallback((value: ReviewMode) => {
     setModeState(value)

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import { useChatReview } from "@/hooks/use-chat-review"
 import { useWorkspaceEditor } from "@/hooks/use-workspace-editor"
 import { editorLanguage } from "@/lib/editor-language"
+import { relative } from "@/lib/workspace-path"
 import type { ChatFileDiff } from "@/types/chat"
 import type { LocalWorkspace, WorkspaceFileContentResponse } from "@/types/workspace"
 import type { SessionItem } from "../../data"
@@ -351,6 +352,7 @@ export function CodePanel(props: {
   const size = useRef({ x: 0, w: 264 })
   const editor = useWorkspaceEditor({ workspace: props.workspace, path: props.path })
   const review = useChatReview(props.workspace?.path, props.sessionId, props.tab === "review" || filter === "changed")
+  const focus = useMemo(() => relative(props.workspace?.path, props.path), [props.path, props.workspace?.path])
   const names = useMemo(() => label(editor.open), [editor.open])
   const paths = useMemo(() => {
     if (filter === "all") return editor.paths
@@ -364,10 +366,10 @@ export function CodePanel(props: {
   }
 
   useEffect(() => {
-    if (!props.path) return
-    if (editor.active !== props.path) editor.show(props.path)
-    if (review.file !== props.path) review.open(props.path)
-  }, [editor, props.path, review])
+    if (!focus) return
+    if (editor.active !== focus) editor.show(focus)
+    if (review.file !== focus) review.open(focus)
+  }, [editor, focus, review])
 
   useEffect(() => {
     if (!editor.active || paths.includes(editor.active)) return
@@ -504,7 +506,7 @@ export function CodePanel(props: {
                 file={review.file}
                 onPick={(path) => {
                   review.open(path)
-                  editor.show(path)
+                  if (editor.paths.includes(path)) editor.show(path)
                 }}
               />
             </>
