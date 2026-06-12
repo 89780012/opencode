@@ -1,13 +1,14 @@
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 import { createPairing } from "./pairing.js"
 import { key, wantsReview, type Analysis, type Chart, type Flow } from "./state.js"
-import { createWorkspace, loadChartRemote, loadRemote, type Pending } from "./workspace.js"
+import { createWorkspace, loadChartRemote, loadRemote, type Fix, type Pending } from "./workspace.js"
 
 type Dep = {
   mem?: Map<string, Flow>
   workspaces?: Map<string, Analysis>
   charts?: Map<string, Chart>
   pending?: Map<string, Pending>
+  fixes?: Map<string, Fix>
   reviewRequests?: Set<string>
   service?: string
   load?: (workspace: string, worktree: string) => Promise<Analysis | undefined>
@@ -19,6 +20,7 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
   const workspaces = dep.workspaces ?? new Map<string, Analysis>()
   const charts = dep.charts ?? new Map<string, Chart>()
   const pending = dep.pending ?? new Map<string, Pending>()
+  const fixes = dep.fixes ?? new Map<string, Fix>()
   const reviewRequests = dep.reviewRequests ?? new Set<string>()
   const workspace = ctx.directory
   const worktree = ctx.worktree || ctx.directory
@@ -40,6 +42,7 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
     workspaces,
     charts,
     pending,
+    fixes,
     reviewRequests,
     workspace,
     worktree,

@@ -22,6 +22,7 @@ import {
   type Analysis,
   type Chart,
 } from "./state.js"
+import { flow, step } from "./workflow.js"
 
 type System = NonNullable<Hooks["experimental.chat.system.transform"]>
 type Before = NonNullable<Hooks["tool.execute.before"]>
@@ -92,10 +93,21 @@ export type Pending =
       text: string
     }
 
+export type Fix = {
+  workspacePath: string
+  worktreePath: string
+  sessionID: string
+  attempt: number
+  text: string
+}
+
+const limit = 3
+
 type Opt = {
   workspaces: Map<string, Analysis>
   charts: Map<string, Chart>
   pending: Map<string, Pending>
+  fixes: Map<string, Fix>
   reviewRequests: Set<string>
   workspace: string
   worktree: string
@@ -121,6 +133,28 @@ function same(input: unknown, workspace: string, worktree: string) {
   return (
     args.workspacePath === workspace && (args.worktreePath === worktree || (!args.worktreePath && worktree === workspace))
   )
+}
+
+function fixkey(id: string, session: string) {
+  return id + "\x00" + session
+}
+
+function noteFix(input: Fix) {
+  return [
+    "The latest strategy review did not pass. Do not save the review result yet.",
+    "You are the main agent, so you must fix the code yourself before asking for another review.",
+    `This is repair attempt ${input.attempt} of ${limit}.`,
+    "Rules:",
+    "- Read the review report below and edit the current workspace code to address the concrete issues.",
+    "- Keep changes focused on the reported SmartX strategy defects and the user's requirements.",
+    "- After editing, run the most relevant local validation you can reasonably run from the package or project directory.",
+    "- Then call the `task` tool again with `subagent_type: strategy-reviewer` and `description: Review strategy implementation`.",
+    "- Pass the same requirements context plus a short summary of the fixes to the reviewer.",
+    "- Do not call `smartx_save_review` until a later review passes, fails after the repair limit, or cannot be completed.",
+    "",
+    "Review report to fix:",
+    input.text,
+  ].join("\n")
 }
 
 function noteSave(input: Pending) {
@@ -199,25 +233,44 @@ export function createWorkspace(opt: Opt) {
       if (row && validChart(row)) opt.charts.set(opt.id, row)
       if (row && !validChart(row)) opt.charts.delete(opt.id)
 
-      const wait = opt.pending.get(opt.id)
-
-      // true 情况 1：子 agent 已产出结果，但还没通过 strategy-service MCP 持久化。
-      // 这时优先提示主 agent 调用 save_analysis/save_flowchart，避免继续推进后续门禁。
-      if (wait) {
-        await opt.write("workspace mcp save reminder injected", {
-          sessionID: input.sessionID,
-          workspace: opt.workspace,
-          worktree: opt.worktree,
-          kind: wait.kind,
-        })
-        output.system.push(noteSave(wait))
-        return true
-      }
-
       const sessionID = input.sessionID
-      if (sessionID) {
-        const requestID = opt.id + "\x00" + sessionID
-        if (opt.reviewRequests.has(requestID)) {
+      return flow([
+        // 门禁 1：子 agent 已产出 analysis/flowchart/review，但还没保存到 strategy-service。
+        // 必须先提醒主 agent 调用对应 smartx_save_*，避免后续门禁基于未持久化状态继续推进。
+        step("save", async () => {
+          const wait = opt.pending.get(opt.id)
+          if (!wait) return false
+          await opt.write("workspace mcp save reminder injected", {
+            sessionID,
+            workspace: opt.workspace,
+            worktree: opt.worktree,
+            kind: wait.kind,
+          })
+          output.system.push(noteSave(wait))
+          return true
+        }),
+
+        // 门禁 2：上一轮 strategy-reviewer 判定未通过，且还没达到自动修复上限。
+        // 这时禁止保存失败审查结果，先要求主 agent 按报告修代码，再重新发起审查。
+        step("fix", async () => {
+          const fix = sessionID ? opt.fixes.get(fixkey(opt.id, sessionID)) : undefined
+          if (!fix) return false
+          await opt.write("workspace review fix injected", {
+            sessionID,
+            workspace: opt.workspace,
+            worktree: opt.worktree,
+            attempt: fix.attempt,
+          })
+          output.system.push(noteFix(fix))
+          return true
+        }),
+
+        // 门禁 3：用户当前会话显式表达了代码审查意图。
+        // 注入隐藏审查流程：先取需求，再启动 strategy-reviewer，并由主 agent 负责失败后的修复循环。
+        step("review", async () => {
+          if (!sessionID) return false
+          const requestID = opt.id + "\x00" + sessionID
+          if (!opt.reviewRequests.has(requestID)) return false
           opt.reviewRequests.delete(requestID)
           await opt.write("workspace review gate injected", {
             sessionID,
@@ -226,188 +279,229 @@ export function createWorkspace(opt: Opt) {
           })
           output.system.push(noteReview({ workspace: opt.workspace, worktree: opt.worktree, sessionID }))
           return true
-        }
-      }
+        }),
 
-      // true 情况 2：当前 workspace/worktree 还没有完成策略运行逻辑分析。
-      // 注入 workspace-analyzer 门禁，让主 agent 先启动分析子 agent。
-      if (!analysis || analysis.state === "requested") {
-        if (!analysis) opt.workspaces.set(opt.id, requestAnalysis(opt.workspace, opt.worktree))
-        await opt.write("workspace analysis gate injected", {
-          sessionID: input.sessionID,
-          workspace: opt.workspace,
-          worktree: opt.worktree,
-          state: analysis?.state ?? "missing",
-        })
-        output.system.push(noteAnalysis())
-        return true
-      }
+        // 门禁 4：当前 workspace/worktree 还没有完成策略运行逻辑分析。
+        // 在写代码、生成方案或其它实现动作前，先要求启动 workspace-analyzer。
+        step("analysis", async () => {
+          if (analysis && analysis.state !== "requested") return false
+          if (!analysis) opt.workspaces.set(opt.id, requestAnalysis(opt.workspace, opt.worktree))
+          await opt.write("workspace analysis gate injected", {
+            sessionID,
+            workspace: opt.workspace,
+            worktree: opt.worktree,
+            state: analysis?.state ?? "missing",
+          })
+          output.system.push(noteAnalysis())
+          return true
+        }),
 
-      // true 情况 3：分析已完成，但流程图还没有生成或处于 requested。
-      // 注入 strategy-flowchart-generator 门禁，让主 agent 生成 Mermaid 流程图。
-      const chart = opt.charts.get(opt.id)
-      if (analysis.state === "done" && (!chart || chart.state === "requested")) {
-        if (!chart) opt.charts.set(opt.id, requestChart(opt.workspace, opt.worktree))
-        await opt.write("workspace flowchart gate injected", {
-          sessionID: input.sessionID,
-          workspace: opt.workspace,
-          worktree: opt.worktree,
-          state: chart?.state ?? "missing",
-        })
-        output.system.push(noteChart(analysis))
-        return true
-      }
-
-      return false
+        // 门禁 5：分析已经完成，但策略流程图还没生成或需要重新生成。
+        // 要求启动 strategy-flowchart-generator，把分析结果转换成 Mermaid 流程图。
+        step("chart", async () => {
+          const chart = opt.charts.get(opt.id)
+          if (analysis?.state !== "done" || (chart && chart.state !== "requested")) return false
+          if (!chart) opt.charts.set(opt.id, requestChart(opt.workspace, opt.worktree))
+          await opt.write("workspace flowchart gate injected", {
+            sessionID,
+            workspace: opt.workspace,
+            worktree: opt.worktree,
+            state: chart?.state ?? "missing",
+          })
+          output.system.push(noteChart(analysis))
+          return true
+        }),
+      ])
     },
     before: async (input: Parameters<Before>[0], output: Parameters<Before>[1]) => {
       if (!opt.workspace || !opt.id) return false
 
-      // true 情况 1：主 agent 正在启动流程图子 agent。
-      // 记录 flowchart 进入 generating 状态，后续 after 会接收子 agent 输出。
-      if (flowchart({ tool: input.tool, args: output.args })) {
-        opt.charts.set(opt.id, freshChart(opt.workspace, opt.worktree))
-        await opt.write("workspace flowchart started", {
-          sessionID: input.sessionID,
-          workspace: opt.workspace,
-          worktree: opt.worktree,
-        })
-        return true
-      }
+      return flow([
+        // 门禁 1：主 agent 即将启动流程图子 agent。
+        // 先把 chart 标记为 generating，避免下一轮 system 继续重复要求生成流程图。
+        step("chart", async () => {
+          if (!flowchart({ tool: input.tool, args: output.args })) return false
+          opt.charts.set(opt.id, freshChart(opt.workspace, opt.worktree))
+          await opt.write("workspace flowchart started", {
+            sessionID: input.sessionID,
+            workspace: opt.workspace,
+            worktree: opt.worktree,
+          })
+          return true
+        }),
 
-      if (review({ tool: input.tool, args: output.args })) {
-        await opt.write("workspace review started", {
-          sessionID: input.sessionID,
-          workspace: opt.workspace,
-          worktree: opt.worktree,
-        })
-        return true
-      }
+        // 门禁 2：主 agent 即将启动审查子 agent。
+        // 这里只记录审查开始，真实的通过/失败判断在 after 阶段处理。
+        step("review", async () => {
+          if (!review({ tool: input.tool, args: output.args })) return false
+          await opt.write("workspace review started", {
+            sessionID: input.sessionID,
+            workspace: opt.workspace,
+            worktree: opt.worktree,
+          })
+          return true
+        }),
 
-      // true 情况 3：主 agent 正在启动分析子 agent。
-      // 记录 analysis 进入 running 状态，避免系统提示重复要求启动 analyzer。
-      if (analyze({ tool: input.tool, args: output.args })) {
-        opt.workspaces.set(opt.id, freshAnalysis(opt.workspace, opt.worktree))
-        await opt.write("workspace analysis started", {
-          sessionID: input.sessionID,
-          workspace: opt.workspace,
-          worktree: opt.worktree,
-        })
-        return true
-      }
-
-      return false
+        // 门禁 3：主 agent 即将启动分析子 agent。
+        // 先把 analysis 标记为 running，避免下一轮 system 重复注入 analyzer 门禁。
+        step("analysis", async () => {
+          if (!analyze({ tool: input.tool, args: output.args })) return false
+          opt.workspaces.set(opt.id, freshAnalysis(opt.workspace, opt.worktree))
+          await opt.write("workspace analysis started", {
+            sessionID: input.sessionID,
+            workspace: opt.workspace,
+            worktree: opt.worktree,
+          })
+          return true
+        }),
+      ])
     },
     after: async (input: Parameters<After>[0], output: Parameters<After>[1]) => {
       if (!opt.workspace || !opt.id) return false
 
-      // true 情况 1：主 agent 已成功调用 MCP 保存 analysis。
-      // 清理 analysis pending，下一轮 system 才能继续推进 flowchart 门禁。
-      if (mcp(input, "save_analysis") && same(input.args, opt.workspace, opt.worktree) && ok(output)) {
-        if (opt.pending.get(opt.id)?.kind === "analysis") opt.pending.delete(opt.id)
-        await opt.write("workspace analysis saved through mcp", {
-          sessionID: input.sessionID,
-          workspace: opt.workspace,
-          worktree: opt.worktree,
-        })
-        return true
-      }
+      return flow([
+        // 门禁 1：主 agent 已成功保存 analysis 到 strategy-service。
+        // 清理 analysis pending，下一轮 system 才能继续推进 flowchart 门禁。
+        step("save_analysis", async () => {
+          if (!mcp(input, "save_analysis") || !same(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
+          if (opt.pending.get(opt.id)?.kind === "analysis") opt.pending.delete(opt.id)
+          await opt.write("workspace analysis saved through mcp", {
+            sessionID: input.sessionID,
+            workspace: opt.workspace,
+            worktree: opt.worktree,
+          })
+          return true
+        }),
 
-      // true 情况 2：主 agent 已成功调用 MCP 保存 flowchart。
-      // 清理 flowchart pending，workspace 门禁链路到这里就完成。
-      if (mcp(input, "save_flowchart") && same(input.args, opt.workspace, opt.worktree) && ok(output)) {
-        if (opt.pending.get(opt.id)?.kind === "flowchart") opt.pending.delete(opt.id)
-        await opt.write("workspace flowchart saved through mcp", {
-          sessionID: input.sessionID,
-          workspace: opt.workspace,
-          worktree: opt.worktree,
-        })
-        return true
-      }
+        // 门禁 2：主 agent 已成功保存 flowchart 到 strategy-service。
+        // 清理 flowchart pending，表示“分析 -> 流程图”这段门禁链已经完成。
+        step("save_chart", async () => {
+          if (!mcp(input, "save_flowchart") || !same(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
+          if (opt.pending.get(opt.id)?.kind === "flowchart") opt.pending.delete(opt.id)
+          await opt.write("workspace flowchart saved through mcp", {
+            sessionID: input.sessionID,
+            workspace: opt.workspace,
+            worktree: opt.worktree,
+          })
+          return true
+        }),
 
-      if (mcp(input, "save_review") && same(input.args, opt.workspace, opt.worktree) && ok(output)) {
-        if (opt.pending.get(opt.id)?.kind === "review") opt.pending.delete(opt.id)
-        await opt.write("workspace review saved through mcp", {
-          sessionID: input.sessionID,
-          workspace: opt.workspace,
-          worktree: opt.worktree,
-        })
-        return true
-      }
+        // 门禁 3：主 agent 已成功保存最终审查结果。
+        // 如果审查通过，重置 analysis/chart，让后续流程基于修复后的代码重新分析和画图。
+        step("save_review", async () => {
+          if (!mcp(input, "save_review") || !same(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
+          const item = opt.pending.get(opt.id)
+          if (item?.kind === "review") opt.pending.delete(opt.id)
+          opt.fixes.delete(fixkey(opt.id, input.sessionID))
+          if (item?.kind === "review" && item.state === "passed") {
+            opt.workspaces.set(opt.id, requestAnalysis(opt.workspace, opt.worktree))
+            opt.charts.set(opt.id, requestChart(opt.workspace, opt.worktree))
+          }
+          await opt.write("workspace review saved through mcp", {
+            sessionID: input.sessionID,
+            workspace: opt.workspace,
+            worktree: opt.worktree,
+            state: item?.kind === "review" ? item.state : undefined,
+          })
+          return true
+        }),
 
-      // true 情况 3：流程图子 agent 调用结束。
-      // 解析 Mermaid，记录到本地缓存，并生成待 MCP 保存任务。
-      if (flowchart(input)) {
-        const code = mermaid(output.output)
-        const state = code ? ("done" as const) : ("error" as const)
-        const next = code
-          ? doneChart(opt.workspace, opt.worktree, code)
-          : {
-              ...freshChart(opt.workspace, opt.worktree),
-              state,
-              err: "flowchart result is empty",
-            }
-        opt.charts.set(opt.id, next)
-        opt.pending.set(opt.id, {
-          kind: "flowchart",
-          workspacePath: opt.workspace,
-          worktreePath: opt.worktree,
-          state,
-          code: next.code,
-          err: next.err,
-        })
-        await opt.write("workspace flowchart completed", {
-          sessionID: input.sessionID,
-          workspace: opt.workspace,
-          worktree: opt.worktree,
-          state: next.state,
-        })
-        return true
-      }
+        // 门禁 4：流程图子 agent 调用结束。
+        // 解析 Mermaid，更新本地 chart 状态，并生成 smartx_save_flowchart 的待保存任务。
+        step("chart_done", async () => {
+          if (!flowchart(input)) return false
+          const code = mermaid(output.output)
+          const state = code ? ("done" as const) : ("error" as const)
+          const next = code
+            ? doneChart(opt.workspace, opt.worktree, code)
+            : {
+                ...freshChart(opt.workspace, opt.worktree),
+                state,
+                err: "flowchart result is empty",
+              }
+          opt.charts.set(opt.id, next)
+          opt.pending.set(opt.id, {
+            kind: "flowchart",
+            workspacePath: opt.workspace,
+            worktreePath: opt.worktree,
+            state,
+            code: next.code,
+            err: next.err,
+          })
+          await opt.write("workspace flowchart completed", {
+            sessionID: input.sessionID,
+            workspace: opt.workspace,
+            worktree: opt.worktree,
+            state: next.state,
+          })
+          return true
+        }),
 
-      if (review(input)) {
-        const text = reviewText(output.output) || "审查报告为空。"
-        const state = reviewState(text)
-        opt.pending.set(opt.id, {
-          kind: "review",
-          workspacePath: opt.workspace,
-          worktreePath: opt.worktree,
-          state,
-          text,
-        })
-        await opt.write("workspace review completed", {
-          sessionID: input.sessionID,
-          workspace: opt.workspace,
-          worktree: opt.worktree,
-          state,
-        })
-        return true
-      }
+        // 门禁 5：审查子 agent 调用结束。
+        // 未通过且未达到上限时进入修复门禁；通过、无法完成或达到上限时生成最终审查保存任务。
+        step("review_done", async () => {
+          if (!review(input)) return false
+          const text = reviewText(output.output) || "审查报告为空。"
+          const state = reviewState(text)
+          const fix = opt.fixes.get(fixkey(opt.id, input.sessionID))
+          if (state === "failed" && (!fix || fix.attempt < limit)) {
+            const next = (fix?.attempt ?? 0) + 1
+            opt.fixes.set(fixkey(opt.id, input.sessionID), {
+              workspacePath: opt.workspace,
+              worktreePath: opt.worktree,
+              sessionID: input.sessionID,
+              attempt: next,
+              text,
+            })
+            await opt.write("workspace review needs fix", {
+              sessionID: input.sessionID,
+              workspace: opt.workspace,
+              worktree: opt.worktree,
+              attempt: next,
+            })
+            return true
+          }
+          opt.fixes.delete(fixkey(opt.id, input.sessionID))
+          opt.pending.set(opt.id, {
+            kind: "review",
+            workspacePath: opt.workspace,
+            worktreePath: opt.worktree,
+            state,
+            text,
+          })
+          await opt.write("workspace review completed", {
+            sessionID: input.sessionID,
+            workspace: opt.workspace,
+            worktree: opt.worktree,
+            state,
+          })
+          return true
+        }),
 
-      // true 情况 4：分析子 agent 调用结束。
-      // 解析 JSON 数组，记录到本地缓存，并生成待 MCP 保存任务。
-      if (analyze(input)) {
-        const list = items(output.output)
-        const text = serial(list)
-        opt.workspaces.set(opt.id, doneAnalysis(opt.workspace, opt.worktree, text, list))
-        opt.charts.set(opt.id, requestChart(opt.workspace, opt.worktree))
-        opt.pending.set(opt.id, {
-          kind: "analysis",
-          workspacePath: opt.workspace,
-          worktreePath: opt.worktree,
-          items: list,
-          text,
-        })
-        await opt.write("workspace analysis completed", {
-          sessionID: input.sessionID,
-          workspace: opt.workspace,
-          worktree: opt.worktree,
-          items: list.length,
-        })
-        return true
-      }
-
-      return false
+        // 门禁 6：分析子 agent 调用结束。
+        // 解析 JSON 数组，更新 analysis 状态，同时把 chart 置为 requested，等待后续生成流程图。
+        step("analysis_done", async () => {
+          if (!analyze(input)) return false
+          const list = items(output.output)
+          const text = serial(list)
+          opt.workspaces.set(opt.id, doneAnalysis(opt.workspace, opt.worktree, text, list))
+          opt.charts.set(opt.id, requestChart(opt.workspace, opt.worktree))
+          opt.pending.set(opt.id, {
+            kind: "analysis",
+            workspacePath: opt.workspace,
+            worktreePath: opt.worktree,
+            items: list,
+            text,
+          })
+          await opt.write("workspace analysis completed", {
+            sessionID: input.sessionID,
+            workspace: opt.workspace,
+            worktree: opt.worktree,
+            items: list.length,
+          })
+          return true
+        }),
+      ])
     },
   }
 }
