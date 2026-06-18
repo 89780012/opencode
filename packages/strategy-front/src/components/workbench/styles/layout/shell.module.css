@@ -90,6 +90,8 @@
 }
 
 .stubcard {
+  width: 100%;
+  max-width: 28rem;
   width: min(100%, 28rem);
   padding: 2rem;
   border: 1px solid #e2e8f0;

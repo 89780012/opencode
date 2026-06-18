@@ -121,6 +121,7 @@ type Opt = {
   id: string
   load: (workspace: string, worktree: string) => Promise<Analysis | undefined>
   loadChart: (workspace: string, worktree: string) => Promise<Chart | undefined>
+  saveReview: (input: SaveReview) => Promise<void>
   write: Log
 }
 
@@ -382,6 +383,30 @@ export function createWorkspace(opt: Opt) {
         // 这里只记录审查开始，真实的通过/失败判断在 after 阶段处理。
         step("review", async () => {
           if (!review({ tool: input.tool, args: output.args })) return false
+          await opt
+            .saveReview({
+              workspacePath: opt.workspace,
+              worktreePath: opt.worktree,
+              state: "running",
+              summary: "审查任务已启动，正在等待 strategy-reviewer 返回结果。",
+              items: [
+                {
+                  name: "审查任务",
+                  status: "running",
+                  detail: "已检测到 strategy-reviewer 子 agent 启动。",
+                  suggestion: "",
+                },
+              ],
+              suggestions: [],
+            })
+            .catch((err) =>
+              opt.write("workspace review running save failed", {
+                sessionID: input.sessionID,
+                workspace: opt.workspace,
+                worktree: opt.worktree,
+                error: err instanceof Error ? err.message : String(err),
+              }),
+            )
           await opt.write("workspace review started", {
             sessionID: input.sessionID,
             workspace: opt.workspace,
@@ -611,6 +636,16 @@ export async function saveChartRemote(service: string, input: SaveChart) {
     body: JSON.stringify(input),
   })
   if (!resp.ok) throw new Error(`save flowchart failed: ${resp.status}`)
+}
+
+export async function saveReviewRemote(service: string, input: SaveReview) {
+  if (!service) return
+  const resp = await fetch(new URL("/api/workbench/review", service), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  })
+  if (!resp.ok) throw new Error(`save review failed: ${resp.status}`)
 }
 
 export async function loadRemote(service: string, workspace: string, worktree: string) {

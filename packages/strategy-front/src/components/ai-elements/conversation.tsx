@@ -37,7 +37,7 @@ function useConversation() {
 
 export type ConversationProps = ComponentProps<"div">
 
-export const Conversation = ({ children, className, onScroll, ...props }: ConversationProps) => {
+export const Conversation = ({ children, className, onScroll, onWheel, ...props }: ConversationProps) => {
   const body = useRef<HTMLDivElement>(null)
   const wrap = useRef<HTMLDivElement>(null)
   const root = useRef<HTMLDivElement>(null)
@@ -64,6 +64,12 @@ export const Conversation = ({ children, className, onScroll, ...props }: Conver
     cancelAnimationFrame(anim.current)
     anim.current = 0
   }, [])
+
+  const leave = useCallback(() => {
+    stop()
+    last.current = false
+    setBot(false)
+  }, [stop])
 
   const jump = useCallback((mode: ScrollBehavior = "auto") => {
     const node = root.current
@@ -153,6 +159,12 @@ export const Conversation = ({ children, className, onScroll, ...props }: Conver
           ref={root}
           role="log"
           {...props}
+          onWheel={(event) => {
+            if (event.deltaY < 0) {
+              leave()
+            }
+            onWheel?.(event)
+          }}
           onScroll={(event) => {
             sync()
             onScroll?.(event)

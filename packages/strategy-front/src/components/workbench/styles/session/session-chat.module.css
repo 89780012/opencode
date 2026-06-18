@@ -169,6 +169,8 @@
 }
 
 .list {
+  width: 100%;
+  max-width: 54rem;
   width: min(100%, 54rem);
   margin: 0 auto;
   display: grid;
@@ -185,6 +187,8 @@
 }
 
 .panelNarrow {
+  width: 100%;
+  max-width: 54rem;
   width: min(100%, 54rem);
   margin: 0 auto;
 }
@@ -210,6 +214,8 @@
 }
 
 .group .card {
+  width: 100%;
+  max-width: 52rem;
   width: min(100%, 52rem);
 }
 
@@ -251,6 +257,7 @@
 
 .card {
   min-width: 0;
+  max-width: 46rem;
   max-width: min(46rem, 84%);
   display: grid;
   gap: 0.45rem;
@@ -264,6 +271,7 @@
 
 .ai .card {
   width: auto;
+  max-width: 52rem;
   max-width: min(52rem, 86%);
   border: 1px solid var(--line);
   border-radius: 0.86rem;
@@ -274,6 +282,7 @@
 }
 
 .user .card {
+  max-width: 42rem;
   max-width: min(42rem, 78%);
   border: 0;
   border-radius: 0.86rem;
@@ -958,6 +967,7 @@
   display: inline-flex;
   align-items: flex-start;
   gap: 0.35rem;
+  max-width: 50rem;
   max-width: min(100%, 50rem);
   color: #dc2626;
   font-size: 0.78rem;
@@ -981,6 +991,7 @@
 }
 
 .statusRetry {
+  max-width: 50rem;
   max-width: min(100%, 50rem);
   padding: 0.55rem 0.7rem;
   border: 1px solid #fdba74;
@@ -1048,5 +1059,23 @@
 
   .user {
     padding-left: 1.8rem;
+  }
+}
+
+@media (max-width: 60.5rem) {
+  .ai .card {
+    max-width: 86%;
+  }
+}
+
+@media (max-width: 54.75rem) {
+  .card {
+    max-width: 84%;
+  }
+}
+
+@media (max-width: 53.875rem) {
+  .user .card {
+    max-width: 78%;
   }
 }

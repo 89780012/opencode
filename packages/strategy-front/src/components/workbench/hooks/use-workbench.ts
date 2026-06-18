@@ -2,7 +2,7 @@ import { useMemo, useState } from "react"
 import { modelChainApi } from "@/api/modules"
 import { toast } from "sonner"
 import { selectWorkbench, useAppDispatch, useAppSelector } from "@/store"
-import { setActive, setStage, upsertReview } from "@/store/workbench-slice"
+import { setActive, setStage } from "@/store/workbench-slice"
 import { code, createBacktest, createTimeline, type FlowStatus, type ReviewStatus, type SessionItem, type StepStatus } from "../data"
 
 function status(state?: string): ReviewStatus {
@@ -54,6 +54,7 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
   const dispatch = useAppDispatch()
   const state = useAppSelector(selectWorkbench)
   const [view, setView] = useState<"current" | "history">("current")
+  const [reviewing, setReviewing] = useState(false)
   const flow = state.flowchart?.workspacePath === state.sessionPath ? state.flowchart : null
   const rows = state.reviewPath === state.sessionPath ? state.reviews : []
   const row = rows[0] ?? null
@@ -123,25 +124,12 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
 
   const review = async () => {
     setRight?.(true)
+    if (reviewing) return
     if (!state.sessionPath || !state.active) {
       toast.error("请先创建或选择一个会话")
       return
     }
-    dispatch(
-      upsertReview({
-        workspacePath: state.sessionPath,
-        review: {
-          id: `pending_${Date.now()}`,
-          workspacePath: state.sessionPath,
-          worktreePath: state.sessionPath,
-          state: "running",
-          summary: "审查请求已提交，正在等待 strategy-reviewer 返回结果。",
-          items: [{ name: "审查任务", status: "running", detail: "正在启动审查子 agent。", suggestion: "" }],
-          suggestions: [],
-          updatedAt: Date.now(),
-        },
-      }),
-    )
+    setReviewing(true)
     try {
       await modelChainApi.sendPrompt({
         workspacePath: state.sessionPath,
@@ -150,6 +138,8 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
       })
     } catch {
       toast.error("提交审查失败")
+    } finally {
+      setReviewing(false)
     }
   }
 
@@ -165,6 +155,7 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
     last,
     risk,
     hint,
+    reviewing,
     setActive: (id: string) => dispatch(setActive(id)),
     review,
     backtest,

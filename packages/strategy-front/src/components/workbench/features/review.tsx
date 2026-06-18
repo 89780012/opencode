@@ -130,7 +130,7 @@ export function Review(props: {
                     <div className={ui.empty}>尚未发起审查</div>
                   )}
                   {app.cur.reviewStatus !== "running" ? (
-                    <button type="button" className={css.submit} onClick={() => void app.review()}>
+                    <button type="button" className={css.submit} onClick={() => void app.review()} disabled={app.reviewing}>
                       <ClipboardCheck size={15} />
                       <span>提交审查</span>
                     </button>

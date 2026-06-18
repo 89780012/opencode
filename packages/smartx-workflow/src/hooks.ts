@@ -1,7 +1,7 @@
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 import { createPairing } from "./pairing.js"
 import { key, wantsReview, type Analysis, type Chart, type Flow } from "./state.js"
-import { createWorkspace, loadChartRemote, loadRemote, type Fix, type Pending } from "./workspace.js"
+import { createWorkspace, loadChartRemote, loadRemote, saveReviewRemote, type Fix, type Pending, type SaveReview } from "./workspace.js"
 
 type Dep = {
   mem?: Map<string, Flow>
@@ -14,6 +14,7 @@ type Dep = {
   service?: string
   load?: (workspace: string, worktree: string) => Promise<Analysis | undefined>
   loadChart?: (workspace: string, worktree: string) => Promise<Chart | undefined>
+  saveReview?: (input: SaveReview) => Promise<void>
 }
 
 export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
@@ -52,6 +53,7 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
     id,
     load: dep.load ?? ((workspace, worktree) => loadRemote(service, workspace, worktree)),
     loadChart: dep.loadChart ?? ((workspace, worktree) => loadChartRemote(service, workspace, worktree)),
+    saveReview: dep.saveReview ?? ((input) => saveReviewRemote(service, input)),
     write,
   })
   const pairing = createPairing({ mem, write })

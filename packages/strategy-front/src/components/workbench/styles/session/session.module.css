@@ -82,6 +82,7 @@
 }
 
 .bubble {
+  max-width: 44rem;
   max-width: min(80%, 44rem);
   border-radius: 1rem;
   padding: 0.72rem 0.9rem;
@@ -105,5 +106,11 @@
 @media (max-width: 920px) {
   .head {
     flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 55rem) {
+  .bubble {
+    max-width: 80%;
   }
 }
