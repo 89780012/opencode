@@ -64,6 +64,12 @@
   color: #0f172a;
 }
 
+.topbtn:focus,
+.topbtn:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px #60a5fa;
+}
+
 .topactive {
   background: #0f172a !important;
   color: #ffffff !important;

@@ -322,6 +322,36 @@
   min-height: 0;
   overflow: auto;
   padding: 0.44rem 0.5rem;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f8fafc;
+}
+
+.tree::-webkit-scrollbar,
+.changes::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.tree::-webkit-scrollbar-track,
+.changes::-webkit-scrollbar-track {
+  background: #f8fafc;
+}
+
+.tree::-webkit-scrollbar-thumb,
+.changes::-webkit-scrollbar-thumb {
+  border: 2px solid #f8fafc;
+  border-radius: 999px;
+  background: #cbd5e1;
+}
+
+.tree::-webkit-scrollbar-thumb:hover,
+.changes::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.tree::-webkit-scrollbar-corner,
+.changes::-webkit-scrollbar-corner {
+  background: #f8fafc;
 }
 
 .treebtn {

@@ -42,6 +42,12 @@
     color 0.16s ease;
 }
 
+.tabs button:focus,
+.tabs button:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px #60a5fa;
+}
+
 .tabon {
   background: #0f172a !important;
   color: #ffffff !important;
@@ -142,6 +148,11 @@
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+}
+
+.stepbox {
+  gap: 0;
+  min-height: 8.85rem;
 }
 
 .sessionlist,
@@ -469,9 +480,14 @@
 .step {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
-  padding: 0.42rem 0.5rem;
+  box-sizing: border-box;
+  min-height: 1.7rem;
+  padding: 0.34rem 0.5rem;
   border-radius: 0.5rem;
+}
+
+.step + .step {
+  margin-top: 0.35rem;
 }
 
 .step:hover {
@@ -493,7 +509,7 @@
 .progress {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
+  min-width: 0;
   color: #334155;
   font-size: 0.75rem;
   line-height: 1rem;
@@ -501,6 +517,11 @@
 
 .progress strong {
   font-weight: 500;
+  min-width: 0;
+  margin-left: 0.45rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .stepicon {
@@ -509,6 +530,8 @@
   justify-content: center;
   width: 1rem;
   height: 1rem;
+  min-width: 1rem;
+  line-height: 1rem;
   flex: none;
 }
 

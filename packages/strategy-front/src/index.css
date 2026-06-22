@@ -81,6 +81,11 @@ textarea {
   letter-spacing: inherit;
 }
 
+button,
+[role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
 .dark {
   --background: 18 18 18;
   --foreground: 255 255 255;
@@ -265,11 +270,9 @@ textarea::-webkit-scrollbar-thumb:hover,
 }
 
 .chat-fold:focus-within {
-  border-color: #c58b17 !important;
-  border-color: -webkit-focus-ring-color !important;
-  box-shadow:
-    inset 0 0 0 1px #c58b17,
-    inset 0 0 0 1px -webkit-focus-ring-color !important;
+  outline: none !important;
+  border-color: #60a5fa !important;
+  box-shadow: inset 0 0 0 1px #60a5fa !important;
 }
 
 .chat-fold-trigger {
@@ -280,6 +283,11 @@ textarea::-webkit-scrollbar-thumb:hover,
 .chat-fold-trigger:focus-visible {
   outline: none !important;
   box-shadow: none !important;
+}
+
+button:focus,
+[role="button"]:focus {
+  outline: none;
 }
 
 .response-body [data-streamdown="code-block-actions"],
