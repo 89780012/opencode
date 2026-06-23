@@ -593,12 +593,21 @@
 }
 
 .chat-perm-actions {
-  align-items: center;
+  display: block !important;
+  text-align: right;
+  white-space: normal;
+}
+
+.chat-perm-actions > * {
+  margin: 4px 0 4px 8px !important;
+  vertical-align: middle;
 }
 
 .chat-perm-btn {
   appearance: none !important;
   -webkit-appearance: none !important;
+  display: inline-block !important;
+  min-width: 72px;
   border-color: #d8e1ea !important;
   background: #ffffff !important;
   background-image: none !important;

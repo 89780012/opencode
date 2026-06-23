@@ -95,11 +95,15 @@
 }
 
 .actions {
-  display: flex;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 0.45rem;
+  display: block;
   margin-top: 0.72rem;
+  text-align: right;
+  white-space: normal;
+}
+
+.actions > * {
+  margin: 0.22rem 0 0.22rem 0.45rem;
+  vertical-align: middle;
 }
 
 .question {

@@ -164,10 +164,9 @@
 }
 
 .head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  display: table;
+  table-layout: fixed;
+  width: 100%;
   min-height: 2.35rem;
   padding-bottom: 0.55rem;
   border-bottom: 1px solid #e2e8f0;
@@ -180,7 +179,11 @@
 }
 
 .head > div:first-child {
-  flex: 1;
+  display: table-cell;
+  width: 100%;
+  min-width: 0;
+  padding-right: 1rem;
+  vertical-align: middle;
 }
 
 .head h2,
@@ -207,30 +210,38 @@
 }
 
 .actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.34rem;
-  flex-wrap: wrap;
+  display: block;
+  text-align: right;
+  white-space: normal;
+}
+
+.head > .actions {
+  display: table-cell;
+  width: 10rem;
+  vertical-align: middle;
+}
+
+.actions > * {
+  margin: 0.16rem 0 0.16rem 0.34rem;
+  vertical-align: middle;
 }
 
 .metrics {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0;
+  clear: both;
+  display: block;
+  min-height: 1.55rem;
   padding: 0.15rem 0;
   border-bottom: 1px solid #e2e8f0;
+  line-height: 1.35;
 }
 
 .metrics div {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.35rem;
+  display: inline-block;
   min-width: 0;
   min-height: 1.25rem;
   padding: 0 0.62rem;
   border-right: 1px solid #e2e8f0;
+  vertical-align: top;
 }
 
 .metrics div:first-child {
@@ -242,6 +253,8 @@
 }
 
 .metrics span {
+  display: inline-block;
+  margin-right: 0.35rem;
   color: #64748b;
   font-size: 0.74rem;
 }
@@ -761,6 +774,23 @@
     padding: 0.9rem;
   }
 
+  .head {
+    display: block;
+    width: auto;
+  }
+
+  .head > div:first-child {
+    display: block;
+    width: auto;
+    padding-right: 0;
+  }
+
+  .head > .actions {
+    display: block;
+    width: auto;
+    margin-top: 0.45rem;
+  }
+
   .head,
   .titleline,
   .row,
@@ -780,6 +810,7 @@
   }
 
   .actions {
+    text-align: left;
     justify-content: flex-start;
   }
 }

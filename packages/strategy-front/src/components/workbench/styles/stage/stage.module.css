@@ -47,14 +47,23 @@
 .flowtools {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  flex-wrap: wrap;
+  gap: 0;
+  margin-top: -0.2rem;
+  margin-left: -0.35rem;
+}
+
+.flowtools > * {
+  margin-top: 0.2rem;
+  margin-left: 0.35rem;
 }
 
 .switch {
   display: inline-flex;
   align-items: center;
   gap: 0.15rem;
-  height: 1.75rem;
+  box-sizing: border-box;
+  height: 1.95rem;
   padding: 0.16rem;
   border: 1px solid #e2e8f0;
   border-radius: 0.5rem;
@@ -63,8 +72,10 @@
 
 .switch button {
   height: 100%;
+  min-width: 2.55rem;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.22rem;
   border: 0;
   border-radius: 0.34rem;
@@ -90,8 +101,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
+  box-sizing: border-box;
+  width: 1.95rem;
+  height: 1.95rem;
   border: 1px solid #e2e8f0;
   border-radius: 0.5rem;
   background: #ffffff;
@@ -109,11 +121,23 @@
 }
 
 .zoomlabel {
-  min-width: 2.8rem;
+  box-sizing: border-box;
+  min-width: 3rem;
+  height: 1.95rem;
+  display: inline-block;
+  line-height: 1.95rem;
   text-align: center;
   font-size: 0.72rem;
   font-weight: 600;
   color: #475569;
+}
+
+.actionbtn {
+  box-sizing: border-box;
+  min-width: 5.25rem;
+  min-height: 1.95rem;
+  padding: 0 0.64rem;
+  vertical-align: middle;
 }
 
 .badge {

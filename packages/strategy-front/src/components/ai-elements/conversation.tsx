@@ -44,6 +44,8 @@ export const Conversation = ({ children, className, onScroll, onWheel, ...props 
   const frame = useRef(0)
   const anim = useRef(0)
   const last = useRef(true)
+  const free = useRef(false)
+  const top = useRef(0)
   const [bot, setBot] = useState(true)
   const setBody = useCallback((node: HTMLDivElement | null) => {
     body.current = node
@@ -53,8 +55,11 @@ export const Conversation = ({ children, className, onScroll, onWheel, ...props 
     const node = root.current
     if (!node) return
     const next = node.scrollHeight - node.clientHeight - node.scrollTop <= GAP
-    last.current = next
-    setBot((prev) => (prev === next ? prev : next))
+    if (!free.current) {
+      last.current = next
+    }
+    const show = free.current ? false : next
+    setBot((prev) => (prev === show ? prev : show))
   }, [])
 
   const stop = useCallback(() => {
@@ -68,6 +73,7 @@ export const Conversation = ({ children, className, onScroll, onWheel, ...props 
   const leave = useCallback(() => {
     stop()
     last.current = false
+    free.current = true
     setBot(false)
   }, [stop])
 
@@ -75,11 +81,14 @@ export const Conversation = ({ children, className, onScroll, onWheel, ...props 
     const node = root.current
     if (!node) return
     stop()
+    free.current = false
+    last.current = true
     if (mode === "smooth") {
       const from = node.scrollTop
       const dist = node.scrollHeight - node.clientHeight - from
       if (dist <= 4) {
         node.scrollTop = node.scrollHeight
+        top.current = node.scrollTop
         return
       }
       const span = Math.min(320, Math.max(160, dist * 0.18))
@@ -87,11 +96,12 @@ export const Conversation = ({ children, className, onScroll, onWheel, ...props 
       const step = (now: number) => {
         const p = Math.min(1, (now - start) / span)
         const eased = 1 - Math.pow(1 - p, 3)
-        const top = node.scrollHeight - node.clientHeight
-        node.scrollTop = from + (top - from) * eased
+        const end = node.scrollHeight - node.clientHeight
+        node.scrollTop = from + (end - from) * eased
         if (p >= 1) {
           anim.current = 0
           node.scrollTop = node.scrollHeight
+          top.current = node.scrollTop
           sync()
           return
         }
@@ -101,10 +111,14 @@ export const Conversation = ({ children, className, onScroll, onWheel, ...props 
       return
     }
     node.scrollTop = node.scrollHeight
+    top.current = node.scrollTop
   }, [stop, sync])
 
   useLayoutEffect(() => {
     jump()
+    if (root.current) {
+      top.current = root.current.scrollTop
+    }
     sync()
   }, [jump, sync])
 
@@ -166,7 +180,26 @@ export const Conversation = ({ children, className, onScroll, onWheel, ...props 
             onWheel?.(event)
           }}
           onScroll={(event) => {
-            sync()
+            const node = event.currentTarget
+            const next = node.scrollHeight - node.clientHeight - node.scrollTop <= GAP
+            const dir = node.scrollTop - top.current
+            top.current = node.scrollTop
+            if (!free.current && dir < 0 && !next) {
+              free.current = true
+              last.current = false
+            }
+            if (free.current) {
+              if (next && dir > 0) {
+                free.current = false
+                last.current = true
+                setBot(true)
+              } else {
+                setBot(false)
+              }
+            } else {
+              last.current = next
+              setBot((prev) => (prev === next ? prev : next))
+            }
             onScroll?.(event)
           }}
         >
