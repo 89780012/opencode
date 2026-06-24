@@ -164,6 +164,6 @@ describe("smartx workflow hooks", () => {
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, output)
 
     expect(rows.some((item) => item.message === "plugin loaded")).toBe(true)
-    expect(rows.some((item) => item.message.includes("状态") || item.message.includes("鎻愮ず"))).toBe(true)
+    expect(rows.some((item) => item.message.includes("state") || item.message.includes("reminder"))).toBe(true)
   })
 })

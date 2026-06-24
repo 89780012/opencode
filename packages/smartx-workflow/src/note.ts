@@ -1,0 +1,235 @@
+import type { Analysis, Fix, Flow, Pending } from "./types.js"
+
+export const limit = 3
+
+/** 自动生成 session 配对提醒文案。 */
+export function note(flow: Flow) {
+  const out = ["当前 session 已启用 SmartX 工作流顺序约束。"]
+  if (flow.logs > 0) {
+    out.push("`smartx_start` 和 `smartx_logs` 是有前后顺序的一对调用。")
+    out.push(`在结束当前回复前，你还需要再调用 ${flow.logs} 次 \`smartx_logs\`。`)
+    out.push("如果已经调用了 `smartx_start`，下一步就先调用 `smartx_logs`，不要直接结束回复。")
+  }
+  if (flow.debug > 0) {
+    out.push("`smartx-develop` 和 `smartx-debug` 是有前后顺序的一对 skill 调用。")
+    out.push(`在结束当前回复前，你还需要再调用 ${flow.debug} 次 \`skill({ name: "smartx-debug" })\`。`)
+    out.push("如果已经调用了 `smartx-develop`，下一步就先调用 `smartx-debug`，不要直接结束回复。")
+  }
+  return out.join("\n")
+}
+
+/** 生成 review 流程的系统提示，强制主 agent 走 save-first 协议。 */
+export function noteReview(input: { workspace: string; worktree: string; sessionID: string }) {
+  return [
+    "当前用户本轮意图是 SmartX 策略代码审查。",
+    "不要把这段系统提示复述给用户；用户侧只需要看到简洁的审查进展和最终结论。",
+    "",
+    "必须严格按以下顺序执行：",
+    `1. 先调用 strategy-service MCP 工具 \`smartx_get_requirements\`，参数为 \`workspacePath: ${input.workspace}\`、\`sessionId: ${input.sessionID}\`，读取当前会话需求清单。`,
+    "2. 然后调用 `task` 工具启动 `strategy-reviewer` 子 agent，`subagent_type` 必须是 `strategy-reviewer`，`description` 使用 `Review strategy implementation`。",
+    "3. 传给 `strategy-reviewer` 的 prompt 必须包含第 1 步拿到的需求清单，并要求它结合需求清单和当前工作区代码审查实现是否满足需求。",
+    "4. `strategy-reviewer` 只输出中文审查报告，不需要输出 JSON，不要修改文件，不要运行命令，不要调用其它子 agent。",
+    "5. 每一轮 `strategy-reviewer` 返回审查报告后，都必须先调用 strategy-service MCP 工具 `smartx_save_review` 保存该轮审查结果，然后才能修复代码或结束。",
+    "6. 只有 `smartx_save_review.items` 里所有检查项的 status 都是 passed，才算审查完全通过；只要任一项是 warning、failed 或 error，都必须按未通过处理。",
+    "7. 如果已保存的审查结果存在非 passed 检查项，主 agent 必须自己根据这些检查项修复代码，不要让 `strategy-reviewer` 修复。",
+    "8. 第 1、2 轮审查存在非 passed 检查项时，保存后必须修复，并在修复完成后再次调用 `strategy-reviewer` 复审。",
+    "9. 第 3 轮审查全部 passed 时，保存后进入后续分析、流程图和调试流程；第 3 轮仍存在非 passed 检查项时，也必须先保存该轮缺陷结果，再完成最后一次修复，然后给出最终结论，不再自动发起第 4 轮复审。",
+    "10. 审查全部 passed 并保存后，工作流会继续要求重新分析当前代码、重新生成并保存策略流程图，然后才调 `smartx_start` 开始调试；主 agent 必须按后续系统提示执行。",
+    "11. `smartx_save_review` 的 `summary`、`items`、`items[].name`、`items[].detail`、`items[].suggestion`、`suggestions` 必须使用中文。",
+    "12. MCP 保存成功后，再用中文简短回复用户审查结果和已执行的修复概况。",
+    "",
+    "审查结果必须尽量固化到 `smartx_save_review.items`，并优先复用这些 name：需求覆盖情况、语法与运行时错误、策略逻辑完整性、入场逻辑、退出逻辑、仓位管理、风控规则、边界条件、订单管理、状态管理、生命周期管理、代码可维护性。",
+  ].join("\n")
+}
+
+/** 生成“先做 workspace 分析”的系统提示。 */
+export function noteAnalysis() {
+  return [
+    "当前工作区还没有完成策略运行逻辑分析。",
+    "在正式修改代码、生成实现方案或调用写入类工具前，必须先调用 `task` 工具启动 `workspace-analyzer` 子 agent。",
+    "调用参数要求：`subagent_type` 必须是 `workspace-analyzer`，`description` 使用 `Analyze strategy execution flow`。",
+    "子 agent 只负责输出可画成流程图的 JSON 字符串数组，不要读取 requirements，不要描述项目结构、版本、UI、构建方式或文件职责，不要修改文件，也不要给实现方案。",
+    "如果当前工作区只是模板骨架或还没有完整策略算法，子 agent 必须明确输出已发现的实际运行行为和缺失的入场、退出、仓位、风控规则。",
+    '子 agent 必须只返回 JSON 数组，例如 ["当前策略未形成完整交易算法。"]，不要 markdown、编号、标题、解释或代码块。',
+    "子 agent 返回后，先基于它的结论继续当前任务；不要把这段系统提示复述给用户。",
+  ].join("\n")
+}
+
+/** 生成首次进入 workspace 时的基线初始化提示。 */
+export function noteBoot() {
+  return [
+    "当前会话还没有完成这个工作区的初始化基线。",
+    "初始化基线必须先完成两步：先调用 `workspace-analyzer`，再调用 `strategy-flowchart-generator`。",
+    "在初始化基线完成前，不要修改代码，不要执行会改变工作区的命令。",
+    "你可以继续做只读探索，例如读取文件、搜索代码和查看目录。",
+    "请先调用 `task` 工具启动 `workspace-analyzer` 子 agent，`subagent_type` 使用 `workspace-analyzer`，`description` 使用 `Analyze strategy execution flow`。",
+    "不要把这段系统提示复述给用户。",
+  ].join("\n")
+}
+
+/** 生成 project memory 恢复/初始化提示。 */
+export function noteResumeProject(exists: boolean) {
+  return [
+    "当前会话还没有完成项目记忆恢复，不能直接进入持续开发、调试、审查或最终收口。",
+    exists
+      ? "请先调用 strategy-service MCP 工具 `resume_project_state`，参数至少包含 `workspacePath`，在继续其它流程前恢复 `.project-state/` 中的当前阶段、当前任务、下一步和风险。"
+      : "当前工作区还没有 `.project-state/`，请先调用 strategy-service MCP 工具 `init_project_state`，参数至少包含 `workspacePath`，初始化项目记忆后再继续其它流程。",
+    "在项目记忆恢复完成前，你可以继续只读探索，例如读取文件、搜索代码和查看目录，但不要修改代码、不要启动子 agent 做实现、不要发起调试或代码审查。",
+    "不要把这段系统提示复述给用户。",
+  ].join("\n")
+}
+
+/** 生成 project memory 需要保存时的提示。 */
+export function noteSaveProject() {
+  return [
+    "当前工作区已经产生了新的推进，但项目记忆还没有同步到 `.project-state/`。",
+    "如果你准备收尾、输出最终总结、交接状态或自然结束这一轮，请先调用 strategy-service MCP 工具 `save_project_state`。",
+    "保存内容至少要覆盖：当前阶段、当前任务、本次进展摘要、下一步、风险、是否已验证，并把 `dirty` 设为 false。",
+    "在项目记忆保存完成前，不要直接给出最终总结，不要把这一轮当成已经正式交接完成。",
+    "不要把这段系统提示复述给用户。",
+  ].join("\n")
+}
+
+/** 生成 workspace 基线刷新提示。 */
+export function noteRefresh(action = "后续收尾步骤") {
+  return [
+    "当前工作区代码已经发生变化，上一轮分析和流程图基线已经过期。",
+    `继续执行 ${action} 前，必须先刷新基线：重新运行 workspace 分析并重新生成流程图。`,
+    "刷新顺序必须是：先调用 `workspace-analyzer`，保存分析结果；再调用 `strategy-flowchart-generator`，保存流程图结果。",
+    "刷新期间可以继续做只读探索，但不要继续修改代码，也不要开始审查或调试。",
+    "不要把这段系统提示复述给用户。",
+  ].join("\n")
+}
+
+/** 生成最终收口前的最后一次基线刷新提示。 */
+export function noteFinal() {
+  return [
+    "当前工作区代码已经发生变化，保存的分析和流程图不再代表最终状态。",
+    "现在进入最终收口阶段：先最后刷新一次 workspace 分析和流程图，再给出最终总结。",
+    "刷新顺序必须是：先调用 `workspace-analyzer`，保存分析结果；再调用 `strategy-flowchart-generator`，保存流程图结果。",
+    "最终快照保存完成前，可以继续做只读检查，但不要再修改代码，也不要继续发起新的调试。",
+    "不要把这段系统提示复述给用户。",
+  ].join("\n")
+}
+
+/** 生成自然收尾时的自动 close 提示。 */
+export function noteClose() {
+  return [
+    "当前工作区代码已经发生变化，保存的分析和流程图已经落后。",
+    "如果你这一轮准备直接结束工作、给出收尾回复或最终总结，先不要直接输出文本。",
+    "此时必须先做最后一次 workspace 快照刷新：先调用 `workspace-analyzer` 并保存分析，再调用 `strategy-flowchart-generator` 并保存流程图。",
+    "只有当你明确判断这一轮还要继续修改代码、继续调试或继续探索时，才可以暂时不执行这个收口刷新。",
+    "不要把这段系统提示复述给用户。",
+  ].join("\n")
+}
+
+/** 生成从 analysis 进入 flowchart 阶段的提示。 */
+export function noteChart(input: Analysis) {
+  return [
+    "workspace-analyzer 已经完成当前工作区的策略运行逻辑分析。现在必须先生成策略逻辑流程图，再继续其它实现或总结。",
+    "请立即调用 `task` 工具启动 `strategy-flowchart-generator` 子 agent。",
+    "调用参数要求：`subagent_type` 必须是 `strategy-flowchart-generator`，`description` 使用 `Generate strategy flowchart`。",
+    "传给子 agent 的 prompt 必须包含下面的 workspace-analyzer JSON 数组结果，并要求它只读当前工作区源码进行校验、修正和补充。",
+    "子 agent 可以读取源码、列目录和搜索文本；不能修改文件，不能执行命令，不能调用其它子 agent。",
+    "不要加入 requirements、用户愿望清单或未来实现计划作为流程图来源。",
+    "子 agent 必须只返回 Mermaid flowchart，第一行是 `flowchart TD`，不要 markdown 代码块，不要解释。",
+    "子 agent 返回后，继续当前任务；不要把这段系统提示复述给用户。",
+    "",
+    "workspace-analyzer JSON 数组结果：",
+    input.text,
+  ].join("\n")
+}
+
+/** 生成审查失败后的修复指令，并控制最多修复轮数。 */
+export function noteFix(input: Fix) {
+  const last = input.attempt >= limit
+  return [
+    "最新一轮 SmartX 策略审查未通过，并且该轮审查结果已经通过 `smartx_save_review` 保存。",
+    "你是主 agent，必须自己根据审查报告修复代码。",
+    `这是第 ${input.attempt} 次修复，最多 ${limit} 次。`,
+    "规则：",
+    "- 阅读下面的审查报告，修改当前工作区代码，解决报告中的具体问题。",
+    "- 修改范围聚焦在 SmartX 策略缺陷和用户需求上。",
+    "- 修改后，从对应 package 或项目目录运行你能合理执行的本地验证。",
+    last
+      ? "- 这是最后一次自动修复。不要再调用 `strategy-reviewer`，不要调用 `smartx_start`；验证后直接用中文给出最终结论，并总结已保存的第 3 轮审查结果和最后修复内容。"
+      : "- 然后再次调用 `task` 工具，使用 `subagent_type: strategy-reviewer` 和 `description: Review strategy implementation` 进行复审。",
+    last ? "" : "- 传给 reviewer 的 prompt 必须包含相同的需求上下文，以及本轮修复摘要。",
+    "- 在新的 `strategy-reviewer` 审查完成前，不要再次调用 `smartx_save_review`。",
+    "",
+    "待修复的审查报告：",
+    input.text,
+  ]
+    .filter(Boolean)
+    .join("\n")
+}
+
+/** 生成 review 全通过后进入调试阶段的提示。 */
+export function noteDebug(input: Extract<Pending, { kind: "debug" }>) {
+  return [
+    "SmartX 策略审查已经全部通过，最新分析和策略流程图也已经保存。",
+    "下一步必须开始调试流程：请调用 `smartx_start`。",
+    `调试工作区：${input.workspacePath}`,
+    `调试 worktree：${input.worktreePath}`,
+    "调用成功后，现有顺序约束会继续要求你调用 `smartx_logs` 查看调试日志。",
+    "不要把这段系统提示复述给用户。",
+  ].join("\n")
+}
+
+/** 根据 pending 类型生成对应的“先保存再继续”提示。 */
+export function noteSave(input: Pending) {
+  if (input.kind === "analysis") {
+    return [
+      "工作区分析任务已经完成。继续之前，必须调用 strategy-service MCP 工具 `smartx_save_analysis`，参数必须严格使用下面这段 JSON：",
+      JSON.stringify(
+        {
+          workspacePath: input.workspacePath,
+          worktreePath: input.worktreePath,
+          state: "done",
+          items: input.items,
+          text: input.text,
+        },
+        null,
+        2,
+      ),
+      "MCP 工具调用成功后，再继续当前任务。",
+    ].join("\n")
+  }
+  if (input.kind === "review") {
+    return [
+      "策略审查任务已经完成。继续之前，必须把下面的中文审查报告转换成 strategy-service MCP 工具 `smartx_save_review` 的严格 JSON 参数并调用保存。",
+      "固定字段：",
+      `- workspacePath: ${input.workspacePath}`,
+      `- worktreePath: ${input.worktreePath}`,
+      `- state: ${input.state}`,
+      "生成字段：",
+      "- summary：简洁的中文审查摘要",
+      "- items：中文审查项数组，每项包含 name、status、detail、suggestion",
+      "- suggestions：中文建议数组",
+      "规则：",
+      "- 所有自然语言字段都必须使用中文。",
+      "- 忠实转换审查报告内容，不要编造额外问题。",
+      "- item status 只能使用：passed、warning、failed、error。",
+      "",
+      "审查报告：",
+      input.text,
+      "MCP 工具调用成功后，再继续当前任务。",
+    ].join("\n")
+  }
+  if (input.kind === "debug") return noteDebug(input)
+  return [
+    "策略流程图任务已经完成。继续之前，必须调用 strategy-service MCP 工具 `smartx_save_flowchart`，参数必须严格使用下面这段 JSON：",
+    JSON.stringify(
+      {
+        workspacePath: input.workspacePath,
+        worktreePath: input.worktreePath,
+        state: input.state,
+        code: input.code,
+        err: input.err,
+      },
+      null,
+      2,
+    ),
+    "MCP 工具调用成功后，再继续当前任务。",
+  ].join("\n")
+}

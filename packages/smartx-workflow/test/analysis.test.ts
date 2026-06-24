@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { build } from "../src/hooks.js"
-import { loadRemote, type Memory } from "../src/workspace.js"
+import { loadRemote } from "../src/remote.js"
 import {
   analyze,
   doneAnalysis,
@@ -15,8 +15,8 @@ import {
   wantsReview,
   type Analysis,
   type Chart,
-  type Project,
 } from "../src/state.js"
+import type { Memory, Project } from "../src/types.js"
 
 type Row = {
   message: string

@@ -1,8 +1,9 @@
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 import { createPairing } from "./pairing.js"
 import { key, wantsFinal, wantsReview, type Analysis, type Chart, type Dirt, type Flow, type Mode } from "./state.js"
-import { createWorkspace, loadChartRemote, loadProjectRemote, loadRemote, saveReviewRemote, type Fix, type Memory, type Pending, type SaveReview } from "./workspace.js"
-import type { Project } from "./state.js"
+import { loadChartRemote, loadProjectRemote, loadRemote, saveReviewRemote } from "./remote.js"
+import type { Fix, Memory, Pending, Project, SaveReview } from "./types.js"
+import { createWorkspace } from "./workspace.js"
 
 type Dep = {
   mem?: Map<string, Flow>
@@ -24,6 +25,7 @@ type Dep = {
   saveReview?: (input: SaveReview) => Promise<void>
 }
 
+/** 组装插件 hook，把 session 配对与 workspace 工作流接到同一个入口上。 */
 export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
   const mem = dep.mem ?? new Map<string, Flow>()
   const workspaces = dep.workspaces ?? new Map<string, Analysis>()
@@ -41,6 +43,7 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
   const worktree = ctx.worktree || ctx.directory
   const id = workspace ? key(workspace, worktree) : ""
   const service = dep.service ?? Bun.env.STRATEGY_SERVICE_URL ?? ""
+  /** 统一把插件内部事件写入 opencode 日志。 */
   const write = async (message: string, extra?: Record<string, unknown>) => {
     await ctx.client.app
       .log({
@@ -88,6 +91,7 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
 
   return {
     event: async (input) => {
+      /** 记录子 session，避免把主工作区门禁错误地下放给子 agent。 */
       if (input.event.type === "session.created") {
         const info = input.event.properties?.info
         if (!info?.parentID || !info.id) return
@@ -95,6 +99,7 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
       }
     },
     "chat.message": async (input, output) => {
+      /** 从用户文本里捕获 review/final 意图，留给 system 阶段注入提示。 */
       if (!id || !input.sessionID) return
       const text = output.parts
         .filter((part): part is typeof part & { type: "text"; text: string } => part.type === "text" && typeof part.text === "string")
@@ -117,6 +122,7 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
       })
     },
     "experimental.chat.system.transform": async (input, output) => {
+      /** 先走 workspace 级门禁，再补 session 级顺序提醒。 */
       if (!input.sessionID) return
 
       const handled = await workspaceFlow.system(input, output)
@@ -125,9 +131,11 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
       await pairing.transform(input, output)
     },
     "tool.execute.before": async (input, output) => {
+      /** 工具执行前做硬门禁和启动态标记。 */
       await workspaceFlow.before(input, output)
     },
     "tool.execute.after": async (input, output) => {
+      /** 工具执行后推进 workspace 状态，再更新 session 配对状态。 */
       await workspaceFlow.after(input, output)
       await pairing.after(input)
     },
