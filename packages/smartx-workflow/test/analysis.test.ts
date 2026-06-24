@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+﻿import { describe, expect, test } from "bun:test"
 import { build } from "../src/hooks.js"
 import { loadRemote } from "../src/remote.js"
 import {
@@ -49,12 +49,12 @@ function workspace() {
   return key("f:/repo", "f:/repo")
 }
 
-function restored(stale = false) {
-  return new Map<string, Memory>([[workspace(), { exists: true, restored: true, stale }]])
+function restored(needsSave = false) {
+  return new Map<string, Memory>([[workspace(), { hasProjectState: true, hasRestoredState: true, needsSave }]])
 }
 
-function projects(exists = true) {
-  return new Map<string, Project>([[workspace(), { workspace: "f:/repo", worktree: "f:/repo", exists, updated: Date.now() }]])
+function projects(hasProjectState = true) {
+  return new Map<string, Project>([[workspace(), { workspace: "f:/repo", worktree: "f:/repo", hasProjectState, updated: Date.now() }]])
 }
 
 function setup(input: ReturnType<typeof ctx>, dep: Parameters<typeof build>[1] = {}) {
@@ -154,7 +154,7 @@ describe("smartx workspace analysis", () => {
     )
 
     expect(workspaces.get(id)?.state).toBe("done")
-    expect(workspaces.get(id)?.items).toEqual(["read market", "enter position"])
+    expect(workspaces.get(id)?.summaryItems).toEqual(["read market", "enter position"])
     expect(pending.get(id)?.kind).toBe("analysis")
 
     const save = { system: [] as string[] }
@@ -217,7 +217,7 @@ describe("smartx workspace analysis", () => {
     )
 
     expect(charts.get(id)?.state).toBe("done")
-    expect(charts.get(id)?.code).toContain("flowchart TD")
+    expect(charts.get(id)?.mermaidCode).toContain("flowchart TD")
     expect(pending.get(id)?.kind).toBe("flowchart")
 
     const save = { system: [] as string[] }
@@ -240,10 +240,10 @@ describe("smartx workspace analysis", () => {
 
   test("prioritizes workspace gates over session pairing reminders", async () => {
     const workspaces = new Map<string, Analysis>()
-    const mem = new Map([["s1", { ...fresh("s1"), logs: 1 }]])
+    const mem = new Map([["s1", { ...fresh("s1"), pendingLogCount: 1 }]])
     const hooks = setup(ctx(), {
       workspaces,
-      mem,
+      sessionFlows: mem,
     })
 
     const first = { system: [] as string[] }
@@ -411,7 +411,7 @@ describe("smartx workspace analysis", () => {
     const id = key("f:/repo", "f:/repo")
     const workspaces = new Map<string, Analysis>([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]])
     const charts = new Map<string, Chart>([
-      [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", code: "flowchart TD", err: "", updated: Date.now() }],
+      [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() }],
     ])
     const pending = new Map()
     const hooks = setup(ctx("f:/repo", rows), {
@@ -457,8 +457,8 @@ describe("smartx workspace analysis", () => {
       workspacePath: "f:/repo",
       worktreePath: "f:/repo",
       state: "done",
-      code: "flowchart TD",
-      err: "",
+      mermaidCode: "flowchart TD",
+      errorText: "",
     })
     const hooks = setup(ctx("f:/repo"), {
       pending,
@@ -484,7 +484,7 @@ describe("smartx workspace analysis", () => {
     const hooks = setup(ctx("f:/repo", rows), {
       workspaces: new Map([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]]),
       charts: new Map([
-        [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", code: "flowchart TD", err: "", updated: Date.now() }],
+        [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() }],
       ]),
       reviewRequests,
     })
@@ -502,7 +502,7 @@ describe("smartx workspace analysis", () => {
 
     expect(out.system.join("\n")).toContain("smartx_get_requirements")
     expect(out.system.join("\n")).toContain("strategy-reviewer")
-    expect(out.system.join("\n")).toContain("每一轮")
+    expect(out.system.join("\n")).toContain("smartx_save_review")
     expect(out.system.join("\n")).toContain("第 3 轮")
     expect(reviewRequests.size).toBe(0)
     expect(rows.some((item) => item.message === "workspace review requested")).toBe(true)
@@ -518,12 +518,12 @@ describe("smartx workspace analysis", () => {
       workspaces,
       charts,
       pending,
-      fixes,
+      reviewFixes: fixes,
     })
     const id = key("f:/repo", "f:/repo")
     const fixID = id + "\x00" + "s1"
     workspaces.set(id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"]))
-    charts.set(id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", code: "flowchart TD", err: "", updated: Date.now() })
+    charts.set(id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() })
 
     await hooks["tool.execute.before"]?.(
       { sessionID: "s1", tool: "task", callID: "c1" },
@@ -575,7 +575,7 @@ describe("smartx workspace analysis", () => {
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, fix)
     expect(fix.system.join("\n")).toContain("最新一轮 SmartX 策略审查未通过")
     expect(fix.system.join("\n")).toContain("主 agent")
-    expect(fix.system.join("\n")).toContain("不要再次调用 `smartx_save_review`")
+    expect(fix.system.join("\n")).toContain("smartx_save_review")
     expect(fix.system.join("\n")).toContain("strategy-reviewer")
     expect(fix.system.join("\n")).toContain("missing stop loss")
     expect(rows.some((item) => item.message === "workspace review needs fix")).toBe(true)
@@ -591,11 +591,11 @@ describe("smartx workspace analysis", () => {
       workspaces,
       charts,
       pending,
-      fixes,
+      reviewFixes: fixes,
     })
     const id = key("f:/repo", "f:/repo")
     workspaces.set(id, doneAnalysis("f:/repo", "f:/repo", "", ["old analysis"]))
-    charts.set(id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", code: "flowchart TD", err: "", updated: Date.now() })
+    charts.set(id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() })
 
     await hooks["tool.execute.after"]?.(
       {
@@ -727,7 +727,7 @@ describe("smartx workspace analysis", () => {
     const id = key("f:/repo", "f:/repo")
     const workspaces = new Map<string, Analysis>([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]])
     const charts = new Map<string, Chart>([
-      [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", code: "flowchart TD", err: "", updated: Date.now() }],
+      [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() }],
     ])
     const hooks = setup(ctx("f:/repo", rows), {
       workspaces,
@@ -755,13 +755,13 @@ describe("smartx workspace analysis", () => {
 
   test("keeps pairing reminders ahead of automatic close reminders", async () => {
     const id = key("f:/repo", "f:/repo")
-    const mem = new Map([["s1", { ...fresh("s1"), logs: 1 }]])
+    const mem = new Map([["s1", { ...fresh("s1"), pendingLogCount: 1 }]])
     const workspaces = new Map<string, Analysis>([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]])
     const charts = new Map<string, Chart>([
-      [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", code: "flowchart TD", err: "", updated: Date.now() }],
+      [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() }],
     ])
     const hooks = setup(ctx("f:/repo"), {
-      mem,
+      sessionFlows: mem,
       workspaces,
       charts,
     })
@@ -788,7 +788,7 @@ describe("smartx workspace analysis", () => {
     const fixes = new Map()
     const hooks = setup(ctx("f:/repo"), {
       pending,
-      fixes,
+      reviewFixes: fixes,
     })
     const id = key("f:/repo", "f:/repo")
     const fixID = id + "\x00" + "s1"
@@ -841,11 +841,11 @@ describe("smartx workspace analysis", () => {
       worktreePath: "f:/repo",
       sessionID: "s1",
       attempt: 3,
-      text: "review conclusion: failed",
+      reviewText: "review conclusion: failed",
     }]])
     const hooks = setup(ctx("f:/repo"), {
       pending,
-      fixes,
+      reviewFixes: fixes,
     })
     const id = key("f:/repo", "f:/repo")
 
@@ -888,8 +888,8 @@ describe("smartx workspace analysis", () => {
 
     const fix = { system: [] as string[] }
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, fix)
-    expect(fix.system.join("\n")).toContain("第 3 次修复")
-    expect(fix.system.join("\n")).toContain("最后一次自动修复")
+    expect(fix.system.join("\n")).toContain("这是第 3 次修复")
+    expect(fix.system.join("\n")).toContain("这是最后一次自动修复")
     expect(fix.system.join("\n")).toContain("strategy-reviewer")
     expect(fix.system.join("\n")).toContain("smartx_start")
     expect(fixes.has(id + "\x00" + "s1")).toBe(false)
@@ -950,7 +950,7 @@ describe("smartx workspace analysis", () => {
       { title: "", output: "{}", metadata: {} },
     )
 
-    expect(memory.get(workspace())?.restored).toBe(true)
+    expect(memory.get(workspace())?.hasRestoredState).toBe(true)
     const next = { system: [] as string[] }
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, next)
     expect(next.system.join("\n")).toContain("workspace-analyzer")
@@ -962,7 +962,7 @@ describe("smartx workspace analysis", () => {
     const memory = restored()
     const workspaces = new Map<string, Analysis>([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]])
     const charts = new Map<string, Chart>([
-      [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", code: "flowchart TD", err: "", updated: Date.now() }],
+      [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() }],
     ])
     const hooks = build(ctx("f:/repo"), {
       memory,
@@ -980,7 +980,7 @@ describe("smartx workspace analysis", () => {
       },
       { title: "", output: "Wrote file successfully.", metadata: {} },
     )
-    expect(memory.get(id)?.stale).toBe(true)
+    expect(memory.get(id)?.needsSave).toBe(true)
 
     await hooks["chat.message"]?.(
       { sessionID: "s1", messageID: "m1", agent: "smartx-helper" },
@@ -1003,10 +1003,12 @@ describe("smartx workspace analysis", () => {
       },
       { title: "", output: "{}", metadata: {} },
     )
-    expect(memory.get(id)?.stale).toBe(false)
+    expect(memory.get(id)?.needsSave).toBe(false)
 
     const final = { system: [] as string[] }
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, final)
     expect(final.system.join("\n")).toContain("workspace")
   })
 })
+
+

@@ -16,42 +16,42 @@ import {
 describe("smartx workflow state", () => {
   test("tracks smartx_start aliases", () => {
     const flow = touch(fresh("s1"), "smartx-start")
-    expect(flow.logs).toBe(1)
+    expect(flow.pendingLogCount).toBe(1)
   })
 
   test("tracks smartx_logs", () => {
-    const flow = touch({ ...fresh("s1"), logs: 1 }, "smartx_logs")
-    expect(flow.logs).toBe(0)
+    const flow = touch({ ...fresh("s1"), pendingLogCount: 1 }, "smartx_logs")
+    expect(flow.pendingLogCount).toBe(0)
   })
 
   test("keeps smartx_log as a legacy alias", () => {
-    const flow = touch({ ...fresh("s1"), logs: 1 }, "smartx_log")
-    expect(flow.logs).toBe(0)
+    const flow = touch({ ...fresh("s1"), pendingLogCount: 1 }, "smartx_log")
+    expect(flow.pendingLogCount).toBe(0)
   })
 
   test("counts unmatched starts", () => {
     const flow = touch(touch(fresh("s1"), "smartx_start"), "smartx_start")
-    expect(flow.logs).toBe(2)
+    expect(flow.pendingLogCount).toBe(2)
   })
 
   test("does not underflow when smartx_logs comes first", () => {
     const flow = touch(fresh("s1"), "smartx_logs")
-    expect(flow.logs).toBe(0)
+    expect(flow.pendingLogCount).toBe(0)
   })
 
   test("tracks smartx-develop skill", () => {
     const flow = touch(fresh("s1"), { tool: "skill", args: { name: "smartx-develop" } })
-    expect(flow.debug).toBe(1)
+    expect(flow.pendingDebugCount).toBe(1)
   })
 
   test("tracks smartx-debug skill", () => {
-    const flow = touch({ ...fresh("s1"), debug: 1 }, { tool: "skill", args: { name: "smartx-debug" } })
-    expect(flow.debug).toBe(0)
+    const flow = touch({ ...fresh("s1"), pendingDebugCount: 1 }, { tool: "skill", args: { name: "smartx-debug" } })
+    expect(flow.pendingDebugCount).toBe(0)
   })
 
   test("does not underflow when smartx-debug comes first", () => {
     const flow = touch(fresh("s1"), { tool: "skill", args: { name: "smartx-debug" } })
-    expect(flow.debug).toBe(0)
+    expect(flow.pendingDebugCount).toBe(0)
   })
 
   test("ignores unrelated tools", () => {
@@ -69,36 +69,34 @@ describe("smartx workflow state", () => {
   })
 
   test("parses workspace analysis JSON items", () => {
-    expect(items('<task_result>["采用网格交易策略。","未发现退出规则。"]</task_result>')).toEqual([
-      "采用网格交易策略。",
-      "未发现退出规则。",
+    expect(items('<task_result>["use grid trading","missing exit rule"]</task_result>')).toEqual([
+      "use grid trading",
+      "missing exit rule",
     ])
   })
 
   test("detects review state variants", () => {
-    expect(reviewState("审查结论：通过")).toBe("passed")
-    expect(reviewState("审查结果 - 未通过")).toBe("failed")
-    expect(reviewState("结论: 不通过")).toBe("failed")
+    expect(reviewState("review conclusion: passed")).toBe("passed")
     expect(reviewState("review result: failed")).toBe("failed")
-    expect(reviewState("结论：无法完成")).toBe("error")
-    expect(reviewState("没有明确结论，但存在风险和问题。")).toBe("failed")
+    expect(reviewState("review status: error")).toBe("error")
+    expect(reviewState("there are still failed checks")).toBe("failed")
   })
 
   test("detects final intent variants", () => {
-    expect(wantsFinal("最终总结一下")).toBe(true)
-    expect(wantsFinal("可以结束了")).toBe(true)
+    expect(wantsFinal("final summary")).toBe(true)
     expect(wantsFinal("wrap up")).toBe(true)
-    expect(wantsFinal("继续改代码")).toBe(false)
+    expect(wantsFinal("can we finish now")).toBe(true)
+    expect(wantsFinal("keep coding")).toBe(false)
     expect(wantsFinal("不要结束")).toBe(false)
   })
 
   test("builds the log reminder", () => {
-    expect(note({ ...fresh("s1"), logs: 2 })).toContain("smartx_logs")
-    expect(note({ ...fresh("s1"), logs: 2 })).toContain("还需要再调用 2 次")
+    expect(note({ ...fresh("s1"), pendingLogCount: 2 })).toContain("smartx_logs")
+    expect(note({ ...fresh("s1"), pendingLogCount: 2 })).toContain("2")
   })
 
   test("builds the debug reminder", () => {
-    expect(note({ ...fresh("s1"), debug: 2 })).toContain("smartx-debug")
-    expect(note({ ...fresh("s1"), debug: 2 })).toContain("还需要再调用 2 次")
+    expect(note({ ...fresh("s1"), pendingDebugCount: 2 })).toContain("smartx-debug")
+    expect(note({ ...fresh("s1"), pendingDebugCount: 2 })).toContain("2")
   })
 })

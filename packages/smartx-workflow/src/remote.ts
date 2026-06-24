@@ -59,13 +59,13 @@ export async function loadRemote(service: string, workspace: string, worktree: s
   if (!resp.ok) return undefined
   const body = (await resp.json()) as { data?: Row | null }
   if (!body.data) return undefined
-  const list = body.data.items?.length ? body.data.items : items(body.data.text ?? "")
+  const summaryItems = body.data.items?.length ? body.data.items : items(body.data.text ?? "")
   return {
     workspace: body.data.workspacePath,
     worktree: body.data.worktreePath,
     state: body.data.state ?? "done",
-    items: list,
-    text: serial(list),
+    summaryItems,
+    summaryText: serial(summaryItems),
     updated: body.data.updatedAt ?? Date.now(),
   }
 }
@@ -84,8 +84,8 @@ export async function loadChartRemote(service: string, workspace: string, worktr
     workspace: body.data.workspacePath,
     worktree: body.data.worktreePath,
     state: body.data.state ?? "done",
-    code: body.data.code ?? "",
-    err: body.data.err ?? "",
+    mermaidCode: body.data.code ?? "",
+    errorText: body.data.err ?? "",
     updated: body.data.updatedAt ?? Date.now(),
   }
 }
@@ -103,7 +103,7 @@ export async function loadProjectRemote(service: string, workspace: string, work
   return {
     workspace: body.data.workspacePath,
     worktree: body.data.worktreePath,
-    exists: body.data.exists,
+    hasProjectState: body.data.exists,
     updated: body.data.updatedAt ?? Date.now(),
   }
 }

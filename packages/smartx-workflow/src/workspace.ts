@@ -1,4 +1,4 @@
-import type { Hooks } from "@opencode-ai/plugin"
+﻿import type { Hooks } from "@opencode-ai/plugin"
 import { gate, closing, saving } from "./gate.js"
 import { cleanDirt, cleanMemory, view } from "./life.js"
 import {
@@ -30,13 +30,13 @@ type Opt = {
   charts: Map<string, Chart>
   projects: Map<string, Project>
   pending: Map<string, Pending>
-  dirts: Map<string, Dirt>
+  dirtyStates: Map<string, Dirt>
   memory: Map<string, Memory>
-  modes: Map<string, Mode>
-  fixes: Map<string, Fix>
+  baselineModes: Map<string, Mode>
+  reviewFixes: Map<string, Fix>
   reviewRequests: Set<string>
   finalRequests: Set<string>
-  subs: Set<string>
+  childSessions: Set<string>
   workspace: string
   worktree: string
   id: string
@@ -48,85 +48,85 @@ type Opt = {
   write: Log
 }
 
-/** 统一判断工具执行结果是否失败，兼容没有 isError 字段的返回值。 */
+/** 缁熶竴鍒ゆ柇宸ュ叿鎵ц缁撴灉鏄惁澶辫触锛屽吋瀹规病鏈?isError 瀛楁鐨勮繑鍥炲€笺€?*/
 function ok(output: unknown) {
   if (!output || typeof output !== "object") return true
   if (!("isError" in output)) return true
   return output.isError !== true
 }
 
-/** 判断一次工具调用是否命中了当前 workspace/worktree。 */
-function same(input: unknown, workspace: string, worktree: string) {
+/** 鍒ゆ柇涓€娆″伐鍏疯皟鐢ㄦ槸鍚﹀懡涓簡褰撳墠 workspace/worktree銆?*/
+function sameWorkspace(input: unknown, workspace: string, worktree: string) {
   if (!input || typeof input !== "object") return false
   const args = input as Record<string, unknown>
   return args.workspacePath === workspace && (args.worktreePath === worktree || (!args.worktreePath && worktree === workspace))
 }
 
-/** 规范化 review item status 的比较值。 */
-function clean(input: unknown) {
+/** 瑙勮寖鍖?review item status 鐨勬瘮杈冨€笺€?*/
+function normalizeStatus(input: unknown) {
   if (typeof input !== "string") return ""
   return input.trim().toLowerCase()
 }
 
-/** 判断 save_review 提交的所有检查项是否都已通过。 */
-function pass(input: unknown) {
+/** 鍒ゆ柇 save_review 鎻愪氦鐨勬墍鏈夋鏌ラ」鏄惁閮藉凡閫氳繃銆?*/
+function reviewPassed(input: unknown) {
   if (!input || typeof input !== "object") return false
   const args = input as Record<string, unknown>
   if (args.state !== "passed") return false
   if (!Array.isArray(args.items) || !args.items.length) return false
-  return args.items.every((item) => item && typeof item === "object" && clean((item as Record<string, unknown>).status) === "passed")
+  return args.items.every((item) => item && typeof item === "object" && normalizeStatus((item as Record<string, unknown>).status) === "passed")
 }
 
-/** 生成 workspace + session 维度的 fix 记录 key。 */
-function fixkey(id: string, session: string) {
+/** 鐢熸垚 workspace + session 缁村害鐨?fix 璁板綍 key銆?*/
+function fixKey(id: string, session: string) {
   return id + "\x00" + session
 }
 
-/** 生成 workspace + session 维度的请求 key。 */
-function sessionkey(id: string, session: string) {
+/** 鐢熸垚 workspace + session 缁村害鐨勮姹?key銆?*/
+function requestKey(id: string, session: string) {
   return id + "\x00" + session
 }
 
-/** 从本地缓存或远端服务同步 analysis / chart / project 三类快照。 */
+/** 浠庢湰鍦扮紦瀛樻垨杩滅鏈嶅姟鍚屾 analysis / chart / project 涓夌被蹇収銆?*/
 async function sync(opt: Opt) {
-  const found = opt.workspaces.get(opt.id) ?? (await opt.load(opt.workspace, opt.worktree).catch(() => undefined))
-  if (found && validAnalysis(found)) opt.workspaces.set(opt.id, found)
-  if (found && !validAnalysis(found)) opt.workspaces.delete(opt.id)
+  const loadedAnalysis = opt.workspaces.get(opt.id) ?? (await opt.load(opt.workspace, opt.worktree).catch(() => undefined))
+  if (loadedAnalysis && validAnalysis(loadedAnalysis)) opt.workspaces.set(opt.id, loadedAnalysis)
+  if (loadedAnalysis && !validAnalysis(loadedAnalysis)) opt.workspaces.delete(opt.id)
   const analysis = opt.workspaces.get(opt.id)
-  const row =
+  const loadedChart =
     analysis?.state === "done"
       ? (opt.charts.get(opt.id) ?? (await opt.loadChart(opt.workspace, opt.worktree).catch(() => undefined)))
       : undefined
-  if (row && validChart(row)) opt.charts.set(opt.id, row)
-  if (row && !validChart(row)) opt.charts.delete(opt.id)
+  if (loadedChart && validChart(loadedChart)) opt.charts.set(opt.id, loadedChart)
+  if (loadedChart && !validChart(loadedChart)) opt.charts.delete(opt.id)
   const project = opt.projects.get(opt.id) ?? (await opt.loadProject(opt.workspace, opt.worktree).catch(() => undefined))
   if (project && validProject(project)) opt.projects.set(opt.id, project)
   if (project && !validProject(project)) opt.projects.delete(opt.id)
   return { analysis, chart: opt.charts.get(opt.id), project: opt.projects.get(opt.id) }
 }
 
-/** 标记当前 workspace 已被写脏，后续 review/final 需要刷新基线。 */
+/** 鏍囪褰撳墠 workspace 宸茶鍐欒剰锛屽悗缁?review/final 闇€瑕佸埛鏂板熀绾裤€?*/
 function mark(opt: Opt, reason: string) {
-  opt.dirts.set(opt.id, {
+  opt.dirtyStates.set(opt.id, {
     state: "dirty",
     updated: Date.now(),
     reason,
   })
 }
 
-/** 把 workspace 重新推回 analysis -> flowchart 的基线流程起点。 */
+/** 鎶?workspace 閲嶆柊鎺ㄥ洖 analysis -> flowchart 鐨勫熀绾挎祦绋嬭捣鐐广€?*/
 function reset(opt: Opt, mode?: Mode) {
   opt.workspaces.set(opt.id, requestAnalysis(opt.workspace, opt.worktree))
   opt.charts.set(opt.id, requestChart(opt.workspace, opt.worktree))
-  opt.modes.set(opt.id, mode ?? (opt.dirts.get(opt.id)?.state === "dirty" ? "refresh" : "boot"))
-  const wait = opt.pending.get(opt.id)
-  if (wait?.kind === "analysis" || wait?.kind === "flowchart" || wait?.kind === "debug") opt.pending.delete(opt.id)
+  opt.baselineModes.set(opt.id, mode ?? (opt.dirtyStates.get(opt.id)?.state === "dirty" ? "refresh" : "boot"))
+  const pendingSave = opt.pending.get(opt.id)
+  if (pendingSave?.kind === "analysis" || pendingSave?.kind === "flowchart" || pendingSave?.kind === "debug") opt.pending.delete(opt.id)
 }
 
-/** workspace 级编排器：负责 system 注入、before 门禁、after 状态推进。 */
+/** workspace 绾х紪鎺掑櫒锛氳礋璐?system 娉ㄥ叆銆乥efore 闂ㄧ銆乤fter 鐘舵€佹帹杩涖€?*/
 export function createWorkspace(opt: Opt) {
   return {
-    /** 外部显式请求刷新时，重建基线并留下日志。 */
+    /** 澶栭儴鏄惧紡璇锋眰鍒锋柊鏃讹紝閲嶅缓鍩虹嚎骞剁暀涓嬫棩蹇椼€?*/
     reset: async (reason: Reason, detail = "") => {
       if (!opt.workspace || !opt.id) return false
       reset(opt)
@@ -138,7 +138,7 @@ export function createWorkspace(opt: Opt) {
       })
       return true
     },
-    /** 在模型出手前决定当前轮应该注入哪一种隐藏系统提示。 */
+    /** 鍦ㄦā鍨嬪嚭鎵嬪墠鍐冲畾褰撳墠杞簲璇ユ敞鍏ュ摢涓€绉嶉殣钘忕郴缁熸彁绀恒€?*/
     system: async (input: Parameters<System>[0], output: Parameters<System>[1]) => {
       if (!opt.workspace || !opt.id) return false
 
@@ -147,10 +147,10 @@ export function createWorkspace(opt: Opt) {
         analysis: data.analysis,
         chart: data.chart,
         project: data.project,
-        wait: opt.pending.get(opt.id),
-        dirt: opt.dirts.get(opt.id) ?? cleanDirt(),
-        mem: opt.memory.get(opt.id) ?? cleanMemory(data.project),
-        mode: opt.modes.get(opt.id) ?? "boot",
+        pendingSave: opt.pending.get(opt.id),
+        dirtyState: opt.dirtyStates.get(opt.id) ?? cleanDirt(),
+        projectMemory: opt.memory.get(opt.id) ?? cleanMemory(data.project),
+        baselineMode: opt.baselineModes.get(opt.id) ?? "boot",
       })
       const sessionID = input.sessionID
 
@@ -159,11 +159,11 @@ export function createWorkspace(opt: Opt) {
           if (
             !sessionID ||
             !saving(next, {
-              sub: opt.subs.has(sessionID),
+              sub: opt.childSessions.has(sessionID),
               hold: opt.hold(sessionID),
-              review: opt.reviewRequests.has(sessionkey(opt.id, sessionID)),
-              final: opt.finalRequests.has(sessionkey(opt.id, sessionID)),
-              fix: opt.fixes.has(fixkey(opt.id, sessionID)),
+              review: opt.reviewRequests.has(requestKey(opt.id, sessionID)),
+              final: opt.finalRequests.has(requestKey(opt.id, sessionID)),
+              fix: opt.reviewFixes.has(fixKey(opt.id, sessionID)),
             })
           )
             return false
@@ -176,31 +176,31 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
         step("project_resume", async () => {
-          if (next.mem.restored) return false
+          if (next.projectMemory.hasRestoredState) return false
           await opt.write("project memory restore gate injected", {
             sessionID,
             workspace: opt.workspace,
             worktree: opt.worktree,
-            exists: next.mem.exists,
+            hasProjectState: next.projectMemory.hasProjectState,
           })
-          output.system.push(noteResumeProject(next.mem.exists))
+          output.system.push(noteResumeProject(next.projectMemory.hasProjectState))
           return true
         }),
         step("save", async () => {
-          const wait = next.wait
-          if (!wait) return false
+          const pendingSave = next.pendingSave
+          if (!pendingSave) return false
           await opt.write("workspace mcp save reminder injected", {
             sessionID,
             workspace: opt.workspace,
             worktree: opt.worktree,
-            kind: wait.kind,
+            kind: pendingSave.kind,
           })
-          output.system.push(noteSave(wait))
+          output.system.push(noteSave(pendingSave))
           return true
         }),
         step("fix", async () => {
           if (!sessionID) return false
-          const fix = opt.fixes.get(fixkey(opt.id, sessionID))
+          const fix = opt.reviewFixes.get(fixKey(opt.id, sessionID))
           if (!fix) return false
           await opt.write("workspace review fix injected", {
             sessionID,
@@ -209,12 +209,12 @@ export function createWorkspace(opt: Opt) {
             attempt: fix.attempt,
           })
           output.system.push(noteFix(fix))
-          if (fix.attempt >= limit) opt.fixes.delete(fixkey(opt.id, sessionID))
+          if (fix.attempt >= limit) opt.reviewFixes.delete(fixKey(opt.id, sessionID))
           return true
         }),
         step("review", async () => {
           if (!sessionID) return false
-          const requestID = sessionkey(opt.id, sessionID)
+          const requestID = requestKey(opt.id, sessionID)
           if (!opt.reviewRequests.has(requestID)) return false
           if (next.life === "dirty") {
             await opt.write("workspace refresh gate injected", {
@@ -223,7 +223,7 @@ export function createWorkspace(opt: Opt) {
               worktree: opt.worktree,
               action: "review",
             })
-            output.system.push(noteRefresh("浠ｇ爜瀹℃煡"))
+            output.system.push(noteRefresh("代码审查"))
             return true
           }
           if (next.life !== "ready") return false
@@ -238,7 +238,7 @@ export function createWorkspace(opt: Opt) {
         }),
         step("final", async () => {
           if (!sessionID) return false
-          const requestID = sessionkey(opt.id, sessionID)
+          const requestID = requestKey(opt.id, sessionID)
           if (!opt.finalRequests.has(requestID)) return false
           if (next.life === "dirty") {
             opt.finalRequests.delete(requestID)
@@ -258,11 +258,11 @@ export function createWorkspace(opt: Opt) {
           if (
             !sessionID ||
             !closing(next, {
-              sub: opt.subs.has(sessionID),
+              sub: opt.childSessions.has(sessionID),
               hold: opt.hold(sessionID),
-              review: opt.reviewRequests.has(sessionkey(opt.id, sessionID)),
-              final: opt.finalRequests.has(sessionkey(opt.id, sessionID)),
-              fix: opt.fixes.has(fixkey(opt.id, sessionID)),
+              review: opt.reviewRequests.has(requestKey(opt.id, sessionID)),
+              final: opt.finalRequests.has(requestKey(opt.id, sessionID)),
+              fix: opt.reviewFixes.has(fixKey(opt.id, sessionID)),
             })
           )
             return false
@@ -277,7 +277,7 @@ export function createWorkspace(opt: Opt) {
         step("boot", async () => {
           if (next.life !== "idle") return false
           if (!next.analysis) opt.workspaces.set(opt.id, requestAnalysis(opt.workspace, opt.worktree))
-          opt.modes.set(opt.id, "boot")
+          opt.baselineModes.set(opt.id, "boot")
           await opt.write("workspace boot gate injected", {
             sessionID,
             workspace: opt.workspace,
@@ -324,19 +324,19 @@ export function createWorkspace(opt: Opt) {
         }),
       ])
     },
-    /** 在工具执行前做硬门禁，并记录 analysis/review/chart 的启动态。 */
+    /** 鍦ㄥ伐鍏锋墽琛屽墠鍋氱‖闂ㄧ锛屽苟璁板綍 analysis/review/chart 鐨勫惎鍔ㄦ€併€?*/
     before: async (input: Parameters<Before>[0], output: Parameters<Before>[1]) => {
       if (!opt.workspace || !opt.id) return false
-      if (!opt.subs.has(input.sessionID)) {
+      if (!opt.childSessions.has(input.sessionID)) {
         const data = await sync(opt)
         const next = view({
           analysis: data.analysis,
           chart: data.chart,
           project: data.project,
-          wait: opt.pending.get(opt.id),
-          dirt: opt.dirts.get(opt.id) ?? cleanDirt(),
-          mem: opt.memory.get(opt.id) ?? cleanMemory(data.project),
-          mode: opt.modes.get(opt.id) ?? "boot",
+          pendingSave: opt.pending.get(opt.id),
+          dirtyState: opt.dirtyStates.get(opt.id) ?? cleanDirt(),
+        projectMemory: opt.memory.get(opt.id) ?? cleanMemory(data.project),
+          baselineMode: opt.baselineModes.get(opt.id) ?? "boot",
         })
         const value = kind({ tool: input.tool, args: output.args })
         const text = gate(next, value)
@@ -348,7 +348,7 @@ export function createWorkspace(opt: Opt) {
             workspace: opt.workspace,
             worktree: opt.worktree,
             tool: input.tool,
-            pending: next.wait?.kind,
+            pending: next.pendingSave?.kind,
             analysis: next.analysis?.state ?? "missing",
             chart: next.chart?.state ?? "missing",
             life: next.life,
@@ -376,12 +376,12 @@ export function createWorkspace(opt: Opt) {
               workspacePath: opt.workspace,
               worktreePath: opt.worktree,
               state: "running",
-              summary: "瀹℃煡浠诲姟宸插惎鍔紝姝ｅ湪绛夊緟 strategy-reviewer 杩斿洖缁撴灉銆?",
+              summary: "鐎光剝鐓℃禒璇插瀹告彃鎯庨崝顭掔礉濮濓絽婀粵澶婄窡 strategy-reviewer 鏉╂柨娲栫紒鎾寸亯閵?",
               items: [
                 {
-                  name: "瀹℃煡浠诲姟",
+                  name: "鐎光剝鐓℃禒璇插",
                   status: "running",
-                  detail: "宸叉娴嬪埌 strategy-reviewer 瀛?agent 鍚姩銆?",
+                  detail: "瀹稿弶顥呭ù瀣煂 strategy-reviewer 鐎?agent 閸氼垰濮╅妴?",
                   suggestion: "",
                 },
               ],
@@ -404,7 +404,7 @@ export function createWorkspace(opt: Opt) {
         }),
         step("analysis", async () => {
           if (!analyze({ tool: input.tool, args: output.args })) return false
-          opt.modes.set(opt.id, opt.modes.get(opt.id) ?? (opt.dirts.get(opt.id)?.state === "dirty" ? "refresh" : "boot"))
+          opt.baselineModes.set(opt.id, opt.baselineModes.get(opt.id) ?? (opt.dirtyStates.get(opt.id)?.state === "dirty" ? "refresh" : "boot"))
           opt.workspaces.set(opt.id, freshAnalysis(opt.workspace, opt.worktree))
           await opt.write("workspace analysis started", {
             sessionID: input.sessionID,
@@ -415,20 +415,20 @@ export function createWorkspace(opt: Opt) {
         }),
       ])
     },
-    /** 在工具执行后推进 project memory、baseline 和 review/debug 队列状态。 */
+    /** 鍦ㄥ伐鍏锋墽琛屽悗鎺ㄨ繘 project memory銆乥aseline 鍜?review/debug 闃熷垪鐘舵€併€?*/
     after: async (input: Parameters<After>[0], output: Parameters<After>[1]) => {
       if (!opt.workspace || !opt.id) return false
 
       return flow([
         step("project_init", async () => {
-          if (!mcp(input, "init_project_state") || !same(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
+          if (!mcp(input, "init_project_state") || !sameWorkspace(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
           opt.projects.set(opt.id, {
             workspace: opt.workspace,
             worktree: opt.worktree,
-            exists: true,
+            hasProjectState: true,
             updated: Date.now(),
           })
-          opt.memory.set(opt.id, { exists: true, restored: true, stale: false })
+          opt.memory.set(opt.id, { hasProjectState: true, hasRestoredState: true, needsSave: false })
           await opt.write("project memory initialized through mcp", {
             sessionID: input.sessionID,
             workspace: opt.workspace,
@@ -437,14 +437,14 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
         step("project_resume", async () => {
-          if (!mcp(input, "resume_project_state") || !same(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
+          if (!mcp(input, "resume_project_state") || !sameWorkspace(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
           opt.projects.set(opt.id, {
             workspace: opt.workspace,
             worktree: opt.worktree,
-            exists: true,
+            hasProjectState: true,
             updated: Date.now(),
           })
-          opt.memory.set(opt.id, { exists: true, restored: true, stale: false })
+          opt.memory.set(opt.id, { hasProjectState: true, hasRestoredState: true, needsSave: false })
           await opt.write("project memory resumed through mcp", {
             sessionID: input.sessionID,
             workspace: opt.workspace,
@@ -453,8 +453,8 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
         step("project_save", async () => {
-          if (!mcp(input, "save_project_state") || !same(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
-          opt.memory.set(opt.id, { exists: true, restored: true, stale: false })
+          if (!mcp(input, "save_project_state") || !sameWorkspace(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
+          opt.memory.set(opt.id, { hasProjectState: true, hasRestoredState: true, needsSave: false })
           await opt.write("project memory saved through mcp", {
             sessionID: input.sessionID,
             workspace: opt.workspace,
@@ -463,15 +463,15 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
         step("dirty", async () => {
-          if (opt.subs.has(input.sessionID) || !ok(output)) return false
+          if (opt.childSessions.has(input.sessionID) || !ok(output)) return false
           const value = kind({ tool: input.tool, args: input.args })
           if (value !== "write" && value !== "exec") return false
           mark(opt, input.tool)
-          const mem = opt.memory.get(opt.id) ?? cleanMemory(opt.projects.get(opt.id))
+          const projectMemory = opt.memory.get(opt.id) ?? cleanMemory(opt.projects.get(opt.id))
           opt.memory.set(opt.id, {
-            exists: mem.exists,
-            restored: mem.restored,
-            stale: mem.restored,
+            hasProjectState: projectMemory.hasProjectState,
+            hasRestoredState: projectMemory.hasRestoredState,
+            needsSave: projectMemory.hasRestoredState,
           })
           await opt.write("workspace dirtied", {
             sessionID: input.sessionID,
@@ -482,7 +482,7 @@ export function createWorkspace(opt: Opt) {
           return false
         }),
         step("refresh", async () => {
-          if (!mcp(input, "refresh_workspace") || !same(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
+          if (!mcp(input, "refresh_workspace") || !sameWorkspace(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
           reset(opt, "refresh")
           await opt.write("workspace refresh requested", {
             sessionID: input.sessionID,
@@ -494,7 +494,7 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
         step("save_analysis", async () => {
-          if (!mcp(input, "save_analysis") || !same(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
+          if (!mcp(input, "save_analysis") || !sameWorkspace(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
           if (opt.pending.get(opt.id)?.kind === "analysis") opt.pending.delete(opt.id)
           await opt.write("workspace analysis saved through mcp", {
             sessionID: input.sessionID,
@@ -504,10 +504,10 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
         step("save_chart", async () => {
-          if (!mcp(input, "save_flowchart") || !same(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
+          if (!mcp(input, "save_flowchart") || !sameWorkspace(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
           const item = opt.pending.get(opt.id)
           if (item?.kind === "flowchart") opt.pending.delete(opt.id)
-          if (item?.kind === "flowchart" && item.state === "done") opt.dirts.set(opt.id, cleanDirt())
+          if (item?.kind === "flowchart" && item.state === "done") opt.dirtyStates.set(opt.id, cleanDirt())
           await opt.write("workspace flowchart saved through mcp", {
             sessionID: input.sessionID,
             workspace: opt.workspace,
@@ -516,12 +516,12 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
         step("save_review", async () => {
-          if (!mcp(input, "save_review") || !same(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
+          if (!mcp(input, "save_review") || !sameWorkspace(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
           const item = opt.pending.get(opt.id)
           if (item?.kind === "review") opt.pending.delete(opt.id)
-          const done = item?.kind === "review" && pass(input.args)
+          const done = item?.kind === "review" && reviewPassed(input.args)
           if (done) {
-            opt.fixes.delete(fixkey(opt.id, input.sessionID))
+            opt.reviewFixes.delete(fixKey(opt.id, input.sessionID))
             opt.pending.set(opt.id, {
               kind: "debug",
               workspacePath: opt.workspace,
@@ -530,14 +530,14 @@ export function createWorkspace(opt: Opt) {
             })
           }
           if (item?.kind === "review" && !done && item.state !== "error") {
-            const fix = opt.fixes.get(fixkey(opt.id, input.sessionID))
+            const fix = opt.reviewFixes.get(fixKey(opt.id, input.sessionID))
             const attempt = Math.min(fix?.attempt ?? 1, limit)
-            opt.fixes.set(fixkey(opt.id, input.sessionID), {
+            opt.reviewFixes.set(fixKey(opt.id, input.sessionID), {
               workspacePath: opt.workspace,
               worktreePath: opt.worktree,
               sessionID: input.sessionID,
               attempt,
-              text: item.text,
+              reviewText: item.reviewText,
             })
           }
           await opt.write("workspace review saved through mcp", {
@@ -570,7 +570,7 @@ export function createWorkspace(opt: Opt) {
             : {
                 ...freshChart(opt.workspace, opt.worktree),
                 state,
-                err: "flowchart result is empty",
+                errorText: "flowchart result is empty",
               }
           opt.charts.set(opt.id, next)
           opt.pending.set(opt.id, {
@@ -578,8 +578,8 @@ export function createWorkspace(opt: Opt) {
             workspacePath: opt.workspace,
             worktreePath: opt.worktree,
             state,
-            code: next.code,
-            err: next.err,
+            mermaidCode: next.mermaidCode,
+            errorText: next.errorText,
           })
           await opt.write("workspace flowchart completed", {
             sessionID: input.sessionID,
@@ -591,17 +591,17 @@ export function createWorkspace(opt: Opt) {
         }),
         step("review_done", async () => {
           if (!review(input)) return false
-          const text = reviewText(output.output) || "瀹℃煡鎶ュ憡涓虹┖銆?"
+          const text = reviewText(output.output) || "鐎光剝鐓￠幎銉ユ啞娑撹櫣鈹栭妴?"
           const state = reviewState(text)
-          const fix = opt.fixes.get(fixkey(opt.id, input.sessionID))
+          const fix = opt.reviewFixes.get(fixKey(opt.id, input.sessionID))
           if (state === "failed") {
             const attempt = Math.min((fix?.attempt ?? 0) + 1, limit)
-            opt.fixes.set(fixkey(opt.id, input.sessionID), {
+            opt.reviewFixes.set(fixKey(opt.id, input.sessionID), {
               workspacePath: opt.workspace,
               worktreePath: opt.worktree,
               sessionID: input.sessionID,
               attempt,
-              text,
+              reviewText: text,
             })
             await opt.write("workspace review needs fix", {
               sessionID: input.sessionID,
@@ -610,13 +610,13 @@ export function createWorkspace(opt: Opt) {
               attempt,
             })
           }
-          if (state !== "failed") opt.fixes.delete(fixkey(opt.id, input.sessionID))
+          if (state !== "failed") opt.reviewFixes.delete(fixKey(opt.id, input.sessionID))
           opt.pending.set(opt.id, {
             kind: "review",
             workspacePath: opt.workspace,
             worktreePath: opt.worktree,
             state,
-            text,
+            reviewText: text,
           })
           await opt.write("workspace review completed", {
             sessionID: input.sessionID,
@@ -636,8 +636,8 @@ export function createWorkspace(opt: Opt) {
             kind: "analysis",
             workspacePath: opt.workspace,
             worktreePath: opt.worktree,
-            items: list,
-            text,
+            summaryItems: list,
+            summaryText: text,
           })
           await opt.write("workspace analysis completed", {
             sessionID: input.sessionID,
@@ -651,3 +651,4 @@ export function createWorkspace(opt: Opt) {
     },
   }
 }
+

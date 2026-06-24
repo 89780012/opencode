@@ -6,7 +6,7 @@ type After = NonNullable<Hooks["tool.execute.after"]>
 type Log = (message: string, extra?: Record<string, unknown>) => Promise<void>
 
 type Opt = {
-  mem: Map<string, Flow>
+  sessionFlows: Map<string, Flow>
   write: Log
 }
 
@@ -16,12 +16,12 @@ export function createPairing(opt: Opt) {
     /** 在系统提示阶段注入尚未完成的配对动作提醒。 */
     transform: async (input: Parameters<System>[0], output: Parameters<System>[1]) => {
       if (!input.sessionID) return false
-      const flow = opt.mem.get(input.sessionID)
-      if (!flow || (flow.logs < 1 && flow.debug < 1)) return false
+      const flow = opt.sessionFlows.get(input.sessionID)
+      if (!flow || (flow.pendingLogCount < 1 && flow.pendingDebugCount < 1)) return false
       await opt.write("session pairing reminder injected", {
         sessionID: input.sessionID,
-        logs: flow.logs,
-        debug: flow.debug,
+        pending_logs: flow.pendingLogCount,
+        pending_debug: flow.pendingDebugCount,
       })
       output.system.push(note(flow))
       return true
@@ -30,17 +30,17 @@ export function createPairing(opt: Opt) {
     after: async (input: Parameters<After>[0]) => {
       if (!input.sessionID) return false
       if (!seen(input)) return false
-      const prev = opt.mem.get(input.sessionID) ?? fresh(input.sessionID)
-      const next = touch(prev, input)
-      opt.mem.set(input.sessionID, next)
+      const prevFlow = opt.sessionFlows.get(input.sessionID) ?? fresh(input.sessionID)
+      const nextFlow = touch(prevFlow, input)
+      opt.sessionFlows.set(input.sessionID, nextFlow)
       await opt.write("session pairing state updated", {
         sessionID: input.sessionID,
         tool: input.tool,
         name: typeof input.args?.name === "string" ? input.args.name.trim() : undefined,
-        logs_before: prev.logs,
-        logs_after: next.logs,
-        debug_before: prev.debug,
-        debug_after: next.debug,
+        pending_logs_before: prevFlow.pendingLogCount,
+        pending_logs_after: nextFlow.pendingLogCount,
+        pending_debug_before: prevFlow.pendingDebugCount,
+        pending_debug_after: nextFlow.pendingDebugCount,
       })
       return true
     },

@@ -6,18 +6,18 @@ import type { Fix, Memory, Pending, Project, SaveReview } from "./types.js"
 import { createWorkspace } from "./workspace.js"
 
 type Dep = {
-  mem?: Map<string, Flow>
+  sessionFlows?: Map<string, Flow>
   workspaces?: Map<string, Analysis>
   charts?: Map<string, Chart>
   projects?: Map<string, Project>
   pending?: Map<string, Pending>
-  dirts?: Map<string, Dirt>
+  dirtyStates?: Map<string, Dirt>
   memory?: Map<string, Memory>
-  modes?: Map<string, Mode>
-  fixes?: Map<string, Fix>
+  baselineModes?: Map<string, Mode>
+  reviewFixes?: Map<string, Fix>
   reviewRequests?: Set<string>
   finalRequests?: Set<string>
-  subs?: Set<string>
+  childSessions?: Set<string>
   service?: string
   load?: (workspace: string, worktree: string) => Promise<Analysis | undefined>
   loadChart?: (workspace: string, worktree: string) => Promise<Chart | undefined>
@@ -27,18 +27,18 @@ type Dep = {
 
 /** 组装插件 hook，把 session 配对与 workspace 工作流接到同一个入口上。 */
 export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
-  const mem = dep.mem ?? new Map<string, Flow>()
+  const sessionFlows = dep.sessionFlows ?? new Map<string, Flow>()
   const workspaces = dep.workspaces ?? new Map<string, Analysis>()
   const charts = dep.charts ?? new Map<string, Chart>()
   const projects = dep.projects ?? new Map<string, Project>()
   const pending = dep.pending ?? new Map<string, Pending>()
-  const dirts = dep.dirts ?? new Map<string, Dirt>()
+  const dirtyStates = dep.dirtyStates ?? new Map<string, Dirt>()
   const memory = dep.memory ?? new Map<string, Memory>()
-  const modes = dep.modes ?? new Map<string, Mode>()
-  const fixes = dep.fixes ?? new Map<string, Fix>()
+  const baselineModes = dep.baselineModes ?? new Map<string, Mode>()
+  const reviewFixes = dep.reviewFixes ?? new Map<string, Fix>()
   const reviewRequests = dep.reviewRequests ?? new Set<string>()
   const finalRequests = dep.finalRequests ?? new Set<string>()
-  const subs = dep.subs ?? new Set<string>()
+  const childSessions = dep.childSessions ?? new Set<string>()
   const workspace = ctx.directory
   const worktree = ctx.worktree || ctx.directory
   const id = workspace ? key(workspace, worktree) : ""
@@ -61,13 +61,13 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
     charts,
     projects,
     pending,
-    dirts,
+    dirtyStates,
     memory,
-    modes,
-    fixes,
+    baselineModes,
+    reviewFixes,
     reviewRequests,
     finalRequests,
-    subs,
+    childSessions,
     workspace,
     worktree,
     id,
@@ -75,14 +75,14 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
     loadChart: dep.loadChart ?? ((workspace, worktree) => loadChartRemote(service, workspace, worktree)),
     loadProject: dep.loadProject ?? ((workspace, worktree) => loadProjectRemote(service, workspace, worktree)),
     hold: (session) => {
-      const flow = mem.get(session)
+      const flow = sessionFlows.get(session)
       if (!flow) return false
-      return flow.logs > 0 || flow.debug > 0
+      return flow.pendingLogCount > 0 || flow.pendingDebugCount > 0
     },
     saveReview: dep.saveReview ?? ((input) => saveReviewRemote(service, input)),
     write,
   })
-  const pairing = createPairing({ mem, write })
+  const pairing = createPairing({ sessionFlows, write })
 
   void write("plugin loaded", {
     directory: ctx.directory,
@@ -95,7 +95,7 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
       if (input.event.type === "session.created") {
         const info = input.event.properties?.info
         if (!info?.parentID || !info.id) return
-        subs.add(info.id)
+        childSessions.add(info.id)
       }
     },
     "chat.message": async (input, output) => {

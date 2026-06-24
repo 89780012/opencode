@@ -11,8 +11,8 @@ function item(input: Call | string): Call {
 export function fresh(session: string): Flow {
   return {
     session,
-    logs: 0,
-    debug: 0,
+    pendingLogCount: 0,
+    pendingDebugCount: 0,
   }
 }
 
@@ -25,11 +25,11 @@ export function key(workspace: string, worktree = workspace) {
 export function touch(flow: Flow, input: Call | string): Flow {
   const call = item(input)
   const name = skill(call)
-  if (start(call)) return { ...flow, logs: flow.logs + 1 }
-  if (logs(call)) return { ...flow, logs: Math.max(0, flow.logs - 1) }
+  if (start(call)) return { ...flow, pendingLogCount: flow.pendingLogCount + 1 }
+  if (logs(call)) return { ...flow, pendingLogCount: Math.max(0, flow.pendingLogCount - 1) }
   if (call.tool !== "skill") return flow
-  if (name === dev) return { ...flow, debug: flow.debug + 1 }
-  if (name === dbg) return { ...flow, debug: Math.max(0, flow.debug - 1) }
+  if (name === dev) return { ...flow, pendingDebugCount: flow.pendingDebugCount + 1 }
+  if (name === dbg) return { ...flow, pendingDebugCount: Math.max(0, flow.pendingDebugCount - 1) }
   return flow
 }
 
@@ -39,8 +39,8 @@ export function requestAnalysis(workspace: string, worktree = workspace): Analys
     workspace,
     worktree,
     state: "requested",
-    items: [],
-    text: "",
+    summaryItems: [],
+    summaryText: "",
     updated: Date.now(),
   }
 }
@@ -51,20 +51,20 @@ export function freshAnalysis(workspace: string, worktree = workspace): Analysis
     workspace,
     worktree,
     state: "running",
-    items: [],
-    text: "",
+    summaryItems: [],
+    summaryText: "",
     updated: Date.now(),
   }
 }
 
 /** 标记“分析已完成”的 analysis 状态。 */
-export function doneAnalysis(workspace: string, worktree = workspace, text = "", list: string[] = []): Analysis {
+export function doneAnalysis(workspace: string, worktree = workspace, summaryText = "", summaryItems: string[] = []): Analysis {
   return {
     workspace,
     worktree,
     state: "done",
-    items: list,
-    text,
+    summaryItems,
+    summaryText,
     updated: Date.now(),
   }
 }
@@ -75,8 +75,8 @@ export function requestChart(workspace: string, worktree = workspace): Chart {
     workspace,
     worktree,
     state: "requested",
-    code: "",
-    err: "",
+    mermaidCode: "",
+    errorText: "",
     updated: Date.now(),
   }
 }
@@ -87,20 +87,20 @@ export function freshChart(workspace: string, worktree = workspace): Chart {
     workspace,
     worktree,
     state: "generating",
-    code: "",
-    err: "",
+    mermaidCode: "",
+    errorText: "",
     updated: Date.now(),
   }
 }
 
 /** 标记“流程图已完成”的 chart 状态。 */
-export function doneChart(workspace: string, worktree = workspace, code = ""): Chart {
+export function doneChart(workspace: string, worktree = workspace, mermaidCode = ""): Chart {
   return {
     workspace,
     worktree,
     state: "done",
-    code,
-    err: "",
+    mermaidCode,
+    errorText: "",
     updated: Date.now(),
   }
 }
@@ -117,5 +117,5 @@ export function validChart(input: Chart) {
 
 /** 校验 project memory 元信息是否具备最小结构。 */
 export function validProject(input: Project) {
-  return typeof input.exists === "boolean"
+  return typeof input.hasProjectState === "boolean"
 }
