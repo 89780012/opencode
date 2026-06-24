@@ -12,7 +12,7 @@ function parse(value: unknown): WorkbenchFlowchart | null {
   if (!obj(value)) return null
   if (typeof value.workspacePath !== "string") return null
   const state =
-    value.state === "generating" || value.state === "done" || value.state === "error" ? value.state : "done"
+    value.state === "requested" || value.state === "generating" || value.state === "done" || value.state === "error" ? value.state : "done"
   return {
     workspacePath: value.workspacePath,
     worktreePath: typeof value.worktreePath === "string" ? value.worktreePath : value.workspacePath,

@@ -25,7 +25,7 @@ export type WorkbenchQuestion = {
 export type WorkbenchAnalysis = {
   workspacePath: string
   worktreePath: string
-  state: "idle" | "running" | "done"
+  state: "idle" | "requested" | "running" | "done"
   items: string[]
   text: string
   updatedAt: number
@@ -34,7 +34,7 @@ export type WorkbenchAnalysis = {
 export type WorkbenchFlowchart = {
   workspacePath: string
   worktreePath: string
-  state: "idle" | "generating" | "done" | "error"
+  state: "idle" | "requested" | "generating" | "done" | "error"
   code: string
   err: string
   manual: boolean

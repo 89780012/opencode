@@ -322,6 +322,69 @@ on conflict(workspace_path, worktree_path) do update set state = excluded.state,
 	}, nil
 }
 
+func (s *Service) RefreshWorkspace(ctx context.Context, req RefreshReq) (RefreshRow, error) {
+	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
+	req.WorktreePath = strings.TrimSpace(req.WorktreePath)
+	req.Reason = strings.TrimSpace(req.Reason)
+	if req.WorkspacePath == "" {
+		return RefreshRow{}, fmt.Errorf("workspacePath is required")
+	}
+	if req.WorktreePath == "" {
+		req.WorktreePath = req.WorkspacePath
+	}
+	now := time.Now().UnixMilli()
+	doc, err := db.Open()
+	if err != nil {
+		return RefreshRow{}, err
+	}
+	tx, err := doc.Begin()
+	if err != nil {
+		return RefreshRow{}, err
+	}
+	defer tx.Rollback()
+	body := "[]"
+	_, err = tx.ExecContext(ctx, `insert into workspace_analysis(workspace_path, worktree_path, state, items, text, updated_at) values (?, ?, ?, ?, ?, ?)
+on conflict(workspace_path, worktree_path) do update set state = excluded.state, items = excluded.items, text = excluded.text, updated_at = excluded.updated_at`,
+		req.WorkspacePath, req.WorktreePath, "requested", body, body, now)
+	if err != nil {
+		return RefreshRow{}, err
+	}
+	_, err = tx.ExecContext(ctx, `insert into workspace_flowcharts(workspace_path, worktree_path, analysis_hash, state, code, err, manual, source, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+on conflict(workspace_path, worktree_path) do update set analysis_hash = excluded.analysis_hash, state = excluded.state, code = excluded.code, err = excluded.err, manual = excluded.manual, source = excluded.source, updated_at = excluded.updated_at`,
+		req.WorkspacePath, req.WorktreePath, "", "requested", "", "", 0, "ai", now)
+	if err != nil {
+		return RefreshRow{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return RefreshRow{}, err
+	}
+	return RefreshRow{
+		WorkspacePath: req.WorkspacePath,
+		WorktreePath:  req.WorktreePath,
+		Reason:        req.Reason,
+		UpdatedAt:     now,
+		Analysis: AnalysisRow{
+			WorkspacePath: req.WorkspacePath,
+			WorktreePath:  req.WorktreePath,
+			State:         "requested",
+			Items:         []string{},
+			Text:          body,
+			UpdatedAt:     now,
+		},
+		Flowchart: FlowchartRow{
+			WorkspacePath: req.WorkspacePath,
+			WorktreePath:  req.WorktreePath,
+			State:         "requested",
+			Code:          "",
+			Err:           "",
+			AnalysisHash:  "",
+			Manual:        false,
+			Source:        "ai",
+			UpdatedAt:     now,
+		},
+	}, nil
+}
+
 func (s *Service) GetAnalysis(ctx context.Context, req AnalysisGet) (AnalysisRow, error) {
 	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
 	req.WorktreePath = strings.TrimSpace(req.WorktreePath)

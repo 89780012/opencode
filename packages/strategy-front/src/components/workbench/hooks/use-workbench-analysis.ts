@@ -32,7 +32,7 @@ function list(value: unknown, text: string) {
 function parse(value: unknown): WorkbenchAnalysis | null {
   if (!obj(value)) return null
   if (typeof value.workspacePath !== "string") return null
-  if (value.state !== "running" && value.state !== "done") return null
+  if (value.state !== "requested" && value.state !== "running" && value.state !== "done") return null
   const text = typeof value.text === "string" ? value.text : ""
   return {
     workspacePath: value.workspacePath,

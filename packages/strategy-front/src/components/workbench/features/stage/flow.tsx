@@ -152,12 +152,12 @@ export function Flow(props: {
               </button>
             </>
           ) : (
-            <button type="button" className={ui.blockbtn} disabled={!dirty || saving} onClick={() => void save()}>
+            <button type="button" className={`${ui.blockbtn} ${css.actionbtn}`} disabled={!dirty || saving} onClick={() => void save()}>
               <Save size={14} />
               <span>{saving ? "保存中" : dirty ? "保存" : "已保存"}</span>
             </button>
           )}
-          <button type="button" className={ui.blockbtn} onClick={props.onRun}>
+          <button type="button" className={`${ui.blockbtn} ${css.actionbtn}`} onClick={props.onRun}>
             <Play size={14} />
             <span>运行回测</span>
           </button>

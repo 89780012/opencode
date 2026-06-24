@@ -3,13 +3,19 @@ import {
   analyze,
   doneAnalysis,
   doneChart,
+  type Dirt,
   flowchart,
   freshAnalysis,
   freshChart,
   items,
+  type Life,
   mermaid,
-  noteAnalysis,
+  type Mode,
+  noteBoot,
   noteChart,
+  noteClose,
+  noteFinal,
+  noteRefresh,
   noteReview,
   requestAnalysis,
   requestChart,
@@ -113,16 +119,31 @@ type Opt = {
   workspaces: Map<string, Analysis>
   charts: Map<string, Chart>
   pending: Map<string, Pending>
+  dirts: Map<string, Dirt>
+  modes: Map<string, Mode>
   fixes: Map<string, Fix>
   reviewRequests: Set<string>
-  debugs: Set<string>
+  finalRequests: Set<string>
+  subs: Set<string>
   workspace: string
   worktree: string
   id: string
   load: (workspace: string, worktree: string) => Promise<Analysis | undefined>
   loadChart: (workspace: string, worktree: string) => Promise<Chart | undefined>
+  hold: (session: string) => boolean
   saveReview: (input: SaveReview) => Promise<void>
   write: Log
+}
+
+type Reason = "manual" | "review" | "gate"
+type Kind = "read" | "write" | "exec" | "analyze" | "chart" | "review" | "save" | "refresh" | "debug" | "other"
+type View = {
+  analysis?: Analysis
+  chart?: Chart
+  wait?: Pending
+  dirt: Dirt
+  mode: Mode
+  life: Life
 }
 
 function mcp(input: { tool: string }, name: string) {
@@ -167,6 +188,141 @@ function fixkey(id: string, session: string) {
 
 function sessionkey(id: string, session: string) {
   return id + "\x00" + session
+}
+
+function cleanDirt(): Dirt {
+  return {
+    state: "clean",
+    updated: 0,
+    reason: "",
+  }
+}
+
+async function sync(opt: Opt) {
+  const found = opt.workspaces.get(opt.id) ?? (await opt.load(opt.workspace, opt.worktree).catch(() => undefined))
+  if (found && validAnalysis(found)) opt.workspaces.set(opt.id, found)
+  if (found && !validAnalysis(found)) opt.workspaces.delete(opt.id)
+  const analysis = opt.workspaces.get(opt.id)
+  const row =
+    analysis?.state === "done"
+      ? (opt.charts.get(opt.id) ?? (await opt.loadChart(opt.workspace, opt.worktree).catch(() => undefined)))
+      : undefined
+  if (row && validChart(row)) opt.charts.set(opt.id, row)
+  if (row && !validChart(row)) opt.charts.delete(opt.id)
+  return {
+    analysis,
+    chart: opt.charts.get(opt.id),
+  }
+}
+
+function kind(input: { tool: string; args?: unknown }) {
+  if (mcp(input, "refresh_workspace")) return "refresh" as const
+  if (mcp(input, "save_analysis") || mcp(input, "save_flowchart")) return "save" as const
+  if (start(input)) return "debug" as const
+  if (input.tool === "task") {
+    const args = input.args
+    const sub = args && typeof args === "object" ? (args as Record<string, unknown>).subagent_type : undefined
+    if (sub === "workspace-analyzer") return "analyze" as const
+    if (sub === "strategy-flowchart-generator") return "chart" as const
+    if (sub === "strategy-reviewer") return "review" as const
+  }
+  if (["read", "grep", "glob", "ls", "list", "codesearch", "lsp", "webfetch", "websearch"].includes(input.tool)) return "read" as const
+  if (["edit", "write", "apply_patch", "multiedit"].includes(input.tool)) return "write" as const
+  if (input.tool === "bash") return "exec" as const
+  return "other" as const
+}
+
+// 把持久化的分析/流程图产物、待保存状态和本地 dirty 元数据折叠成一个
+// 生命周期视图，避免门禁策略散落在多个分支里。
+function view(opt: Opt, input: { analysis?: Analysis; chart?: Chart }) {
+  const wait = opt.pending.get(opt.id)
+  const dirt = opt.dirts.get(opt.id) ?? cleanDirt()
+  const mode = opt.modes.get(opt.id) ?? "boot"
+  const busy = mode === "final" ? "finalizing" : mode === "refresh" ? "refreshing" : "booting"
+  const life =
+    wait?.kind === "analysis" || wait?.kind === "flowchart"
+      ? busy
+      : !input.analysis || input.analysis.state === "requested"
+        ? mode === "final"
+          ? "finalizing"
+          : mode === "refresh"
+            ? "refreshing"
+            : "idle"
+        : input.analysis.state === "running"
+          ? busy
+          : !input.chart || input.chart.state === "requested" || input.chart.state === "generating" || input.chart.state === "error"
+            ? busy
+            : dirt.state === "dirty"
+              ? "dirty"
+              : "ready"
+  return {
+    analysis: input.analysis,
+    chart: input.chart,
+    wait,
+    dirt,
+    mode,
+    life,
+  } satisfies View
+}
+
+// 新门禁按阶段工作：初始化时严格，中间开发和调试阶段放松，只在
+// review 或最终收口这类动作前重新收紧。
+function gate(next: View, value: Kind) {
+  if (next.wait?.kind === "review") return next.life === "ready" || next.life === "dirty" ? "" : ""
+  if (next.wait?.kind === "debug" && value === "debug") return ""
+  if (next.life === "idle") {
+    if (value === "read" || value === "analyze" || value === "refresh" || value === "other") return ""
+    if (value === "save") return "SmartX workflow requires creating the initial workspace baseline first."
+    return "SmartX workflow requires initial workspace analysis and flowchart generation before implementation."
+  }
+  if (next.life === "booting") {
+    if (value === "read" || value === "analyze" || value === "chart" || value === "save" || value === "refresh") return ""
+    return "SmartX workflow is still building the initial workspace baseline. Finish analysis and flowchart first."
+  }
+  if (next.life === "ready") return ""
+  if (next.life === "dirty") {
+    if (value === "review") return "SmartX workflow requires refreshing workspace analysis and flowchart before review."
+    return ""
+  }
+  if (next.life === "refreshing") {
+    if (value === "read" || value === "analyze" || value === "chart" || value === "save" || value === "refresh") return ""
+    return "SmartX workflow is refreshing the workspace baseline after code changes. Finish analysis and flowchart first."
+  }
+  if (next.life === "finalizing") {
+    if (value === "read" || value === "analyze" || value === "chart" || value === "save" || value === "refresh") return ""
+    return "SmartX workflow is generating the final workspace snapshot. Finish analysis and flowchart first."
+  }
+  return ""
+}
+
+// 根会话里任何成功的写入或执行都会让当前基线失效，直到下一次
+// 分析 + 流程图刷新完整结束。
+function mark(opt: Opt, reason: string) {
+  opt.dirts.set(opt.id, {
+    state: "dirty",
+    updated: Date.now(),
+    reason,
+  })
+}
+
+// reset 总是重新进入基线流水线。mode 用来告诉后续 hook，
+// 当前这轮到底是首次初始化，还是代码修改后的刷新。
+function reset(opt: Opt, mode?: Mode) {
+  opt.workspaces.set(opt.id, requestAnalysis(opt.workspace, opt.worktree))
+  opt.charts.set(opt.id, requestChart(opt.workspace, opt.worktree))
+  opt.modes.set(opt.id, mode ?? (opt.dirts.get(opt.id)?.state === "dirty" ? "refresh" : "boot"))
+  const wait = opt.pending.get(opt.id)
+  if (wait?.kind === "analysis" || wait?.kind === "flowchart" || wait?.kind === "debug") opt.pending.delete(opt.id)
+}
+
+// 自动收口只在主会话的脏工作区生效，并且不能打断 review 修复、显式收口或顺序型待办。
+function closing(opt: Opt, next: View, session: string) {
+  if (opt.subs.has(session)) return false
+  if (next.life !== "dirty" || next.wait) return false
+  if (opt.hold(session)) return false
+  if (opt.reviewRequests.has(sessionkey(opt.id, session))) return false
+  if (opt.finalRequests.has(sessionkey(opt.id, session))) return false
+  return !opt.fixes.has(fixkey(opt.id, session))
 }
 
 function noteFix(input: Fix) {
@@ -265,27 +421,29 @@ function noteSave(input: Pending) {
 
 export function createWorkspace(opt: Opt) {
   return {
+    reset: async (reason: Reason, detail = "") => {
+      if (!opt.workspace || !opt.id) return false
+      reset(opt)
+      await opt.write("workspace refresh requested", {
+        workspace: opt.workspace,
+        worktree: opt.worktree,
+        reason,
+        detail,
+      })
+      return true
+    },
     system: async (input: Parameters<System>[0], output: Parameters<System>[1]) => {
       if (!opt.workspace || !opt.id) return false
 
-      const found = opt.workspaces.get(opt.id) ?? (await opt.load(opt.workspace, opt.worktree).catch(() => undefined))
-      if (found && validAnalysis(found)) opt.workspaces.set(opt.id, found)
-      if (found && !validAnalysis(found)) opt.workspaces.delete(opt.id)
-
-      const analysis = opt.workspaces.get(opt.id)
-      const row =
-        analysis?.state === "done"
-          ? (opt.charts.get(opt.id) ?? (await opt.loadChart(opt.workspace, opt.worktree).catch(() => undefined)))
-          : undefined
-      if (row && validChart(row)) opt.charts.set(opt.id, row)
-      if (row && !validChart(row)) opt.charts.delete(opt.id)
+      const data = await sync(opt)
+      const next = view(opt, data)
 
       const sessionID = input.sessionID
       return flow([
-        // 门禁 1：子 agent 已产出 analysis/flowchart/review，但还没保存到 strategy-service。
-        // 必须先提醒主 agent 调用对应 smartx_save_*，避免后续门禁基于未持久化状态继续推进。
+        // 优先级最高：子 agent 一旦产出了分析、流程图或审查结果，
+        // 主 agent 必须先保存，后续阶段才能信任这份状态。
         step("save", async () => {
-          const wait = opt.pending.get(opt.id)
+          const wait = next.wait
           if (!wait) return false
           await opt.write("workspace mcp save reminder injected", {
             sessionID,
@@ -297,7 +455,8 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
 
-        // 门禁 2：上一轮未通过审查已经保存，需要主 agent 按报告修代码。
+        // 未通过的审查修复循环优先于初始化/刷新提示，确保主 agent
+        // 始终先根据最新已保存的审查报告修代码。
         step("fix", async () => {
           const session = sessionID
           if (!session) return false
@@ -314,12 +473,23 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
 
-        // 门禁 3：用户当前会话显式表达了代码审查意图。
-        // 注入隐藏审查流程：先取需求，再启动 strategy-reviewer，并由主 agent 负责保存后的修复循环。
+        // 审查只能从干净且 ready 的基线开始。工作区一旦 dirty，
+        // 先转去刷新路径，再进入 review。
         step("review", async () => {
           if (!sessionID) return false
           const requestID = opt.id + "\x00" + sessionID
           if (!opt.reviewRequests.has(requestID)) return false
+          if (next.life === "dirty") {
+            await opt.write("workspace refresh gate injected", {
+              sessionID,
+              workspace: opt.workspace,
+              worktree: opt.worktree,
+              action: "review",
+            })
+            output.system.push(noteRefresh("代码审查"))
+            return true
+          }
+          if (next.life !== "ready") return false
           opt.reviewRequests.delete(requestID)
           await opt.write("workspace review gate injected", {
             sessionID,
@@ -330,44 +500,130 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
 
-        // 门禁 4：当前 workspace/worktree 还没有完成策略运行逻辑分析。
-        // 在写代码、生成方案或其它实现动作前，先要求启动 workspace-analyzer。
-        step("analysis", async () => {
-          if (analysis && analysis.state !== "requested") return false
-          if (!analysis) opt.workspaces.set(opt.id, requestAnalysis(opt.workspace, opt.worktree))
-          await opt.write("workspace analysis gate injected", {
+        // 最终收口和 review 分开处理。dirty 时先做最后一次快照刷新，
+        // clean 时不打断，直接允许主 agent 给出最终结论。
+        step("final", async () => {
+          if (!sessionID) return false
+          const requestID = opt.id + "\x00" + sessionID
+          if (!opt.finalRequests.has(requestID)) return false
+          if (next.life === "dirty") {
+            opt.finalRequests.delete(requestID)
+            reset(opt, "final")
+            await opt.write("workspace final gate injected", {
+              sessionID,
+              workspace: opt.workspace,
+              worktree: opt.worktree,
+            })
+            output.system.push(noteFinal())
+            return true
+          }
+          if (next.life === "ready") opt.finalRequests.delete(requestID)
+          return false
+        }),
+
+        // 主 agent 到了自然收尾点时，先提醒它做最后一次快照刷新。
+        // 这一步不直接重置状态，而是把“是否准备结束”交给模型自己判断。
+        step("close", async () => {
+          if (!sessionID || !closing(opt, next, sessionID)) return false
+          await opt.write("workspace close reminder injected", {
             sessionID,
             workspace: opt.workspace,
             worktree: opt.worktree,
-            state: analysis?.state ?? "missing",
           })
-          output.system.push(noteAnalysis())
+          output.system.push(noteClose())
           return true
         }),
 
-        // 门禁 5：分析已经完成，但策略流程图还没生成或需要重新生成。
-        // 要求启动 strategy-flowchart-generator，把分析结果转换成 Mermaid 流程图。
+        // 首次触达工作区时的初始化提示。只有这里会强制要求先建立第一份 workspace 基线。
+        step("boot", async () => {
+          if (next.life !== "idle") return false
+          if (!next.analysis) opt.workspaces.set(opt.id, requestAnalysis(opt.workspace, opt.worktree))
+          opt.modes.set(opt.id, "boot")
+          await opt.write("workspace boot gate injected", {
+            sessionID,
+            workspace: opt.workspace,
+            worktree: opt.worktree,
+            state: next.analysis?.state ?? "missing",
+          })
+          output.system.push(noteBoot())
+          return true
+        }),
+
+        // 分析结果仍然是流程图的唯一事实来源，所以即使外层生命周期
+        // 已经放松，流程图生成仍然必须排在分析之后。
         step("chart", async () => {
-          const chart = opt.charts.get(opt.id)
-          if (analysis?.state !== "done" || (chart && chart.state !== "requested")) return false
-          if (!chart) opt.charts.set(opt.id, requestChart(opt.workspace, opt.worktree))
+          const chart = next.chart
+          if (next.analysis?.state !== "done" || chart?.state === "done" || chart?.state === "generating") return false
+          if (!chart || chart.state === "error") opt.charts.set(opt.id, requestChart(opt.workspace, opt.worktree))
           await opt.write("workspace flowchart gate injected", {
             sessionID,
             workspace: opt.workspace,
             worktree: opt.worktree,
             state: chart?.state ?? "missing",
           })
-          output.system.push(noteChart(analysis))
+          output.system.push(noteChart(next.analysis))
+          return true
+        }),
+
+        // dirty 工作区因为 review 进入刷新阶段时，要提醒模型现在是在
+        // 做 refresh，而不是重新开始一轮全新的 bootstrap。
+        step("refresh", async () => {
+          if (next.life !== "refreshing") return false
+          if (next.analysis?.state === "done" && (!next.chart || next.chart.state === "requested" || next.chart.state === "error")) return false
+          await opt.write("workspace refresh reminder injected", {
+            sessionID,
+            workspace: opt.workspace,
+            worktree: opt.worktree,
+          })
+          output.system.push(noteRefresh())
+          return true
+        }),
+
+        // finalizing 与普通 refresh 使用同一条分析/流程图流水线，
+        // 区别只在于这里代表最终收口前的最后一次快照刷新。
+        step("finalizing", async () => {
+          if (next.life !== "finalizing") return false
+          if (next.analysis?.state === "done" && (!next.chart || next.chart.state === "requested" || next.chart.state === "error")) return false
+          await opt.write("workspace final reminder injected", {
+            sessionID,
+            workspace: opt.workspace,
+            worktree: opt.worktree,
+          })
+          output.system.push(noteFinal())
           return true
         }),
       ])
     },
     before: async (input: Parameters<Before>[0], output: Parameters<Before>[1]) => {
       if (!opt.workspace || !opt.id) return false
+      if (!opt.subs.has(input.sessionID)) {
+        const data = await sync(opt)
+        const next = view(opt, data)
+        const value = kind({ tool: input.tool, args: output.args })
+        const text = gate(next, value)
+        if (text) {
+          // 只有在生命周期边界才做硬拦截。读取类动作可以继续，
+          // 写入或收尾动作在需要时才触发基线重置。
+          if (next.life === "idle") reset(opt, "boot")
+          if (next.life === "dirty" && value === "review") reset(opt, "refresh")
+          await opt.write("workspace hard gate blocked tool", {
+            sessionID: input.sessionID,
+            workspace: opt.workspace,
+            worktree: opt.worktree,
+            tool: input.tool,
+            pending: next.wait?.kind,
+            analysis: next.analysis?.state ?? "missing",
+            chart: next.chart?.state ?? "missing",
+            life: next.life,
+            kind: value,
+          })
+          throw new Error(text)
+        }
+      }
 
       return flow([
-        // 门禁 1：主 agent 即将启动流程图子 agent。
-        // 先把 chart 标记为 generating，避免下一轮 system 继续重复要求生成流程图。
+        // 在流程图子 agent 真正启动前先把 chart 标成 running，
+        // 避免下一轮 system 重复注入同一条流程图提示。
         step("chart", async () => {
           if (!flowchart({ tool: input.tool, args: output.args })) return false
           opt.charts.set(opt.id, freshChart(opt.workspace, opt.worktree))
@@ -379,8 +635,8 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
 
-        // 门禁 2：主 agent 即将启动审查子 agent。
-        // 这里只记录审查开始，真实的通过/失败判断在 after 阶段处理。
+        // review 仍然坚持 save-first。这里立即记录 running，
+        // 让后端能反映出一轮审查已经在进行中。
         step("review", async () => {
           if (!review({ tool: input.tool, args: output.args })) return false
           await opt
@@ -415,10 +671,11 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
 
-        // 门禁 3：主 agent 即将启动分析子 agent。
-        // 先把 analysis 标记为 running，避免下一轮 system 重复注入 analyzer 门禁。
+        // 分析启动时顺手写下当前 mode，后面的 save/gate 才知道
+        // 这一轮属于 boot 还是 refresh。
         step("analysis", async () => {
           if (!analyze({ tool: input.tool, args: output.args })) return false
+          opt.modes.set(opt.id, opt.modes.get(opt.id) ?? (opt.dirts.get(opt.id)?.state === "dirty" ? "refresh" : "boot"))
           opt.workspaces.set(opt.id, freshAnalysis(opt.workspace, opt.worktree))
           await opt.write("workspace analysis started", {
             sessionID: input.sessionID,
@@ -433,8 +690,39 @@ export function createWorkspace(opt: Opt) {
       if (!opt.workspace || !opt.id) return false
 
       return flow([
-        // 门禁 1：主 agent 已成功保存 analysis 到 strategy-service。
-        // 清理 analysis pending，下一轮 system 才能继续推进 flowchart 门禁。
+        // 根会话里的成功修改不会立刻打断开发，
+        // 但会让后续收尾阶段使用的基线失效。
+        step("dirty", async () => {
+          if (opt.subs.has(input.sessionID) || !ok(output)) return false
+          const value = kind({ tool: input.tool, args: input.args })
+          if (value !== "write" && value !== "exec") return false
+          mark(opt, input.tool)
+          await opt.write("workspace dirtied", {
+            sessionID: input.sessionID,
+            workspace: opt.workspace,
+            worktree: opt.worktree,
+            tool: input.tool,
+          })
+          return false
+        }),
+
+        // 手动 refresh 会显式重新进入基线流水线，
+        // 不管这次失效是来自代码修改还是用户主动要求。
+        step("refresh", async () => {
+          if (!mcp(input, "refresh_workspace") || !same(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
+          reset(opt, "refresh")
+          await opt.write("workspace refresh requested", {
+            sessionID: input.sessionID,
+            workspace: opt.workspace,
+            worktree: opt.worktree,
+            reason: "manual",
+            detail: typeof input.args?.reason === "string" ? input.args.reason : "",
+          })
+          return true
+        }),
+
+        // 分析保存会把事务从“已产出分析”推进到“可以生成流程图”。
+        // 这里还不能清掉 dirty，因为基线在流程图保存前都不完整。
         step("save_analysis", async () => {
           if (!mcp(input, "save_analysis") || !same(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
           if (opt.pending.get(opt.id)?.kind === "analysis") opt.pending.delete(opt.id)
@@ -446,22 +734,18 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
 
-        // 门禁 2：主 agent 已成功保存 flowchart 到 strategy-service。
-        // 清理 flowchart pending，表示“分析 -> 流程图”这段门禁链已经完成。
+        // 流程图保存才真正完成一轮基线事务，
+        // 也是唯一一个把 dirty 清回 clean 的地方。
         step("save_chart", async () => {
           if (!mcp(input, "save_flowchart") || !same(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
           const item = opt.pending.get(opt.id)
           if (item?.kind === "flowchart") opt.pending.delete(opt.id)
-          const key = sessionkey(opt.id, input.sessionID)
-          if (item?.kind === "flowchart" && item.state === "done" && opt.debugs.has(key)) {
-            opt.debugs.delete(key)
-            opt.pending.set(opt.id, {
-              kind: "debug",
-              workspacePath: opt.workspace,
-              worktreePath: opt.worktree,
-              sessionID: input.sessionID,
+          if (item?.kind === "flowchart" && item.state === "done")
+            opt.dirts.set(opt.id, {
+              state: "clean",
+              updated: Date.now(),
+              reason: "",
             })
-          }
           await opt.write("workspace flowchart saved through mcp", {
             sessionID: input.sessionID,
             workspace: opt.workspace,
@@ -470,8 +754,8 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
 
-        // 门禁 3：主 agent 已成功保存一轮审查结果。
-        // 如果审查通过，重置 analysis/chart；如果审查失败，后续 system 门禁会注入修复提醒。
+        // 审查完全通过后直接排队进入 debug。
+        // 这里不再强制重新分析，只有后续编辑把工作区打脏时才刷新。
         step("save_review", async () => {
           if (!mcp(input, "save_review") || !same(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
           const item = opt.pending.get(opt.id)
@@ -479,11 +763,13 @@ export function createWorkspace(opt: Opt) {
           const done = item?.kind === "review" && pass(input.args)
           if (done) {
             opt.fixes.delete(fixkey(opt.id, input.sessionID))
-            opt.debugs.add(sessionkey(opt.id, input.sessionID))
-            opt.workspaces.set(opt.id, requestAnalysis(opt.workspace, opt.worktree))
-            opt.charts.set(opt.id, requestChart(opt.workspace, opt.worktree))
+            opt.pending.set(opt.id, {
+              kind: "debug",
+              workspacePath: opt.workspace,
+              worktreePath: opt.worktree,
+              sessionID: input.sessionID,
+            })
           }
-          if (!done) opt.debugs.delete(sessionkey(opt.id, input.sessionID))
           if (item?.kind === "review" && !done && item.state !== "error") {
             const fix = opt.fixes.get(fixkey(opt.id, input.sessionID))
             const attempt = Math.min(fix?.attempt ?? 1, limit)
@@ -505,7 +791,8 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
 
-        // 门禁 4：通过审查保存后，主 agent 已经成功启动 SmartX 调试。
+        // debug 需要的是已保存的通过审查和专门的 debug pending，
+        // 不要求额外刷新到最终快照后再启动。
         step("start_debug", async () => {
           if (!start(input) || !ok(output)) return false
           const item = opt.pending.get(opt.id)
@@ -519,8 +806,8 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
 
-        // 门禁 5：流程图子 agent 调用结束。
-        // 解析 Mermaid，更新本地 chart 状态，并生成 smartx_save_flowchart 的待保存任务。
+        // 子 agent 完成时只是在本地生成产物；
+        // 下一轮 system 注入的 save 提醒才会把它变成可持久化状态。
         step("chart_done", async () => {
           if (!flowchart(input)) return false
           const code = mermaid(output.output)
@@ -550,8 +837,8 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
 
-        // 门禁 6：审查子 agent 调用结束。
-        // 每轮审查都必须先保存；失败时登记保存后的修复门禁，第三轮失败保存后仍修复但不再复审。
+        // review 完成后先把报告落到本地；
+        // 真正的保存和修复分流在后面的 save_review 阶段决定。
         step("review_done", async () => {
           if (!review(input)) return false
           const text = reviewText(output.output) || "审查报告为空。"
@@ -590,8 +877,8 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
 
-        // 门禁 7：分析子 agent 调用结束。
-        // 解析 JSON 数组，更新 analysis 状态，同时把 chart 置为 requested，等待后续生成流程图。
+        // 分析完成后会重新启动事务里的流程图半段，
+        // 后续流程图仍然必须基于这次最新分析文本重新生成。
         step("analysis_done", async () => {
           if (!analyze(input)) return false
           const list = items(output.output)

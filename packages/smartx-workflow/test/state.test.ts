@@ -10,6 +10,7 @@ import {
   seen,
   touch,
   validAnalysis,
+  wantsFinal,
 } from "../src/state.js"
 
 describe("smartx workflow state", () => {
@@ -81,6 +82,14 @@ describe("smartx workflow state", () => {
     expect(reviewState("review result: failed")).toBe("failed")
     expect(reviewState("结论：无法完成")).toBe("error")
     expect(reviewState("没有明确结论，但存在风险和问题。")).toBe("failed")
+  })
+
+  test("detects final intent variants", () => {
+    expect(wantsFinal("最终总结一下")).toBe(true)
+    expect(wantsFinal("可以结束了")).toBe(true)
+    expect(wantsFinal("wrap up")).toBe(true)
+    expect(wantsFinal("继续改代码")).toBe(false)
+    expect(wantsFinal("不要结束")).toBe(false)
   })
 
   test("builds the log reminder", () => {

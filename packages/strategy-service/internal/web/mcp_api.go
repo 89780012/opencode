@@ -58,7 +58,7 @@ func (a *API) mcpPost(c *gin.Context) {
 				"name":    "strategy-service",
 				"version": "dev",
 			},
-			"instructions": "Use start/logs for SmartX runtime work, get_requirements for workspace requirements, and save_analysis/save_flowchart/save_review to persist workspace analysis results.",
+			"instructions": "Use start/logs for SmartX runtime work, get_requirements for workspace requirements, refresh_workspace to request fresh workspace analysis plus flowchart, and save_analysis/save_flowchart/save_review to persist workspace analysis results.",
 		})
 	case "notifications/initialized":
 		c.Status(202)
@@ -140,6 +140,15 @@ func (a *API) mcpPost(c *gin.Context) {
 						"workspacePath": prop("string", "Workspace path."),
 						"sessionId":     prop("string", "Workbench session id."),
 					}, []string{"workspacePath", "sessionId"}),
+				},
+				{
+					"name":        "refresh_workspace",
+					"description": "Request fresh workspace strategy analysis and flowchart before continuing. Use after code changes or when current workspace understanding is stale.",
+					"inputSchema": schema(map[string]any{
+						"workspacePath": prop("string", "Workspace path."),
+						"worktreePath":  prop("string", "Worktree path. Defaults to workspacePath."),
+						"reason":        prop("string", "Why analysis and flowchart must be refreshed."),
+					}, []string{"workspacePath"}),
 				},
 				{
 					"name":        "save_flowchart",
@@ -268,6 +277,19 @@ func (a *API) mcpPost(c *gin.Context) {
 					WorkspacePath: text(args["workspacePath"]),
 					SessionID:     text(args["sessionId"]),
 				})
+			})
+		case "refresh_workspace":
+			mcpWorkbench(c.Request.Context(), req.ID, c, func(ctx context.Context) (any, error) {
+				data, err := a.bench.RefreshWorkspace(ctx, workbench.RefreshReq{
+					WorkspacePath: text(args["workspacePath"]),
+					WorktreePath:  text(args["worktreePath"]),
+					Reason:        text(args["reason"]),
+				})
+				if err == nil {
+					a.event.emitBroadcast("analysis.updated", utils.Pack(data.Analysis))
+					a.event.emitBroadcast("flowchart.updated", utils.Pack(data.Flowchart))
+				}
+				return data, err
 			})
 		case "save_flowchart":
 			mcpWorkbench(c.Request.Context(), req.ID, c, func(ctx context.Context) (any, error) {

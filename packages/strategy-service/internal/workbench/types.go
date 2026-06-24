@@ -80,6 +80,21 @@ type AnalysisReq struct {
 	Text          string   `json:"text"`
 }
 
+type RefreshReq struct {
+	WorkspacePath string `json:"workspacePath"`
+	WorktreePath  string `json:"worktreePath"`
+	Reason        string `json:"reason,omitempty"`
+}
+
+type RefreshRow struct {
+	WorkspacePath string       `json:"workspacePath"`
+	WorktreePath  string       `json:"worktreePath"`
+	Reason        string       `json:"reason,omitempty"`
+	Analysis      AnalysisRow  `json:"analysis"`
+	Flowchart     FlowchartRow `json:"flowchart"`
+	UpdatedAt     int64        `json:"updatedAt"`
+}
+
 type RequirementsGet struct {
 	WorkspacePath string `form:"workspacePath" json:"workspacePath"`
 	SessionID     string `form:"sessionId" json:"sessionId"`

@@ -233,6 +233,229 @@ describe("smartx workspace analysis", () => {
     expect(first.system.join("\n")).not.toContain("smartx_logs")
   })
 
+  test("allows read tools before analysis starts but blocks writes", async () => {
+    const hooks = build(ctx("f:/repo"))
+
+    await expect(
+      hooks["tool.execute.before"]?.(
+        { sessionID: "s1", tool: "read", callID: "c1" },
+        { args: { filePath: "f:/repo/a.ts" } },
+      ),
+    ).resolves.toBeUndefined()
+
+    expect(
+      hooks["tool.execute.before"]?.(
+        { sessionID: "s1", tool: "edit", callID: "c2" },
+        { args: { filePath: "f:/repo/a.ts", oldString: "a", newString: "b" } },
+      ),
+    ).rejects.toThrow("initial workspace analysis")
+
+    await expect(
+      hooks["tool.execute.before"]?.(
+        { sessionID: "s1", tool: "task", callID: "c3" },
+        { args: { subagent_type: "workspace-analyzer" } },
+      ),
+    ).resolves.toBeUndefined()
+  })
+
+  test("allows reads during baseline save phases and unblocks writes after flowchart save", async () => {
+    const workspaces = new Map<string, Analysis>()
+    const pending = new Map()
+    const hooks = build(ctx("f:/repo"), {
+      workspaces,
+      pending,
+    })
+
+    await hooks["tool.execute.before"]?.(
+      { sessionID: "s1", tool: "task", callID: "c1" },
+      { args: { subagent_type: "workspace-analyzer" } },
+    )
+
+    await hooks["tool.execute.after"]?.(
+      {
+        sessionID: "s1",
+        tool: "task",
+        callID: "c1",
+        args: { subagent_type: "workspace-analyzer" },
+      },
+      {
+        title: "",
+        output: ['<task_result>', '["read market"]', "</task_result>"].join("\n"),
+        metadata: {},
+      },
+    )
+
+    await expect(
+      hooks["tool.execute.before"]?.(
+        { sessionID: "s1", tool: "read", callID: "c2" },
+        { args: { filePath: "f:/repo/a.ts" } },
+      ),
+    ).resolves.toBeUndefined()
+
+    expect(
+      hooks["tool.execute.before"]?.(
+        { sessionID: "s1", tool: "write", callID: "c2w" },
+        { args: { filePath: "f:/repo/a.ts", content: "next" } },
+      ),
+    ).rejects.toThrow("initial workspace baseline")
+
+    await hooks["tool.execute.after"]?.(
+      {
+        sessionID: "s1",
+        tool: "smartx_save_analysis",
+        callID: "c3",
+        args: { workspacePath: "f:/repo", worktreePath: "f:/repo" },
+      },
+      { title: "", output: "{}", metadata: {} },
+    )
+
+    await expect(
+      hooks["tool.execute.before"]?.(
+        { sessionID: "s1", tool: "read", callID: "c4" },
+        { args: { filePath: "f:/repo/a.ts" } },
+      ),
+    ).resolves.toBeUndefined()
+
+    await expect(
+      hooks["tool.execute.before"]?.(
+        { sessionID: "s1", tool: "task", callID: "c5" },
+        { args: { subagent_type: "strategy-flowchart-generator" } },
+      ),
+    ).resolves.toBeUndefined()
+
+    await hooks["tool.execute.after"]?.(
+      {
+        sessionID: "s1",
+        tool: "task",
+        callID: "c5",
+        args: { subagent_type: "strategy-flowchart-generator" },
+      },
+      {
+        title: "",
+        output: "<task_result>flowchart TD\nA-->B</task_result>",
+        metadata: {},
+      },
+    )
+
+    await expect(
+      hooks["tool.execute.before"]?.(
+        { sessionID: "s1", tool: "read", callID: "c6" },
+        { args: { filePath: "f:/repo/a.ts" } },
+      ),
+    ).resolves.toBeUndefined()
+
+    await hooks["tool.execute.after"]?.(
+      {
+        sessionID: "s1",
+        tool: "smartx_save_flowchart",
+        callID: "c7",
+        args: { workspacePath: "f:/repo", worktreePath: "f:/repo" },
+      },
+      { title: "", output: "{}", metadata: {} },
+    )
+
+    await expect(
+      hooks["tool.execute.before"]?.(
+        { sessionID: "s1", tool: "read", callID: "c8" },
+        { args: { filePath: "f:/repo/a.ts" } },
+      ),
+    ).resolves.toBeUndefined()
+  })
+
+  test("does not hard block child sessions", async () => {
+    const hooks = build(ctx("f:/repo"))
+
+    await hooks.event?.({
+      event: {
+        type: "session.created",
+        properties: {
+          info: {
+            id: "s2",
+            parentID: "s1",
+          },
+        },
+      } as never,
+    })
+
+    await expect(
+      hooks["tool.execute.before"]?.(
+        { sessionID: "s2", tool: "read", callID: "c1" },
+        { args: { filePath: "f:/repo/a.ts" } },
+      ),
+    ).resolves.toBeUndefined()
+  })
+
+  test("refresh tool allows reads and blocks writes until refreshed baseline is rebuilt", async () => {
+    const rows: Row[] = []
+    const id = key("f:/repo", "f:/repo")
+    const workspaces = new Map<string, Analysis>([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]])
+    const charts = new Map<string, Chart>([
+      [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", code: "flowchart TD", err: "", updated: Date.now() }],
+    ])
+    const pending = new Map()
+    const hooks = build(ctx("f:/repo", rows), {
+      workspaces,
+      charts,
+      pending,
+    })
+
+    await hooks["tool.execute.after"]?.(
+      {
+        sessionID: "s1",
+        tool: "smartx_refresh_workspace",
+        callID: "c0",
+        args: { workspacePath: "f:/repo", worktreePath: "f:/repo", reason: "code changed" },
+      },
+      { title: "", output: "{}", metadata: {} },
+    )
+
+    expect(workspaces.get(id)?.state).toBe("requested")
+    expect(charts.get(id)?.state).toBe("requested")
+    expect(rows.some((item) => item.message === "workspace refresh requested")).toBe(true)
+
+    await expect(
+      hooks["tool.execute.before"]?.(
+        { sessionID: "s1", tool: "read", callID: "c1" },
+        { args: { filePath: "f:/repo/a.ts" } },
+      ),
+    ).resolves.toBeUndefined()
+
+    expect(
+      hooks["tool.execute.before"]?.(
+        { sessionID: "s1", tool: "write", callID: "c2" },
+        { args: { filePath: "f:/repo/a.ts", content: "next" } },
+      ),
+    ).rejects.toThrow("refreshing the workspace baseline")
+  })
+
+  test("refresh tool clears pending analysis and flowchart saves", async () => {
+    const id = key("f:/repo", "f:/repo")
+    const pending = new Map()
+    pending.set(id, {
+      kind: "flowchart",
+      workspacePath: "f:/repo",
+      worktreePath: "f:/repo",
+      state: "done",
+      code: "flowchart TD",
+      err: "",
+    })
+    const hooks = build(ctx("f:/repo"), {
+      pending,
+    })
+
+    await hooks["tool.execute.after"]?.(
+      {
+        sessionID: "s1",
+        tool: "smartx_refresh_workspace",
+        callID: "c0",
+        args: { workspacePath: "f:/repo", worktreePath: "f:/repo", reason: "code changed" },
+      },
+      { title: "", output: "{}", metadata: {} },
+    )
+
+    expect(pending.has(id)).toBe(false)
+  })
+
   test("injects hidden review workflow when user asks for review", async () => {
     const rows: Row[] = []
     const id = key("f:/repo", "f:/repo")
@@ -266,14 +489,20 @@ describe("smartx workspace analysis", () => {
 
   test("saves failed review before asking the main agent to fix it", async () => {
     const rows: Row[] = []
+    const workspaces = new Map<string, Analysis>()
+    const charts = new Map<string, Chart>()
     const pending = new Map()
     const fixes = new Map()
     const hooks = build(ctx("f:/repo", rows), {
+      workspaces,
+      charts,
       pending,
       fixes,
     })
     const id = key("f:/repo", "f:/repo")
     const fixID = id + "\x00" + "s1"
+    workspaces.set(id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"]))
+    charts.set(id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", code: "flowchart TD", err: "", updated: Date.now() })
 
     await hooks["tool.execute.before"]?.(
       { sessionID: "s1", tool: "task", callID: "c1" },
@@ -332,7 +561,7 @@ describe("smartx workspace analysis", () => {
     expect(rows.some((item) => item.message === "workspace review needs fix")).toBe(true)
   })
 
-  test("reanalyzes and redraws before debug after saving a fully passed review", async () => {
+  test("queues debug after a passed review and finalizes with one last refresh after later edits", async () => {
     const rows: Row[] = []
     const workspaces = new Map<string, Analysis>()
     const charts = new Map<string, Chart>()
@@ -385,58 +614,6 @@ describe("smartx workspace analysis", () => {
       { title: "", output: "{}", metadata: {} },
     )
 
-    expect(pending.has(id)).toBe(false)
-    expect(workspaces.get(id)?.state).toBe("requested")
-    expect(charts.get(id)?.state).toBe("requested")
-
-    const analysis = { system: [] as string[] }
-    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, analysis)
-    expect(analysis.system.join("\n")).toContain("workspace-analyzer")
-
-    await hooks["tool.execute.after"]?.(
-      {
-        sessionID: "s1",
-        tool: "task",
-        callID: "c3",
-        args: { subagent_type: "workspace-analyzer" },
-      },
-      { title: "", output: '<task_result>["新的策略逻辑"]</task_result>', metadata: {} },
-    )
-
-    await hooks["tool.execute.after"]?.(
-      {
-        sessionID: "s1",
-        tool: "smartx_save_analysis",
-        callID: "c4",
-        args: { workspacePath: "f:/repo", worktreePath: "f:/repo" },
-      },
-      { title: "", output: "{}", metadata: {} },
-    )
-
-    const chart = { system: [] as string[] }
-    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, chart)
-    expect(chart.system.join("\n")).toContain("strategy-flowchart-generator")
-
-    await hooks["tool.execute.after"]?.(
-      {
-        sessionID: "s1",
-        tool: "task",
-        callID: "c5",
-        args: { subagent_type: "strategy-flowchart-generator" },
-      },
-      { title: "", output: "<task_result>flowchart TD\nA-->B</task_result>", metadata: {} },
-    )
-
-    await hooks["tool.execute.after"]?.(
-      {
-        sessionID: "s1",
-        tool: "smartx_save_flowchart",
-        callID: "c6",
-        args: { workspacePath: "f:/repo", worktreePath: "f:/repo" },
-      },
-      { title: "", output: "{}", metadata: {} },
-    )
-
     expect(pending.get(id)?.kind).toBe("debug")
 
     const start = { system: [] as string[] }
@@ -446,20 +623,145 @@ describe("smartx workspace analysis", () => {
     await hooks["tool.execute.after"]?.(
       {
         sessionID: "s1",
-        tool: "smartx_start",
+        tool: "write",
         callID: "c7",
+        args: { filePath: "f:/repo/a.ts", content: "changed" },
+      },
+      { title: "", output: "Wrote file successfully.", metadata: {} },
+    )
+
+    await expect(
+      hooks["tool.execute.before"]?.(
+        { sessionID: "s1", tool: "smartx_start", callID: "c8" },
+        { args: {} },
+      ),
+    ).resolves.toBeUndefined()
+
+    await hooks["tool.execute.after"]?.(
+      {
+        sessionID: "s1",
+        tool: "smartx_start",
+        callID: "c9",
         args: {},
       },
       { title: "", output: "{}", metadata: {} },
     )
 
-    expect(pending.has(id)).toBe(false)
+    await hooks["chat.message"]?.(
+      { sessionID: "s1", messageID: "m2", agent: "smartx-helper" },
+      {
+        message: {} as never,
+        parts: [{ type: "text", text: "给我一个最终总结" } as never],
+      },
+    )
 
-    const logs = { system: [] as string[] }
-    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, logs)
-    expect(logs.system.join("\n")).toContain("smartx_logs")
-    expect(rows.some((item) => item.message === "workspace review completed")).toBe(true)
-    expect(rows.some((item) => item.message === "workspace review debug started")).toBe(true)
+    const refresh = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, refresh)
+    expect(refresh.system.join("\n")).toContain("最后刷新一次 workspace 分析和流程图")
+
+    await hooks["tool.execute.after"]?.(
+      {
+        sessionID: "s1",
+        tool: "task",
+        callID: "c10",
+        args: { subagent_type: "workspace-analyzer" },
+      },
+      { title: "", output: '<task_result>["新的策略逻辑"]</task_result>', metadata: {} },
+    )
+
+    await hooks["tool.execute.after"]?.(
+      {
+        sessionID: "s1",
+        tool: "smartx_save_analysis",
+        callID: "c11",
+        args: { workspacePath: "f:/repo", worktreePath: "f:/repo" },
+      },
+      { title: "", output: "{}", metadata: {} },
+    )
+
+    await hooks["tool.execute.after"]?.(
+      {
+        sessionID: "s1",
+        tool: "task",
+        callID: "c12",
+        args: { subagent_type: "strategy-flowchart-generator" },
+      },
+      { title: "", output: "<task_result>flowchart TD\nA-->B</task_result>", metadata: {} },
+    )
+
+    await hooks["tool.execute.after"]?.(
+      {
+        sessionID: "s1",
+        tool: "smartx_save_flowchart",
+        callID: "c13",
+        args: { workspacePath: "f:/repo", worktreePath: "f:/repo" },
+      },
+      { title: "", output: "{}", metadata: {} },
+    )
+
+    expect(pending.has(id)).toBe(false)
+    expect(rows.some((item) => item.message === "workspace final requested")).toBe(true)
+  })
+
+  test("injects an automatic close reminder before a dirty workspace naturally wraps up", async () => {
+    const rows: Row[] = []
+    const id = key("f:/repo", "f:/repo")
+    const workspaces = new Map<string, Analysis>([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]])
+    const charts = new Map<string, Chart>([
+      [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", code: "flowchart TD", err: "", updated: Date.now() }],
+    ])
+    const hooks = build(ctx("f:/repo", rows), {
+      workspaces,
+      charts,
+    })
+
+    await hooks["tool.execute.after"]?.(
+      {
+        sessionID: "s1",
+        tool: "write",
+        callID: "c1",
+        args: { filePath: "f:/repo/a.ts", content: "changed" },
+      },
+      { title: "", output: "Wrote file successfully.", metadata: {} },
+    )
+
+    const out = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, out)
+
+    expect(out.system.join("\n")).toContain("如果你这一轮准备直接结束工作、给出收尾回复或最终总结")
+    expect(workspaces.get(id)?.state).toBe("done")
+    expect(charts.get(id)?.state).toBe("done")
+    expect(rows.some((item) => item.message === "workspace close reminder injected")).toBe(true)
+  })
+
+  test("keeps pairing reminders ahead of automatic close reminders", async () => {
+    const id = key("f:/repo", "f:/repo")
+    const mem = new Map([["s1", { ...fresh("s1"), logs: 1 }]])
+    const workspaces = new Map<string, Analysis>([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]])
+    const charts = new Map<string, Chart>([
+      [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", code: "flowchart TD", err: "", updated: Date.now() }],
+    ])
+    const hooks = build(ctx("f:/repo"), {
+      mem,
+      workspaces,
+      charts,
+    })
+
+    await hooks["tool.execute.after"]?.(
+      {
+        sessionID: "s1",
+        tool: "write",
+        callID: "c1",
+        args: { filePath: "f:/repo/a.ts", content: "changed" },
+      },
+      { title: "", output: "Wrote file successfully.", metadata: {} },
+    )
+
+    const out = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, out)
+
+    expect(out.system.join("\n")).toContain("smartx_logs")
+    expect(out.system.join("\n")).not.toContain("如果你这一轮准备直接结束工作、给出收尾回复或最终总结")
   })
 
   test("fixes saved review when any item is not passed", async () => {

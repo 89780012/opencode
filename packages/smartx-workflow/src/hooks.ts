@@ -1,6 +1,6 @@
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 import { createPairing } from "./pairing.js"
-import { key, wantsReview, type Analysis, type Chart, type Flow } from "./state.js"
+import { key, wantsFinal, wantsReview, type Analysis, type Chart, type Dirt, type Flow, type Mode } from "./state.js"
 import { createWorkspace, loadChartRemote, loadRemote, saveReviewRemote, type Fix, type Pending, type SaveReview } from "./workspace.js"
 
 type Dep = {
@@ -8,9 +8,12 @@ type Dep = {
   workspaces?: Map<string, Analysis>
   charts?: Map<string, Chart>
   pending?: Map<string, Pending>
+  dirts?: Map<string, Dirt>
+  modes?: Map<string, Mode>
   fixes?: Map<string, Fix>
   reviewRequests?: Set<string>
-  debugs?: Set<string>
+  finalRequests?: Set<string>
+  subs?: Set<string>
   service?: string
   load?: (workspace: string, worktree: string) => Promise<Analysis | undefined>
   loadChart?: (workspace: string, worktree: string) => Promise<Chart | undefined>
@@ -22,9 +25,12 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
   const workspaces = dep.workspaces ?? new Map<string, Analysis>()
   const charts = dep.charts ?? new Map<string, Chart>()
   const pending = dep.pending ?? new Map<string, Pending>()
+  const dirts = dep.dirts ?? new Map<string, Dirt>()
+  const modes = dep.modes ?? new Map<string, Mode>()
   const fixes = dep.fixes ?? new Map<string, Fix>()
   const reviewRequests = dep.reviewRequests ?? new Set<string>()
-  const debugs = dep.debugs ?? new Set<string>()
+  const finalRequests = dep.finalRequests ?? new Set<string>()
+  const subs = dep.subs ?? new Set<string>()
   const workspace = ctx.directory
   const worktree = ctx.worktree || ctx.directory
   const id = workspace ? key(workspace, worktree) : ""
@@ -45,14 +51,22 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
     workspaces,
     charts,
     pending,
+    dirts,
+    modes,
     fixes,
     reviewRequests,
-    debugs,
+    finalRequests,
+    subs,
     workspace,
     worktree,
     id,
     load: dep.load ?? ((workspace, worktree) => loadRemote(service, workspace, worktree)),
     loadChart: dep.loadChart ?? ((workspace, worktree) => loadChartRemote(service, workspace, worktree)),
+    hold: (session) => {
+      const flow = mem.get(session)
+      if (!flow) return false
+      return flow.logs > 0 || flow.debug > 0
+    },
     saveReview: dep.saveReview ?? ((input) => saveReviewRemote(service, input)),
     write,
   })
@@ -64,15 +78,30 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
   })
 
   return {
+    event: async (input) => {
+      if (input.event.type === "session.created") {
+        const info = input.event.properties?.info
+        if (!info?.parentID || !info.id) return
+        subs.add(info.id)
+      }
+    },
     "chat.message": async (input, output) => {
       if (!id || !input.sessionID) return
       const text = output.parts
         .filter((part): part is typeof part & { type: "text"; text: string } => part.type === "text" && typeof part.text === "string")
         .map((part) => part.text)
         .join("\n")
-      if (!wantsReview(text)) return
-      reviewRequests.add(id + "\x00" + input.sessionID)
-      await write("workspace review requested", {
+      if (wantsReview(text)) {
+        reviewRequests.add(id + "\x00" + input.sessionID)
+        await write("workspace review requested", {
+          sessionID: input.sessionID,
+          workspace,
+          worktree,
+        })
+      }
+      if (!wantsFinal(text)) return
+      finalRequests.add(id + "\x00" + input.sessionID)
+      await write("workspace final requested", {
         sessionID: input.sessionID,
         workspace,
         worktree,
