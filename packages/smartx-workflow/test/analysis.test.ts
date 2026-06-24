@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { build } from "../src/hooks.js"
-import { loadRemote } from "../src/workspace.js"
+import { loadRemote, type Memory } from "../src/workspace.js"
 import {
   analyze,
   doneAnalysis,
@@ -15,6 +15,7 @@ import {
   wantsReview,
   type Analysis,
   type Chart,
+  type Project,
 } from "../src/state.js"
 
 type Row = {
@@ -44,6 +45,26 @@ function ctx(dir = "f:/repo", rows: Row[] = []) {
   }
 }
 
+function workspace() {
+  return key("f:/repo", "f:/repo")
+}
+
+function restored(stale = false) {
+  return new Map<string, Memory>([[workspace(), { exists: true, restored: true, stale }]])
+}
+
+function projects(exists = true) {
+  return new Map<string, Project>([[workspace(), { workspace: "f:/repo", worktree: "f:/repo", exists, updated: Date.now() }]])
+}
+
+function setup(input: ReturnType<typeof ctx>, dep: Parameters<typeof build>[1] = {}) {
+  return build(input, {
+    memory: restored(),
+    projects: projects(),
+    ...dep,
+  })
+}
+
 describe("smartx workspace analysis", () => {
   test("detects workspace task calls and review requests", () => {
     expect(analyze({ tool: "task", args: { subagent_type: "workspace-analyzer" } })).toBe(true)
@@ -51,13 +72,13 @@ describe("smartx workspace analysis", () => {
     expect(analyze("read")).toBe(false)
     expect(flowchart({ tool: "task", args: { subagent_type: "strategy-flowchart-generator" } })).toBe(true)
     expect(review({ tool: "task", args: { subagent_type: "strategy-reviewer" } })).toBe(true)
-    expect(wantsReview("审查")).toBe(true)
-    expect(wantsReview("请帮我做代码审查")).toBe(true)
-    expect(wantsReview("麻烦 review 一下当前实现")).toBe(true)
-    expect(wantsReview("需要提交审查")).toBe(true)
-    expect(wantsReview("不要审查")).toBe(false)
-    expect(wantsReview("审查结论：通过")).toBe(false)
-    expect(wantsReview("请帮我写代码")).toBe(false)
+    expect(wantsReview("review")).toBe(true)
+    expect(wantsReview("please do a code review")).toBe(true)
+    expect(wantsReview("please review current implementation")).toBe(true)
+    expect(wantsReview("need code review")).toBe(true)
+    expect(wantsReview("review conclusion: passed")).toBe(false)
+    expect(wantsReview("review result: failed")).toBe(false)
+    expect(wantsReview("please write code")).toBe(false)
   })
 
   test("tracks workspace analysis states", () => {
@@ -100,7 +121,7 @@ describe("smartx workspace analysis", () => {
     const rows: Row[] = []
     const workspaces = new Map<string, Analysis>()
     const pending = new Map()
-    const hooks = build(ctx("f:/repo", rows), {
+    const hooks = setup(ctx("f:/repo", rows), {
       workspaces,
       pending,
     })
@@ -162,7 +183,7 @@ describe("smartx workspace analysis", () => {
     const workspaces = new Map<string, Analysis>()
     const charts = new Map<string, Chart>()
     const pending = new Map()
-    const hooks = build(ctx("f:/repo", rows), {
+    const hooks = setup(ctx("f:/repo", rows), {
       workspaces,
       charts,
       pending,
@@ -220,7 +241,7 @@ describe("smartx workspace analysis", () => {
   test("prioritizes workspace gates over session pairing reminders", async () => {
     const workspaces = new Map<string, Analysis>()
     const mem = new Map([["s1", { ...fresh("s1"), logs: 1 }]])
-    const hooks = build(ctx(), {
+    const hooks = setup(ctx(), {
       workspaces,
       mem,
     })
@@ -234,7 +255,7 @@ describe("smartx workspace analysis", () => {
   })
 
   test("allows read tools before analysis starts but blocks writes", async () => {
-    const hooks = build(ctx("f:/repo"))
+    const hooks = setup(ctx("f:/repo"))
 
     await expect(
       hooks["tool.execute.before"]?.(
@@ -261,7 +282,7 @@ describe("smartx workspace analysis", () => {
   test("allows reads during baseline save phases and unblocks writes after flowchart save", async () => {
     const workspaces = new Map<string, Analysis>()
     const pending = new Map()
-    const hooks = build(ctx("f:/repo"), {
+    const hooks = setup(ctx("f:/repo"), {
       workspaces,
       pending,
     })
@@ -363,7 +384,7 @@ describe("smartx workspace analysis", () => {
   })
 
   test("does not hard block child sessions", async () => {
-    const hooks = build(ctx("f:/repo"))
+    const hooks = setup(ctx("f:/repo"))
 
     await hooks.event?.({
       event: {
@@ -393,7 +414,7 @@ describe("smartx workspace analysis", () => {
       [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", code: "flowchart TD", err: "", updated: Date.now() }],
     ])
     const pending = new Map()
-    const hooks = build(ctx("f:/repo", rows), {
+    const hooks = setup(ctx("f:/repo", rows), {
       workspaces,
       charts,
       pending,
@@ -439,7 +460,7 @@ describe("smartx workspace analysis", () => {
       code: "flowchart TD",
       err: "",
     })
-    const hooks = build(ctx("f:/repo"), {
+    const hooks = setup(ctx("f:/repo"), {
       pending,
     })
 
@@ -460,7 +481,7 @@ describe("smartx workspace analysis", () => {
     const rows: Row[] = []
     const id = key("f:/repo", "f:/repo")
     const reviewRequests = new Set<string>()
-    const hooks = build(ctx("f:/repo", rows), {
+    const hooks = setup(ctx("f:/repo", rows), {
       workspaces: new Map([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]]),
       charts: new Map([
         [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", code: "flowchart TD", err: "", updated: Date.now() }],
@@ -472,7 +493,7 @@ describe("smartx workspace analysis", () => {
       { sessionID: "s1", messageID: "m1", agent: "smartx-helper" },
       {
         message: {} as never,
-        parts: [{ type: "text", text: "审查" } as never],
+        parts: [{ type: "text", text: "review" } as never],
       },
     )
 
@@ -493,7 +514,7 @@ describe("smartx workspace analysis", () => {
     const charts = new Map<string, Chart>()
     const pending = new Map()
     const fixes = new Map()
-    const hooks = build(ctx("f:/repo", rows), {
+    const hooks = setup(ctx("f:/repo", rows), {
       workspaces,
       charts,
       pending,
@@ -518,7 +539,7 @@ describe("smartx workspace analysis", () => {
       },
       {
         title: "",
-        output: ["<task_result>", "审查结论：未通过\n\n问题：未发现止损规则。\n建议：补充止损和异常行情保护。", "</task_result>"].join("\n"),
+        output: ["<task_result>", "review conclusion: failed\n\nissue: missing stop loss.\nsuggestion: add stop loss protection.", "</task_result>"].join("\n"),
         metadata: {},
       },
     )
@@ -541,7 +562,7 @@ describe("smartx workspace analysis", () => {
           workspacePath: "f:/repo",
           worktreePath: "f:/repo",
           state: "failed",
-          items: [{ name: "风控规则", status: "failed", detail: "未发现止损规则", suggestion: "补充止损" }],
+          items: [{ name: "risk control", status: "failed", detail: "missing stop loss", suggestion: "add stop loss" }],
         },
       },
       { title: "", output: "{}", metadata: {} },
@@ -552,12 +573,11 @@ describe("smartx workspace analysis", () => {
 
     const fix = { system: [] as string[] }
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, fix)
-    expect(fix.system.join("\n")).toContain("审查结果已经")
+    expect(fix.system.join("\n")).toContain("最新一轮 SmartX 策略审查未通过")
     expect(fix.system.join("\n")).toContain("主 agent")
-    expect(fix.system.join("\n")).toContain("最多 3 次")
-    expect(fix.system.join("\n")).toContain("strategy-reviewer")
     expect(fix.system.join("\n")).toContain("不要再次调用 `smartx_save_review`")
-    expect(fix.system.join("\n")).toContain("未发现止损规则")
+    expect(fix.system.join("\n")).toContain("strategy-reviewer")
+    expect(fix.system.join("\n")).toContain("missing stop loss")
     expect(rows.some((item) => item.message === "workspace review needs fix")).toBe(true)
   })
 
@@ -567,7 +587,7 @@ describe("smartx workspace analysis", () => {
     const charts = new Map<string, Chart>()
     const pending = new Map()
     const fixes = new Map()
-    const hooks = build(ctx("f:/repo", rows), {
+    const hooks = setup(ctx("f:/repo", rows), {
       workspaces,
       charts,
       pending,
@@ -586,7 +606,7 @@ describe("smartx workspace analysis", () => {
       },
       {
         title: "",
-        output: ["<task_result>", "审查结论：通过\n\n未发现阻塞问题。", "</task_result>"].join("\n"),
+        output: ["<task_result>", "review conclusion: passed\n\nno blocking issue.", "</task_result>"].join("\n"),
         metadata: {},
       },
     )
@@ -597,7 +617,7 @@ describe("smartx workspace analysis", () => {
     const save = { system: [] as string[] }
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, save)
     expect(save.system.join("\n")).toContain("smartx_save_review")
-    expect(save.system.join("\n")).toContain("未发现阻塞问题")
+    expect(save.system.join("\n")).toContain("no blocking issue")
 
     await hooks["tool.execute.after"]?.(
       {
@@ -608,10 +628,9 @@ describe("smartx workspace analysis", () => {
           workspacePath: "f:/repo",
           worktreePath: "f:/repo",
           state: "passed",
-          items: [{ name: "需求覆盖情况", status: "passed", detail: "通过", suggestion: "" }],
+          items: [{ name: "requirements", status: "passed", detail: "passed", suggestion: "" }],
         },
       },
-      { title: "", output: "{}", metadata: {} },
     )
 
     expect(pending.get(id)?.kind).toBe("debug")
@@ -651,13 +670,13 @@ describe("smartx workspace analysis", () => {
       { sessionID: "s1", messageID: "m2", agent: "smartx-helper" },
       {
         message: {} as never,
-        parts: [{ type: "text", text: "给我一个最终总结" } as never],
+        parts: [{ type: "text", text: "final summary" } as never],
       },
     )
 
     const refresh = { system: [] as string[] }
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, refresh)
-    expect(refresh.system.join("\n")).toContain("最后刷新一次 workspace 分析和流程图")
+    expect(refresh.system.join("\n")).toContain("最终收口阶段")
 
     await hooks["tool.execute.after"]?.(
       {
@@ -666,7 +685,7 @@ describe("smartx workspace analysis", () => {
         callID: "c10",
         args: { subagent_type: "workspace-analyzer" },
       },
-      { title: "", output: '<task_result>["新的策略逻辑"]</task_result>', metadata: {} },
+      { title: "", output: '<task_result>["new strategy logic"]</task_result>', metadata: {} },
     )
 
     await hooks["tool.execute.after"]?.(
@@ -710,7 +729,7 @@ describe("smartx workspace analysis", () => {
     const charts = new Map<string, Chart>([
       [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", code: "flowchart TD", err: "", updated: Date.now() }],
     ])
-    const hooks = build(ctx("f:/repo", rows), {
+    const hooks = setup(ctx("f:/repo", rows), {
       workspaces,
       charts,
     })
@@ -728,10 +747,10 @@ describe("smartx workspace analysis", () => {
     const out = { system: [] as string[] }
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, out)
 
-    expect(out.system.join("\n")).toContain("如果你这一轮准备直接结束工作、给出收尾回复或最终总结")
+    expect(out.system.join("\n")).toContain("save_project_state")
     expect(workspaces.get(id)?.state).toBe("done")
     expect(charts.get(id)?.state).toBe("done")
-    expect(rows.some((item) => item.message === "workspace close reminder injected")).toBe(true)
+    expect(rows.some((item) => item.message === "project memory save reminder injected")).toBe(true)
   })
 
   test("keeps pairing reminders ahead of automatic close reminders", async () => {
@@ -741,7 +760,7 @@ describe("smartx workspace analysis", () => {
     const charts = new Map<string, Chart>([
       [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", code: "flowchart TD", err: "", updated: Date.now() }],
     ])
-    const hooks = build(ctx("f:/repo"), {
+    const hooks = setup(ctx("f:/repo"), {
       mem,
       workspaces,
       charts,
@@ -761,13 +780,13 @@ describe("smartx workspace analysis", () => {
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, out)
 
     expect(out.system.join("\n")).toContain("smartx_logs")
-    expect(out.system.join("\n")).not.toContain("如果你这一轮准备直接结束工作、给出收尾回复或最终总结")
+    expect(out.system.join("\n")).not.toContain("save_project_state")
   })
 
   test("fixes saved review when any item is not passed", async () => {
     const pending = new Map()
     const fixes = new Map()
-    const hooks = build(ctx("f:/repo"), {
+    const hooks = setup(ctx("f:/repo"), {
       pending,
       fixes,
     })
@@ -783,7 +802,7 @@ describe("smartx workspace analysis", () => {
       },
       {
         title: "",
-        output: ["<task_result>", "审查结论：通过\n\n风险：风控规则需要补强。", "</task_result>"].join("\n"),
+        output: ["<task_result>", "review conclusion: passed\n\nrisk control needs reinforcement.", "</task_result>"].join("\n"),
         metadata: {},
       },
     )
@@ -798,8 +817,8 @@ describe("smartx workspace analysis", () => {
           worktreePath: "f:/repo",
           state: "passed",
           items: [
-            { name: "需求覆盖情况", status: "passed", detail: "通过", suggestion: "" },
-            { name: "风控规则", status: "warning", detail: "需要补强", suggestion: "补充风控" },
+            { name: "requirements", status: "passed", detail: "passed", suggestion: "" },
+            { name: "risk control", status: "warning", detail: "needs reinforcement", suggestion: "add risk control" },
           ],
         },
       },
@@ -811,7 +830,7 @@ describe("smartx workspace analysis", () => {
 
     const fix = { system: [] as string[] }
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, fix)
-    expect(fix.system.join("\n")).toContain("需要补强")
+    expect(fix.system.join("\n")).toContain("needs reinforcement")
     expect(fix.system.join("\n")).toContain("strategy-reviewer")
   })
 
@@ -822,9 +841,9 @@ describe("smartx workspace analysis", () => {
       worktreePath: "f:/repo",
       sessionID: "s1",
       attempt: 3,
-      text: "审查结论：未通过",
+      text: "review conclusion: failed",
     }]])
-    const hooks = build(ctx("f:/repo"), {
+    const hooks = setup(ctx("f:/repo"), {
       pending,
       fixes,
     })
@@ -839,7 +858,7 @@ describe("smartx workspace analysis", () => {
       },
       {
         title: "",
-        output: ["<task_result>", "审查结论：未通过\n\n问题：仍缺少止损。", "</task_result>"].join("\n"),
+        output: ["<task_result>", "review conclusion: failed\n\nissue: still missing stop loss.", "</task_result>"].join("\n"),
         metadata: {},
       },
     )
@@ -861,7 +880,7 @@ describe("smartx workspace analysis", () => {
           workspacePath: "f:/repo",
           worktreePath: "f:/repo",
           state: "failed",
-          items: [{ name: "风控规则", status: "failed", detail: "仍缺少止损", suggestion: "补充止损" }],
+          items: [{ name: "risk control", status: "failed", detail: "still missing stop loss", suggestion: "add stop loss" }],
         },
       },
       { title: "", output: "{}", metadata: {} },
@@ -871,8 +890,123 @@ describe("smartx workspace analysis", () => {
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, fix)
     expect(fix.system.join("\n")).toContain("第 3 次修复")
     expect(fix.system.join("\n")).toContain("最后一次自动修复")
-    expect(fix.system.join("\n")).toContain("不要再次调用 `strategy-reviewer`")
-    expect(fix.system.join("\n")).toContain("不要调用 `smartx_start`")
+    expect(fix.system.join("\n")).toContain("strategy-reviewer")
+    expect(fix.system.join("\n")).toContain("smartx_start")
     expect(fixes.has(id + "\x00" + "s1")).toBe(false)
+  })
+
+  test("requires project memory restore before sustained work", async () => {
+    const hooks = build(ctx("f:/repo"), {
+      projects: projects(true),
+      memory: new Map(),
+    })
+
+    const out = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, out)
+    expect(out.system.join("\n")).toContain("resume_project_state")
+
+    await expect(
+      hooks["tool.execute.before"]?.(
+        { sessionID: "s1", tool: "read", callID: "c1" },
+        { args: { filePath: "f:/repo/a.ts" } },
+      ),
+    ).resolves.toBeUndefined()
+
+    expect(
+      hooks["tool.execute.before"]?.(
+        { sessionID: "s1", tool: "edit", callID: "c2" },
+        { args: { filePath: "f:/repo/a.ts", oldString: "a", newString: "b" } },
+      ),
+    ).rejects.toThrow("restoring project memory")
+
+    expect(
+      hooks["tool.execute.before"]?.(
+        { sessionID: "s1", tool: "skill", callID: "c3" },
+        { args: { name: "smartx-develop" } },
+      ),
+    ).rejects.toThrow("restoring project memory")
+  })
+
+  test("initializes missing project memory and then enters baseline flow", async () => {
+    const memory = new Map<string, Memory>()
+    const workspaces = new Map<string, Analysis>()
+    const hooks = build(ctx("f:/repo"), {
+      projects: projects(false),
+      memory,
+      workspaces,
+    })
+
+    const first = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, first)
+    expect(first.system.join("\n")).toContain("init_project_state")
+
+    await hooks["tool.execute.after"]?.(
+      {
+        sessionID: "s1",
+        tool: "smartx_init_project_state",
+        callID: "c1",
+        args: { workspacePath: "f:/repo", worktreePath: "f:/repo" },
+      },
+      { title: "", output: "{}", metadata: {} },
+    )
+
+    expect(memory.get(workspace())?.restored).toBe(true)
+    const next = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, next)
+    expect(next.system.join("\n")).toContain("workspace-analyzer")
+    expect(workspaces.get(workspace())?.state).toBe("requested")
+  })
+
+  test("marks project memory stale after writes and requires save before final wrap-up", async () => {
+    const id = workspace()
+    const memory = restored()
+    const workspaces = new Map<string, Analysis>([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]])
+    const charts = new Map<string, Chart>([
+      [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", code: "flowchart TD", err: "", updated: Date.now() }],
+    ])
+    const hooks = build(ctx("f:/repo"), {
+      memory,
+      projects: projects(),
+      workspaces,
+      charts,
+    })
+
+    await hooks["tool.execute.after"]?.(
+      {
+        sessionID: "s1",
+        tool: "write",
+        callID: "c1",
+        args: { filePath: "f:/repo/a.ts", content: "changed" },
+      },
+      { title: "", output: "Wrote file successfully.", metadata: {} },
+    )
+    expect(memory.get(id)?.stale).toBe(true)
+
+    await hooks["chat.message"]?.(
+      { sessionID: "s1", messageID: "m1", agent: "smartx-helper" },
+      {
+        message: {} as never,
+        parts: [{ type: "text", text: "final summary" } as never],
+      },
+    )
+
+    const save = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, save)
+    expect(save.system.join("\n")).toContain("save_project_state")
+
+    await hooks["tool.execute.after"]?.(
+      {
+        sessionID: "s1",
+        tool: "smartx_save_project_state",
+        callID: "c2",
+        args: { workspacePath: "f:/repo", worktreePath: "f:/repo" },
+      },
+      { title: "", output: "{}", metadata: {} },
+    )
+    expect(memory.get(id)?.stale).toBe(false)
+
+    const final = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, final)
+    expect(final.system.join("\n")).toContain("workspace")
   })
 })

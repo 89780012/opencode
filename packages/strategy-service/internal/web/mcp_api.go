@@ -58,7 +58,7 @@ func (a *API) mcpPost(c *gin.Context) {
 				"name":    "strategy-service",
 				"version": "dev",
 			},
-			"instructions": "Use start/logs for SmartX runtime work, get_requirements for workspace requirements, refresh_workspace to request fresh workspace analysis plus flowchart, and save_analysis/save_flowchart/save_review to persist workspace analysis results.",
+			"instructions": "Use start/logs for SmartX runtime work, use init_project_state/resume_project_state/save_project_state to maintain workspace memory, get_requirements for workspace requirements, refresh_workspace to request fresh workspace analysis plus flowchart, and save_analysis/save_flowchart/save_review to persist workspace analysis results.",
 		})
 	case "notifications/initialized":
 		c.Status(202)
@@ -107,6 +107,81 @@ func (a *API) mcpPost(c *gin.Context) {
 						},
 						"additionalProperties": false,
 					},
+				},
+				{
+					"name":        "init_project_state",
+					"description": "Initialize .project-state for a workspace before sustained SmartX work.",
+					"inputSchema": schema(map[string]any{
+						"workspacePath": prop("string", "Workspace path."),
+						"worktreePath":  prop("string", "Worktree path. Defaults to workspacePath."),
+						"sessionId":     prop("string", "Optional workbench session id."),
+						"project":       prop("string", "Optional project name."),
+						"phase":         prop("string", "Optional current phase."),
+						"status":        prop("string", "Optional current status."),
+						"current":       prop("string", "Optional current task summary."),
+						"summary":       prop("string", "Optional project summary."),
+						"next": map[string]any{
+							"type":        "array",
+							"description": "Optional next steps.",
+							"items":       map[string]any{"type": "string"},
+						},
+						"risks": map[string]any{
+							"type":        "array",
+							"description": "Optional risks.",
+							"items":       map[string]any{"type": "string"},
+						},
+						"verified": prop("boolean", "Whether the current state is verified."),
+						"dirty":    prop("boolean", "Whether the initialized memory should be marked dirty."),
+					}, []string{"workspacePath"}),
+				},
+				{
+					"name":        "resume_project_state",
+					"description": "Restore current project memory from .project-state.",
+					"inputSchema": schema(map[string]any{
+						"workspacePath": prop("string", "Workspace path."),
+						"worktreePath":  prop("string", "Worktree path. Defaults to workspacePath."),
+					}, []string{"workspacePath"}),
+				},
+				{
+					"name":        "get_project_state",
+					"description": "Read current project memory from .project-state without mutating it.",
+					"inputSchema": schema(map[string]any{
+						"workspacePath": prop("string", "Workspace path."),
+						"worktreePath":  prop("string", "Worktree path. Defaults to workspacePath."),
+					}, []string{"workspacePath"}),
+				},
+				{
+					"name":        "save_project_state",
+					"description": "Persist the latest project progress and handoff state to .project-state.",
+					"inputSchema": schema(map[string]any{
+						"workspacePath": prop("string", "Workspace path."),
+						"worktreePath":  prop("string", "Worktree path. Defaults to workspacePath."),
+						"sessionId":     prop("string", "Optional workbench session id."),
+						"phase":         prop("string", "Current phase."),
+						"status":        prop("string", "Current status."),
+						"current":       prop("string", "Current task summary."),
+						"summary":       prop("string", "Current progress summary."),
+						"next": map[string]any{
+							"type":        "array",
+							"description": "Next steps.",
+							"items":       map[string]any{"type": "string"},
+						},
+						"risks": map[string]any{
+							"type":        "array",
+							"description": "Current risks.",
+							"items":       map[string]any{"type": "string"},
+						},
+						"verified": prop("boolean", "Whether the current state is verified."),
+						"dirty":    prop("boolean", "Whether memory remains dirty after save."),
+					}, []string{"workspacePath"}),
+				},
+				{
+					"name":        "validate_project_state",
+					"description": "Validate .project-state structure and repair missing template files when possible.",
+					"inputSchema": schema(map[string]any{
+						"workspacePath": prop("string", "Workspace path."),
+						"worktreePath":  prop("string", "Worktree path. Defaults to workspacePath."),
+					}, []string{"workspacePath"}),
 				},
 				{
 					"name":        "save_analysis",
@@ -250,6 +325,60 @@ func (a *API) mcpPost(c *gin.Context) {
 				"logs":    out.Logs,
 			}
 			mcpToolResult(c, req.ID, jsonText(body), body, false)
+		case "init_project_state":
+			mcpWorkbench(c.Request.Context(), req.ID, c, func(ctx context.Context) (any, error) {
+				return a.bench.InitProjectState(ctx, workbench.ProjectStateInitReq{
+					WorkspacePath: text(args["workspacePath"]),
+					WorktreePath:  text(args["worktreePath"]),
+					SessionID:     text(args["sessionId"]),
+					Project:       text(args["project"]),
+					Phase:         text(args["phase"]),
+					Status:        text(args["status"]),
+					Current:       text(args["current"]),
+					Summary:       text(args["summary"]),
+					Next:          texts(args["next"]),
+					Risks:         texts(args["risks"]),
+					Verified:      boolptr(args["verified"]),
+					Dirty:         boolptr(args["dirty"]),
+				})
+			})
+		case "resume_project_state":
+			mcpWorkbench(c.Request.Context(), req.ID, c, func(ctx context.Context) (any, error) {
+				return a.bench.ResumeProjectState(ctx, workbench.ProjectStateGet{
+					WorkspacePath: text(args["workspacePath"]),
+					WorktreePath:  text(args["worktreePath"]),
+				})
+			})
+		case "get_project_state":
+			mcpWorkbench(c.Request.Context(), req.ID, c, func(ctx context.Context) (any, error) {
+				return a.bench.GetProjectState(ctx, workbench.ProjectStateGet{
+					WorkspacePath: text(args["workspacePath"]),
+					WorktreePath:  text(args["worktreePath"]),
+				})
+			})
+		case "save_project_state":
+			mcpWorkbench(c.Request.Context(), req.ID, c, func(ctx context.Context) (any, error) {
+				return a.bench.SaveProjectState(ctx, workbench.ProjectStateSaveReq{
+					WorkspacePath: text(args["workspacePath"]),
+					WorktreePath:  text(args["worktreePath"]),
+					SessionID:     text(args["sessionId"]),
+					Phase:         text(args["phase"]),
+					Status:        text(args["status"]),
+					Current:       text(args["current"]),
+					Summary:       text(args["summary"]),
+					Next:          texts(args["next"]),
+					Risks:         texts(args["risks"]),
+					Verified:      boolptr(args["verified"]),
+					Dirty:         boolptr(args["dirty"]),
+				})
+			})
+		case "validate_project_state":
+			mcpWorkbench(c.Request.Context(), req.ID, c, func(ctx context.Context) (any, error) {
+				return a.bench.ValidateProjectState(ctx, workbench.ProjectStateGet{
+					WorkspacePath: text(args["workspacePath"]),
+					WorktreePath:  text(args["worktreePath"]),
+				})
+			})
 		case "save_analysis":
 			mcpWorkbench(c.Request.Context(), req.ID, c, func(ctx context.Context) (any, error) {
 				data, err := a.bench.SaveAnalysis(ctx, workbench.AnalysisReq{
@@ -467,6 +596,22 @@ func boolean(v any) bool {
 		return strings.EqualFold(strings.TrimSpace(x), "true")
 	default:
 		return false
+	}
+}
+
+func boolptr(v any) *bool {
+	switch x := v.(type) {
+	case bool:
+		return &x
+	case string:
+		text := strings.TrimSpace(x)
+		if text == "" {
+			return nil
+		}
+		next := strings.EqualFold(text, "true")
+		return &next
+	default:
+		return nil
 	}
 }
 

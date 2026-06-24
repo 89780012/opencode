@@ -1,14 +1,17 @@
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 import { createPairing } from "./pairing.js"
 import { key, wantsFinal, wantsReview, type Analysis, type Chart, type Dirt, type Flow, type Mode } from "./state.js"
-import { createWorkspace, loadChartRemote, loadRemote, saveReviewRemote, type Fix, type Pending, type SaveReview } from "./workspace.js"
+import { createWorkspace, loadChartRemote, loadProjectRemote, loadRemote, saveReviewRemote, type Fix, type Memory, type Pending, type SaveReview } from "./workspace.js"
+import type { Project } from "./state.js"
 
 type Dep = {
   mem?: Map<string, Flow>
   workspaces?: Map<string, Analysis>
   charts?: Map<string, Chart>
+  projects?: Map<string, Project>
   pending?: Map<string, Pending>
   dirts?: Map<string, Dirt>
+  memory?: Map<string, Memory>
   modes?: Map<string, Mode>
   fixes?: Map<string, Fix>
   reviewRequests?: Set<string>
@@ -17,6 +20,7 @@ type Dep = {
   service?: string
   load?: (workspace: string, worktree: string) => Promise<Analysis | undefined>
   loadChart?: (workspace: string, worktree: string) => Promise<Chart | undefined>
+  loadProject?: (workspace: string, worktree: string) => Promise<Project | undefined>
   saveReview?: (input: SaveReview) => Promise<void>
 }
 
@@ -24,8 +28,10 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
   const mem = dep.mem ?? new Map<string, Flow>()
   const workspaces = dep.workspaces ?? new Map<string, Analysis>()
   const charts = dep.charts ?? new Map<string, Chart>()
+  const projects = dep.projects ?? new Map<string, Project>()
   const pending = dep.pending ?? new Map<string, Pending>()
   const dirts = dep.dirts ?? new Map<string, Dirt>()
+  const memory = dep.memory ?? new Map<string, Memory>()
   const modes = dep.modes ?? new Map<string, Mode>()
   const fixes = dep.fixes ?? new Map<string, Fix>()
   const reviewRequests = dep.reviewRequests ?? new Set<string>()
@@ -50,8 +56,10 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
   const workspaceFlow = createWorkspace({
     workspaces,
     charts,
+    projects,
     pending,
     dirts,
+    memory,
     modes,
     fixes,
     reviewRequests,
@@ -62,6 +70,7 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
     id,
     load: dep.load ?? ((workspace, worktree) => loadRemote(service, workspace, worktree)),
     loadChart: dep.loadChart ?? ((workspace, worktree) => loadChartRemote(service, workspace, worktree)),
+    loadProject: dep.loadProject ?? ((workspace, worktree) => loadProjectRemote(service, workspace, worktree)),
     hold: (session) => {
       const flow = mem.get(session)
       if (!flow) return false

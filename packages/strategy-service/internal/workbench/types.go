@@ -179,3 +179,67 @@ type ReviewRow struct {
 	Suggestions   []string     `json:"suggestions"`
 	UpdatedAt     int64        `json:"updatedAt"`
 }
+
+type ProjectTask struct {
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	Description  string   `json:"description"`
+	Status       string   `json:"status"`
+	Priority     string   `json:"priority"`
+	Dependencies []string `json:"dependencies"`
+	Notes        string   `json:"notes,omitempty"`
+}
+
+type ProjectStateGet struct {
+	WorkspacePath string `form:"workspacePath" json:"workspacePath"`
+	WorktreePath  string `form:"worktreePath" json:"worktreePath"`
+}
+
+type ProjectStateInitReq struct {
+	WorkspacePath string        `json:"workspacePath"`
+	WorktreePath  string        `json:"worktreePath"`
+	SessionID     string        `json:"sessionId,omitempty"`
+	Project       string        `json:"project,omitempty"`
+	Phase         string        `json:"phase,omitempty"`
+	Status        string        `json:"status,omitempty"`
+	Current       string        `json:"current,omitempty"`
+	Summary       string        `json:"summary,omitempty"`
+	Next          []string      `json:"next,omitempty"`
+	Risks         []string      `json:"risks,omitempty"`
+	Verified      *bool         `json:"verified,omitempty"`
+	Dirty         *bool         `json:"dirty,omitempty"`
+	Features      []ProjectTask `json:"features,omitempty"`
+}
+
+type ProjectStateSaveReq struct {
+	WorkspacePath string        `json:"workspacePath"`
+	WorktreePath  string        `json:"worktreePath"`
+	SessionID     string        `json:"sessionId,omitempty"`
+	Phase         string        `json:"phase,omitempty"`
+	Status        string        `json:"status,omitempty"`
+	Current       string        `json:"current,omitempty"`
+	Summary       string        `json:"summary,omitempty"`
+	Next          []string      `json:"next,omitempty"`
+	Risks         []string      `json:"risks,omitempty"`
+	Verified      *bool         `json:"verified,omitempty"`
+	Dirty         *bool         `json:"dirty,omitempty"`
+	Features      []ProjectTask `json:"features,omitempty"`
+}
+
+type ProjectStateRow struct {
+	WorkspacePath string        `json:"workspacePath"`
+	WorktreePath  string        `json:"worktreePath"`
+	Exists        bool          `json:"exists"`
+	Project       string        `json:"project"`
+	Phase         string        `json:"phase"`
+	Status        string        `json:"status"`
+	Current       string        `json:"current"`
+	Summary       string        `json:"summary"`
+	Next          []string      `json:"next"`
+	Risks         []string      `json:"risks"`
+	Verified      bool          `json:"verified"`
+	Dirty         bool          `json:"dirty"`
+	SessionID     string        `json:"sessionId,omitempty"`
+	Features      []ProjectTask `json:"features"`
+	UpdatedAt     int64         `json:"updatedAt"`
+}

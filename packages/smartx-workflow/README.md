@@ -1,90 +1,126 @@
 # `@opencode-ai/smartx-workflow`
 
-`smartx-workflow` 是一个给 SmartX 策略开发流程加顺序约束的插件。它同时维护两类约束：
+`smartx-workflow` 是给 SmartX 策略开发流程加顺序约束的插件。
+
+现在它同时维护三条约束轴：
 
 1. 会话级顺序约束
-2. 工作区级基线约束
+2. workspace baseline 约束
+3. project memory 约束
 
-## 会话级顺序约束
+## 1. 会话级顺序约束
 
-插件会继续跟踪两组已有顺序：
+插件持续跟踪两组顺序：
 
 - `smartx_start` / `smartx-start` -> `smartx_logs`
 - `skill({ name: "smartx-develop" })` -> `skill({ name: "smartx-debug" })`
 
-只要前一步已经发生、后一步还没补齐，插件就会在下一轮模型继续生成前注入系统提示，要求先完成对应 follow-up。
+只要前一步发生、后一步还没补齐，插件就会在下一轮模型生成前注入提醒。
 
-## 工作区级基线约束
+## 2. Workspace Baseline 约束
 
-工作区基线由两份产物组成：
+workspace baseline 由两份产物组成：
 
-1. `workspace-analyzer` 生成并保存的工作区分析
-2. `strategy-flowchart-generator` 生成并保存的流程图
+1. `workspace-analyzer` 生成并保存的 workspace analysis
+2. `strategy-flowchart-generator` 生成并保存的 flowchart
 
 ### 初始化阶段
 
-一个工作区在当前会话第一次被使用时，必须先完成初始化基线：
+一个工作区第一次进入持续工作前，必须先完成：
 
-1. 调用 `workspace-analyzer`
-2. 调用 `smartx_save_analysis`
-3. 调用 `strategy-flowchart-generator`
-4. 调用 `smartx_save_flowchart`
+1. `workspace-analyzer`
+2. `smartx_save_analysis`
+3. `strategy-flowchart-generator`
+4. `smartx_save_flowchart`
 
 初始化完成前：
 
-- 可以继续只读探索
-- 不允许修改代码
-- 不允许执行会改变工作区状态的命令
+- 可以读文件、搜索、列目录
+- 不允许写代码
+- 不允许执行会改变工作区状态的动作
 
-### 迭代阶段
+### dirty 阶段
 
-初始化完成后，只要主会话里发生成功的写入或执行，工作区就会被标记为 `dirty`。
+主会话里只要发生成功写入或执行，workspace 会被标成 `dirty`。
 
-`dirty` 的含义是：
+`dirty` 表示：
 
-- 已保存的分析和流程图已经过期
-- 但开发、验证、调试都可以继续
+- 已保存的 analysis / flowchart 已过期
+- 但开发、调试、验证还可以继续
 
-因此插件不会在每次调试前强制刷新分析和流程图。`dirty` 只表示“最终快照已经过期”，不表示“当前不能继续干活”。
+当进入 review 或 final wrap-up 时，workflow 会要求刷新 baseline。
 
-### Review 阶段
+## 3. Project Memory 约束
 
-代码审查仍然是独立流程：
+project memory 使用 `.project-state/` 作为工作区记忆。
 
-- 用户明确要求 review 时才进入
-- review 前如果工作区是 `dirty`，会先刷新基线
-- review 结果必须先通过 `smartx_save_review` 落盘
-- 未通过时由主 agent 自己修代码，再发起下一轮 review
+它有独立生命周期：
 
-### 最终收口阶段
+- `missing`: `.project-state/` 不存在
+- `ready`: 当前会话已经恢复或初始化项目记忆
+- `stale`: 本轮工作产生了新推进，但还没重新保存
 
-当工作区是 `dirty` 且主 agent 准备自然收尾时，插件会优先走 AI 自动收口：
+### 强制协议
 
-- 注入一条软提示，要求模型在“准备结束这一轮并输出最终总结”之前，先刷新一次最终快照
-- 最终快照顺序仍然是：分析 -> 保存分析 -> 流程图 -> 保存流程图
+持续型任务默认顺序：
 
-如果模型没有主动判定到自然收尾，用户显式说“最终总结”“收尾”“wrap up”等话术，仍然会触发显式收口兜底。
+1. `resume_project_state` 或 `init_project_state`
+2. baseline 初始化 / 刷新（需要时）
+3. `smartx-develop`
+4. `smartx-debug`
+5. `save_project_state`
+6. 最终总结
 
-最终收口完成前：
+### 恢复规则
 
-- 可以继续做只读检查
-- 不应再继续改代码
-- 不应再发起新的调试
+在 project memory 尚未恢复时：
 
-## 生命周期
+- 允许：`read` / `grep` / `list` / `codesearch` / `get_project_state` / `validate_project_state`
+- 阻止：写代码、执行命令、审查、调试、最终收口
 
-插件内部把工作区状态收敛为几个阶段：
+如果 `.project-state/` 已存在，workflow 会要求先调用：
 
-- `idle`：还没有初始化基线
-- `booting`：初始化基线进行中
-- `ready`：基线齐全且是最新状态
-- `dirty`：代码变了，但允许继续开发和调试
-- `refreshing`：为了 review 之类的动作在刷新基线
-- `finalizing`：为了最终收口在刷新最终快照
+- `resume_project_state`
 
-## 构建与验证
+如果 `.project-state/` 不存在，workflow 会要求先调用：
 
-在 `packages/smartx-workflow` 目录执行：
+- `init_project_state`
+
+### 保存规则
+
+当前会话一旦成功写入或执行并推进任务，project memory 会被标记为 `stale`。
+
+`stale` 状态下：
+
+- 允许继续开发和调试
+- 不允许直接收尾
+
+如果用户请求最终总结，或者会话自然进入收口点，workflow 会先要求：
+
+- `save_project_state`
+
+保存成功后，才允许继续最终 wrap-up。
+
+## MCP 工具
+
+project memory 相关工具：
+
+- `init_project_state`
+- `resume_project_state`
+- `get_project_state`
+- `save_project_state`
+- `validate_project_state`
+
+workspace baseline 相关工具：
+
+- `refresh_workspace`
+- `save_analysis`
+- `save_flowchart`
+- `save_review`
+
+## 验证
+
+在 `packages/smartx-workflow` 目录运行：
 
 ```bash
 bun typecheck
@@ -92,7 +128,7 @@ bun test
 bun run build
 ```
 
-产物输出到：
+产物输出：
 
 ```text
 packages/smartx-workflow/dist/smartx-workflow.js

@@ -136,3 +136,87 @@ func (a *API) workbenchReviewPut(c *gin.Context) {
 	a.event.emitBroadcast("review.updated", utils.Pack(data))
 	ok(c, data)
 }
+
+func (a *API) workbenchProjectStateGet(c *gin.Context) {
+	req := workbench.ProjectStateGet{}
+	if err := c.ShouldBindQuery(&req); err != nil {
+		bad(c, err)
+		return
+	}
+
+	data, err := a.bench.GetProjectState(c.Request.Context(), req)
+	if errors.Is(err, db.ErrNotFound) {
+		ok(c, nil)
+		return
+	}
+	if err != nil {
+		bad(c, err)
+		return
+	}
+
+	ok(c, data)
+}
+
+func (a *API) workbenchProjectStateInit(c *gin.Context) {
+	body := workbench.ProjectStateInitReq{}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		bad(c, err)
+		return
+	}
+
+	data, err := a.bench.InitProjectState(c.Request.Context(), body)
+	if err != nil {
+		bad(c, err)
+		return
+	}
+
+	ok(c, data)
+}
+
+func (a *API) workbenchProjectStateResume(c *gin.Context) {
+	body := workbench.ProjectStateGet{}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		bad(c, err)
+		return
+	}
+
+	data, err := a.bench.ResumeProjectState(c.Request.Context(), body)
+	if err != nil {
+		bad(c, err)
+		return
+	}
+
+	ok(c, data)
+}
+
+func (a *API) workbenchProjectStateSave(c *gin.Context) {
+	body := workbench.ProjectStateSaveReq{}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		bad(c, err)
+		return
+	}
+
+	data, err := a.bench.SaveProjectState(c.Request.Context(), body)
+	if err != nil {
+		bad(c, err)
+		return
+	}
+
+	ok(c, data)
+}
+
+func (a *API) workbenchProjectStateValidate(c *gin.Context) {
+	body := workbench.ProjectStateGet{}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		bad(c, err)
+		return
+	}
+
+	data, err := a.bench.ValidateProjectState(c.Request.Context(), body)
+	if err != nil {
+		bad(c, err)
+		return
+	}
+
+	ok(c, data)
+}

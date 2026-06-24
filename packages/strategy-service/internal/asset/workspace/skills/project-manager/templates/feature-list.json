@@ -1,15 +1,15 @@
 {
   "project": "请填写项目名称",
-  "created": "2026-04-20",
+  "created": "2026-06-24",
   "features": [
     {
       "id": "1",
-      "name": "请填写首个任务名称",
+      "name": "请填写当前任务",
       "description": "请填写任务说明",
-      "status": "pending",
+      "status": "in-progress",
       "priority": "high",
       "dependencies": [],
-      "notes": "请填写补充说明"
+      "notes": "补充背景或限制条件"
     }
   ]
 }

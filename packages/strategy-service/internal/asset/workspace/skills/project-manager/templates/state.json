@@ -1,0 +1,14 @@
+{
+  "phase": "implementation",
+  "status": "in-progress",
+  "current": "请填写当前任务",
+  "summary": "请填写本轮进展摘要",
+  "next": [
+    "请填写下一步"
+  ],
+  "risks": [],
+  "verified": false,
+  "dirty": false,
+  "session_id": "",
+  "updated_at": 0
+}

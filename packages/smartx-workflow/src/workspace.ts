@@ -15,8 +15,11 @@ import {
   noteChart,
   noteClose,
   noteFinal,
+  noteResumeProject,
   noteRefresh,
   noteReview,
+  noteSaveProject,
+  type Project,
   requestAnalysis,
   requestChart,
   review,
@@ -25,6 +28,7 @@ import {
   serial,
   validAnalysis,
   validChart,
+  validProject,
   type Analysis,
   type Chart,
 } from "./state.js"
@@ -56,6 +60,13 @@ export type SaveChart = {
 }
 
 type ChartRow = SaveChart & {
+  updatedAt: number
+}
+
+type ProjectRow = {
+  workspacePath: string
+  worktreePath: string
+  exists: boolean
   updatedAt: number
 }
 
@@ -113,13 +124,21 @@ export type Fix = {
   text: string
 }
 
+export type Memory = {
+  exists: boolean
+  restored: boolean
+  stale: boolean
+}
+
 const limit = 3
 
 type Opt = {
   workspaces: Map<string, Analysis>
   charts: Map<string, Chart>
+  projects: Map<string, Project>
   pending: Map<string, Pending>
   dirts: Map<string, Dirt>
+  memory: Map<string, Memory>
   modes: Map<string, Mode>
   fixes: Map<string, Fix>
   reviewRequests: Set<string>
@@ -130,18 +149,21 @@ type Opt = {
   id: string
   load: (workspace: string, worktree: string) => Promise<Analysis | undefined>
   loadChart: (workspace: string, worktree: string) => Promise<Chart | undefined>
+  loadProject: (workspace: string, worktree: string) => Promise<Project | undefined>
   hold: (session: string) => boolean
   saveReview: (input: SaveReview) => Promise<void>
   write: Log
 }
 
 type Reason = "manual" | "review" | "gate"
-type Kind = "read" | "write" | "exec" | "analyze" | "chart" | "review" | "save" | "refresh" | "debug" | "other"
+type Kind = "read" | "write" | "exec" | "analyze" | "chart" | "review" | "save" | "refresh" | "debug" | "project_init" | "project_resume" | "project_get" | "project_save" | "project_validate" | "other"
 type View = {
   analysis?: Analysis
   chart?: Chart
+  project?: Project
   wait?: Pending
   dirt: Dirt
+  mem: Memory
   mode: Mode
   life: Life
 }
@@ -152,6 +174,13 @@ function mcp(input: { tool: string }, name: string) {
 
 function start(input: { tool: string }) {
   return input.tool === "smartx_start" || input.tool === "smartx-start"
+}
+
+function skill(input: { tool: string; args?: unknown }) {
+  if (input.tool !== "skill") return ""
+  if (!input.args || typeof input.args !== "object") return ""
+  const args = input.args as Record<string, unknown>
+  return typeof args.name === "string" ? args.name : ""
 }
 
 function ok(output: unknown) {
@@ -198,6 +227,14 @@ function cleanDirt(): Dirt {
   }
 }
 
+function cleanMemory(project?: Project): Memory {
+  return {
+    exists: project?.exists === true,
+    restored: false,
+    stale: false,
+  }
+}
+
 async function sync(opt: Opt) {
   const found = opt.workspaces.get(opt.id) ?? (await opt.load(opt.workspace, opt.worktree).catch(() => undefined))
   if (found && validAnalysis(found)) opt.workspaces.set(opt.id, found)
@@ -209,16 +246,28 @@ async function sync(opt: Opt) {
       : undefined
   if (row && validChart(row)) opt.charts.set(opt.id, row)
   if (row && !validChart(row)) opt.charts.delete(opt.id)
+  const project = opt.projects.get(opt.id) ?? (await opt.loadProject(opt.workspace, opt.worktree).catch(() => undefined))
+  if (project && validProject(project)) opt.projects.set(opt.id, project)
+  if (project && !validProject(project)) opt.projects.delete(opt.id)
   return {
     analysis,
     chart: opt.charts.get(opt.id),
+    project: opt.projects.get(opt.id),
   }
 }
 
 function kind(input: { tool: string; args?: unknown }) {
+  if (mcp(input, "init_project_state")) return "project_init" as const
+  if (mcp(input, "resume_project_state")) return "project_resume" as const
+  if (mcp(input, "get_project_state")) return "project_get" as const
+  if (mcp(input, "save_project_state")) return "project_save" as const
+  if (mcp(input, "validate_project_state")) return "project_validate" as const
   if (mcp(input, "refresh_workspace")) return "refresh" as const
   if (mcp(input, "save_analysis") || mcp(input, "save_flowchart")) return "save" as const
   if (start(input)) return "debug" as const
+  const name = skill(input)
+  if (name === "smartx-develop") return "write" as const
+  if (name === "smartx-debug") return "debug" as const
   if (input.tool === "task") {
     const args = input.args
     const sub = args && typeof args === "object" ? (args as Record<string, unknown>).subagent_type : undefined
@@ -234,9 +283,10 @@ function kind(input: { tool: string; args?: unknown }) {
 
 // 把持久化的分析/流程图产物、待保存状态和本地 dirty 元数据折叠成一个
 // 生命周期视图，避免门禁策略散落在多个分支里。
-function view(opt: Opt, input: { analysis?: Analysis; chart?: Chart }) {
+function view(opt: Opt, input: { analysis?: Analysis; chart?: Chart; project?: Project }) {
   const wait = opt.pending.get(opt.id)
   const dirt = opt.dirts.get(opt.id) ?? cleanDirt()
+  const mem = opt.memory.get(opt.id) ?? cleanMemory(input.project)
   const mode = opt.modes.get(opt.id) ?? "boot"
   const busy = mode === "final" ? "finalizing" : mode === "refresh" ? "refreshing" : "booting"
   const life =
@@ -258,8 +308,10 @@ function view(opt: Opt, input: { analysis?: Analysis; chart?: Chart }) {
   return {
     analysis: input.analysis,
     chart: input.chart,
+    project: input.project,
     wait,
     dirt,
+    mem,
     mode,
     life,
   } satisfies View
@@ -268,6 +320,12 @@ function view(opt: Opt, input: { analysis?: Analysis; chart?: Chart }) {
 // 新门禁按阶段工作：初始化时严格，中间开发和调试阶段放松，只在
 // review 或最终收口这类动作前重新收紧。
 function gate(next: View, value: Kind) {
+  if (!next.mem.restored) {
+    if (value === "read" || value === "project_init" || value === "project_resume" || value === "project_get" || value === "project_validate" || value === "other") return ""
+    return next.mem.exists
+      ? "SmartX workflow requires restoring project memory through resume_project_state before sustained work."
+      : "SmartX workflow requires initializing project memory through init_project_state before sustained work."
+  }
   if (next.wait?.kind === "review") return next.life === "ready" || next.life === "dirty" ? "" : ""
   if (next.wait?.kind === "debug" && value === "debug") return ""
   if (next.life === "idle") {
@@ -318,10 +376,21 @@ function reset(opt: Opt, mode?: Mode) {
 // 自动收口只在主会话的脏工作区生效，并且不能打断 review 修复、显式收口或顺序型待办。
 function closing(opt: Opt, next: View, session: string) {
   if (opt.subs.has(session)) return false
+  if (next.mem.stale) return false
   if (next.life !== "dirty" || next.wait) return false
   if (opt.hold(session)) return false
   if (opt.reviewRequests.has(sessionkey(opt.id, session))) return false
   if (opt.finalRequests.has(sessionkey(opt.id, session))) return false
+  return !opt.fixes.has(fixkey(opt.id, session))
+}
+
+function saving(opt: Opt, next: View, session: string) {
+  if (opt.subs.has(session)) return false
+  if (!next.mem.restored || !next.mem.stale || next.wait) return false
+  if (opt.hold(session)) return false
+  if (opt.reviewRequests.has(sessionkey(opt.id, session))) return false
+  if (opt.finalRequests.has(sessionkey(opt.id, session))) return true
+  if (next.life !== "dirty") return false
   return !opt.fixes.has(fixkey(opt.id, session))
 }
 
@@ -440,6 +509,28 @@ export function createWorkspace(opt: Opt) {
 
       const sessionID = input.sessionID
       return flow([
+        step("project_save", async () => {
+          if (!sessionID || !saving(opt, next, sessionID)) return false
+          await opt.write("project memory save reminder injected", {
+            sessionID,
+            workspace: opt.workspace,
+            worktree: opt.worktree,
+          })
+          output.system.push(noteSaveProject())
+          return true
+        }),
+
+        step("project_resume", async () => {
+          if (next.mem.restored) return false
+          await opt.write("project memory restore gate injected", {
+            sessionID,
+            workspace: opt.workspace,
+            worktree: opt.worktree,
+            exists: next.mem.exists,
+          })
+          output.system.push(noteResumeProject(next.mem.exists))
+          return true
+        }),
         // 优先级最高：子 agent 一旦产出了分析、流程图或审查结果，
         // 主 agent 必须先保存，后续阶段才能信任这份状态。
         step("save", async () => {
@@ -690,6 +781,63 @@ export function createWorkspace(opt: Opt) {
       if (!opt.workspace || !opt.id) return false
 
       return flow([
+        step("project_init", async () => {
+          if (!mcp(input, "init_project_state") || !same(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
+          opt.projects.set(opt.id, {
+            workspace: opt.workspace,
+            worktree: opt.worktree,
+            exists: true,
+            updated: Date.now(),
+          })
+          opt.memory.set(opt.id, {
+            exists: true,
+            restored: true,
+            stale: false,
+          })
+          await opt.write("project memory initialized through mcp", {
+            sessionID: input.sessionID,
+            workspace: opt.workspace,
+            worktree: opt.worktree,
+          })
+          return true
+        }),
+
+        step("project_resume", async () => {
+          if (!mcp(input, "resume_project_state") || !same(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
+          opt.projects.set(opt.id, {
+            workspace: opt.workspace,
+            worktree: opt.worktree,
+            exists: true,
+            updated: Date.now(),
+          })
+          opt.memory.set(opt.id, {
+            exists: true,
+            restored: true,
+            stale: false,
+          })
+          await opt.write("project memory resumed through mcp", {
+            sessionID: input.sessionID,
+            workspace: opt.workspace,
+            worktree: opt.worktree,
+          })
+          return true
+        }),
+
+        step("project_save", async () => {
+          if (!mcp(input, "save_project_state") || !same(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
+          opt.memory.set(opt.id, {
+            exists: true,
+            restored: true,
+            stale: false,
+          })
+          await opt.write("project memory saved through mcp", {
+            sessionID: input.sessionID,
+            workspace: opt.workspace,
+            worktree: opt.worktree,
+          })
+          return true
+        }),
+
         // 根会话里的成功修改不会立刻打断开发，
         // 但会让后续收尾阶段使用的基线失效。
         step("dirty", async () => {
@@ -697,6 +845,12 @@ export function createWorkspace(opt: Opt) {
           const value = kind({ tool: input.tool, args: input.args })
           if (value !== "write" && value !== "exec") return false
           mark(opt, input.tool)
+          const mem = opt.memory.get(opt.id) ?? cleanMemory(opt.projects.get(opt.id))
+          opt.memory.set(opt.id, {
+            exists: mem.exists,
+            restored: mem.restored,
+            stale: mem.restored,
+          })
           await opt.write("workspace dirtied", {
             sessionID: input.sessionID,
             workspace: opt.workspace,
@@ -970,6 +1124,23 @@ export async function loadChartRemote(service: string, workspace: string, worktr
     state: body.data.state ?? "done",
     code: body.data.code ?? "",
     err: body.data.err ?? "",
+    updated: body.data.updatedAt ?? Date.now(),
+  }
+}
+
+export async function loadProjectRemote(service: string, workspace: string, worktree: string) {
+  if (!service) return undefined
+  const url = new URL("/api/workbench/project-state", service)
+  url.searchParams.set("workspacePath", workspace)
+  url.searchParams.set("worktreePath", worktree)
+  const resp = await fetch(url)
+  if (!resp.ok) return undefined
+  const body = (await resp.json()) as { data?: ProjectRow | null }
+  if (!body.data) return undefined
+  return {
+    workspace: body.data.workspacePath,
+    worktree: body.data.worktreePath,
+    exists: body.data.exists,
     updated: body.data.updatedAt ?? Date.now(),
   }
 }

@@ -7,10 +7,13 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -19,6 +22,35 @@ import (
 	oc "strategy-service/internal/opencode"
 	"strategy-service/internal/question"
 )
+
+type projectStateDoc struct {
+	Phase     string   `json:"phase"`
+	Status    string   `json:"status"`
+	Current   string   `json:"current"`
+	Summary   string   `json:"summary"`
+	Next      []string `json:"next"`
+	Risks     []string `json:"risks"`
+	Verified  bool     `json:"verified"`
+	Dirty     bool     `json:"dirty"`
+	SessionID string   `json:"session_id,omitempty"`
+	UpdatedAt int64    `json:"updated_at"`
+}
+
+type projectFeatureDoc struct {
+	Project  string        `json:"project"`
+	Created  string        `json:"created"`
+	Features []ProjectTask `json:"features"`
+}
+
+type projectFiles struct {
+	dir      string
+	state    string
+	feature  string
+	progress string
+	log      string
+}
+
+var projectStateRequired = []string{"feature-list.json", "progress.md", "session-log.md", "state.json"}
 
 type Service struct {
 	op    *oc.Service
@@ -597,6 +629,118 @@ func (s *Service) SaveReview(ctx context.Context, req ReviewReq) (ReviewRow, err
 	}, nil
 }
 
+func (s *Service) InitProjectState(ctx context.Context, req ProjectStateInitReq) (ProjectStateRow, error) {
+	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
+	req.WorktreePath = strings.TrimSpace(req.WorktreePath)
+	req.SessionID = strings.TrimSpace(req.SessionID)
+	req.Project = strings.TrimSpace(req.Project)
+	req.Phase = strings.TrimSpace(req.Phase)
+	req.Status = strings.TrimSpace(req.Status)
+	req.Current = strings.TrimSpace(req.Current)
+	req.Summary = strings.TrimSpace(req.Summary)
+	req.Next = clean(req.Next)
+	req.Risks = clean(req.Risks)
+	req.Features = cleanTasks(req.Features)
+	if req.WorkspacePath == "" {
+		return ProjectStateRow{}, fmt.Errorf("workspacePath is required")
+	}
+	if req.WorktreePath == "" {
+		req.WorktreePath = req.WorkspacePath
+	}
+	files := projectFilesFor(req.WorkspacePath)
+	if _, err := os.Stat(files.dir); err == nil {
+		return ProjectStateRow{}, fmt.Errorf(".project-state already exists")
+	}
+	if err := os.MkdirAll(files.dir, 0o755); err != nil {
+		return ProjectStateRow{}, err
+	}
+	row := seedProjectState(req.WorkspacePath, req.WorktreePath, req.Project, req.Phase, req.Status, req.Current, req.Summary, req.Next, req.Risks, req.SessionID, req.Verified, req.Dirty, req.Features)
+	if err := writeProjectState(files, row, true); err != nil {
+		return ProjectStateRow{}, err
+	}
+	return row, nil
+}
+
+func (s *Service) ResumeProjectState(ctx context.Context, req ProjectStateGet) (ProjectStateRow, error) {
+	_ = ctx
+	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
+	req.WorktreePath = strings.TrimSpace(req.WorktreePath)
+	if req.WorkspacePath == "" {
+		return ProjectStateRow{}, fmt.Errorf("workspacePath is required")
+	}
+	if req.WorktreePath == "" {
+		req.WorktreePath = req.WorkspacePath
+	}
+	return loadProjectState(req.WorkspacePath, req.WorktreePath, true)
+}
+
+func (s *Service) GetProjectState(ctx context.Context, req ProjectStateGet) (ProjectStateRow, error) {
+	_ = ctx
+	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
+	req.WorktreePath = strings.TrimSpace(req.WorktreePath)
+	if req.WorkspacePath == "" {
+		return ProjectStateRow{}, fmt.Errorf("workspacePath is required")
+	}
+	if req.WorktreePath == "" {
+		req.WorktreePath = req.WorkspacePath
+	}
+	return loadProjectState(req.WorkspacePath, req.WorktreePath, false)
+}
+
+func (s *Service) SaveProjectState(ctx context.Context, req ProjectStateSaveReq) (ProjectStateRow, error) {
+	_ = ctx
+	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
+	req.WorktreePath = strings.TrimSpace(req.WorktreePath)
+	req.SessionID = strings.TrimSpace(req.SessionID)
+	req.Phase = strings.TrimSpace(req.Phase)
+	req.Status = strings.TrimSpace(req.Status)
+	req.Current = strings.TrimSpace(req.Current)
+	req.Summary = strings.TrimSpace(req.Summary)
+	req.Next = clean(req.Next)
+	req.Risks = clean(req.Risks)
+	req.Features = cleanTasks(req.Features)
+	if req.WorkspacePath == "" {
+		return ProjectStateRow{}, fmt.Errorf("workspacePath is required")
+	}
+	if req.WorktreePath == "" {
+		req.WorktreePath = req.WorkspacePath
+	}
+	row, err := loadProjectState(req.WorkspacePath, req.WorktreePath, true)
+	if err != nil {
+		return ProjectStateRow{}, err
+	}
+	row.Phase = pick(req.Phase, row.Phase, "implementation")
+	row.Status = projectStatus(pick(req.Status, row.Status, "in-progress"))
+	row.Current = pick(req.Current, row.Current)
+	row.Summary = pick(req.Summary, row.Summary)
+	row.Next = pickList(req.Next, row.Next)
+	row.Risks = pickList(req.Risks, row.Risks)
+	row.SessionID = pick(req.SessionID, row.SessionID)
+	row.Verified = pickBool(req.Verified, row.Verified)
+	row.Dirty = pickBool(req.Dirty, false)
+	row.UpdatedAt = time.Now().UnixMilli()
+	if len(req.Features) > 0 {
+		row.Features = req.Features
+	}
+	if err := writeProjectState(projectFilesFor(req.WorkspacePath), row, false); err != nil {
+		return ProjectStateRow{}, err
+	}
+	return row, nil
+}
+
+func (s *Service) ValidateProjectState(ctx context.Context, req ProjectStateGet) (ProjectStateRow, error) {
+	_ = ctx
+	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
+	req.WorktreePath = strings.TrimSpace(req.WorktreePath)
+	if req.WorkspacePath == "" {
+		return ProjectStateRow{}, fmt.Errorf("workspacePath is required")
+	}
+	if req.WorktreePath == "" {
+		req.WorktreePath = req.WorkspacePath
+	}
+	return loadProjectState(req.WorkspacePath, req.WorktreePath, true)
+}
+
 func (s *Service) saveFlow(ctx context.Context, row FlowchartRow) error {
 	doc, err := db.Open()
 	if err != nil {
@@ -891,6 +1035,388 @@ func mermaid(text string) string {
 func hash(text string) string {
 	sum := sha256.Sum256([]byte(strings.TrimSpace(text)))
 	return hex.EncodeToString(sum[:])
+}
+
+func projectFilesFor(workspace string) projectFiles {
+	dir := filepath.Join(workspace, ".project-state")
+	return projectFiles{
+		dir:      dir,
+		state:    filepath.Join(dir, "state.json"),
+		feature:  filepath.Join(dir, "feature-list.json"),
+		progress: filepath.Join(dir, "progress.md"),
+		log:      filepath.Join(dir, "session-log.md"),
+	}
+}
+
+func loadProjectState(workspace string, worktree string, repair bool) (ProjectStateRow, error) {
+	files := projectFilesFor(workspace)
+	if _, err := os.Stat(files.dir); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return ProjectStateRow{}, db.ErrNotFound
+		}
+		return ProjectStateRow{}, err
+	}
+	if repair {
+		if err := repairProjectFiles(files); err != nil {
+			return ProjectStateRow{}, err
+		}
+	}
+	doc, err := readStateDoc(files.state)
+	if err != nil {
+		return ProjectStateRow{}, err
+	}
+	feature, err := readFeatureDoc(files.feature)
+	if err != nil {
+		return ProjectStateRow{}, err
+	}
+	return ProjectStateRow{
+		WorkspacePath: workspace,
+		WorktreePath:  worktree,
+		Exists:        true,
+		Project:       feature.Project,
+		Phase:         doc.Phase,
+		Status:        projectStatus(doc.Status),
+		Current:       doc.Current,
+		Summary:       doc.Summary,
+		Next:          clean(doc.Next),
+		Risks:         clean(doc.Risks),
+		Verified:      doc.Verified,
+		Dirty:         doc.Dirty,
+		SessionID:     doc.SessionID,
+		Features:      cleanTasks(feature.Features),
+		UpdatedAt:     doc.UpdatedAt,
+	}, nil
+}
+
+func writeProjectState(files projectFiles, row ProjectStateRow, fresh bool) error {
+	if err := os.MkdirAll(files.dir, 0o755); err != nil {
+		return err
+	}
+	created := date(row.UpdatedAt)
+	if doc, err := readFeatureDoc(files.feature); err == nil && strings.TrimSpace(doc.Created) != "" {
+		created = doc.Created
+	}
+	feature := projectFeatureDoc{
+		Project:  pick(row.Project, filepath.Base(row.WorkspacePath)),
+		Created:  created,
+		Features: cleanTasks(row.Features),
+	}
+	if len(feature.Features) == 0 {
+		feature.Features = []ProjectTask{{
+			ID:           "1",
+			Name:         pick(row.Current, "Initial task"),
+			Description:  pick(row.Summary, "Initialize project memory"),
+			Status:       "in-progress",
+			Priority:     "high",
+			Dependencies: []string{},
+		}}
+	}
+	state := projectStateDoc{
+		Phase:     pick(row.Phase, "implementation"),
+		Status:    projectStatus(row.Status),
+		Current:   row.Current,
+		Summary:   row.Summary,
+		Next:      clean(row.Next),
+		Risks:     clean(row.Risks),
+		Verified:  row.Verified,
+		Dirty:     row.Dirty,
+		SessionID: row.SessionID,
+		UpdatedAt: row.UpdatedAt,
+	}
+	if err := writeJSON(files.feature, feature); err != nil {
+		return err
+	}
+	if err := writeJSON(files.state, state); err != nil {
+		return err
+	}
+	if err := os.WriteFile(files.progress, []byte(renderProgress(feature.Project, state, feature.Features)), 0o644); err != nil {
+		return err
+	}
+	body := renderLog(feature.Project, state, fresh)
+	if fresh {
+		return os.WriteFile(files.log, []byte(body), 0o644)
+	}
+	prev, err := os.ReadFile(files.log)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	if len(prev) == 0 {
+		return os.WriteFile(files.log, []byte(body), 0o644)
+	}
+	next := strings.TrimRight(string(prev), "\r\n") + "\n\n" + body
+	return os.WriteFile(files.log, []byte(next), 0o644)
+}
+
+func repairProjectFiles(files projectFiles) error {
+	if err := os.MkdirAll(files.dir, 0o755); err != nil {
+		return err
+	}
+	miss := []string{}
+	for _, item := range projectStateRequired {
+		if _, err := os.Stat(filepath.Join(files.dir, item)); errors.Is(err, os.ErrNotExist) {
+			miss = append(miss, item)
+		}
+	}
+	if len(miss) == 0 {
+		return nil
+	}
+	row := seedProjectState(filepath.Dir(files.dir), filepath.Dir(files.dir), filepath.Base(filepath.Dir(files.dir)), "", "", "", "", nil, nil, "", nil, nil, nil)
+	if _, err := os.Stat(files.state); err == nil {
+		doc, err := readStateDoc(files.state)
+		if err == nil {
+			row.Phase = doc.Phase
+			row.Status = doc.Status
+			row.Current = doc.Current
+			row.Summary = doc.Summary
+			row.Next = doc.Next
+			row.Risks = doc.Risks
+			row.Verified = doc.Verified
+			row.Dirty = doc.Dirty
+			row.SessionID = doc.SessionID
+			row.UpdatedAt = doc.UpdatedAt
+		}
+	}
+	if _, err := os.Stat(files.feature); err == nil {
+		doc, err := readFeatureDoc(files.feature)
+		if err == nil {
+			row.Project = doc.Project
+			row.Features = doc.Features
+		}
+	}
+	feature := projectFeatureDoc{
+		Project:  pick(row.Project, filepath.Base(row.WorkspacePath)),
+		Created:  date(row.UpdatedAt),
+		Features: cleanTasks(row.Features),
+	}
+	if len(feature.Features) == 0 {
+		feature.Features = []ProjectTask{{
+			ID:           "1",
+			Name:         pick(row.Current, "Initial task"),
+			Description:  pick(row.Summary, "Initialize project memory"),
+			Status:       "in-progress",
+			Priority:     "high",
+			Dependencies: []string{},
+		}}
+	}
+	state := projectStateDoc{
+		Phase:     pick(row.Phase, "implementation"),
+		Status:    projectStatus(row.Status),
+		Current:   row.Current,
+		Summary:   row.Summary,
+		Next:      clean(row.Next),
+		Risks:     clean(row.Risks),
+		Verified:  row.Verified,
+		Dirty:     row.Dirty,
+		SessionID: row.SessionID,
+		UpdatedAt: row.UpdatedAt,
+	}
+	for _, item := range miss {
+		switch item {
+		case "feature-list.json":
+			if err := writeJSON(files.feature, feature); err != nil {
+				return err
+			}
+		case "state.json":
+			if err := writeJSON(files.state, state); err != nil {
+				return err
+			}
+		case "progress.md":
+			if err := os.WriteFile(files.progress, []byte(renderProgress(feature.Project, state, feature.Features)), 0o644); err != nil {
+				return err
+			}
+		case "session-log.md":
+			if err := os.WriteFile(files.log, []byte(renderLog(feature.Project, state, true)), 0o644); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func seedProjectState(workspace string, worktree string, project string, phase string, status string, current string, summary string, next []string, risks []string, session string, verified *bool, dirty *bool, features []ProjectTask) ProjectStateRow {
+	return ProjectStateRow{
+		WorkspacePath: workspace,
+		WorktreePath:  worktree,
+		Exists:        true,
+		Project:       pick(project, filepath.Base(workspace)),
+		Phase:         pick(phase, "implementation"),
+		Status:        projectStatus(pick(status, "in-progress")),
+		Current:       pick(current, "Initialize project memory"),
+		Summary:       pick(summary, "Project state initialized"),
+		Next:          pickList(next, []string{"Continue current SmartX task"}),
+		Risks:         clean(risks),
+		Verified:      pickBool(verified, false),
+		Dirty:         pickBool(dirty, false),
+		SessionID:     session,
+		Features:      cleanTasks(features),
+		UpdatedAt:     time.Now().UnixMilli(),
+	}
+}
+
+func readStateDoc(file string) (projectStateDoc, error) {
+	body, err := os.ReadFile(file)
+	if err != nil {
+		return projectStateDoc{}, err
+	}
+	out := projectStateDoc{}
+	if err := json.Unmarshal(body, &out); err != nil {
+		return projectStateDoc{}, err
+	}
+	out.Phase = pick(out.Phase, "implementation")
+	out.Status = projectStatus(out.Status)
+	out.Next = clean(out.Next)
+	out.Risks = clean(out.Risks)
+	return out, nil
+}
+
+func readFeatureDoc(file string) (projectFeatureDoc, error) {
+	body, err := os.ReadFile(file)
+	if err != nil {
+		return projectFeatureDoc{}, err
+	}
+	out := projectFeatureDoc{}
+	if err := json.Unmarshal(body, &out); err != nil {
+		return projectFeatureDoc{}, err
+	}
+	out.Project = strings.TrimSpace(out.Project)
+	out.Features = cleanTasks(out.Features)
+	return out, nil
+}
+
+func writeJSON(file string, input any) error {
+	body, err := json.MarshalIndent(input, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(file, append(body, '\n'), 0o644)
+}
+
+func renderProgress(project string, state projectStateDoc, features []ProjectTask) string {
+	done := 0
+	for _, item := range features {
+		if item.Status == "done" {
+			done++
+		}
+	}
+	return strings.TrimSpace(fmt.Sprintf(`# 项目进度记录 - %s
+## 最新状态
+- 更新时间: %s
+- 当前阶段: %s
+- 完成进度: %d/%d 个任务
+- 当前任务: %s
+- 下一步: %s
+- 风险: %s
+- 验证状态: %s
+
+## 注意事项
+
+- 项目状态由 .project-state/ 维护
+- 结束前需要同步最新交接信息
+`, pick(project, "Unnamed Project"), stamp(state.UpdatedAt), pick(state.Phase, "implementation"), done, max(len(features), 1), pick(state.Current, "N/A"), join(state.Next), join(state.Risks), yes(state.Verified)))
+}
+
+func renderLog(project string, state projectStateDoc, fresh bool) string {
+	title := "更新项目状态"
+	if fresh {
+		title = "初始化项目状态"
+	}
+	return strings.TrimSpace(fmt.Sprintf(`## %s
+
+- 会话目标: %s
+- 执行动作: %s
+- 当前结果: %s
+- 下一步: %s
+- 风险或提醒: %s
+`, stamp(state.UpdatedAt), title, title, pick(state.Summary, state.Current, "Project state updated"), join(state.Next), join(state.Risks)))
+}
+
+func cleanTasks(list []ProjectTask) []ProjectTask {
+	out := list[:0]
+	for i, item := range list {
+		item.ID = pick(strings.TrimSpace(item.ID), fmt.Sprintf("%d", i+1))
+		item.Name = strings.TrimSpace(item.Name)
+		item.Description = strings.TrimSpace(item.Description)
+		item.Status = taskStatus(item.Status)
+		item.Priority = pick(strings.TrimSpace(item.Priority), "medium")
+		item.Dependencies = clean(item.Dependencies)
+		item.Notes = strings.TrimSpace(item.Notes)
+		if item.Name == "" && item.Description == "" {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out
+}
+
+func projectStatus(input string) string {
+	switch strings.TrimSpace(input) {
+	case "pending", "in-progress", "done", "blocked", "running", "ready":
+		return strings.TrimSpace(input)
+	default:
+		return "in-progress"
+	}
+}
+
+func taskStatus(input string) string {
+	switch strings.TrimSpace(input) {
+	case "pending", "in-progress", "done", "blocked":
+		return strings.TrimSpace(input)
+	default:
+		return "in-progress"
+	}
+}
+
+func pick(list ...string) string {
+	for _, item := range list {
+		item = strings.TrimSpace(item)
+		if item != "" {
+			return item
+		}
+	}
+	return ""
+}
+
+func pickList(list []string, fallback []string) []string {
+	if len(clean(list)) > 0 {
+		return clean(list)
+	}
+	return clean(fallback)
+}
+
+func pickBool(value *bool, fallback bool) bool {
+	if value == nil {
+		return fallback
+	}
+	return *value
+}
+
+func date(ts int64) string {
+	return time.UnixMilli(ts).Format("2006-01-02")
+}
+
+func stamp(ts int64) string {
+	return time.UnixMilli(ts).Format("2006-01-02 15:04")
+}
+
+func yes(input bool) string {
+	if input {
+		return "已验证"
+	}
+	return "未验证"
+}
+
+func join(list []string) string {
+	if len(list) == 0 {
+		return "无"
+	}
+	return strings.Join(list, "; ")
+}
+
+func max(a int, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 func (s *Service) path(raw string) string {

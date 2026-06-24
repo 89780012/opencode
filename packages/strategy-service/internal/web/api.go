@@ -128,6 +128,11 @@ func (a *API) Register(r *gin.Engine) {
 	bench.POST("/flowchart", a.workbenchFlowchartPut)
 	bench.GET("/review", a.workbenchReviewGet)
 	bench.POST("/review", a.workbenchReviewPut)
+	bench.GET("/project-state", a.workbenchProjectStateGet)
+	bench.POST("/project-state/init", a.workbenchProjectStateInit)
+	bench.POST("/project-state/resume", a.workbenchProjectStateResume)
+	bench.POST("/project-state/save", a.workbenchProjectStateSave)
+	bench.POST("/project-state/validate", a.workbenchProjectStateValidate)
 
 	sum := api.Group("/summary")
 	sum.GET("/session", a.summaryGet)

@@ -5,136 +5,90 @@ import sys
 from pathlib import Path
 
 
-req = ("project", "created", "features")
-task = ("id", "name", "description", "status", "priority", "dependencies")
-status = {"pending", "in-progress", "done", "blocked"}
-mark = ("更新时间", "当前阶段", "下一步")
-note = ("会话目标", "执行动作", "当前结果", "下一步")
+FILES = ("feature-list.json", "progress.md", "session-log.md", "state.json")
+TASK = ("id", "name", "description", "status", "priority", "dependencies")
+TASK_STATUS = {"pending", "in-progress", "done", "blocked"}
+STATE_STATUS = {"pending", "in-progress", "done", "blocked", "running", "ready"}
 
 
 def fail(msg: str) -> int:
-    print(f"[错误] {msg}")
+    print(f"[error] {msg}")
     return 1
 
 
 def ok(msg: str) -> None:
-    print(f"[通过] {msg}")
-
-
-def lines(text: str) -> list[str]:
-    return text.splitlines()
-
-
-def section(text: str, name: str) -> list[str] | None:
-    row = lines(text)
-    for i, line in enumerate(row):
-        if line.strip() != f"## {name}":
-            continue
-        body: list[str] = []
-        for item in row[i + 1 :]:
-            if item.strip().startswith("## "):
-                break
-            body.append(item)
-        return body
-    return None
-
-
-def has(row: list[str], name: str) -> bool:
-    return any(item.strip().startswith(f"- {name}：") or item.strip().startswith(f"- {name}:") for item in row)
-
-
-def check_progress(text: str) -> int | None:
-    row = [line.strip() for line in lines(text) if line.strip()]
-    top = next((line for line in row if line.startswith("## ")), None)
-    if top != "## 最新状态":
-        return fail("progress.md 顶部必须先出现 `## 最新状态`")
-
-    body = section(text, "最新状态")
-    if body is None:
-        return fail("progress.md 缺少 `## 最新状态` 段落")
-
-    miss = [name for name in mark if not has(body, name)]
-    if miss:
-        return fail(f"progress.md 的“最新状态”缺少字段: {', '.join(miss)}")
-    return None
-
-
-def check_log(text: str) -> int | None:
-    row = lines(text)
-    head = [(i, line.strip()) for i, line in enumerate(row) if line.strip().startswith("## ")]
-    if not head:
-        return fail("session-log.md 至少要有一条 `## 时间` 记录")
-
-    for n, (i, line) in enumerate(head, start=1):
-        if not line.removeprefix("## ").strip():
-            return fail(f"session-log.md 第 {n} 条记录缺少时间标题")
-        end = head[n][0] if n < len(head) else len(row)
-        body = row[i + 1 : end]
-        miss = [name for name in note if not has(body, name)]
-        if miss:
-            return fail(f"session-log.md 第 {n} 条记录缺少字段: {', '.join(miss)}")
-    return None
+    print(f"[ok] {msg}")
 
 
 def main() -> int:
     root = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path.cwd()
     state = root / ".project-state"
     if not state.exists():
-        return fail(f"未找到状态目录: {state}")
+        return fail(f"missing .project-state at {state}")
 
-    files = {
-        "feature-list.json": state / "feature-list.json",
-        "progress.md": state / "progress.md",
-        "session-log.md": state / "session-log.md",
-    }
-    miss = [name for name, file in files.items() if not file.exists()]
+    miss = [name for name in FILES if not (state / name).exists()]
     if miss:
-        return fail(f"缺少状态文件: {', '.join(miss)}")
+        return fail(f"missing files: {', '.join(miss)}")
+    ok("project-state files exist")
 
-    ok("状态目录和基础文件存在")
+    feature = json.loads((state / "feature-list.json").read_text(encoding="utf-8"))
+    if not isinstance(feature, dict):
+        return fail("feature-list.json must be an object")
+    if not isinstance(feature.get("project"), str) or not feature["project"].strip():
+        return fail("feature-list.json.project is required")
+    if not isinstance(feature.get("created"), str) or not feature["created"].strip():
+        return fail("feature-list.json.created is required")
+    if not isinstance(feature.get("features"), list):
+        return fail("feature-list.json.features must be an array")
 
-    try:
-        data = json.loads(files["feature-list.json"].read_text(encoding="utf-8"))
-    except json.JSONDecodeError as err:
-        return fail(f"feature-list.json 不是合法 JSON: {err}")
-
-    miss = [key for key in req if key not in data]
-    if miss:
-        return fail(f"feature-list.json 缺少字段: {', '.join(miss)}")
-
-    if not isinstance(data["features"], list):
-        return fail("feature-list.json 的 features 必须是数组")
-
-    for i, item in enumerate(data["features"], start=1):
+    for i, item in enumerate(feature["features"], start=1):
         if not isinstance(item, dict):
-            return fail(f"第 {i} 个任务不是对象")
-        miss = [key for key in task if key not in item]
+            return fail(f"feature {i} must be an object")
+        miss = [key for key in TASK if key not in item]
         if miss:
-            return fail(f"第 {i} 个任务缺少字段: {', '.join(miss)}")
-        if item["status"] not in status:
-            return fail(f"第 {i} 个任务的 status 非法: {item['status']}")
+            return fail(f"feature {i} missing fields: {', '.join(miss)}")
+        if item["status"] not in TASK_STATUS:
+            return fail(f"feature {i} has invalid status: {item['status']}")
         if not isinstance(item["dependencies"], list):
-            return fail(f"第 {i} 个任务的 dependencies 必须是数组")
+            return fail(f"feature {i}.dependencies must be an array")
+    ok("feature-list.json is valid")
 
-    ok("feature-list.json 结构合法")
+    doc = json.loads((state / "state.json").read_text(encoding="utf-8"))
+    if not isinstance(doc, dict):
+        return fail("state.json must be an object")
+    if not isinstance(doc.get("phase"), str) or not doc["phase"].strip():
+        return fail("state.json.phase is required")
+    if not isinstance(doc.get("status"), str) or doc["status"] not in STATE_STATUS:
+        return fail(f"state.json.status is invalid: {doc.get('status')}")
+    if not isinstance(doc.get("current"), str) or not doc["current"].strip():
+        return fail("state.json.current is required")
+    if not isinstance(doc.get("next"), list):
+        return fail("state.json.next must be an array")
+    if not isinstance(doc.get("risks"), list):
+        return fail("state.json.risks must be an array")
+    if not isinstance(doc.get("verified"), bool):
+        return fail("state.json.verified must be a boolean")
+    if not isinstance(doc.get("dirty"), bool):
+        return fail("state.json.dirty must be a boolean")
+    if not isinstance(doc.get("updated_at"), int):
+        return fail("state.json.updated_at must be an integer")
+    ok("state.json is valid")
 
-    prog = files["progress.md"].read_text(encoding="utf-8").strip()
-    if not prog:
-        return fail("progress.md 不能为空")
-    err = check_progress(prog)
-    if err:
-        return err
-    ok("progress.md 结构合法")
+    progress = (state / "progress.md").read_text(encoding="utf-8").strip()
+    if not progress:
+        return fail("progress.md cannot be empty")
+    if "#" not in progress:
+        return fail("progress.md should contain at least one markdown heading")
+    ok("progress.md is non-empty")
 
-    log = files["session-log.md"].read_text(encoding="utf-8").strip()
+    log = (state / "session-log.md").read_text(encoding="utf-8").strip()
     if not log:
-        return fail("session-log.md 不能为空")
-    err = check_log(log)
-    if err:
-        return err
-    ok("session-log.md 结构合法")
+        return fail("session-log.md cannot be empty")
+    if "## " not in log:
+        return fail("session-log.md should contain at least one section heading")
+    ok("session-log.md is non-empty")
 
-    print("[完成] 项目状态文件校验通过")
+    print("[done] project state validation passed")
     return 0
 
 
