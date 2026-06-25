@@ -1,6 +1,6 @@
-﻿import type { Hooks } from "@opencode-ai/plugin"
-import { gate, closing, saving } from "./gate.js"
-import { cleanDirt, cleanMemory, view } from "./life.js"
+import type { Hooks } from "@opencode-ai/plugin"
+import { gate as block, closing, saving } from "./gate.js"
+import { cleanDirt, cleanMemory, view as stateView } from "./life.js"
 import {
   doneAnalysis,
   doneChart,
@@ -48,27 +48,27 @@ type Opt = {
   write: Log
 }
 
-/** 缁熶竴鍒ゆ柇宸ュ叿鎵ц缁撴灉鏄惁澶辫触锛屽吋瀹规病鏈?isError 瀛楁鐨勮繑鍥炲€笺€?*/
+/** 统一判断工具执行结果是否失败，也兼容没有 `isError` 字段的返回值。*/
 function ok(output: unknown) {
   if (!output || typeof output !== "object") return true
   if (!("isError" in output)) return true
   return output.isError !== true
 }
 
-/** 鍒ゆ柇涓€娆″伐鍏疯皟鐢ㄦ槸鍚﹀懡涓簡褰撳墠 workspace/worktree銆?*/
+/** 判断一次工具调用是否命中了当前 workspace / worktree。*/
 function sameWorkspace(input: unknown, workspace: string, worktree: string) {
   if (!input || typeof input !== "object") return false
   const args = input as Record<string, unknown>
   return args.workspacePath === workspace && (args.worktreePath === worktree || (!args.worktreePath && worktree === workspace))
 }
 
-/** 瑙勮寖鍖?review item status 鐨勬瘮杈冨€笺€?*/
+/** 规范化 review item 的 status，方便做大小写无关的比较。*/
 function normalizeStatus(input: unknown) {
   if (typeof input !== "string") return ""
   return input.trim().toLowerCase()
 }
 
-/** 鍒ゆ柇 save_review 鎻愪氦鐨勬墍鏈夋鏌ラ」鏄惁閮藉凡閫氳繃銆?*/
+/** 判断 `save_review` 提交的所有检查项是否都已通过。*/
 function reviewPassed(input: unknown) {
   if (!input || typeof input !== "object") return false
   const args = input as Record<string, unknown>
@@ -77,18 +77,18 @@ function reviewPassed(input: unknown) {
   return args.items.every((item) => item && typeof item === "object" && normalizeStatus((item as Record<string, unknown>).status) === "passed")
 }
 
-/** 鐢熸垚 workspace + session 缁村害鐨?fix 璁板綍 key銆?*/
+/** 生成 workspace + session 维度的修复记录 key。*/
 function fixKey(id: string, session: string) {
   return id + "\x00" + session
 }
 
-/** 鐢熸垚 workspace + session 缁村害鐨勮姹?key銆?*/
+/** 生成 workspace + session 维度的请求 key。*/
 function requestKey(id: string, session: string) {
   return id + "\x00" + session
 }
 
-/** 浠庢湰鍦扮紦瀛樻垨杩滅鏈嶅姟鍚屾 analysis / chart / project 涓夌被蹇収銆?*/
-async function sync(opt: Opt) {
+/** 从本地缓存或远端服务同步 analysis / chart / project 三类快照。*/
+async function snapshot(opt: Opt) {
   const loadedAnalysis = opt.workspaces.get(opt.id) ?? (await opt.load(opt.workspace, opt.worktree).catch(() => undefined))
   if (loadedAnalysis && validAnalysis(loadedAnalysis)) opt.workspaces.set(opt.id, loadedAnalysis)
   if (loadedAnalysis && !validAnalysis(loadedAnalysis)) opt.workspaces.delete(opt.id)
@@ -105,7 +105,7 @@ async function sync(opt: Opt) {
   return { analysis, chart: opt.charts.get(opt.id), project: opt.projects.get(opt.id) }
 }
 
-/** 鏍囪褰撳墠 workspace 宸茶鍐欒剰锛屽悗缁?review/final 闇€瑕佸埛鏂板熀绾裤€?*/
+/** 标记当前 workspace 已被写脏，后续 review / final 需要刷新基线。*/
 function mark(opt: Opt, reason: string) {
   opt.dirtyStates.set(opt.id, {
     state: "dirty",
@@ -114,7 +114,7 @@ function mark(opt: Opt, reason: string) {
   })
 }
 
-/** 鎶?workspace 閲嶆柊鎺ㄥ洖 analysis -> flowchart 鐨勫熀绾挎祦绋嬭捣鐐广€?*/
+/** 将 workspace 重新推回 analysis -> flowchart 的基线起点。*/
 function reset(opt: Opt, mode?: Mode) {
   opt.workspaces.set(opt.id, requestAnalysis(opt.workspace, opt.worktree))
   opt.charts.set(opt.id, requestChart(opt.workspace, opt.worktree))
@@ -123,10 +123,10 @@ function reset(opt: Opt, mode?: Mode) {
   if (pendingSave?.kind === "analysis" || pendingSave?.kind === "flowchart" || pendingSave?.kind === "debug") opt.pending.delete(opt.id)
 }
 
-/** workspace 绾х紪鎺掑櫒锛氳礋璐?system 娉ㄥ叆銆乥efore 闂ㄧ銆乤fter 鐘舵€佹帹杩涖€?*/
+/** workspace 级编排器，负责 system 注入、before 门禁和 after 状态推进。*/
 export function createWorkspace(opt: Opt) {
   return {
-    /** 澶栭儴鏄惧紡璇锋眰鍒锋柊鏃讹紝閲嶅缓鍩虹嚎骞剁暀涓嬫棩蹇椼€?*/
+    /** 外部显式要求刷新时，重建基线并记录日志。*/
     reset: async (reason: Reason, detail = "") => {
       if (!opt.workspace || !opt.id) return false
       reset(opt)
@@ -138,27 +138,29 @@ export function createWorkspace(opt: Opt) {
       })
       return true
     },
-    /** 鍦ㄦā鍨嬪嚭鎵嬪墠鍐冲畾褰撳墠杞簲璇ユ敞鍏ュ摢涓€绉嶉殣钘忕郴缁熸彁绀恒€?*/
+    /** 模型出手前，决定这一轮应该注入哪一种隐藏系统提示。*/
     system: async (input: Parameters<System>[0], output: Parameters<System>[1]) => {
       if (!opt.workspace || !opt.id) return false
 
-      const data = await sync(opt)
-      const next = view({
-        analysis: data.analysis,
-        chart: data.chart,
-        project: data.project,
+      const snap = await snapshot(opt)
+      const state = stateView({
+        analysis: snap.analysis,
+        chart: snap.chart,
+        project: snap.project,
         pendingSave: opt.pending.get(opt.id),
         dirtyState: opt.dirtyStates.get(opt.id) ?? cleanDirt(),
-        projectMemory: opt.memory.get(opt.id) ?? cleanMemory(data.project),
+        projectMemory: opt.memory.get(opt.id) ?? cleanMemory(snap.project),
         baselineMode: opt.baselineModes.get(opt.id) ?? "boot",
       })
       const sessionID = input.sessionID
 
       return flow([
+        /** 1. 当前轮需要先保存 project memory 时，优先注入保存提醒。*/
         step("project_save", async () => {
+          // 只有当前会话已经恢复过记忆，且这轮确实产生了新进展时，才会走到这里。
           if (
             !sessionID ||
-            !saving(next, {
+            !saving(state, {
               sub: opt.childSessions.has(sessionID),
               hold: opt.hold(sessionID),
               review: opt.reviewRequests.has(requestKey(opt.id, sessionID)),
@@ -175,19 +177,23 @@ export function createWorkspace(opt: Opt) {
           output.system.push(noteSaveProject())
           return true
         }),
+        /** 2. project memory 尚未恢复时，先要求恢复或初始化记忆。*/
         step("project_resume", async () => {
-          if (next.projectMemory.hasRestoredState) return false
+          // 没有恢复态时，先把 project memory 这道门补上，避免直接进入持续开发。
+          if (state.projectMemory.hasRestoredState) return false
           await opt.write("project memory restore gate injected", {
             sessionID,
             workspace: opt.workspace,
             worktree: opt.worktree,
-            hasProjectState: next.projectMemory.hasProjectState,
+            hasProjectState: state.projectMemory.hasProjectState,
           })
-          output.system.push(noteResumeProject(next.projectMemory.hasProjectState))
+          output.system.push(noteResumeProject(state.projectMemory.hasProjectState))
           return true
         }),
+        /** 3. 当前轮已经有待保存的 baseline 产物时，先去做 MCP 保存。*/
         step("save", async () => {
-          const pendingSave = next.pendingSave
+          // analysis / flowchart 已经产出，但还没同步进策略服务时，先强制保存。
+          const pendingSave = state.pendingSave
           if (!pendingSave) return false
           await opt.write("workspace mcp save reminder injected", {
             sessionID,
@@ -198,7 +204,9 @@ export function createWorkspace(opt: Opt) {
           output.system.push(noteSave(pendingSave))
           return true
         }),
+        /** 4. 审查结果需要继续修复时，先把修复指令注入给主 agent。*/
         step("fix", async () => {
+          // 审查没通过且还在修复轮次内时，先让主 agent 按审查意见继续修。
           if (!sessionID) return false
           const fix = opt.reviewFixes.get(fixKey(opt.id, sessionID))
           if (!fix) return false
@@ -212,11 +220,14 @@ export function createWorkspace(opt: Opt) {
           if (fix.attempt >= limit) opt.reviewFixes.delete(fixKey(opt.id, sessionID))
           return true
         }),
+        /** 5. 用户明确要求 review 时，优先进入审查流程；若基线脏了则先刷新。*/
         step("review", async () => {
+          // 只有用户已经显式请求 review，才会进入这条分支。
           if (!sessionID) return false
           const requestID = requestKey(opt.id, sessionID)
           if (!opt.reviewRequests.has(requestID)) return false
-          if (next.life === "dirty") {
+          // 基线被写脏了，说明审查前必须先重新刷新 analysis / flowchart。
+          if (state.life === "dirty") {
             await opt.write("workspace refresh gate injected", {
               sessionID,
               workspace: opt.workspace,
@@ -226,7 +237,8 @@ export function createWorkspace(opt: Opt) {
             output.system.push(noteRefresh("代码审查"))
             return true
           }
-          if (next.life !== "ready") return false
+          // 只有基线完整且工作区干净时，才真正放行审查。
+          if (state.life !== "ready") return false
           opt.reviewRequests.delete(requestID)
           await opt.write("workspace review gate injected", {
             sessionID,
@@ -236,11 +248,14 @@ export function createWorkspace(opt: Opt) {
           output.system.push(noteReview({ workspace: opt.workspace, worktree: opt.worktree, sessionID }))
           return true
         }),
+        /** 6. 用户明确要求最终收口时，若工作区已写脏则先切到 final 模式。*/
         step("final", async () => {
+          // final 请求是显式意图，所以这里只处理用户已经要求收口的情况。
           if (!sessionID) return false
           const requestID = requestKey(opt.id, sessionID)
           if (!opt.finalRequests.has(requestID)) return false
-          if (next.life === "dirty") {
+          // 工作区已变脏时，先切到 final 模式并重建基线，再继续收口。
+          if (state.life === "dirty") {
             opt.finalRequests.delete(requestID)
             reset(opt, "final")
             await opt.write("workspace final gate injected", {
@@ -251,13 +266,16 @@ export function createWorkspace(opt: Opt) {
             output.system.push(noteFinal())
             return true
           }
-          if (next.life === "ready") opt.finalRequests.delete(requestID)
+          // 如果已经干净收口完成，就清掉这次 final 请求。
+          if (state.life === "ready") opt.finalRequests.delete(requestID)
           return false
         }),
+        /** 7. 工作区自然收尾时，提醒先完成 project memory 保存。*/
         step("close", async () => {
+          // 只有不是子会话、没有挂起修复、也没有 review/final 请求时，才会自然收尾。
           if (
             !sessionID ||
-            !closing(next, {
+            !closing(state, {
               sub: opt.childSessions.has(sessionID),
               hold: opt.hold(sessionID),
               review: opt.reviewRequests.has(requestKey(opt.id, sessionID)),
@@ -274,22 +292,26 @@ export function createWorkspace(opt: Opt) {
           output.system.push(noteClose())
           return true
         }),
+        /** 8. 首次进入或 analysis 缺失时，先建立初始 workspace 基线。*/
         step("boot", async () => {
-          if (next.life !== "idle") return false
-          if (!next.analysis) opt.workspaces.set(opt.id, requestAnalysis(opt.workspace, opt.worktree))
+          // 首次进入且 life 处于 idle，说明还没有现成的 initial baseline。
+          if (state.life !== "idle") return false
+          if (!state.analysis) opt.workspaces.set(opt.id, requestAnalysis(opt.workspace, opt.worktree))
           opt.baselineModes.set(opt.id, "boot")
           await opt.write("workspace boot gate injected", {
             sessionID,
             workspace: opt.workspace,
             worktree: opt.worktree,
-            state: next.analysis?.state ?? "missing",
+            state: state.analysis?.state ?? "missing",
           })
           output.system.push(noteBoot())
           return true
         }),
+        /** 9. analysis 已完成但 flowchart 还没准备好时，先推进流程图生成。*/
         step("chart", async () => {
-          const chart = next.chart
-          if (next.analysis?.state !== "done" || chart?.state === "done" || chart?.state === "generating") return false
+          // analysis 必须已经 done，才有资格启动 flowchart。
+          const chart = state.chart
+          if (state.analysis?.state !== "done" || chart?.state === "done" || chart?.state === "generating") return false
           if (!chart || chart.state === "error") opt.charts.set(opt.id, requestChart(opt.workspace, opt.worktree))
           await opt.write("workspace flowchart gate injected", {
             sessionID,
@@ -297,12 +319,14 @@ export function createWorkspace(opt: Opt) {
             worktree: opt.worktree,
             state: chart?.state ?? "missing",
           })
-          output.system.push(noteChart(next.analysis))
+          output.system.push(noteChart(state.analysis))
           return true
         }),
+        /** 10. 基线刷新中时，继续提醒完成 refresh 流程。*/
         step("refresh", async () => {
-          if (next.life !== "refreshing") return false
-          if (next.analysis?.state === "done" && (!next.chart || next.chart.state === "requested" || next.chart.state === "error")) return false
+          // refresh 模式下，如果新的 analysis / chart 还没同步好，先继续提醒刷新。
+          if (state.life !== "refreshing") return false
+          if (state.analysis?.state === "done" && (!state.chart || state.chart.state === "requested" || state.chart.state === "error")) return false
           await opt.write("workspace refresh reminder injected", {
             sessionID,
             workspace: opt.workspace,
@@ -311,9 +335,11 @@ export function createWorkspace(opt: Opt) {
           output.system.push(noteRefresh())
           return true
         }),
+        /** 11. 最终收口阶段时，继续提醒完成最后一次刷新。*/
         step("finalizing", async () => {
-          if (next.life !== "finalizing") return false
-          if (next.analysis?.state === "done" && (!next.chart || next.chart.state === "requested" || next.chart.state === "error")) return false
+          // final 模式本质上也是刷新流程，只是目标换成最终收口。
+          if (state.life !== "finalizing") return false
+          if (state.analysis?.state === "done" && (!state.chart || state.chart.state === "requested" || state.chart.state === "error")) return false
           await opt.write("workspace final reminder injected", {
             sessionID,
             workspace: opt.workspace,
@@ -324,42 +350,50 @@ export function createWorkspace(opt: Opt) {
         }),
       ])
     },
-    /** 鍦ㄥ伐鍏锋墽琛屽墠鍋氱‖闂ㄧ锛屽苟璁板綍 analysis/review/chart 鐨勫惎鍔ㄦ€併€?*/
+    /** 工具执行前做硬门禁，并记录 analysis / review / chart 的启动状态。*/
     before: async (input: Parameters<Before>[0], output: Parameters<Before>[1]) => {
       if (!opt.workspace || !opt.id) return false
       if (!opt.childSessions.has(input.sessionID)) {
-        const data = await sync(opt)
-        const next = view({
-          analysis: data.analysis,
-          chart: data.chart,
-          project: data.project,
+        // 1. 先读取当前工作区快照，拿到 analysis / chart / project 的最新状态。
+        const snap = await snapshot(opt)
+        // 2. 再把分散状态折叠成统一生命周期视图，方便后面做一次性判断。
+        const state = stateView({
+          analysis: snap.analysis,
+          chart: snap.chart,
+          project: snap.project,
           pendingSave: opt.pending.get(opt.id),
           dirtyState: opt.dirtyStates.get(opt.id) ?? cleanDirt(),
-        projectMemory: opt.memory.get(opt.id) ?? cleanMemory(data.project),
+          projectMemory: opt.memory.get(opt.id) ?? cleanMemory(snap.project),
           baselineMode: opt.baselineModes.get(opt.id) ?? "boot",
         })
-        const value = kind({ tool: input.tool, args: output.args })
-        const text = gate(next, value)
-        if (text) {
-          if (next.life === "idle") reset(opt, "boot")
-          if (next.life === "dirty" && value === "review") reset(opt, "refresh")
+        // 3. 把当前即将执行的工具归类成工作流动作类型。
+        const action = kind({ tool: input.tool, args: output.args })
+        // 4. 根据“当前状态 + 即将执行的动作”计算门禁结果；有返回文案就说明必须拦截。
+        const blockText = block(state, action)
+        if (blockText) {
+          // 还没建立 initial baseline，却已经想执行实现类动作时，先把状态重置回 boot 起点。
+          if (state.life === "idle") reset(opt, "boot")
+          // dirty 工作区直接请求 review 时，先把状态重置回 refresh 起点。
+          if (state.life === "dirty" && action === "review") reset(opt, "refresh")
           await opt.write("workspace hard gate blocked tool", {
             sessionID: input.sessionID,
             workspace: opt.workspace,
             worktree: opt.worktree,
             tool: input.tool,
-            pending: next.pendingSave?.kind,
-            analysis: next.analysis?.state ?? "missing",
-            chart: next.chart?.state ?? "missing",
-            life: next.life,
-            kind: value,
+            pending: state.pendingSave?.kind,
+            analysis: state.analysis?.state ?? "missing",
+            chart: state.chart?.state ?? "missing",
+            life: state.life,
+            kind: action,
           })
-          throw new Error(text)
+          throw new Error(blockText)
         }
       }
 
       return flow([
+        /** flowchart 子 agent 即将启动时，把 chart 标成 generating。*/
         step("chart", async () => {
+          // 只有真正启动了 strategy-flowchart-generator，才会命中这里。
           if (!flowchart({ tool: input.tool, args: output.args })) return false
           opt.charts.set(opt.id, freshChart(opt.workspace, opt.worktree))
           await opt.write("workspace flowchart started", {
@@ -369,19 +403,21 @@ export function createWorkspace(opt: Opt) {
           })
           return true
         }),
+        /** review 子 agent 即将启动时，先把“审查进行中”写进远端状态。*/
         step("review", async () => {
+          // 只有真正启动了 strategy-reviewer，才会预写 running review 结果。
           if (!review({ tool: input.tool, args: output.args })) return false
           await opt
             .saveReview({
               workspacePath: opt.workspace,
               worktreePath: opt.worktree,
               state: "running",
-              summary: "鐎光剝鐓℃禒璇插瀹告彃鎯庨崝顭掔礉濮濓絽婀粵澶婄窡 strategy-reviewer 鏉╂柨娲栫紒鎾寸亯閵?",
+              summary: "审查已开始，当前由 strategy-reviewer 接手处理。",
               items: [
                 {
-                  name: "鐎光剝鐓℃禒璇插",
+                  name: "审查进行中",
                   status: "running",
-                  detail: "瀹稿弶顥呭ù瀣煂 strategy-reviewer 鐎?agent 閸氼垰濮╅妴?",
+                  detail: "strategy-reviewer 子 agent 正在执行审查。",
                   suggestion: "",
                 },
               ],
@@ -402,7 +438,9 @@ export function createWorkspace(opt: Opt) {
           })
           return true
         }),
+        /** analysis 子 agent 即将启动时，把 analysis 标成 running，并确定当前 baseline 模式。*/
         step("analysis", async () => {
+          // 只有真正启动了 workspace-analyzer，才会把 analysis 状态推进到 running。
           if (!analyze({ tool: input.tool, args: output.args })) return false
           opt.baselineModes.set(opt.id, opt.baselineModes.get(opt.id) ?? (opt.dirtyStates.get(opt.id)?.state === "dirty" ? "refresh" : "boot"))
           opt.workspaces.set(opt.id, freshAnalysis(opt.workspace, opt.worktree))
@@ -415,12 +453,13 @@ export function createWorkspace(opt: Opt) {
         }),
       ])
     },
-    /** 鍦ㄥ伐鍏锋墽琛屽悗鎺ㄨ繘 project memory銆乥aseline 鍜?review/debug 闃熷垪鐘舵€併€?*/
+    /** 工具执行后推进 project memory、baseline 以及 review / debug 队列状态。*/
     after: async (input: Parameters<After>[0], output: Parameters<After>[1]) => {
       if (!opt.workspace || !opt.id) return false
 
       return flow([
         step("project_init", async () => {
+          // 只有 init_project_state 成功返回，才说明记忆是“新建成功”。
           if (!mcp(input, "init_project_state") || !sameWorkspace(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
           opt.projects.set(opt.id, {
             workspace: opt.workspace,
@@ -437,6 +476,7 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
         step("project_resume", async () => {
+          // resume_project_state 成功后，才算把历史记忆真正接回来了。
           if (!mcp(input, "resume_project_state") || !sameWorkspace(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
           opt.projects.set(opt.id, {
             workspace: opt.workspace,
@@ -453,6 +493,7 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
         step("project_save", async () => {
+          // save_project_state 只有在当前工作区、当前 worktree 且执行成功时才生效。
           if (!mcp(input, "save_project_state") || !sameWorkspace(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
           opt.memory.set(opt.id, { hasProjectState: true, hasRestoredState: true, needsSave: false })
           await opt.write("project memory saved through mcp", {
@@ -463,6 +504,7 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
         step("dirty", async () => {
+          // 只要主会话里真正发生了写入或执行，就把 workspace 标成 dirty。
           if (opt.childSessions.has(input.sessionID) || !ok(output)) return false
           const value = kind({ tool: input.tool, args: input.args })
           if (value !== "write" && value !== "exec") return false
@@ -482,6 +524,7 @@ export function createWorkspace(opt: Opt) {
           return false
         }),
         step("refresh", async () => {
+          // 手动调用 refresh_workspace 时，重置 analysis 和 flowchart 基线。
           if (!mcp(input, "refresh_workspace") || !sameWorkspace(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
           reset(opt, "refresh")
           await opt.write("workspace refresh requested", {
@@ -494,6 +537,7 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
         step("save_analysis", async () => {
+          // analysis 保存成功后，清掉对应的 pending 状态。
           if (!mcp(input, "save_analysis") || !sameWorkspace(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
           if (opt.pending.get(opt.id)?.kind === "analysis") opt.pending.delete(opt.id)
           await opt.write("workspace analysis saved through mcp", {
@@ -504,6 +548,7 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
         step("save_chart", async () => {
+          // flowchart 保存成功后，如果它本轮已经 done，就把 dirty 状态也顺手清掉。
           if (!mcp(input, "save_flowchart") || !sameWorkspace(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
           const item = opt.pending.get(opt.id)
           if (item?.kind === "flowchart") opt.pending.delete(opt.id)
@@ -516,6 +561,7 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
         step("save_review", async () => {
+          // review 保存后要分两种情况：通过则进入 debug，未通过则继续积累修复轮次。
           if (!mcp(input, "save_review") || !sameWorkspace(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
           const item = opt.pending.get(opt.id)
           if (item?.kind === "review") opt.pending.delete(opt.id)
@@ -550,6 +596,7 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
         step("start_debug", async () => {
+          // 只有前一步 review 已经通过、且当前会话正好在 debug 队列里，才会触发这里。
           if (!start(input) || !ok(output)) return false
           const item = opt.pending.get(opt.id)
           if (item?.kind !== "debug" || item.sessionID !== input.sessionID) return false
@@ -562,6 +609,7 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
         step("chart_done", async () => {
+          // flowchart 子 agent 返回后，把结果落到 chart 状态和 pending 队列里。
           if (!flowchart(input)) return false
           const code = mermaid(output.output)
           const state = code ? ("done" as const) : ("error" as const)
@@ -590,8 +638,9 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
         step("review_done", async () => {
+          // review 子 agent 返回后，先解析结论，再决定是否要继续修复。
           if (!review(input)) return false
-          const text = reviewText(output.output) || "鐎光剝鐓￠幎銉ユ啞娑撹櫣鈹栭妴?"
+          const text = reviewText(output.output) || "审查结果为空"
           const state = reviewState(text)
           const fix = opt.reviewFixes.get(fixKey(opt.id, input.sessionID))
           if (state === "failed") {
@@ -627,6 +676,7 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
         step("analysis_done", async () => {
+          // analysis 子 agent 返回后，更新 analysis 结果，并把 flowchart 重新拉回 requested。
           if (!analyze(input)) return false
           const list = items(output.output)
           const text = serial(list)
@@ -651,4 +701,3 @@ export function createWorkspace(opt: Opt) {
     },
   }
 }
-
