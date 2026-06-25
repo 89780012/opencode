@@ -102,9 +102,22 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
       /** 从用户文本里捕获 review/final 意图，留给 system 阶段注入提示。 */
       if (!id || !input.sessionID) return
       const text = output.parts
-        .filter((part): part is typeof part & { type: "text"; text: string } => part.type === "text" && typeof part.text === "string")
+        .filter(
+          (part): part is typeof part & { type: "text"; text: string } =>
+            part.type === "text" && typeof part.text === "string",
+        )
         .map((part) => part.text)
         .join("\n")
+
+      // 解析到用户的文本
+      write("chat.message", {
+        sessionID: input.sessionID,
+        workspace,
+        worktree,
+        text,
+      })
+
+      //识别是否是审查请求
       if (wantsReview(text)) {
         reviewRequests.add(id + "\x00" + input.sessionID)
         await write("workspace review requested", {
@@ -113,21 +126,26 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
           worktree,
         })
       }
-      if (!wantsFinal(text)) return
-      finalRequests.add(id + "\x00" + input.sessionID)
-      await write("workspace final requested", {
-        sessionID: input.sessionID,
-        workspace,
-        worktree,
-      })
+
+      //识别到是要求收尾的请求
+      if (wantsFinal(text)) {
+        finalRequests.add(id + "\x00" + input.sessionID)
+        await write("workspace final requested", {
+          sessionID: input.sessionID,
+          workspace,
+          worktree,
+        })
+      }
     },
     "experimental.chat.system.transform": async (input, output) => {
       /** 先走 workspace 级门禁，再补 session 级顺序提醒。 */
       if (!input.sessionID) return
 
+      // 先走系统级别的门禁
       const handled = await workspaceFlow.system(input, output)
       if (handled) return
 
+      // smartx_start 和 smartx_end 是 smartx 的门禁处理
       await pairing.transform(input, output)
     },
     "tool.execute.before": async (input, output) => {

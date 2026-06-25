@@ -12,7 +12,19 @@ import {
   validChart,
   validProject,
 } from "./model.js"
-import { noteBoot, noteChart, noteClose, noteFinal, noteFix, noteRefresh, noteReview, noteResumeProject, noteSave, noteSaveProject, limit } from "./note.js"
+import {
+  noteBoot,
+  noteChart,
+  noteClose,
+  noteFinal,
+  noteFix,
+  noteRefresh,
+  noteReview,
+  noteResumeProject,
+  noteSave,
+  noteSaveProject,
+  limit,
+} from "./note.js"
 import { items, mermaid, reviewState, reviewText, serial } from "./parse.js"
 import { analyze, flowchart, kind, mcp, review, start } from "./tool.js"
 import type { Analysis, Chart, Dirt, Fix, Memory, Mode, Pending, Project, SaveReview } from "./types.js"
@@ -59,7 +71,10 @@ function ok(output: unknown) {
 function sameWorkspace(input: unknown, workspace: string, worktree: string) {
   if (!input || typeof input !== "object") return false
   const args = input as Record<string, unknown>
-  return args.workspacePath === workspace && (args.worktreePath === worktree || (!args.worktreePath && worktree === workspace))
+  return (
+    args.workspacePath === workspace &&
+    (args.worktreePath === worktree || (!args.worktreePath && worktree === workspace))
+  )
 }
 
 /** 规范化 review item 的 status，方便做大小写无关的比较。*/
@@ -74,7 +89,10 @@ function reviewPassed(input: unknown) {
   const args = input as Record<string, unknown>
   if (args.state !== "passed") return false
   if (!Array.isArray(args.items) || !args.items.length) return false
-  return args.items.every((item) => item && typeof item === "object" && normalizeStatus((item as Record<string, unknown>).status) === "passed")
+  return args.items.every(
+    (item) =>
+      item && typeof item === "object" && normalizeStatus((item as Record<string, unknown>).status) === "passed",
+  )
 }
 
 /** 生成 workspace + session 维度的修复记录 key。*/
@@ -89,7 +107,8 @@ function requestKey(id: string, session: string) {
 
 /** 从本地缓存或远端服务同步 analysis / chart / project 三类快照。*/
 async function snapshot(opt: Opt) {
-  const loadedAnalysis = opt.workspaces.get(opt.id) ?? (await opt.load(opt.workspace, opt.worktree).catch(() => undefined))
+  const loadedAnalysis =
+    opt.workspaces.get(opt.id) ?? (await opt.load(opt.workspace, opt.worktree).catch(() => undefined))
   if (loadedAnalysis && validAnalysis(loadedAnalysis)) opt.workspaces.set(opt.id, loadedAnalysis)
   if (loadedAnalysis && !validAnalysis(loadedAnalysis)) opt.workspaces.delete(opt.id)
   const analysis = opt.workspaces.get(opt.id)
@@ -99,7 +118,8 @@ async function snapshot(opt: Opt) {
       : undefined
   if (loadedChart && validChart(loadedChart)) opt.charts.set(opt.id, loadedChart)
   if (loadedChart && !validChart(loadedChart)) opt.charts.delete(opt.id)
-  const project = opt.projects.get(opt.id) ?? (await opt.loadProject(opt.workspace, opt.worktree).catch(() => undefined))
+  const project =
+    opt.projects.get(opt.id) ?? (await opt.loadProject(opt.workspace, opt.worktree).catch(() => undefined))
   if (project && validProject(project)) opt.projects.set(opt.id, project)
   if (project && !validProject(project)) opt.projects.delete(opt.id)
   return { analysis, chart: opt.charts.get(opt.id), project: opt.projects.get(opt.id) }
@@ -120,7 +140,8 @@ function reset(opt: Opt, mode?: Mode) {
   opt.charts.set(opt.id, requestChart(opt.workspace, opt.worktree))
   opt.baselineModes.set(opt.id, mode ?? (opt.dirtyStates.get(opt.id)?.state === "dirty" ? "refresh" : "boot"))
   const pendingSave = opt.pending.get(opt.id)
-  if (pendingSave?.kind === "analysis" || pendingSave?.kind === "flowchart" || pendingSave?.kind === "debug") opt.pending.delete(opt.id)
+  if (pendingSave?.kind === "analysis" || pendingSave?.kind === "flowchart" || pendingSave?.kind === "debug")
+    opt.pending.delete(opt.id)
 }
 
 /** workspace 级编排器，负责 system 注入、before 门禁和 after 状态推进。*/
@@ -142,7 +163,10 @@ export function createWorkspace(opt: Opt) {
     system: async (input: Parameters<System>[0], output: Parameters<System>[1]) => {
       if (!opt.workspace || !opt.id) return false
 
+      // 获取到当前快照
       const snap = await snapshot(opt)
+
+      // 当前的状态管理
       const state = stateView({
         analysis: snap.analysis,
         chart: snap.chart,
@@ -326,7 +350,11 @@ export function createWorkspace(opt: Opt) {
         step("refresh", async () => {
           // refresh 模式下，如果新的 analysis / chart 还没同步好，先继续提醒刷新。
           if (state.life !== "refreshing") return false
-          if (state.analysis?.state === "done" && (!state.chart || state.chart.state === "requested" || state.chart.state === "error")) return false
+          if (
+            state.analysis?.state === "done" &&
+            (!state.chart || state.chart.state === "requested" || state.chart.state === "error")
+          )
+            return false
           await opt.write("workspace refresh reminder injected", {
             sessionID,
             workspace: opt.workspace,
@@ -339,7 +367,11 @@ export function createWorkspace(opt: Opt) {
         step("finalizing", async () => {
           // final 模式本质上也是刷新流程，只是目标换成最终收口。
           if (state.life !== "finalizing") return false
-          if (state.analysis?.state === "done" && (!state.chart || state.chart.state === "requested" || state.chart.state === "error")) return false
+          if (
+            state.analysis?.state === "done" &&
+            (!state.chart || state.chart.state === "requested" || state.chart.state === "error")
+          )
+            return false
           await opt.write("workspace final reminder injected", {
             sessionID,
             workspace: opt.workspace,
@@ -442,7 +474,10 @@ export function createWorkspace(opt: Opt) {
         step("analysis", async () => {
           // 只有真正启动了 workspace-analyzer，才会把 analysis 状态推进到 running。
           if (!analyze({ tool: input.tool, args: output.args })) return false
-          opt.baselineModes.set(opt.id, opt.baselineModes.get(opt.id) ?? (opt.dirtyStates.get(opt.id)?.state === "dirty" ? "refresh" : "boot"))
+          opt.baselineModes.set(
+            opt.id,
+            opt.baselineModes.get(opt.id) ?? (opt.dirtyStates.get(opt.id)?.state === "dirty" ? "refresh" : "boot"),
+          )
           opt.workspaces.set(opt.id, freshAnalysis(opt.workspace, opt.worktree))
           await opt.write("workspace analysis started", {
             sessionID: input.sessionID,
@@ -460,7 +495,12 @@ export function createWorkspace(opt: Opt) {
       return flow([
         step("project_init", async () => {
           // 只有 init_project_state 成功返回，才说明记忆是“新建成功”。
-          if (!mcp(input, "init_project_state") || !sameWorkspace(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
+          if (
+            !mcp(input, "init_project_state") ||
+            !sameWorkspace(input.args, opt.workspace, opt.worktree) ||
+            !ok(output)
+          )
+            return false
           opt.projects.set(opt.id, {
             workspace: opt.workspace,
             worktree: opt.worktree,
@@ -477,7 +517,12 @@ export function createWorkspace(opt: Opt) {
         }),
         step("project_resume", async () => {
           // resume_project_state 成功后，才算把历史记忆真正接回来了。
-          if (!mcp(input, "resume_project_state") || !sameWorkspace(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
+          if (
+            !mcp(input, "resume_project_state") ||
+            !sameWorkspace(input.args, opt.workspace, opt.worktree) ||
+            !ok(output)
+          )
+            return false
           opt.projects.set(opt.id, {
             workspace: opt.workspace,
             worktree: opt.worktree,
@@ -494,7 +539,12 @@ export function createWorkspace(opt: Opt) {
         }),
         step("project_save", async () => {
           // save_project_state 只有在当前工作区、当前 worktree 且执行成功时才生效。
-          if (!mcp(input, "save_project_state") || !sameWorkspace(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
+          if (
+            !mcp(input, "save_project_state") ||
+            !sameWorkspace(input.args, opt.workspace, opt.worktree) ||
+            !ok(output)
+          )
+            return false
           opt.memory.set(opt.id, { hasProjectState: true, hasRestoredState: true, needsSave: false })
           await opt.write("project memory saved through mcp", {
             sessionID: input.sessionID,
@@ -525,7 +575,12 @@ export function createWorkspace(opt: Opt) {
         }),
         step("refresh", async () => {
           // 手动调用 refresh_workspace 时，重置 analysis 和 flowchart 基线。
-          if (!mcp(input, "refresh_workspace") || !sameWorkspace(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
+          if (
+            !mcp(input, "refresh_workspace") ||
+            !sameWorkspace(input.args, opt.workspace, opt.worktree) ||
+            !ok(output)
+          )
+            return false
           reset(opt, "refresh")
           await opt.write("workspace refresh requested", {
             sessionID: input.sessionID,
@@ -538,7 +593,8 @@ export function createWorkspace(opt: Opt) {
         }),
         step("save_analysis", async () => {
           // analysis 保存成功后，清掉对应的 pending 状态。
-          if (!mcp(input, "save_analysis") || !sameWorkspace(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
+          if (!mcp(input, "save_analysis") || !sameWorkspace(input.args, opt.workspace, opt.worktree) || !ok(output))
+            return false
           if (opt.pending.get(opt.id)?.kind === "analysis") opt.pending.delete(opt.id)
           await opt.write("workspace analysis saved through mcp", {
             sessionID: input.sessionID,
@@ -549,7 +605,8 @@ export function createWorkspace(opt: Opt) {
         }),
         step("save_chart", async () => {
           // flowchart 保存成功后，如果它本轮已经 done，就把 dirty 状态也顺手清掉。
-          if (!mcp(input, "save_flowchart") || !sameWorkspace(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
+          if (!mcp(input, "save_flowchart") || !sameWorkspace(input.args, opt.workspace, opt.worktree) || !ok(output))
+            return false
           const item = opt.pending.get(opt.id)
           if (item?.kind === "flowchart") opt.pending.delete(opt.id)
           if (item?.kind === "flowchart" && item.state === "done") opt.dirtyStates.set(opt.id, cleanDirt())
@@ -562,7 +619,8 @@ export function createWorkspace(opt: Opt) {
         }),
         step("save_review", async () => {
           // review 保存后要分两种情况：通过则进入 debug，未通过则继续积累修复轮次。
-          if (!mcp(input, "save_review") || !sameWorkspace(input.args, opt.workspace, opt.worktree) || !ok(output)) return false
+          if (!mcp(input, "save_review") || !sameWorkspace(input.args, opt.workspace, opt.worktree) || !ok(output))
+            return false
           const item = opt.pending.get(opt.id)
           if (item?.kind === "review") opt.pending.delete(opt.id)
           const done = item?.kind === "review" && reviewPassed(input.args)
