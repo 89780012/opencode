@@ -18,6 +18,7 @@
   flex-direction: column;
   overflow: hidden;
   background: #ffffff;
+  font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
 }
 
 .topbar {

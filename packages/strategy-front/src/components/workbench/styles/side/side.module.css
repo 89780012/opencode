@@ -161,6 +161,9 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding-right: 0.2rem;
 }
 
@@ -188,6 +191,9 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
   gap: 0.22rem;

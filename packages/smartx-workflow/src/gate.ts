@@ -4,6 +4,7 @@ import type { Kind } from "./tool.js"
 /** 根据生命周期视图和动作类型，判断是否需要硬性拦截。 */
 export function gate(state: View, toolKind: Kind) {
   // 如果没有恢复项目状态，则不允许进行写操作
+  // 但允许项目状态相关的操作（初始化、恢复、查询等）以及只读操作
   if (!state.projectMemory.hasRestoredState) {
     if (
       toolKind === "read" ||
@@ -22,49 +23,68 @@ export function gate(state: View, toolKind: Kind) {
       : "SmartX workflow requires initializing project memory through init_project_state before sustained work."
   }
   if (state.pendingSave?.kind === "review") return state.life === "ready" || state.life === "dirty" ? "" : ""
+  // 审查结果保存后，调试工具调用被允许
   if (state.pendingSave?.kind === "debug" && toolKind === "debug") return ""
+  // idle 状态：等待基线初始化
   if (state.life === "idle") {
+    // 只读操作、分析操作、刷新操作和其他操作被允许
     if (toolKind === "read" || toolKind === "analyze" || toolKind === "refresh" || toolKind === "other") return ""
+    // 保存操作需要先创建基线
     if (toolKind === "save") return "SmartX workflow requires creating the initial workspace baseline first."
+    // 其他写操作需要先完成工作区分析和流程图生成
     return "SmartX workflow requires initial workspace analysis and flowchart generation before implementation."
   }
+  // booting 状态：正在建立初始基线
   if (state.life === "booting") {
+    // 只读操作、分析操作、流程图操作、保存操作、刷新操作和项目初始化操作被允许
     if (
       toolKind === "read" ||
       toolKind === "analyze" ||
       toolKind === "chart" ||
       toolKind === "save" ||
-      toolKind === "refresh"
+      toolKind === "refresh" ||
+      toolKind === "project_init"
     )
       return ""
+    // 其他操作需要等待基线建立完成
     return "SmartX workflow is still building the initial workspace baseline. Finish analysis and flowchart first."
   }
+  // ready 状态：基线已建立，可以正常开发
   if (state.life === "ready") return ""
-  if (state.life === "dirty") {
-    if (toolKind === "review")
-      return "SmartX workflow requires refreshing workspace analysis and flowchart before review."
-    return ""
-  }
+  // 如果有代码变动，如果审查代码 必须要进行工作区分析和流程图刷新
+  // if (state.life === "dirty") {
+  //   if (toolKind === "review")
+  //     return "SmartX workflow requires refreshing workspace analysis and flowchart before review."
+  //   return ""
+  // }
+  // refreshing 状态：代码变更后正在刷新基线
   if (state.life === "refreshing") {
+    // 只读操作、分析操作、流程图操作、保存操作、刷新操作和项目初始化操作被允许
     if (
       toolKind === "read" ||
       toolKind === "analyze" ||
       toolKind === "chart" ||
       toolKind === "save" ||
-      toolKind === "refresh"
+      toolKind === "refresh" ||
+      toolKind === "project_init"
     )
       return ""
+    // 其他操作需要等待基线刷新完成
     return "SmartX workflow is refreshing the workspace baseline after code changes. Finish analysis and flowchart first."
   }
+  // finalizing 状态：正在生成最终快照
   if (state.life === "finalizing") {
+    // 只读操作、分析操作、流程图操作、保存操作、刷新操作和项目初始化操作被允许
     if (
       toolKind === "read" ||
       toolKind === "analyze" ||
       toolKind === "chart" ||
       toolKind === "save" ||
-      toolKind === "refresh"
+      toolKind === "refresh" ||
+      toolKind === "project_init"
     )
       return ""
+    // 其他操作需要等待最终快照生成完成
     return "SmartX workflow is generating the final workspace snapshot. Finish analysis and flowchart first."
   }
   return ""

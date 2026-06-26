@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { ArrowDownIcon } from "lucide-react"
+import { ArrowDown } from "lucide-react"
 import {
   createContext,
   useCallback,
@@ -35,9 +35,18 @@ function useConversation() {
   return ctx
 }
 
-export type ConversationProps = ComponentProps<"div">
+export type ConversationProps = ComponentProps<"div"> & {
+  autoScroll?: boolean
+}
 
-export const Conversation = ({ children, className, onScroll, onWheel, ...props }: ConversationProps) => {
+export const Conversation = ({
+  children,
+  className,
+  onScroll,
+  onWheel,
+  autoScroll = true,
+  ...props
+}: ConversationProps) => {
   const body = useRef<HTMLDivElement>(null)
   const wrap = useRef<HTMLDivElement>(null)
   const root = useRef<HTMLDivElement>(null)
@@ -77,45 +86,52 @@ export const Conversation = ({ children, className, onScroll, onWheel, ...props 
     setBot(false)
   }, [stop])
 
-  const jump = useCallback((mode: ScrollBehavior = "auto") => {
-    const node = root.current
-    if (!node) return
-    stop()
-    free.current = false
-    last.current = true
-    if (mode === "smooth") {
-      const from = node.scrollTop
-      const dist = node.scrollHeight - node.clientHeight - from
-      if (dist <= 4) {
-        node.scrollTop = node.scrollHeight
-        top.current = node.scrollTop
-        return
-      }
-      const span = Math.min(320, Math.max(160, dist * 0.18))
-      const start = performance.now()
-      const step = (now: number) => {
-        const p = Math.min(1, (now - start) / span)
-        const eased = 1 - Math.pow(1 - p, 3)
-        const end = node.scrollHeight - node.clientHeight
-        node.scrollTop = from + (end - from) * eased
-        if (p >= 1) {
-          anim.current = 0
+  const jump = useCallback(
+    (mode: ScrollBehavior = "auto") => {
+      const node = root.current
+      if (!node) return
+      stop()
+      free.current = false
+      last.current = true
+      if (mode === "smooth") {
+        const from = node.scrollTop
+        const dist = node.scrollHeight - node.clientHeight - from
+        if (dist <= 4) {
           node.scrollTop = node.scrollHeight
           top.current = node.scrollTop
-          sync()
           return
         }
+        const span = Math.min(320, Math.max(160, dist * 0.18))
+        const start = performance.now()
+        const step = (now: number) => {
+          const p = Math.min(1, (now - start) / span)
+          const eased = 1 - Math.pow(1 - p, 3)
+          const end = node.scrollHeight - node.clientHeight
+          node.scrollTop = from + (end - from) * eased
+          if (p >= 1) {
+            anim.current = 0
+            node.scrollTop = node.scrollHeight
+            top.current = node.scrollTop
+            sync()
+            return
+          }
+          anim.current = requestAnimationFrame(step)
+        }
         anim.current = requestAnimationFrame(step)
+        return
       }
-      anim.current = requestAnimationFrame(step)
-      return
-    }
-    node.scrollTop = node.scrollHeight
-    top.current = node.scrollTop
-  }, [stop, sync])
+      node.scrollTop = node.scrollHeight
+      top.current = node.scrollTop
+    },
+    [stop, sync],
+  )
 
+  const mounted = useRef(false)
   useLayoutEffect(() => {
-    jump()
+    if (!mounted.current && autoScroll) {
+      jump()
+      mounted.current = true
+    }
     if (root.current) {
       top.current = root.current.scrollTop
     }
@@ -149,7 +165,7 @@ export const Conversation = ({ children, className, onScroll, onWheel, ...props 
       }
       frame.current = requestAnimationFrame(() => {
         frame.current = 0
-        if (last.current) {
+        if (last.current && autoScroll) {
           jump()
         }
         sync()
@@ -222,7 +238,9 @@ export const ConversationContent = ({ className, plain, ...props }: Conversation
     },
     [ctx],
   )
-  return <div className={cn("conversation-body min-w-0", plain ? "" : "space-y-4 p-4", className)} ref={ref} {...props} />
+  return (
+    <div className={cn("conversation-body min-w-0", plain ? "" : "space-y-4 p-4", className)} ref={ref} {...props} />
+  )
 }
 
 export type ConversationEmptyStateProps = ComponentProps<"div"> & {
@@ -282,7 +300,7 @@ export const ConversationScrollButton = ({ className, ...props }: ConversationSc
         variant="outline"
         {...props}
       >
-        <ArrowDownIcon className="size-4" />
+        <ArrowDown className="size-4" />
       </Button>
     </div>,
     wrap.current,

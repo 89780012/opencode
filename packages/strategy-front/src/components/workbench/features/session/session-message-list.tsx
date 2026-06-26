@@ -1,4 +1,14 @@
-import { Bot, Check, CheckCircle2, ChevronDown, CircleAlert, Copy, Download, FileCode2, LoaderCircle } from "lucide-react"
+import {
+  Bot,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  CircleAlert,
+  Copy,
+  Download,
+  FileCode2,
+  LoaderCircle,
+} from "lucide-react"
 import { memo, useEffect, useState, type ReactNode } from "react"
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation"
 import { Response } from "@/components/ai-elements/response"
@@ -206,7 +216,12 @@ function Tool(props: { part: ChatToolPart }) {
       : props.part.state.status === "error"
         ? "error"
         : "done"
-  const label = state === "running" ? `正在调用 ${props.part.tool}` : state === "error" ? `${props.part.tool} 调用失败` : `已调用 ${props.part.tool}`
+  const label =
+    state === "running"
+      ? `正在调用 ${props.part.tool}`
+      : state === "error"
+        ? `${props.part.tool} 调用失败`
+        : `已调用 ${props.part.tool}`
   const data = "metadata" in props.part.state ? props.part.state.metadata : undefined
   const sid = data && typeof data.sessionId === "string" ? data.sessionId : ""
   const used = "time" in props.part.state ? time(props.part.state.time) : ""
@@ -290,7 +305,13 @@ function CodeBlock(props: { lang: string; value: string }) {
           <button type="button" className={css.codeaction} aria-label="下载代码块" title="下载" onClick={save}>
             <Download size={13} />
           </button>
-          <button type="button" className={css.codeaction} aria-label="复制代码块" title={copied ? "已复制" : "复制"} onClick={copy}>
+          <button
+            type="button"
+            className={css.codeaction}
+            aria-label="复制代码块"
+            title={copied ? "已复制" : "复制"}
+            onClick={copy}
+          >
             {copied ? <Check size={13} /> : <Copy size={13} />}
           </button>
         </span>
@@ -336,14 +357,17 @@ function proc(parts: ChatPart[]) {
   ) {
     return "running"
   }
-  if (body.some((part) => (part.type === "tool" && part.state.status === "error") || part.type === "retry")) return "warn"
+  if (body.some((part) => (part.type === "tool" && part.state.status === "error") || part.type === "retry"))
+    return "warn"
   return "done"
 }
 
 function meta(parts: ChatPart[]) {
   const body = parts.filter(shown)
   const tools = body.filter((part): part is ChatToolPart => part.type === "tool").length
-  const fail = body.filter((part) => (part.type === "tool" && part.state.status === "error") || part.type === "retry").length
+  const fail = body.filter(
+    (part) => (part.type === "tool" && part.state.status === "error") || part.type === "retry",
+  ).length
   if (!tools) return `${body.length} 步`
   return `${body.length} 步 · ${tools} 个工具${fail ? ` · ${fail} 个失败` : ""}`
 }
@@ -362,7 +386,6 @@ function Process(props: { parts: ChatPart[]; onOpenDiff?: (file: string) => void
     </Fold>
   )
 }
-
 
 function Part(props: { part: ChatPart; role: ChatMessageInfo["role"]; onOpenDiff?: (file: string) => void }) {
   if (props.part.type === "text") {
@@ -447,13 +470,13 @@ const Item = memo(function Item(props: { info: ChatMessageInfo; onOpenDiff?: (fi
     <article className={`${css.msg} ${user ? css.user : css.ai} ${trace ? css.trace : ""}`}>
       <div className={css.avatar}>{user ? "我" : <Bot size={14} />}</div>
       <div className={css.card}>
-        {list.map((item) => (
+        {list.map((item) =>
           item.type === "proc" ? (
             <Process key={item.key} parts={item.parts} onOpenDiff={props.onOpenDiff} />
           ) : (
             <Part key={item.part.id} part={item.part} role={props.info.role} onOpenDiff={props.onOpenDiff} />
-          )
-        ))}
+          ),
+        )}
         {msg ? (
           <Fold title="回复失败" state="error">
             <div className={css.warn}>{msg}</div>
@@ -486,13 +509,13 @@ const Group = memo(function Group(props: { infos: ChatAssistantMessage[]; onOpen
         <Bot size={14} />
       </div>
       <div className={css.card}>
-        {list.map((item) => (
+        {list.map((item) =>
           item.type === "proc" ? (
             <Process key={item.key} parts={item.parts} onOpenDiff={props.onOpenDiff} />
           ) : (
             <Part key={item.part.id} part={item.part} role="assistant" onOpenDiff={props.onOpenDiff} />
-          )
-        ))}
+          ),
+        )}
         {msg ? (
           <Fold title="回复失败" state="error">
             <div className={css.warn}>{msg}</div>
@@ -529,24 +552,20 @@ export function SessionMessageList(props: {
   const note = props.status.type === "retry" ? props.status : retry
 
   return (
-    <Conversation className={css.body}>
+    <Conversation className={css.body} autoScroll={false}>
       <ConversationContent plain className={`${css.list} ${props.mode === "full" ? css.listFull : ""}`}>
         {props.loading ? (
           <div className={css.load}>
             <LoaderCircle className={common.spin} size={20} />
           </div>
         ) : null}
-        {entries(props.messages).map((item) => (
+        {entries(props.messages).map((item) =>
           item.type === "group" ? (
-            <Group
-              key={`${item.parent}:${item.infos[0]?.id ?? ""}`}
-              infos={item.infos}
-              onOpenDiff={props.onOpenDiff}
-            />
+            <Group key={`${item.parent}:${item.infos[0]?.id ?? ""}`} infos={item.infos} onOpenDiff={props.onOpenDiff} />
           ) : (
             <Item key={item.info.id} info={item.info} onOpenDiff={props.onOpenDiff} />
-          )
-        ))}
+          ),
+        )}
         {props.status.type !== "idle" ? (
           <div className={`${css.status} ${note ? css.statusRetry : ""}`}>
             {note ? <CircleAlert size={14} /> : <LoaderCircle className={common.spin} size={13} />}

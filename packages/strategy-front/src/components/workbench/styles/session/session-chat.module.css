@@ -13,9 +13,10 @@
   display: flex;
   flex-direction: column;
   background: #ffffff;
+  font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
   box-shadow:
-    1px 0 0 var(--line-soft) inset,
-    -1px 0 0 var(--line-soft) inset;
+    1px 0 0 #f3f4f6 inset,
+    -1px 0 0 #f3f4f6 inset;
 }
 
 .bar {
@@ -26,7 +27,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.9rem;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid #e5e7eb;
   background: linear-gradient(180deg, #ffffff 0%, #f9fafb 100%);
   padding: 0.52rem 1.1rem;
 }
@@ -89,6 +90,7 @@
   background: #111827;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.22);
   transition: transform 0.18s ease;
+  pointer-events: none;
 }
 
 .modes[data-mode="full"]::before {
@@ -135,37 +137,12 @@
   min-width: 0;
   min-height: 0;
   overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   display: block;
   padding: 0.85rem 1.2rem 1.4rem;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(163, 163, 163, 0.72) transparent;
   background: #ffffff;
-}
-
-.body::-webkit-scrollbar {
-  width: 0.42rem;
-  height: 0.42rem;
-}
-
-.body::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.body::-webkit-scrollbar-thumb {
-  min-height: 2rem;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  background: rgba(163, 163, 163, 0.58);
-  background-clip: padding-box;
-}
-
-.body::-webkit-scrollbar-thumb:hover {
-  background: rgba(115, 115, 115, 0.78);
-  background-clip: padding-box;
-}
-
-.body::-webkit-scrollbar-corner {
-  background: transparent;
 }
 
 .list {
@@ -179,6 +156,7 @@
 
 .listFull {
   width: 100%;
+  max-width: none;
 }
 
 .panelNarrow,
@@ -263,7 +241,7 @@
   gap: 0.45rem;
   border: 0;
   background: transparent;
-  color: var(--text);
+  color: #111827;
   font-size: 0.895rem;
   line-height: 1.62;
   padding: 0;
@@ -273,10 +251,10 @@
   width: auto;
   max-width: 52rem;
   max-width: min(52rem, 86%);
-  border: 1px solid var(--line);
+  border: 1px solid #e5e7eb;
   border-radius: 0.86rem;
   border-top-left-radius: 0.28rem;
-  background: var(--panel);
+  background: #f9fafb;
   padding: 0.56rem 0.72rem;
   gap: 0.42rem;
 }
@@ -306,7 +284,7 @@
 
 .markdown {
   min-width: 0;
-  color: var(--text);
+  color: #111827;
   font-size: 0.895rem;
   line-height: 1.66;
 }
@@ -406,17 +384,65 @@
   color: #1f2937 !important;
 }
 
-.markdown.markdown :global([data-streamdown="table-wrapper"] > div:first-child > .relative > div) {
+.markdown :global([data-streamdown="table-wrapper"] > div:first-child > .relative > div) {
   overflow: hidden;
   min-width: 8.2rem;
   border: 1px solid #e5e7eb !important;
   border-radius: 0.56rem !important;
   background: #ffffff !important;
   background-image: none !important;
-  box-shadow: 0 0.7rem 1.8rem rgba(17, 24, 39, 0.12) !important;
+  color: #111827 !important;
 }
 
-.markdown.markdown :global([data-streamdown="table-wrapper"] > div:first-child > .relative > div button) {
+/* 兼容性修复：确保下拉菜单内容可见 */
+.markdown :global([data-streamdown="table-wrapper"] > div:first-child > .relative > div *) {
+  color: #111827 !important;
+  background: transparent !important;
+}
+
+/* 强制修复所有可能的黑色背景 */
+.markdown :global([data-streamdown="table-wrapper"] [style*="background:black" i]),
+.markdown :global([data-streamdown="table-wrapper"] [style*="background:#000" i]),
+.markdown :global([data-streamdown="table-wrapper"] [style*="background-color:black" i]),
+.markdown :global([data-streamdown="table-wrapper"] [style*="background-color:#000" i]) {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+}
+
+/* 额外修复：针对下拉菜单容器的黑色背景 */
+.markdown :global([data-streamdown="table-wrapper"] > div:first-child > .relative > div > div) {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 0.56rem !important;
+}
+
+/* 修复绝对定位的下拉菜单 */
+.markdown :global([data-streamdown="table-wrapper"] > div:first-child > .relative [role="menu"]) {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 0.56rem !important;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+/* 修复下拉菜单项 */
+.markdown :global([data-streamdown="table-wrapper"] > div:first-child > .relative [role="menu"] button) {
+  background: transparent !important;
+  color: #111827 !important;
+}
+
+.markdown :global([data-streamdown="table-wrapper"] > div:first-child > .relative [role="menu"] button:hover) {
+  background: #f3f4f6 !important;
+  color: #1f2937 !important;
+}
+
+.markdown :global([data-streamdown="table-wrapper"] > div:first-child > .relative > div button:hover) {
+  background: #f3f4f6 !important;
+  color: #1f2937 !important;
+}
+
+.markdown :global([data-streamdown="table-wrapper"] > div:first-child > .relative > div button) {
   justify-content: flex-start !important;
   width: 100%;
   min-height: 2.05rem;
@@ -426,7 +452,7 @@
   padding: 0.48rem 0.7rem !important;
 }
 
-.markdown.markdown :global([data-streamdown="table-wrapper"] > div:first-child > .relative > div button:hover) {
+.markdown :global([data-streamdown="table-wrapper"] > div:first-child > .relative > div button:hover) {
   background: #f3f4f6 !important;
   color: #1f2937 !important;
 }
@@ -435,30 +461,23 @@
   border: 0 !important;
   border-radius: 0 !important;
   background: #ffffff !important;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(163, 163, 163, 0.64) transparent;
-}
-
-.markdown :global([data-streamdown="table-wrapper"] > div:last-child::-webkit-scrollbar) {
-  width: 0.36rem;
-  height: 0.36rem;
-}
-
-.markdown :global([data-streamdown="table-wrapper"] > div:last-child::-webkit-scrollbar-track) {
-  background: transparent;
-}
-
-.markdown :global([data-streamdown="table-wrapper"] > div:last-child::-webkit-scrollbar-thumb) {
-  border-radius: 999px;
-  background: rgba(163, 163, 163, 0.58);
 }
 
 .markdown :global([data-streamdown="table-wrapper"] table) {
   width: 100%;
   border-collapse: collapse;
-  color: var(--text);
+  color: #111827;
   font-size: 0.82rem;
   line-height: 1.55;
+}
+
+/* 通用黑色背景修复 */
+.markdown :global([data-streamdown="table-wrapper"] *) {
+  background-color: transparent !important;
+}
+
+.markdown :global([data-streamdown="table-wrapper"] button) {
+  background-color: transparent !important;
 }
 
 .markdown :global([data-streamdown="table-header"]) {
@@ -494,7 +513,7 @@
 
 :global([data-streamdown="table-fullscreen"]) {
   background: #f9fafb !important;
-  color: var(--text) !important;
+  color: #111827 !important;
 }
 
 :global([data-streamdown="table-fullscreen"] > div > div:first-child) {
@@ -521,7 +540,7 @@
   border: 1px solid #e5e7eb !important;
   border-radius: 0.62rem;
   background: #ffffff !important;
-  color: var(--text) !important;
+  color: #111827 !important;
 }
 
 :global([data-streamdown="table-fullscreen"] thead) {
@@ -538,6 +557,24 @@
   color: #111827 !important;
 }
 
+/* 全屏模式通用黑色背景修复 */
+:global([data-streamdown="table-fullscreen"] *) {
+  background-color: transparent !important;
+}
+
+:global([data-streamdown="table-fullscreen"] button) {
+  background-color: transparent !important;
+}
+
+/* 全屏模式强制修复所有可能的黑色背景 */
+:global([data-streamdown="table-fullscreen"] [style*="background:black" i]),
+:global([data-streamdown="table-fullscreen"] [style*="background:#000" i]),
+:global([data-streamdown="table-fullscreen"] [style*="background-color:black" i]),
+:global([data-streamdown="table-fullscreen"] [style*="background-color:#000" i]) {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+}
+
 :global([data-streamdown="table-fullscreen"] .relative > div) {
   overflow: hidden;
   min-width: 8.2rem;
@@ -545,7 +582,6 @@
   border-radius: 0.56rem !important;
   background: #ffffff !important;
   background-image: none !important;
-  box-shadow: 0 0.7rem 1.8rem rgba(17, 24, 39, 0.12) !important;
 }
 
 :global([data-streamdown="table-fullscreen"] .relative > div button) {
@@ -559,6 +595,26 @@
 }
 
 :global([data-streamdown="table-fullscreen"] .relative > div button:hover) {
+  background: #f3f4f6 !important;
+  color: #1f2937 !important;
+}
+
+/* 全屏模式下拉菜单修复 */
+:global([data-streamdown="table-fullscreen"] .relative [role="menu"]) {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 0.56rem !important;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+:global([data-streamdown="table-fullscreen"] .relative [role="menu"] button) {
+  background: transparent !important;
+  color: #111827 !important;
+}
+
+:global([data-streamdown="table-fullscreen"] .relative [role="menu"] button:hover) {
   background: #f3f4f6 !important;
   color: #1f2937 !important;
 }
@@ -651,7 +707,7 @@
 .foldbody {
   border-top: 0;
   margin: 0.2rem 0 0.12rem 0.38rem;
-  padding: 0.12rem 0 0.12rem var(--fold-indent);
+  padding: 0.12rem 0 0.12rem 1.15rem;
   border-left: 2px solid #d1d5db;
   background: transparent;
 }
@@ -773,22 +829,6 @@
   max-height: 12rem;
   overflow: auto;
   padding-right: 0.28rem;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(163, 163, 163, 0.64) transparent;
-}
-
-.process .thought::-webkit-scrollbar {
-  width: 0.36rem;
-  height: 0.36rem;
-}
-
-.process .thought::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.process .thought::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: rgba(163, 163, 163, 0.58);
 }
 
 .fold > .foldbody > .process {

@@ -67,14 +67,38 @@ function ok(output: unknown) {
   return output.isError !== true
 }
 
+/** 规范化路径，统一分隔符并转为小写，用于跨平台比较。*/
+function normalizePath(input: string) {
+  return input.replace(/\\/g, "/").toLowerCase()
+}
+
 /** 判断一次工具调用是否命中了当前 workspace / worktree。*/
-function sameWorkspace(input: unknown, workspace: string, worktree: string) {
+function sameWorkspace(input: unknown, workspace: string, worktree: string, write: Log) {
   if (!input || typeof input !== "object") return false
-  const args = input as Record<string, unknown>
-  return (
-    args.workspacePath === workspace &&
-    (args.worktreePath === worktree || (!args.worktreePath && worktree === workspace))
-  )
+  const a = input as Record<string, unknown>
+  const wp = normalizePath(String(a.workspacePath ?? ""))
+  if (wp !== normalizePath(workspace)) return false
+  if (!a.worktreePath) {
+    write("same workspace check", {
+      workspace,
+      worktree,
+      wp,
+      wt: "",
+      ws: normalizePath(workspace),
+      wtree: normalizePath(worktree),
+    })
+    return true
+  }
+  const result = normalizePath(String(a.worktreePath)) === normalizePath(worktree)
+  write("same workspace check", {
+    workspace,
+    worktree,
+    wp,
+    wt: normalizePath(String(a.worktreePath)),
+    ws: normalizePath(workspace),
+    wtree: normalizePath(worktree),
+  })
+  return result
 }
 
 /** 规范化 review item 的 status，方便做大小写无关的比较。*/
@@ -244,25 +268,14 @@ export function createWorkspace(opt: Opt) {
           if (fix.attempt >= limit) opt.reviewFixes.delete(fixKey(opt.id, sessionID))
           return true
         }),
-        /** 5. 用户明确要求 review 时，优先进入审查流程；若基线脏了则先刷新。*/
+        /** 5. 用户明确要求 review 时，优先进入审查流程。*/
         step("review", async () => {
           // 只有用户已经显式请求 review，才会进入这条分支。
           if (!sessionID) return false
           const requestID = requestKey(opt.id, sessionID)
           if (!opt.reviewRequests.has(requestID)) return false
-          // 基线被写脏了，说明审查前必须先重新刷新 analysis / flowchart。
-          if (state.life === "dirty") {
-            await opt.write("workspace refresh gate injected", {
-              sessionID,
-              workspace: opt.workspace,
-              worktree: opt.worktree,
-              action: "review",
-            })
-            output.system.push(noteRefresh("代码审查"))
-            return true
-          }
-          // 只有基线完整且工作区干净时，才真正放行审查。
-          if (state.life !== "ready") return false
+          // 允许在 dirty 状态下进行审查，不强制刷新基线
+          if (state.life !== "ready" && state.life !== "dirty") return false
           opt.reviewRequests.delete(requestID)
           await opt.write("workspace review gate injected", {
             sessionID,
@@ -294,7 +307,47 @@ export function createWorkspace(opt: Opt) {
           if (state.life === "ready") opt.finalRequests.delete(requestID)
           return false
         }),
-        /** 7. 工作区自然收尾时，提醒先完成 project memory 保存。*/
+        /** 7. 自动 final 检测：当审查通过且调试完成时自动触发最终收口 */
+        step("auto_final", async () => {
+          // 确保必要的 ID 存在
+          if (!sessionID || !opt.id) return false
+
+          // 安全地检查 pendingSave 的类型和状态
+          const pendingSave = state.pendingSave
+          const isReviewPassed =
+            pendingSave != null &&
+            typeof pendingSave === "object" &&
+            "kind" in pendingSave &&
+            pendingSave.kind === "review" &&
+            "state" in pendingSave &&
+            pendingSave.state === "passed"
+
+          // 检查是否满足自动 final 条件：
+          // 1. 审查刚刚完成且状态为 passed
+          // 2. 调试配对已完成（通过 hold 函数检查）
+          // 3. 工作区有代码变更（dirty 状态）
+          // 4. 没有其他 pending 的 review/final 请求
+          const isDebugComplete = !opt.hold(sessionID) // hold 返回 true 表示还有 pending 的调试
+          const hasDirtyChanges = state.life === "dirty"
+          const requestID = requestKey(opt.id, sessionID)
+          const noExistingRequests = !opt.reviewRequests.has(requestID) && !opt.finalRequests.has(requestID)
+
+          if (isReviewPassed && isDebugComplete && hasDirtyChanges && noExistingRequests) {
+            // 清除 review pending 状态
+            opt.pending.delete(opt.id)
+            // 触发 final 流程
+            opt.finalRequests.add(requestID)
+            await opt.write("workspace auto final triggered", {
+              sessionID,
+              workspace: opt.workspace,
+              worktree: opt.worktree,
+              reason: "review passed and debug completed",
+            })
+            return true
+          }
+          return false
+        }),
+        /** 8. 工作区自然收尾时，提醒先完成 project memory 保存。*/
         step("close", async () => {
           // 只有不是子会话、没有挂起修复、也没有 review/final 请求时，才会自然收尾。
           if (
@@ -405,8 +458,6 @@ export function createWorkspace(opt: Opt) {
         if (blockText) {
           // 还没建立 initial baseline，却已经想执行实现类动作时，先把状态重置回 boot 起点。
           if (state.life === "idle") reset(opt, "boot")
-          // dirty 工作区直接请求 review 时，先把状态重置回 refresh 起点。
-          if (state.life === "dirty" && action === "review") reset(opt, "refresh")
           await opt.write("workspace hard gate blocked tool", {
             sessionID: input.sessionID,
             workspace: opt.workspace,
@@ -497,10 +548,18 @@ export function createWorkspace(opt: Opt) {
           // 只有 init_project_state 成功返回，才说明记忆是“新建成功”。
           if (
             !mcp(input, "init_project_state") ||
-            !sameWorkspace(input.args, opt.workspace, opt.worktree) ||
+            !sameWorkspace(input.args, opt.workspace, opt.worktree, opt.write) ||
             !ok(output)
-          )
+          ) {
+            opt.write("project memory initialization failed", {
+              sessionID: input.sessionID,
+              workspace: opt.workspace,
+              worktree: opt.worktree,
+              error: "project memory initialization failed",
+            })
             return false
+          }
+
           opt.projects.set(opt.id, {
             workspace: opt.workspace,
             worktree: opt.worktree,
@@ -519,10 +578,17 @@ export function createWorkspace(opt: Opt) {
           // resume_project_state 成功后，才算把历史记忆真正接回来了。
           if (
             !mcp(input, "resume_project_state") ||
-            !sameWorkspace(input.args, opt.workspace, opt.worktree) ||
+            !sameWorkspace(input.args, opt.workspace, opt.worktree, opt.write) ||
             !ok(output)
-          )
+          ) {
+            opt.write("project memory resume failed", {
+              sessionID: input.sessionID,
+              workspace: opt.workspace,
+              worktree: opt.worktree,
+              error: "project memory resume failed",
+            })
             return false
+          }
           opt.projects.set(opt.id, {
             workspace: opt.workspace,
             worktree: opt.worktree,
@@ -541,7 +607,7 @@ export function createWorkspace(opt: Opt) {
           // save_project_state 只有在当前工作区、当前 worktree 且执行成功时才生效。
           if (
             !mcp(input, "save_project_state") ||
-            !sameWorkspace(input.args, opt.workspace, opt.worktree) ||
+            !sameWorkspace(input.args, opt.workspace, opt.worktree, opt.write) ||
             !ok(output)
           )
             return false
@@ -577,7 +643,7 @@ export function createWorkspace(opt: Opt) {
           // 手动调用 refresh_workspace 时，重置 analysis 和 flowchart 基线。
           if (
             !mcp(input, "refresh_workspace") ||
-            !sameWorkspace(input.args, opt.workspace, opt.worktree) ||
+            !sameWorkspace(input.args, opt.workspace, opt.worktree, opt.write) ||
             !ok(output)
           )
             return false
@@ -593,7 +659,11 @@ export function createWorkspace(opt: Opt) {
         }),
         step("save_analysis", async () => {
           // analysis 保存成功后，清掉对应的 pending 状态。
-          if (!mcp(input, "save_analysis") || !sameWorkspace(input.args, opt.workspace, opt.worktree) || !ok(output))
+          if (
+            !mcp(input, "save_analysis") ||
+            !sameWorkspace(input.args, opt.workspace, opt.worktree, opt.write) ||
+            !ok(output)
+          )
             return false
           if (opt.pending.get(opt.id)?.kind === "analysis") opt.pending.delete(opt.id)
           await opt.write("workspace analysis saved through mcp", {
@@ -603,9 +673,14 @@ export function createWorkspace(opt: Opt) {
           })
           return true
         }),
+
         step("save_chart", async () => {
           // flowchart 保存成功后，如果它本轮已经 done，就把 dirty 状态也顺手清掉。
-          if (!mcp(input, "save_flowchart") || !sameWorkspace(input.args, opt.workspace, opt.worktree) || !ok(output))
+          if (
+            !mcp(input, "save_flowchart") ||
+            !sameWorkspace(input.args, opt.workspace, opt.worktree, opt.write) ||
+            !ok(output)
+          )
             return false
           const item = opt.pending.get(opt.id)
           if (item?.kind === "flowchart") opt.pending.delete(opt.id)
@@ -619,7 +694,11 @@ export function createWorkspace(opt: Opt) {
         }),
         step("save_review", async () => {
           // review 保存后要分两种情况：通过则进入 debug，未通过则继续积累修复轮次。
-          if (!mcp(input, "save_review") || !sameWorkspace(input.args, opt.workspace, opt.worktree) || !ok(output))
+          if (
+            !mcp(input, "save_review") ||
+            !sameWorkspace(input.args, opt.workspace, opt.worktree, opt.write) ||
+            !ok(output)
+          )
             return false
           const item = opt.pending.get(opt.id)
           if (item?.kind === "review") opt.pending.delete(opt.id)

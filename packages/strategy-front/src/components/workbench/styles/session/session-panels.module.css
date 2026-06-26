@@ -180,6 +180,9 @@
 .todos {
   max-height: 11rem;
   overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   display: grid;
   gap: 0.32rem;
 }
