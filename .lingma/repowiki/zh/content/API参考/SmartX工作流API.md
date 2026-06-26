@@ -21,11 +21,11 @@
 
 ## 更新摘要
 **所做变更**
-- 增强了项目内存管理机制，改进了项目状态恢复、保存和清理流程
-- 新增了聊天消息意图识别功能，支持自动识别审查请求和最终收口请求
-- 完善了工作区生命周期控制，增强了状态管理和门禁验证机制
-- 改进了gate函数的安全验证，增加了更细粒度的访问控制
-- 优化了hooks中的意图识别机制，提升了用户体验
+- 新增详细的工作流状态管理，包括 idle、booting、ready、refreshing、finalizing 状态
+- 改进的跨平台路径规范化机制，统一路径分隔符和大小写处理
+- 增强的 workspace 成员身份验证机制，防止子会话误用主工作区约束
+- 完善的项目记忆状态管理，新增 needsSave 字段跟踪保存需求
+- 增强的门禁控制系统，支持更细粒度的状态检查和拦截
 
 ## 目录
 1. [简介](#简介)
@@ -50,7 +50,7 @@
 
 本说明以仓库中SmartX工作流插件为核心，结合其内部状态机、门禁控制、系统提示注入与远程服务交互，形成一套可落地的API与工作流编排框架。
 
-**更新** 本次更新反映了SmartX工作流系统在项目内存管理、聊天消息处理和工作区生命周期控制方面的增强功能。
+**更新** 本次更新反映了SmartX工作流系统在工作流状态管理、跨平台路径处理和成员身份验证方面的重大增强。
 
 ## 项目结构
 SmartX工作流位于packages/smartx-workflow，采用"插件入口 + 工作流编排 + 状态模型 + 门禁与提示 + 远程服务"的分层组织方式：
@@ -102,7 +102,7 @@ C --> K["解析与意图识别<br/>src/parse.ts + src/state.ts + src/tool.ts"]
 - 远程服务交互：与strategy-service通过REST接口读写分析、流程图与审查结果
 - 意图识别：自动识别用户聊天消息中的审查请求和最终收口请求
 
-**更新** 新增了意图识别机制，增强了项目内存管理和生命周期控制。
+**更新** 新增了详细的工作流状态管理机制，包括idle、booting、ready、refreshing、finalizing状态的完整支持。
 
 **章节来源**
 - [packages/smartx-workflow/src/workspace.ts:148-761](file://packages/smartx-workflow/src/workspace.ts#L148-L761)
@@ -369,8 +369,9 @@ Tool ..> State : "使用"
 - 门禁拦截：在before阶段尽早拦截不合规动作，降低无效执行成本
 - 日志与可观测性：通过统一日志写入接口记录关键事件，便于追踪与优化
 - **新增** 意图识别缓存：聊天消息意图识别结果会在会话级别缓存，避免重复计算
+- **新增** 跨平台路径规范化：统一路径分隔符和大小写处理，提升多平台兼容性
 
-**更新** 新增了意图识别缓存机制，提升了性能表现。
+**更新** 新增了意图识别缓存机制和跨平台路径规范化性能优化。
 
 ## 故障排查指南
 常见错误与处理
@@ -380,8 +381,9 @@ Tool ..> State : "使用"
 - 审查未通过：根据审查结果进入修复轮次，最多3轮；超过限制后需人工介入
 - 自然收尾：在工作区dirty且无挂起修复/审查/最终收口时，可触发自然收尾提醒
 - **新增** 意图识别失败：如果用户使用了不常见的表达方式请求审查或收口，系统可能无法正确识别，需要用户提供更明确的指令
+- **新增** 跨平台路径错误：确保工作区路径使用统一的斜杠分隔符，避免大小写敏感问题
 
-**更新** 新增了意图识别相关的故障排查指导。
+**更新** 新增了意图识别和跨平台路径相关的故障排查指导。
 
 **章节来源**
 - [packages/smartx-workflow/src/gate.ts:5-67](file://packages/smartx-workflow/src/gate.ts#L5-L67)
@@ -390,7 +392,7 @@ Tool ..> State : "使用"
 ## 结论
 SmartX工作流API通过严格的生命周期视图、硬门禁与系统提示注入，实现了对workspace与session的精细化编排。配合strategy-service的REST接口，能够可靠地完成分析、流程图生成、审查、修复与调试的全链路管理。对于集成者而言，遵循本文档的工作流模板与参数规范，即可在OpenCode平台上安全高效地落地策略开发与管理工作流。
 
-**更新** 本次更新显著增强了系统在项目内存管理、聊天消息处理和工作区生命周期控制方面的能力，为用户提供更加智能和高效的协作体验。
+**更新** 本次更新显著增强了系统在工作流状态管理、跨平台兼容性和成员身份验证方面的能力，为用户提供更加智能和高效的协作体验。
 
 ## 附录
 
@@ -472,8 +474,9 @@ SmartX工作流API通过严格的生命周期视图、硬门禁与系统提示�
 - 业务错误：门禁拦截时抛出带明确原因的错误，提示正确的执行顺序
 - 异常恢复：拦截后根据当前生命周期重置到合适起点（boot/refresh/final）
 - **新增** 意图识别错误：当聊天消息意图识别失败时，系统会降级处理，但仍会按照默认流程执行
+- **新增** 路径规范化错误：当跨平台路径处理失败时，系统会抛出路径格式错误
 
-**更新** 新增了意图识别相关的异常处理说明。
+**更新** 新增了意图识别和路径规范化相关的异常处理说明。
 
 **章节来源**
 - [packages/smartx-workflow/src/remote.ts:27-49](file://packages/smartx-workflow/src/remote.ts#L27-L49)
@@ -486,6 +489,7 @@ SmartX工作流API通过严格的生命周期视图、硬门禁与系统提示�
 - 顺序约束：确保smartx_start/logs与develop/debug成对出现，避免遗漏
 - **新增** 项目记忆管理：在执行任何写入操作前，必须先调用resume_project_state或init_project_state
 - **新增** 意图识别：用户可以通过多种表达方式请求审查或最终收口，系统会自动识别
+- **新增** 跨平台兼容：确保工作区路径使用统一格式，避免大小写和分隔符问题
 
 **更新** 新增了项目记忆管理和意图识别的最佳实践指导。
 
@@ -505,3 +509,41 @@ SmartX工作流API通过严格的生命周期视图、硬门禁与系统提示�
 **章节来源**
 - [packages/smartx-workflow/src/parse.ts:52-68](file://packages/smartx-workflow/src/parse.ts#L52-L68)
 - [packages/smartx-workflow/src/hooks.ts:120-138](file://packages/smartx-workflow/src/hooks.ts#L120-L138)
+
+### 跨平台路径规范化机制
+- **路径标准化**：统一使用正斜杠作为分隔符，转换为小写格式
+- **多平台兼容**：支持Windows反斜杠、Linux正斜杠等多种路径格式
+- **大小写处理**：统一转换为小写，避免大小写敏感问题
+- **性能优化**：通过缓存机制避免重复的路径处理操作
+
+**新增** 跨平台路径规范化机制的详细说明。
+
+**章节来源**
+- [packages/smartx-workflow/src/workspace.ts:70-102](file://packages/smartx-workflow/src/workspace.ts#L70-L102)
+
+### 成员身份验证机制
+- **子会话识别**：通过session.created事件识别子会话，避免误用主工作区约束
+- **权限隔离**：子会话不会受到主工作区的硬门禁限制
+- **状态隔离**：子会话拥有独立的状态管理，不影响主工作区的生命周期
+- **安全验证**：确保工作流约束只应用于主会话，保护子agent的正常运行
+
+**新增** 成员身份验证机制的详细说明。
+
+**章节来源**
+- [packages/smartx-workflow/src/hooks.ts:92-100](file://packages/smartx-workflow/src/hooks.ts#L92-L100)
+- [packages/smartx-workflow/src/workspace.ts:441-474](file://packages/smartx-workflow/src/workspace.ts#L441-L474)
+
+### 工作流状态管理详解
+- **idle状态**：工作区首次进入，等待基线初始化
+- **booting状态**：正在建立初始基线，analysis和flowchart生成中
+- **ready状态**：基线建立完成，可以正常进行开发工作
+- **dirty状态**：工作区已被修改，需要刷新基线
+- **refreshing状态**：代码变更后正在刷新基线
+- **finalizing状态**：正在生成最终快照，准备收尾
+
+**新增** 详细的工作流状态管理说明。
+
+**章节来源**
+- [packages/smartx-workflow/src/life.ts:32-44](file://packages/smartx-workflow/src/life.ts#L32-L44)
+- [packages/smartx-workflow/src/types.ts:40](file://packages/smartx-workflow/src/types.ts#L40)
+- [packages/smartx-workflow/src/workspace.ts:524-540](file://packages/smartx-workflow/src/workspace.ts#L524-L540)

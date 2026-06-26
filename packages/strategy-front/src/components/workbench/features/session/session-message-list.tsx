@@ -461,14 +461,25 @@ const Item = memo(function Item(props: { info: ChatMessageInfo; onOpenDiff?: (fi
   const body = parts.length > 0 ? parts : empty
   const msg = err(props.info)
   const user = props.info.role === "user"
+  const synthetic = body.length > 0 && body.every((part: ChatPart) => part.type === "text" && part.synthetic)
+  const fromUser = user && !synthetic
   const list = blocks(body, props.info.role)
   const trace = !user && list.length === 1 && list[0]?.type === "proc"
 
   if (list.length === 0 && !msg) return null
 
+  if (body.length === 1 && body[0]?.type === "compaction") {
+    const part = body[0]
+    return (
+      <div className={css.compaction}>
+        <span>上下文已压缩{part.overflow ? "，原因是上下文溢出" : ""}</span>
+      </div>
+    )
+  }
+
   return (
-    <article className={`${css.msg} ${user ? css.user : css.ai} ${trace ? css.trace : ""}`}>
-      <div className={css.avatar}>{user ? "我" : <Bot size={14} />}</div>
+    <article className={`${css.msg} ${fromUser ? css.user : css.ai} ${trace ? css.trace : ""}`}>
+      <div className={css.avatar}>{fromUser ? "我" : <Bot size={14} />}</div>
       <div className={css.card}>
         {list.map((item) =>
           item.type === "proc" ? (

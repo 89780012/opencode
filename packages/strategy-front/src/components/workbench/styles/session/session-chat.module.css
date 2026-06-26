@@ -1114,6 +1114,27 @@
   }
 }
 
+.compaction {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  color: #9ca3af;
+  font-size: 0.72rem;
+}
+
+.compaction::before,
+.compaction::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #e5e7eb;
+}
+
+.compaction span {
+  flex: none;
+}
+
 @media (max-width: 53.875rem) {
   .user .card {
     max-width: 78%;
