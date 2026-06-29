@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -58,7 +59,7 @@ func (a *API) mcpPost(c *gin.Context) {
 				"name":    "strategy-service",
 				"version": "dev",
 			},
-			"instructions": "Use start/logs for SmartX runtime work, use init_project_state/resume_project_state/save_project_state to maintain workspace memory, get_requirements for workspace requirements, refresh_workspace to request fresh workspace analysis plus flowchart, and save_analysis/save_flowchart/save_review to persist workspace analysis results.",
+			"instructions": "Use start/logs for SmartX runtime work, use init_project_state/resume_project_state/save_project_state to maintain workspace memory, get_requirements for workspace requirements, refresh_workspace to request fresh workspace analysis plus flowchart, and save_analysis/save_flowchart/save_review to persist workspace analysis results. Progress events are recorded automatically for these operations.",
 		})
 	case "notifications/initialized":
 		c.Status(202)
@@ -293,6 +294,14 @@ func (a *API) mcpPost(c *gin.Context) {
 		call := req.Params
 		name := text(call["name"])
 		args, _ := call["arguments"].(map[string]any)
+		slog.Info("mcp tools call",
+			"id", req.ID,
+			"name", name,
+			"workspace_path", text(args["workspacePath"]),
+			"worktree_path", text(args["worktreePath"]),
+			"session_id", text(args["sessionId"]),
+			"state", text(args["state"]),
+		)
 		switch name {
 		case "start":
 			out, err := a.sx.Start(c.Request.Context(), smartx.Input{
@@ -454,9 +463,6 @@ func (a *API) mcpPost(c *gin.Context) {
 					Items:         reviewItems(args["items"]),
 					Suggestions:   texts(args["suggestions"]),
 				})
-				if err == nil {
-					a.event.emitBroadcast("review.updated", utils.Pack(data))
-				}
 				return data, err
 			})
 		case "get_review":
@@ -477,13 +483,16 @@ func (a *API) mcpPost(c *gin.Context) {
 func mcpWorkbench(ctx context.Context, id any, c *gin.Context, run func(context.Context) (any, error)) {
 	body, err := run(ctx)
 	if errors.Is(err, db.ErrNotFound) {
+		slog.Info("mcp workbench result", "id", id, "status", "not_found")
 		mcpToolResult(c, id, "null", map[string]any{}, false)
 		return
 	}
 	if err != nil {
+		slog.Warn("mcp workbench result", "id", id, "status", "error", "error", err)
 		mcpToolResult(c, id, err.Error(), map[string]any{"error": err.Error()}, true)
 		return
 	}
+	slog.Info("mcp workbench result", "id", id, "status", "ok")
 	mcpToolResult(c, id, jsonText(body), body, false)
 }
 

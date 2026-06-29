@@ -166,6 +166,20 @@ var schema = []string{
 	created_at integer not null
 )`,
 	`create index if not exists idx_questions_workspace_created on questions(workspace_path, created_at)`,
+	`create table if not exists session_progress_events (
+	id text primary key,
+	workspace_path text not null,
+	session_id text not null,
+	kind text not null,
+	state text not null,
+	title text not null,
+	detail text not null,
+	source text not null,
+	payload text not null,
+	created_at integer not null
+)`,
+	`create index if not exists idx_session_progress_events_workspace_session_created on session_progress_events(workspace_path, session_id, created_at desc)`,
+	`create index if not exists idx_session_progress_events_workspace_created on session_progress_events(workspace_path, created_at desc)`,
 	`create table if not exists summaries (
 	workspace_path text not null,
 	session_id text not null,

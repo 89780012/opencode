@@ -12,9 +12,7 @@ export function gate(state: View, toolKind: Kind) {
       toolKind === "project_resume" ||
       toolKind === "project_get" ||
       toolKind === "project_validate" ||
-      toolKind === "other" ||
-      toolKind === "write" ||
-      toolKind === "debug"
+      toolKind === "other"
     ) {
       return ""
     }
@@ -28,7 +26,17 @@ export function gate(state: View, toolKind: Kind) {
   // idle 状态：等待基线初始化
   if (state.life === "idle") {
     // 只读操作、分析操作、刷新操作和其他操作被允许
-    if (toolKind === "read" || toolKind === "analyze" || toolKind === "refresh" || toolKind === "other") return ""
+    if (
+      toolKind === "read" ||
+      toolKind === "analyze" ||
+      toolKind === "refresh" ||
+      toolKind === "project_init" ||
+      toolKind === "project_resume" ||
+      toolKind === "project_get" ||
+      toolKind === "project_validate" ||
+      toolKind === "other"
+    )
+      return ""
     // 保存操作需要先创建基线
     if (toolKind === "save") return "SmartX workflow requires creating the initial workspace baseline first."
     // 其他写操作需要先完成工作区分析和流程图生成
@@ -43,7 +51,10 @@ export function gate(state: View, toolKind: Kind) {
       toolKind === "chart" ||
       toolKind === "save" ||
       toolKind === "refresh" ||
-      toolKind === "project_init"
+      toolKind === "project_init" ||
+      toolKind === "project_resume" ||
+      toolKind === "project_get" ||
+      toolKind === "project_validate"
     )
       return ""
     // 其他操作需要等待基线建立完成
@@ -66,7 +77,10 @@ export function gate(state: View, toolKind: Kind) {
       toolKind === "chart" ||
       toolKind === "save" ||
       toolKind === "refresh" ||
-      toolKind === "project_init"
+      toolKind === "project_init" ||
+      toolKind === "project_resume" ||
+      toolKind === "project_get" ||
+      toolKind === "project_validate"
     )
       return ""
     // 其他操作需要等待基线刷新完成
@@ -81,7 +95,10 @@ export function gate(state: View, toolKind: Kind) {
       toolKind === "chart" ||
       toolKind === "save" ||
       toolKind === "refresh" ||
-      toolKind === "project_init"
+      toolKind === "project_init" ||
+      toolKind === "project_resume" ||
+      toolKind === "project_get" ||
+      toolKind === "project_validate"
     )
       return ""
     // 其他操作需要等待最终快照生成完成

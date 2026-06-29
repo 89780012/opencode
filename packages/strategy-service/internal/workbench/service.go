@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -52,12 +53,15 @@ type projectFiles struct {
 
 var projectStateRequired = []string{"feature-list.json", "progress.md", "session-log.md", "state.json"}
 
+const progressDedupeWindow = 2 * time.Second
+
 type Service struct {
 	op    *oc.Service
 	chain *modelchain.Service
 	q     *question.Service
 	base  string
 	cli   *http.Client
+	evt   func(context.Context, string, json.RawMessage)
 }
 
 func NewService(op *oc.Service, chain *modelchain.Service, q *question.Service, base string) *Service {
@@ -73,6 +77,10 @@ func NewService(op *oc.Service, chain *modelchain.Service, q *question.Service, 
 			Timeout: 60 * time.Second,
 		},
 	}
+}
+
+func (s *Service) SetEvent(fn func(context.Context, string, json.RawMessage)) {
+	s.evt = fn
 }
 
 func (s *Service) CreateSession(ctx context.Context, req SessionCreate) (json.RawMessage, error) {
@@ -328,6 +336,13 @@ func (s *Service) SaveAnalysis(ctx context.Context, req AnalysisReq) (AnalysisRo
 	if len(req.Items) > 0 {
 		req.Text = serial(req.Items)
 	}
+	slog.Info("workbench save analysis",
+		"workspace_path", req.WorkspacePath,
+		"worktree_path", req.WorktreePath,
+		"state", req.State,
+		"items", len(req.Items),
+		"text_hash", hash(req.Text),
+	)
 
 	body, err := json.Marshal(req.Items)
 	if err != nil {
@@ -342,6 +357,15 @@ func (s *Service) SaveAnalysis(ctx context.Context, req AnalysisReq) (AnalysisRo
 on conflict(workspace_path, worktree_path) do update set state = excluded.state, items = excluded.items, text = excluded.text, updated_at = excluded.updated_at`,
 		req.WorkspacePath, req.WorktreePath, req.State, string(body), req.Text, now)
 	if err != nil {
+		return AnalysisRow{}, err
+	}
+	if err := s.pushProgress(ctx, req.WorkspacePath, progressInput{
+		kind:   progressKindAnalysis(req.State),
+		state:  progressState(req.State),
+		title:  "工作区分析",
+		detail: pickSummary(req.Text, req.Items),
+		source: "service",
+	}); err != nil {
 		return AnalysisRow{}, err
 	}
 	return AnalysisRow{
@@ -388,6 +412,15 @@ on conflict(workspace_path, worktree_path) do update set analysis_hash = exclude
 		return RefreshRow{}, err
 	}
 	if err := tx.Commit(); err != nil {
+		return RefreshRow{}, err
+	}
+	if err := s.pushProgress(ctx, req.WorkspacePath, progressInput{
+		kind:   "workspace.refresh",
+		state:  "done",
+		title:  "刷新工作区",
+		detail: pick(req.Reason, "请求刷新工作区分析和流程图"),
+		source: "service",
+	}); err != nil {
 		return RefreshRow{}, err
 	}
 	return RefreshRow{
@@ -496,6 +529,14 @@ func (s *Service) SaveFlowchart(ctx context.Context, req FlowchartReq) (Flowchar
 	if req.State != "generating" && req.State != "done" && req.State != "error" {
 		return FlowchartRow{}, fmt.Errorf("invalid flowchart state")
 	}
+	slog.Info("workbench save flowchart",
+		"workspace_path", req.WorkspacePath,
+		"worktree_path", req.WorktreePath,
+		"state", req.State,
+		"code_hash", hash(req.Code),
+		"code_len", len(req.Code),
+		"err", req.Err,
+	)
 	manual := req.Manual || req.Source == "manual"
 	source := "ai"
 	if manual {
@@ -520,6 +561,15 @@ func (s *Service) SaveFlowchart(ctx context.Context, req FlowchartReq) (Flowchar
 		UpdatedAt:     time.Now().UnixMilli(),
 	}
 	if err := s.saveFlow(ctx, row); err != nil {
+		return FlowchartRow{}, err
+	}
+	if err := s.pushProgress(ctx, req.WorkspacePath, progressInput{
+		kind:   progressKindFlowchart(req.State),
+		state:  progressState(req.State),
+		title:  "流程图",
+		detail: progressDetail(row.State, row.Code, row.Err),
+		source: "service",
+	}); err != nil {
 		return FlowchartRow{}, err
 	}
 	return row, nil
@@ -617,6 +667,15 @@ func (s *Service) SaveReview(ctx context.Context, req ReviewReq) (ReviewRow, err
 	if err != nil {
 		return ReviewRow{}, err
 	}
+	if err := s.pushProgress(ctx, req.WorkspacePath, progressInput{
+		kind:   progressKindReview(req.State),
+		state:  progressState(req.State),
+		title:  "审查",
+		detail: req.Summary,
+		source: "service",
+	}); err != nil {
+		return ReviewRow{}, err
+	}
 	return ReviewRow{
 		ID:            id,
 		WorkspacePath: req.WorkspacePath,
@@ -627,6 +686,163 @@ func (s *Service) SaveReview(ctx context.Context, req ReviewReq) (ReviewRow, err
 		Suggestions:   req.Suggestions,
 		UpdatedAt:     now,
 	}, nil
+}
+
+func (s *Service) AppendProgress(ctx context.Context, req ProgressAppend) (ProgressEvent, error) {
+	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
+	req.SessionID = strings.TrimSpace(req.SessionID)
+	req.Kind = strings.TrimSpace(req.Kind)
+	req.State = strings.TrimSpace(req.State)
+	req.Title = strings.TrimSpace(req.Title)
+	req.Detail = strings.TrimSpace(req.Detail)
+	req.Source = strings.TrimSpace(req.Source)
+	if req.WorkspacePath == "" {
+		return ProgressEvent{}, fmt.Errorf("workspacePath is required")
+	}
+	if req.Kind == "" {
+		return ProgressEvent{}, fmt.Errorf("kind is required")
+	}
+	if req.State == "" {
+		req.State = "done"
+	}
+	if req.Title == "" {
+		req.Title = req.Kind
+	}
+	if req.Source == "" {
+		req.Source = "service"
+	}
+	if req.SessionID == "" {
+		id, err := s.progressSession(ctx, req.WorkspacePath)
+		if err != nil {
+			return ProgressEvent{}, err
+		}
+		req.SessionID = id
+	}
+	if req.SessionID == "" {
+		return ProgressEvent{}, fmt.Errorf("sessionId is required")
+	}
+	now := time.Now().UnixMilli()
+	row := ProgressEvent{
+		ID:            "progress_" + hash(fmt.Sprintf("%s\x00%s\x00%s\x00%d", req.WorkspacePath, req.SessionID, req.Kind, now)),
+		WorkspacePath: req.WorkspacePath,
+		SessionID:     req.SessionID,
+		Kind:          req.Kind,
+		State:         req.State,
+		Title:         req.Title,
+		Detail:        req.Detail,
+		Source:        req.Source,
+		Payload:       req.Payload,
+		CreatedAt:     now,
+	}
+	doc, err := db.Open()
+	if err != nil {
+		return ProgressEvent{}, err
+	}
+	tx, err := doc.BeginTx(ctx, nil)
+	if err != nil {
+		return ProgressEvent{}, err
+	}
+	defer tx.Rollback()
+
+	// 做时间上的幂等处理 2秒内
+	prev, ok, err := s.lastProgress(ctx, tx, row)
+	if err != nil {
+		return ProgressEvent{}, err
+	}
+	if ok && time.Duration(row.CreatedAt-prev.CreatedAt)*time.Millisecond <= progressDedupeWindow {
+		slog.Info("workbench progress duplicate ignored",
+			"workspace_path", row.WorkspacePath,
+			"session_id", row.SessionID,
+			"kind", row.Kind,
+			"state", row.State,
+			"title", row.Title,
+			"source", row.Source,
+			"prev_id", prev.ID,
+		)
+		if err := tx.Commit(); err != nil {
+			return ProgressEvent{}, err
+		}
+		return prev, nil
+	}
+	if err := s.writeProgress(ctx, tx, row); err != nil {
+		return ProgressEvent{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return ProgressEvent{}, err
+	}
+	if s.evt != nil {
+		msg, err := json.Marshal(row)
+		if err == nil {
+			s.evt(ctx, "progress.updated", msg)
+		}
+	}
+	return row, nil
+}
+
+func (s *Service) lastProgress(ctx context.Context, doc *sql.Tx, row ProgressEvent) (ProgressEvent, bool, error) {
+	prev, err := scanProgress(doc.QueryRowContext(ctx, `select id, workspace_path, session_id, kind, state, title, detail, source, payload, created_at from session_progress_events where workspace_path = ? and session_id = ? and kind = ? and state = ? and title = ? and detail = ? and source = ? order by created_at desc limit 1`,
+		row.WorkspacePath, row.SessionID, row.Kind, row.State, row.Title, row.Detail, row.Source))
+	if err == sql.ErrNoRows {
+		return ProgressEvent{}, false, nil
+	}
+	if err != nil {
+		return ProgressEvent{}, false, err
+	}
+	return prev, true, nil
+}
+
+func (s *Service) ListProgress(ctx context.Context, req ProgressList) (ProgressList, error) {
+	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
+	req.SessionID = strings.TrimSpace(req.SessionID)
+	if req.WorkspacePath == "" {
+		return ProgressList{}, fmt.Errorf("workspacePath is required")
+	}
+	if req.SessionID == "" {
+		id, err := s.progressSession(ctx, req.WorkspacePath)
+		if err != nil {
+			return ProgressList{}, err
+		}
+		req.SessionID = id
+	}
+	if req.SessionID == "" {
+		return ProgressList{WorkspacePath: req.WorkspacePath}, nil
+	}
+	doc, err := db.Open()
+	if err != nil {
+		return ProgressList{}, err
+	}
+	rows, err := doc.QueryContext(ctx, `select id, workspace_path, session_id, kind, state, title, detail, source, payload, created_at from session_progress_events where workspace_path = ? and session_id = ? order by created_at asc`,
+		req.WorkspacePath, req.SessionID)
+	if err != nil {
+		return ProgressList{}, err
+	}
+	defer rows.Close()
+
+	out := ProgressList{
+		WorkspacePath: req.WorkspacePath,
+		SessionID:     req.SessionID,
+	}
+	for rows.Next() {
+		row, err := scanProgress(rows)
+		if err != nil {
+			return ProgressList{}, err
+		}
+		out.Events = append(out.Events, row)
+	}
+	if err := rows.Err(); err != nil {
+		return ProgressList{}, err
+	}
+	return out, nil
+}
+
+func (s *Service) writeProgress(ctx context.Context, doc *sql.Tx, row ProgressEvent) error {
+	body, err := json.Marshal(row.Payload)
+	if err != nil {
+		return err
+	}
+	_, err = doc.ExecContext(ctx, `insert into session_progress_events(id, workspace_path, session_id, kind, state, title, detail, source, payload, created_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		row.ID, row.WorkspacePath, row.SessionID, row.Kind, row.State, row.Title, row.Detail, row.Source, string(body), row.CreatedAt)
+	return err
 }
 
 func (s *Service) InitProjectState(ctx context.Context, req ProjectStateInitReq) (ProjectStateRow, error) {
@@ -658,6 +874,16 @@ func (s *Service) InitProjectState(ctx context.Context, req ProjectStateInitReq)
 	if err := writeProjectState(files, row, true); err != nil {
 		return ProjectStateRow{}, err
 	}
+	if err := s.pushProgress(ctx, req.WorkspacePath, progressInput{
+		session: row.SessionID,
+		kind:    "workspace.state.init",
+		state:   "done",
+		title:   "初始化工作区状态",
+		detail:  row.Current,
+		source:  "service",
+	}); err != nil {
+		return ProjectStateRow{}, err
+	}
 	return row, nil
 }
 
@@ -671,7 +897,21 @@ func (s *Service) ResumeProjectState(ctx context.Context, req ProjectStateGet) (
 	if req.WorktreePath == "" {
 		req.WorktreePath = req.WorkspacePath
 	}
-	return loadProjectState(req.WorkspacePath, req.WorktreePath, true)
+	row, err := loadProjectState(req.WorkspacePath, req.WorktreePath, true)
+	if err != nil {
+		return ProjectStateRow{}, err
+	}
+	if err := s.pushProgress(ctx, req.WorkspacePath, progressInput{
+		session: row.SessionID,
+		kind:    "workspace.state.resume",
+		state:   "done",
+		title:   "恢复工作区状态",
+		detail:  row.Current,
+		source:  "service",
+	}); err != nil {
+		return ProjectStateRow{}, err
+	}
+	return row, nil
 }
 
 func (s *Service) GetProjectState(ctx context.Context, req ProjectStateGet) (ProjectStateRow, error) {
@@ -722,7 +962,26 @@ func (s *Service) SaveProjectState(ctx context.Context, req ProjectStateSaveReq)
 	if len(req.Features) > 0 {
 		row.Features = req.Features
 	}
+	slog.Info("workbench save project state",
+		"workspace_path", req.WorkspacePath,
+		"worktree_path", req.WorktreePath,
+		"session_id", row.SessionID,
+		"phase", row.Phase,
+		"status", row.Status,
+		"current_hash", hash(row.Current),
+		"summary_hash", hash(row.Summary),
+	)
 	if err := writeProjectState(projectFilesFor(req.WorkspacePath), row, false); err != nil {
+		return ProjectStateRow{}, err
+	}
+	if err := s.pushProgress(ctx, req.WorkspacePath, progressInput{
+		session: row.SessionID,
+		kind:    "workspace.state.save",
+		state:   "done",
+		title:   "保存工作区状态",
+		detail:  row.Summary,
+		source:  "service",
+	}); err != nil {
 		return ProjectStateRow{}, err
 	}
 	return row, nil
@@ -738,7 +997,21 @@ func (s *Service) ValidateProjectState(ctx context.Context, req ProjectStateGet)
 	if req.WorktreePath == "" {
 		req.WorktreePath = req.WorkspacePath
 	}
-	return loadProjectState(req.WorkspacePath, req.WorktreePath, true)
+	row, err := loadProjectState(req.WorkspacePath, req.WorktreePath, true)
+	if err != nil {
+		return ProjectStateRow{}, err
+	}
+	if err := s.pushProgress(ctx, req.WorkspacePath, progressInput{
+		session: row.SessionID,
+		kind:    "workspace.state.validate",
+		state:   "done",
+		title:   "校验工作区状态",
+		detail:  row.Project,
+		source:  "service",
+	}); err != nil {
+		return ProjectStateRow{}, err
+	}
+	return row, nil
 }
 
 func (s *Service) saveFlow(ctx context.Context, row FlowchartRow) error {
@@ -750,6 +1023,144 @@ func (s *Service) saveFlow(ctx context.Context, row FlowchartRow) error {
 on conflict(workspace_path, worktree_path) do update set analysis_hash = excluded.analysis_hash, state = excluded.state, code = excluded.code, err = excluded.err, manual = excluded.manual, source = excluded.source, updated_at = excluded.updated_at`,
 		row.WorkspacePath, row.WorktreePath, row.AnalysisHash, row.State, row.Code, row.Err, row.Manual, row.Source, row.UpdatedAt)
 	return err
+}
+
+type progressInput struct {
+	session string
+	kind    string
+	state   string
+	title   string
+	detail  string
+	source  string
+}
+
+func progressKindAnalysis(state string) string {
+	if state == "running" {
+		return "analysis.start"
+	}
+	return "analysis.done"
+}
+
+func progressKindFlowchart(state string) string {
+	if state == "generating" {
+		return "flowchart.start"
+	}
+	if state == "error" {
+		return "flowchart.error"
+	}
+	return "flowchart.done"
+}
+
+func progressKindReview(state string) string {
+	if state == "running" {
+		return "review.start"
+	}
+	if state == "error" {
+		return "review.error"
+	}
+	return "review.done"
+}
+
+func progressState(state string) string {
+	if state == "running" || state == "generating" {
+		return "running"
+	}
+	if state == "error" || state == "failed" {
+		return "error"
+	}
+	return "done"
+}
+
+func pickSummary(text string, list []string) string {
+	if strings.TrimSpace(text) != "" {
+		return strings.TrimSpace(text)
+	}
+	return strings.Join(clean(list), "; ")
+}
+
+func progressDetail(state string, code string, err string) string {
+	if state == "error" {
+		return strings.TrimSpace(err)
+	}
+	if strings.TrimSpace(code) == "" {
+		return state
+	}
+	return "flowchart saved"
+}
+
+func (s *Service) pushProgress(ctx context.Context, workspace string, input progressInput) error {
+	session := strings.TrimSpace(input.session)
+	if session == "" {
+		var err error
+		session, err = s.progressSession(ctx, workspace)
+		if err != nil {
+			return err
+		}
+	}
+	if session == "" {
+		return nil
+	}
+	slog.Info("workbench push progress",
+		"workspace_path", workspace,
+		"session_id", session,
+		"kind", input.kind,
+		"state", input.state,
+		"title", input.title,
+		"source", input.source,
+		"detail_hash", hash(input.detail),
+	)
+	_, err := s.AppendProgress(ctx, ProgressAppend{
+		WorkspacePath: workspace,
+		SessionID:     session,
+		Kind:          input.kind,
+		State:         input.state,
+		Title:         input.title,
+		Detail:        input.detail,
+		Source:        input.source,
+	})
+	return err
+}
+
+func (s *Service) progressSession(ctx context.Context, workspace string) (string, error) {
+	row, err := loadProjectState(workspace, workspace, false)
+	if err == nil {
+		session := strings.TrimSpace(row.SessionID)
+		if session != "" {
+			return session, nil
+		}
+	}
+	if err != nil && !errors.Is(err, db.ErrNotFound) {
+		return "", err
+	}
+	return s.currentSession(ctx, workspace)
+}
+
+func (s *Service) currentSession(ctx context.Context, workspace string) (string, error) {
+	doc, err := db.Open()
+	if err != nil {
+		return "", err
+	}
+	var id string
+	err = doc.QueryRowContext(ctx, `select id from sessions where workspace_path = ? order by updated_at desc limit 1`, strings.TrimSpace(workspace)).Scan(&id)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(id), nil
+}
+
+func scanProgress(rows scanner) (ProgressEvent, error) {
+	var row ProgressEvent
+	var body string
+	if err := rows.Scan(&row.ID, &row.WorkspacePath, &row.SessionID, &row.Kind, &row.State, &row.Title, &row.Detail, &row.Source, &body, &row.CreatedAt); err != nil {
+		return ProgressEvent{}, err
+	}
+	if strings.TrimSpace(body) != "" {
+		_ = json.Unmarshal([]byte(body), &row.Payload)
+	}
+	return row, nil
 }
 
 func (s *Service) put(ctx context.Context, req SessionCreate, session json.RawMessage) error {
@@ -779,6 +1190,34 @@ on conflict(id) do update set workspace_path = excluded.workspace_path, title = 
 		meta.ID, req.WorkspacePath, meta.Title, string(session), analysis, now, now)
 	if err != nil {
 		return err
+	}
+	if _, err := s.AppendProgress(ctx, ProgressAppend{
+		WorkspacePath: req.WorkspacePath,
+		SessionID:     meta.ID,
+		Kind:          "session.created",
+		State:         "done",
+		Title:         "创建会话",
+		Detail:        req.Title,
+		Source:        "service",
+	}); err != nil {
+		return err
+	}
+	if len(req.Requirements) > 0 || len(req.Analysis) > 0 {
+		detail := strings.Join(clean(req.Requirements), "; ")
+		if detail == "" {
+			detail = "session created with analysis"
+		}
+		if _, err := s.AppendProgress(ctx, ProgressAppend{
+			WorkspacePath: req.WorkspacePath,
+			SessionID:     meta.ID,
+			Kind:          "requirements.identified",
+			State:         "done",
+			Title:         "需求分析",
+			Detail:        detail,
+			Source:        "service",
+		}); err != nil {
+			return err
+		}
 	}
 	if req.Requirements == nil {
 		return nil

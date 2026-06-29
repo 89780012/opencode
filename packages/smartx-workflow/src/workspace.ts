@@ -131,8 +131,9 @@ function requestKey(id: string, session: string) {
 
 /** 从本地缓存或远端服务同步 analysis / chart / project 三类快照。*/
 async function snapshot(opt: Opt) {
-  const loadedAnalysis =
-    opt.workspaces.get(opt.id) ?? (await opt.load(opt.workspace, opt.worktree).catch(() => undefined))
+  const cached = opt.workspaces.get(opt.id)
+  if (cached && !validAnalysis(cached)) opt.workspaces.delete(opt.id)
+  const loadedAnalysis = opt.workspaces.get(opt.id) ?? (await opt.load(opt.workspace, opt.worktree).catch(() => undefined))
   if (loadedAnalysis && validAnalysis(loadedAnalysis)) opt.workspaces.set(opt.id, loadedAnalysis)
   if (loadedAnalysis && !validAnalysis(loadedAnalysis)) opt.workspaces.delete(opt.id)
   const analysis = opt.workspaces.get(opt.id)
@@ -567,6 +568,7 @@ export function createWorkspace(opt: Opt) {
             updated: Date.now(),
           })
           opt.memory.set(opt.id, { hasProjectState: true, hasRestoredState: true, needsSave: false })
+          await snapshot(opt)
           await opt.write("project memory initialized through mcp", {
             sessionID: input.sessionID,
             workspace: opt.workspace,
@@ -596,6 +598,7 @@ export function createWorkspace(opt: Opt) {
             updated: Date.now(),
           })
           opt.memory.set(opt.id, { hasProjectState: true, hasRestoredState: true, needsSave: false })
+          await snapshot(opt)
           await opt.write("project memory resumed through mcp", {
             sessionID: input.sessionID,
             workspace: opt.workspace,

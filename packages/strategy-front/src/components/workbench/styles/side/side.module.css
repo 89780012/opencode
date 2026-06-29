@@ -515,6 +515,7 @@
 .progress {
   display: inline-flex;
   align-items: center;
+  width: 100%;
   min-width: 0;
   color: #334155;
   font-size: 0.75rem;
@@ -528,6 +529,15 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.progress time {
+  flex: none;
+  margin-left: auto;
+  padding-left: 0.5rem;
+  color: #94a3b8;
+  font-size: 0.65rem;
+  line-height: 1rem;
 }
 
 .stepicon {

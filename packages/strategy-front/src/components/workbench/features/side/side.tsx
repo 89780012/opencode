@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 import { ClipboardList, MessageSquareMore, Sparkles } from "lucide-react"
-import { selectWorkbench, selectWorkbenchAnalysis, selectWorkbenchFlowchart, useAppSelector } from "@/store"
+import {
+  selectWorkbench,
+  selectWorkbenchAnalysis,
+  selectWorkbenchFlowchart,
+  selectWorkbenchProgress,
+  useAppSelector,
+} from "@/store"
 import { type SidebarTab } from "../../data"
 import css from "../../styles/side/side.module.css"
 import { RequirementsTab, SessionsTab } from "./side-tabs"
@@ -23,6 +29,7 @@ export function Side() {
   const path = search.get("path")?.trim() ?? ""
   const analysis = useAppSelector((state) => selectWorkbenchAnalysis(state, path))
   const flowchart = useAppSelector((state) => selectWorkbenchFlowchart(state, path))
+  const progress = useAppSelector((state) => selectWorkbenchProgress(state, path, app.active))
   const [tab, setTab] = useState<SidebarTab>("requirements")
   const [open, setOpen] = useState<Record<string, boolean>>(init)
   const flip = (key: string) => setOpen((state) => ({ ...state, [key]: !state[key] }))
@@ -63,6 +70,7 @@ export function Side() {
           cur={app.cur}
           analysis={analysis}
           flowchart={flowchart}
+          progress={progress}
           open={open}
           risk={app.risk}
           hint={app.hint}

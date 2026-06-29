@@ -58,8 +58,9 @@ func (a *API) workbenchAnalysisPut(c *gin.Context) {
 		bad(c, err)
 		return
 	}
-
-	a.event.emitBroadcast("analysis.updated", utils.Pack(data))
+	if data.State == "running" {
+		a.event.emitBroadcast("analysis.updated", utils.Pack(data))
+	}
 	ok(c, data)
 }
 
@@ -95,7 +96,6 @@ func (a *API) workbenchFlowchartPut(c *gin.Context) {
 		bad(c, err)
 		return
 	}
-
 	a.event.emitBroadcast("flowchart.updated", utils.Pack(data))
 	ok(c, data)
 }
@@ -132,8 +132,21 @@ func (a *API) workbenchReviewPut(c *gin.Context) {
 		bad(c, err)
 		return
 	}
-
 	a.event.emitBroadcast("review.updated", utils.Pack(data))
+	ok(c, data)
+}
+
+func (a *API) workbenchProgressGet(c *gin.Context) {
+	req := workbench.ProgressList{}
+	if err := c.ShouldBindQuery(&req); err != nil {
+		bad(c, err)
+		return
+	}
+	data, err := a.bench.ListProgress(c.Request.Context(), req)
+	if err != nil {
+		bad(c, err)
+		return
+	}
 	ok(c, data)
 }
 
@@ -149,6 +162,22 @@ func (a *API) workbenchProjectStateGet(c *gin.Context) {
 		ok(c, nil)
 		return
 	}
+	if err != nil {
+		bad(c, err)
+		return
+	}
+
+	ok(c, data)
+}
+
+func (a *API) workbenchProgressPost(c *gin.Context) {
+	body := workbench.ProgressAppend{}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		bad(c, err)
+		return
+	}
+
+	data, err := a.bench.AppendProgress(c.Request.Context(), body)
 	if err != nil {
 		bad(c, err)
 		return

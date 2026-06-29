@@ -164,3 +164,10 @@ export function selectWorkbenchReview(state: RootState, path?: string | null) {
   if (state.workbench.reviewPath !== path) return null
   return state.workbench.reviews[0] ?? null
 }
+
+export function selectWorkbenchProgress(state: RootState, path?: string | null, session?: string | null) {
+  if (!path || !session) return []
+  if (state.workbench.progressPath !== path) return []
+  if (state.workbench.progressSession !== session) return []
+  return state.workbench.progress
+}

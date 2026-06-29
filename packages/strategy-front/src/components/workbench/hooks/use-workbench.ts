@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react"
 import { modelChainApi } from "@/api/modules"
 import { toast } from "sonner"
-import { selectWorkbench, useAppDispatch, useAppSelector } from "@/store"
+import { selectWorkbench, selectWorkbenchProgress, useAppDispatch, useAppSelector } from "@/store"
 import { setActive, setStage } from "@/store/workbench-slice"
-import { code, createBacktest, createTimeline, type FlowStatus, type ReviewStatus, type SessionItem, type StepStatus } from "../data"
+import { code, createBacktest, createTimeline, type FlowStatus, type ReviewStatus, type SessionItem, type StepStatus, type TimelineEvent } from "../data"
+import { useWorkbenchProgressSync } from "./use-workbench-progress"
 
 function status(state?: string): ReviewStatus {
   if (state === "running") return "running"
@@ -50,9 +51,32 @@ function empty(): SessionItem {
   }
 }
 
+function map(event: ReturnType<typeof selectWorkbenchProgress>[number]): TimelineEvent {
+  const type =
+    event.kind.includes("analysis") || event.kind.includes("requirements")
+      ? "requirement"
+      : event.kind.includes("flowchart")
+        ? "flowchart"
+        : event.kind.includes("review")
+          ? "review"
+          : event.kind.includes("state") || event.kind.includes("session")
+            ? "git"
+            : "code"
+  return {
+    id: event.id,
+    type,
+    label: event.title || event.kind,
+    time: new Date(event.createdAt).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }),
+    description: event.detail || event.kind,
+    diffSummary: event.detail || undefined,
+  }
+}
+
 export function useWorkbench(setRight?: (open: boolean) => void) {
   const dispatch = useAppDispatch()
   const state = useAppSelector(selectWorkbench)
+  useWorkbenchProgressSync(state.sessionPath, state.active)
+  const prog = useAppSelector((item) => selectWorkbenchProgress(item, state.sessionPath, state.active))
   const [view, setView] = useState<"current" | "history">("current")
   const [reviewing, setReviewing] = useState(false)
   const flow = state.flowchart?.workspacePath === state.sessionPath ? state.flowchart : null
@@ -105,9 +129,9 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
       backtestStatus: "done",
       backtestResults: back,
       backtestHistory: [{ time: "09:45", results: back }],
-      timelineEvents: createTimeline(session.title),
+      timelineEvents: prog.length > 0 ? prog.map(map) : createTimeline(session.title),
     }
-  }, [flow, row, rows, state.active, state.sessions, view])
+  }, [flow, prog, row, rows, state.active, state.sessions, state.sessionPath, view])
   const last = cur.reviewHistory.at(-1) ?? null
   const risk = useMemo(() => {
     if (cur.reviewStatus === "passed") return "审查已通过"

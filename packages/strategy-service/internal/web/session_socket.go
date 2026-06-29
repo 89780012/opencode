@@ -82,6 +82,38 @@ func (a *API) handleSessionList(ctx context.Context, client *socketClient, evt s
 	client.reply(evt.ID, "session.listed", utils.Pack(data))
 }
 
+func (a *API) handleProgressGet(ctx context.Context, client *socketClient, evt socketEvent) {
+	req := workbench.ProgressList{}
+	if len(evt.Payload) > 0 {
+		if err := json.Unmarshal(evt.Payload, &req); err != nil {
+			client.reply(evt.ID, "progress.get.error", utils.Pack(socketError{Message: err.Error()}))
+			return
+		}
+	}
+	data, err := a.bench.ListProgress(ctx, req)
+	if err != nil {
+		client.reply(evt.ID, "progress.get.error", utils.Pack(socketError{WorkspacePath: req.WorkspacePath, Message: err.Error()}))
+		return
+	}
+	client.reply(evt.ID, "progress.got", utils.Pack(data))
+}
+
+func (a *API) handleProgressAppend(ctx context.Context, client *socketClient, evt socketEvent) {
+	req := workbench.ProgressAppend{}
+	if len(evt.Payload) > 0 {
+		if err := json.Unmarshal(evt.Payload, &req); err != nil {
+			client.reply(evt.ID, "progress.append.error", utils.Pack(socketError{Message: err.Error()}))
+			return
+		}
+	}
+	data, err := a.bench.AppendProgress(ctx, req)
+	if err != nil {
+		client.reply(evt.ID, "progress.append.error", utils.Pack(socketError{WorkspacePath: req.WorkspacePath, Message: err.Error()}))
+		return
+	}
+	client.reply(evt.ID, "progress.appended", utils.Pack(data))
+}
+
 func (a *API) handleSessionDetail(ctx context.Context, client *socketClient, evt socketEvent) {
 	req := workbench.SessionDetail{}
 	if len(evt.Payload) > 0 {

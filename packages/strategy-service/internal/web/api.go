@@ -1,6 +1,8 @@
 package web
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
 
 	cfg "strategy-service/internal/config"
@@ -75,9 +77,15 @@ func NewAPI(run *rt.Service, op *oc.Service, cfg *cfg.Store, sx *smartx.Service,
 		chain:    chain,
 		bench:    workbench.NewService(op, chain, question, smartURL),
 	}
+	api.bench.SetEvent(func(ctx context.Context, kind string, payload json.RawMessage) {
+		_ = ctx
+		api.event.emitBroadcast(kind, payload)
+	})
 	api.socketHandlers = map[string]socketHandlerFunc{
 		"analysis.get":    api.handleAnalysisGet,
 		"flowchart.get":   api.handleFlowchartGet,
+		"progress.append": api.handleProgressAppend,
+		"progress.get":    api.handleProgressGet,
 		"review.get":      api.handleReviewGet,
 		"question.append": api.handleQuestionAppend,
 		"question.delete": api.handleQuestionDelete,
@@ -126,6 +134,8 @@ func (a *API) Register(r *gin.Engine) {
 	bench.POST("/analysis", a.workbenchAnalysisPut)
 	bench.GET("/flowchart", a.workbenchFlowchartGet)
 	bench.POST("/flowchart", a.workbenchFlowchartPut)
+	bench.GET("/progress", a.workbenchProgressGet)
+	bench.POST("/progress", a.workbenchProgressPost)
 	bench.GET("/review", a.workbenchReviewGet)
 	bench.POST("/review", a.workbenchReviewPut)
 	bench.GET("/project-state", a.workbenchProjectStateGet)

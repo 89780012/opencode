@@ -3,10 +3,14 @@ package workbench
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"strategy-service/internal/db"
 )
 
 func TestBriefKeepsNumberAndTextTogether(t *testing.T) {
@@ -147,6 +151,133 @@ func TestProjectStateValidateRepairsMissingFilesWithoutOverwritingExistingConten
 	}
 	if _, err := os.Stat(filepath.Join(dir, ".project-state", "state.json")); err != nil {
 		t.Fatalf("state.json not repaired: %v", err)
+	}
+}
+
+func TestProgressUsesProjectStateSession(t *testing.T) {
+	svc := NewService(nil, nil, nil, "")
+	dir := t.TempDir()
+	ses := fmt.Sprintf("ses_%d", time.Now().UnixNano())
+	old := ses + "_old"
+
+	if _, err := svc.InitProjectState(context.Background(), ProjectStateInitReq{
+		WorkspacePath: dir,
+		Project:       "alpha",
+		SessionID:     ses,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	doc, err := db.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := doc.ExecContext(context.Background(), `insert into sessions(id, workspace_path, title, body, analysis, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?)`,
+		old, dir, "older", "{}", "", int64(1), int64(1)); err != nil {
+		t.Fatal(err)
+	}
+	row, err := svc.AppendProgress(context.Background(), ProgressAppend{
+		WorkspacePath: dir,
+		Kind:          "analysis.done",
+		State:         "done",
+		Title:         "分析",
+		Detail:        "ok",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if row.SessionID != ses {
+		t.Fatalf("session id = %q, want %s", row.SessionID, ses)
+	}
+}
+
+func TestProgressPersistsEvent(t *testing.T) {
+	svc := NewService(nil, nil, nil, "")
+	dir := t.TempDir()
+	ses := fmt.Sprintf("ses_%d", time.Now().UnixNano())
+
+	if _, err := svc.InitProjectState(context.Background(), ProjectStateInitReq{
+		WorkspacePath: dir,
+		SessionID:     ses,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.AppendProgress(context.Background(), ProgressAppend{
+		WorkspacePath: dir,
+		SessionID:     ses,
+		Kind:          "review.done",
+		State:         "done",
+		Title:         "review",
+		Detail:        "passed",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	doc, err := db.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var count int
+	if err := doc.QueryRowContext(context.Background(), `select count(*) from session_progress_events where workspace_path = ? and session_id = ? and kind = ?`, dir, ses, "review.done").Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("event count = %d, want 1", count)
+	}
+	list, err := svc.ListProgress(context.Background(), ProgressList{WorkspacePath: dir, SessionID: ses})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasProgress(list.Events, "review.done") {
+		t.Fatalf("unexpected progress events: %#v", list.Events)
+	}
+}
+
+func hasProgress(events []ProgressEvent, kind string) bool {
+	for _, event := range events {
+		if event.Kind == kind {
+			return true
+		}
+	}
+	return false
+}
+
+func TestProgressDedupesImmediateDuplicate(t *testing.T) {
+	svc := NewService(nil, nil, nil, "")
+	dir := t.TempDir()
+	ses := fmt.Sprintf("ses_%d", time.Now().UnixNano())
+
+	first, err := svc.AppendProgress(context.Background(), ProgressAppend{
+		WorkspacePath: dir,
+		SessionID:     ses,
+		Kind:          "analysis.done",
+		State:         "done",
+		Title:         "工作区分析",
+		Detail:        "same",
+		Source:        "service",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := svc.AppendProgress(context.Background(), ProgressAppend{
+		WorkspacePath: dir,
+		SessionID:     ses,
+		Kind:          "analysis.done",
+		State:         "done",
+		Title:         "工作区分析",
+		Detail:        "same",
+		Source:        "service",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.ID != first.ID {
+		t.Fatalf("duplicate id = %q, want %q", second.ID, first.ID)
+	}
+	list, err := svc.ListProgress(context.Background(), ProgressList{WorkspacePath: dir, SessionID: ses})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list.Events) != 1 {
+		t.Fatalf("event count = %d, want 1", len(list.Events))
 	}
 }
 

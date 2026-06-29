@@ -60,6 +60,19 @@ export type WorkbenchReview = {
   updatedAt: number
 }
 
+export type WorkbenchProgressEvent = {
+  id: string
+  workspacePath: string
+  sessionId: string
+  kind: string
+  state: "running" | "done" | "error"
+  title: string
+  detail: string
+  source: string
+  payload?: unknown
+  createdAt: number
+}
+
 type State = {
   sessions: WorkbenchSession[]
   sessionPath: string
@@ -71,6 +84,9 @@ type State = {
   flowchartPath: string
   reviews: WorkbenchReview[]
   reviewPath: string
+  progress: WorkbenchProgressEvent[]
+  progressPath: string
+  progressSession: string
   active: string
   stage: Stage
 }
@@ -86,6 +102,9 @@ const initialState: State = {
   flowchartPath: "",
   reviews: [],
   reviewPath: "",
+  progress: [],
+  progressPath: "",
+  progressSession: "",
   active: "",
   stage: "session",
 }
@@ -115,6 +134,22 @@ const slice = createSlice({
     setReviews(state, action: PayloadAction<{ workspacePath: string; reviews: WorkbenchReview[] }>) {
       state.reviewPath = action.payload.workspacePath
       state.reviews = action.payload.reviews
+    },
+    setProgress(
+      state,
+      action: PayloadAction<{ workspacePath: string; sessionId: string; events: WorkbenchProgressEvent[] }>,
+    ) {
+      state.progressPath = action.payload.workspacePath
+      state.progressSession = action.payload.sessionId
+      state.progress = action.payload.events
+    },
+    upsertProgress(state, action: PayloadAction<{ workspacePath: string; event: WorkbenchProgressEvent }>) {
+      state.progressPath = action.payload.workspacePath
+      state.progressSession = action.payload.event.sessionId
+      state.progress = [
+        ...state.progress.filter((item) => item.id !== action.payload.event.id),
+        action.payload.event,
+      ].sort((a, b) => a.createdAt - b.createdAt)
     },
     upsertReview(state, action: PayloadAction<{ workspacePath: string; review: WorkbenchReview }>) {
       state.reviewPath = action.payload.workspacePath
@@ -161,9 +196,11 @@ export const {
   setActive,
   setFlowchart,
   setQuestions,
+  setProgress,
   setReviews,
   setSessions,
   setStage,
+  upsertProgress,
   upsertReview,
   upsertSession,
 } = slice.actions

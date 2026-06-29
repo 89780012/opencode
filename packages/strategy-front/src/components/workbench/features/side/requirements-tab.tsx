@@ -3,72 +3,21 @@ import {
   CheckCircle2,
   CircleAlert,
   Clock3,
-  ClipboardCheck,
-  Code2,
-  FileCheck,
   FileText,
   LoaderCircle,
   Workflow,
 } from "lucide-react"
 import { useAppDispatch } from "@/store"
-import { setStage, type WorkbenchAnalysis, type WorkbenchFlowchart } from "@/store/workbench-slice"
+import {
+  setStage,
+  type WorkbenchAnalysis,
+  type WorkbenchFlowchart,
+  type WorkbenchProgressEvent,
+} from "@/store/workbench-slice"
 import { type SessionItem } from "../../data"
 import { Compact } from "../../layout/compact"
 import ui from "../../../shared/styles/ui.module.css"
 import css from "../../styles/side/side.module.css"
-
-const steps = [
-  { key: "requirement", label: "需求确认", icon: FileCheck },
-  { key: "code", label: "代码编写", icon: Code2 },
-  { key: "review", label: "代码审查", icon: ClipboardCheck },
-  { key: "flowchart", label: "流程图生成", icon: Workflow },
-  { key: "backtest", label: "回测验证", icon: ChartColumn },
-] as const
-
-function state(cur: SessionItem, key: (typeof steps)[number]["key"]) {
-  if (key === "requirement") return "done"
-  if (key === "code") return "done"
-  if (key === "review") {
-    if (cur.reviewStatus === "running") return "running"
-    if (cur.reviewStatus === "passed" || cur.reviewStatus === "failed") return "done"
-    return "pending"
-  }
-  if (key === "flowchart") {
-    if (cur.flowchartStatus === "generating") return "running"
-    if (cur.flowchartStatus === "done") return "done"
-    return "pending"
-  }
-  if (cur.backtestStatus === "running") return "running"
-  if (cur.backtestStatus === "done") return "done"
-  return "pending"
-}
-
-function Progress(props: { cur: SessionItem }) {
-  return (
-    <div className={css.stepbox}>
-      {steps.map((item) => {
-        const Icon = item.icon
-        const tone = state(props.cur, item.key)
-        return (
-          <div key={item.key} className={`${css.step} ${css[`step_${tone}`]}`}>
-            <div className={css.progress}>
-              <span className={`${css.stepicon} ${css[`stepicon_${tone}`]}`}>
-                {tone === "done" ? (
-                  <CheckCircle2 size={14} />
-                ) : tone === "running" ? (
-                  <LoaderCircle size={14} className={ui.spin} />
-                ) : (
-                  <Icon size={14} />
-                )}
-              </span>
-              <strong>{item.label}</strong>
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
 
 type Mark = {
   key: string
@@ -129,9 +78,9 @@ function Logic(props: { analysis: WorkbenchAnalysis | null }) {
       <>
         <p className={css.warn}>
           <CircleAlert size={14} />
-          <span>暂未分析</span>
+          <span>暂无分析</span>
         </p>
-        <p className={css.logic}>工作区策略逻辑分析尚未开始。</p>
+        <p className={css.logic}>工作区策略分析尚未开始。</p>
       </>
     )
   }
@@ -165,10 +114,22 @@ function Logic(props: { analysis: WorkbenchAnalysis | null }) {
   ))
 }
 
+function Tick(props: { item: WorkbenchProgressEvent }) {
+  if (props.item.state === "error") return <CircleAlert size={14} color="#ef4444" />
+  if (props.item.state === "running") return <LoaderCircle size={14} className={ui.spin} color="#2563eb" />
+  return <CheckCircle2 size={14} color="#16a34a" />
+}
+
+function stamp(value: number) {
+  if (!value) return ""
+  return new Date(value).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })
+}
+
 export function RequirementsTab(props: {
   cur: SessionItem
   analysis: WorkbenchAnalysis | null
   flowchart: WorkbenchFlowchart | null
+  progress: WorkbenchProgressEvent[]
   open: Record<string, boolean>
   risk: string
   hint: string
@@ -179,12 +140,7 @@ export function RequirementsTab(props: {
 
   return (
     <div className={css.stack}>
-      <Compact
-        open={props.open.requirements}
-        icon={FileText}
-        title="需求理解"
-        onToggle={() => props.onToggle("requirements")}
-      >
+      <Compact open={props.open.requirements} icon={FileText} title="需求理解" onToggle={() => props.onToggle("requirements")}>
         <div className={css.reqbox}>
           {props.cur.analyzedRequirements.length ? (
             props.cur.analyzedRequirements.map((item, idx) => (
@@ -229,24 +185,32 @@ export function RequirementsTab(props: {
           </button>
         }
       >
-        <Progress cur={props.cur} />
+        <div className={css.stepbox}>
+          {props.progress.length ? (
+            props.progress.slice(-8).map((item) => (
+              <div key={item.id} className={css.step}>
+                <div className={css.progress}>
+                  <span className={css.stepicon}>
+                    <Tick item={item} />
+                  </span>
+                  <strong>{item.title || item.kind}</strong>
+                  <time dateTime={item.createdAt ? new Date(item.createdAt).toISOString() : undefined}>
+                    {stamp(item.createdAt)}
+                  </time>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className={ui.empty}>暂无进度记录</div>
+          )}
+        </div>
       </Compact>
 
-      <Compact
-        open={props.open.backtest}
-        icon={ChartColumn}
-        title="回测记录"
-        onToggle={() => props.onToggle("backtest")}
-      >
+      <Compact open={props.open.backtest} icon={ChartColumn} title="回测记录" onToggle={() => props.onToggle("backtest")}>
         <div className={`${css.logbox} ${ui.scroll}`}>
           {props.cur.backtestHistory.length ? (
             props.cur.backtestHistory.map((item, idx) => (
-              <button
-                key={`${item.time}-${idx}`}
-                type="button"
-                className={css.log}
-                onClick={() => props.onBacktest(idx)}
-              >
+              <button key={`${item.time}-${idx}`} type="button" className={css.log} onClick={() => props.onBacktest(idx)}>
                 <div className={css.rowtop}>
                   <span className={css.logtitle}>回测 #{props.cur.backtestHistory.length - idx}</span>
                   <span>{item.time}</span>

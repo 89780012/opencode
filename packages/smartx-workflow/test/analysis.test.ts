@@ -957,6 +957,48 @@ describe("smartx workspace analysis", () => {
     expect(workspaces.get(workspace())?.state).toBe("requested")
   })
 
+  test("loads persisted baseline after project memory restore", async () => {
+    const memory = new Map<string, Memory>()
+    const workspaces = new Map<string, Analysis>([[workspace(), requestAnalysis("f:/repo", "f:/repo")]])
+    const charts = new Map<string, Chart>()
+    const hooks = build(ctx("f:/repo"), {
+      projects: projects(),
+      memory,
+      workspaces,
+      charts,
+      load: async () => doneAnalysis("f:/repo", "f:/repo", "read market", ["read market"]),
+      loadChart: async () => ({
+        workspace: "f:/repo",
+        worktree: "f:/repo",
+        state: "done",
+        mermaidCode: "flowchart TD\nA-->B",
+        errorText: "",
+        updated: Date.now(),
+      }),
+    })
+
+    await hooks["tool.execute.after"]?.(
+      {
+        sessionID: "s1",
+        tool: "smartx_resume_project_state",
+        callID: "c1",
+        args: { workspacePath: "f:/repo", worktreePath: "f:/repo" },
+      },
+      { title: "", output: "{}", metadata: {} },
+    )
+
+    const out = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, out)
+    expect(out.system.join("\n")).not.toContain("workspace-analyzer")
+
+    await expect(
+      hooks["tool.execute.before"]?.(
+        { sessionID: "s1", tool: "edit", callID: "c2" },
+        { args: { filePath: "f:/repo/a.ts", oldString: "a", newString: "b" } },
+      ),
+    ).resolves.toBeUndefined()
+  })
+
   test("marks project memory stale after writes and requires save before final wrap-up", async () => {
     const id = workspace()
     const memory = restored()

@@ -243,3 +243,33 @@ type ProjectStateRow struct {
 	Features      []ProjectTask `json:"features"`
 	UpdatedAt     int64         `json:"updatedAt"`
 }
+
+type ProgressAppend struct {
+	WorkspacePath string          `json:"workspacePath"`
+	SessionID     string          `json:"sessionId"`
+	Kind          string          `json:"kind"`
+	State         string          `json:"state"`
+	Title         string          `json:"title"`
+	Detail        string          `json:"detail"`
+	Source        string          `json:"source"`
+	Payload       json.RawMessage `json:"payload,omitempty"`
+}
+
+type ProgressEvent struct {
+	ID            string          `json:"id"`
+	WorkspacePath string          `json:"workspacePath"`
+	SessionID     string          `json:"sessionId"`
+	Kind          string          `json:"kind"`
+	State         string          `json:"state"`
+	Title         string          `json:"title"`
+	Detail        string          `json:"detail"`
+	Source        string          `json:"source"`
+	Payload       json.RawMessage `json:"payload,omitempty"`
+	CreatedAt     int64           `json:"createdAt"`
+}
+
+type ProgressList struct {
+	WorkspacePath string          `json:"workspacePath"`
+	SessionID     string          `json:"sessionId"`
+	Events        []ProgressEvent `json:"events"`
+}
