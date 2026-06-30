@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, ArrowUpToLine, ChevronDown, Loader2, RefreshCcw, RotateCcw, Search } from "lucide-react"
+import { ArrowDown, ArrowUp, ChevronsUp, ChevronDown, Loader2, RefreshCcw, RotateCcw, Search } from "lucide-react"
 import { useState } from "react"
 import { modelChainLimit, modelKey } from "@/lib/model-catalog"
 import { Switch } from "../ui/switch"
@@ -82,16 +82,16 @@ export function ModelsPanel(props: { app: App; onProviders: () => void }) {
                   <div className={css.actions}>
                     <button
                       type="button"
-                      className={css.icon}
+                      className={ui.icon}
                       onClick={() => app.top(idx)}
                       disabled={idx === 0}
                       aria-label="置顶"
                     >
-                      <ArrowUpToLine size={14} />
+                      <ChevronsUp size={14} />
                     </button>
                     <button
                       type="button"
-                      className={css.icon}
+                      className={ui.icon}
                       onClick={() => app.move(idx, -1)}
                       disabled={idx === 0}
                       aria-label="上移"
@@ -100,7 +100,7 @@ export function ModelsPanel(props: { app: App; onProviders: () => void }) {
                     </button>
                     <button
                       type="button"
-                      className={css.icon}
+                      className={ui.icon}
                       onClick={() => app.move(idx, 1)}
                       disabled={idx === app.order.length - 1}
                       aria-label="下移"
