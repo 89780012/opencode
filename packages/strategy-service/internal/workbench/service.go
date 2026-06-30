@@ -566,8 +566,7 @@ func (s *Service) SaveFlowchart(ctx context.Context, req FlowchartReq) (Flowchar
 	if err := s.pushProgress(ctx, req.WorkspacePath, progressInput{
 		kind:   progressKindFlowchart(req.State),
 		state:  progressState(req.State),
-		title:  "流程图",
-		detail: progressDetail(row.State, row.Code, row.Err),
+		title:  flowTitle(row),
 		source: "service",
 	}); err != nil {
 		return FlowchartRow{}, err
@@ -1078,14 +1077,17 @@ func pickSummary(text string, list []string) string {
 	return strings.Join(clean(list), "; ")
 }
 
-func progressDetail(state string, code string, err string) string {
-	if state == "error" {
-		return strings.TrimSpace(err)
+func flowTitle(row FlowchartRow) string {
+	if row.State == "generating" {
+		return "开始生成流程图"
 	}
-	if strings.TrimSpace(code) == "" {
-		return state
+	if row.State == "error" {
+		return "流程图生成失败"
 	}
-	return "flowchart saved"
+	if row.Manual || row.Source == "manual" {
+		return "手动保存流程图"
+	}
+	return "保存 AI 流程图"
 }
 
 func (s *Service) pushProgress(ctx context.Context, workspace string, input progressInput) error {
