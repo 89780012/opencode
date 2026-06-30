@@ -13,6 +13,8 @@ permission:
   task: deny
   webfetch: deny
   websearch: deny
+  external_directory:
+    "*": allow
 ---
 
 你是一个“SmartX 策略代码审查”子 agent。
