@@ -628,6 +628,15 @@ func (s *Service) ListReviews(ctx context.Context, req ReviewGet) ([]ReviewRow, 
 	return out, rows.Close()
 }
 
+func recent(ctx context.Context, doc *sql.DB, workspace string, worktree string) (ReviewRow, error) {
+	row, err := scanReview(doc.QueryRowContext(ctx, `select id, workspace_path, worktree_path, state, summary, items, suggestions, updated_at from workspace_reviews where workspace_path = ? and worktree_path = ? order by updated_at desc limit 1`,
+		workspace, worktree))
+	if err == sql.ErrNoRows {
+		return ReviewRow{}, nil
+	}
+	return row, err
+}
+
 func (s *Service) SaveReview(ctx context.Context, req ReviewReq) (ReviewRow, error) {
 	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
 	req.WorktreePath = strings.TrimSpace(req.WorktreePath)
@@ -661,7 +670,17 @@ func (s *Service) SaveReview(ctx context.Context, req ReviewReq) (ReviewRow, err
 		return ReviewRow{}, err
 	}
 	id := "review_" + hash(fmt.Sprintf("%s\x00%s\x00%d\x00%s", req.WorkspacePath, req.WorktreePath, now, req.Summary))
-	_, err = doc.ExecContext(ctx, `insert into workspace_reviews(id, workspace_path, worktree_path, state, summary, items, suggestions, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?)`,
+	if req.State != "running" {
+		prev, err := recent(ctx, doc, req.WorkspacePath, req.WorktreePath)
+		if err != nil {
+			return ReviewRow{}, err
+		}
+		if prev.State == "running" {
+			id = prev.ID
+		}
+	}
+	_, err = doc.ExecContext(ctx, `insert into workspace_reviews(id, workspace_path, worktree_path, state, summary, items, suggestions, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?)
+on conflict(id) do update set state = excluded.state, summary = excluded.summary, items = excluded.items, suggestions = excluded.suggestions, updated_at = excluded.updated_at`,
 		id, req.WorkspacePath, req.WorktreePath, req.State, req.Summary, string(body), string(tips), now)
 	if err != nil {
 		return ReviewRow{}, err

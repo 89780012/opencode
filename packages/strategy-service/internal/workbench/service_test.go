@@ -243,6 +243,53 @@ func hasProgress(events []ProgressEvent, kind string) bool {
 	return false
 }
 
+func TestSaveReviewUpdatesRunningReview(t *testing.T) {
+	svc := NewService(nil, nil, nil, "")
+	dir := t.TempDir()
+
+	run, err := svc.SaveReview(context.Background(), ReviewReq{
+		WorkspacePath: dir,
+		State:         "running",
+		Summary:       "审查已开始",
+		Items: []ReviewItem{{
+			Name:   "审查进行中",
+			Status: "running",
+			Detail: "strategy-reviewer 正在执行审查",
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	done, err := svc.SaveReview(context.Background(), ReviewReq{
+		WorkspacePath: dir,
+		State:         "failed",
+		Summary:       "发现风险，需要修复",
+		Items: []ReviewItem{{
+			Name:       "风控缺陷",
+			Status:     "failed",
+			Detail:     "缺少止损逻辑",
+			Suggestion: "补充止损条件",
+		}},
+		Suggestions: []string{"补充风险控制"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if done.ID != run.ID {
+		t.Fatalf("review id = %q, want %q", done.ID, run.ID)
+	}
+	list, err := svc.ListReviews(context.Background(), ReviewGet{WorkspacePath: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 {
+		t.Fatalf("review count = %d, want 1", len(list))
+	}
+	if list[0].State != "failed" || list[0].Items[0].Name != "风控缺陷" {
+		t.Fatalf("running review was not updated: %#v", list[0])
+	}
+}
+
 func TestProgressDedupesImmediateDuplicate(t *testing.T) {
 	svc := NewService(nil, nil, nil, "")
 	dir := t.TempDir()

@@ -6,10 +6,12 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const dir = path.join(root, "dist")
 const out = path.join(dir, "smartx-workflow.js")
 
-function decode(text: string) {
-  return text.replace(/\\u\{([0-9a-fA-F]+)\}|\\u([0-9a-fA-F]{4})/g, (_, wide, short) =>
-    String.fromCodePoint(Number.parseInt(wide || short, 16)),
-  )
+function ascii(text: string) {
+  return text.replace(/[^\x00-\x7F]/g, (char) => {
+    const point = char.codePointAt(0) ?? 0
+    if (point <= 0xffff) return `\\u${point.toString(16).padStart(4, "0")}`
+    return `\\u{${point.toString(16)}}`
+  })
 }
 
 await rm(dir, { recursive: true, force: true })
@@ -37,4 +39,4 @@ if (!file) {
   process.exit(1)
 }
 
-await Bun.write(out, "\uFEFF" + decode(await file.text()))
+await Bun.write(out, ascii(await file.text()))

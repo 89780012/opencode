@@ -463,6 +463,9 @@ func (a *API) mcpPost(c *gin.Context) {
 					Items:         reviewItems(args["items"]),
 					Suggestions:   texts(args["suggestions"]),
 				})
+				if err == nil {
+					a.event.emitBroadcast("review.updated", utils.Pack(data))
+				}
 				return data, err
 			})
 		case "get_review":
