@@ -14,10 +14,13 @@ import (
 )
 
 func TestBriefKeepsNumberAndTextTogether(t *testing.T) {
-	text := brief([]string{"use grid strategy.", "  "})
+	text := brief([]string{"use grid strategy.", "trade BTC.", "  "})
 
 	if !strings.Contains(text, "1. use grid strategy.") {
 		t.Fatalf("brief() = %q", text)
+	}
+	if strings.Contains(text, "\n\n") {
+		t.Fatalf("brief() contains blank line: %q", text)
 	}
 	if strings.Contains(text, "1.\n") {
 		t.Fatalf("brief() split number and text: %q", text)

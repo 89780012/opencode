@@ -1438,7 +1438,7 @@ func numbered(list []string) string {
 	for i, item := range clean(list) {
 		out = append(out, fmt.Sprintf("%d. %s", i+1, item))
 	}
-	return strings.Join(out, "\n\n")
+	return strings.Join(out, "\n")
 }
 
 func serial(list []string) string {
@@ -1451,7 +1451,6 @@ func serial(list []string) string {
 
 func brief(list []string) string {
 	return strings.TrimSpace(`请根据以下策略需求开始工作：
-
 ` + numbered(list))
 }
 
