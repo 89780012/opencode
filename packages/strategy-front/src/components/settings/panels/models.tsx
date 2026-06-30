@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, ChevronDown, Loader2, RefreshCcw, RotateCcw, Search } from "lucide-react"
+import { ArrowDown, ArrowUp, ArrowUpToLine, ChevronDown, Loader2, RefreshCcw, RotateCcw, Search } from "lucide-react"
 import { useState } from "react"
 import { modelChainLimit, modelKey } from "@/lib/model-catalog"
 import { Switch } from "../ui/switch"
@@ -26,7 +26,12 @@ export function ModelsPanel(props: { app: App; onProviders: () => void }) {
             <RefreshCcw className={app.prv.load ? ui.spin : ""} size={14} />
             刷新
           </button>
-          <button type="button" className={ui.btn} onClick={app.clear} disabled={app.prv.load || Object.keys(app.user).length === 0}>
+          <button
+            type="button"
+            className={ui.btn}
+            onClick={app.clear}
+            disabled={app.prv.load || Object.keys(app.user).length === 0}
+          >
             <RotateCcw size={14} />
             重置显示
           </button>
@@ -75,7 +80,22 @@ export function ModelsPanel(props: { app: App; onProviders: () => void }) {
                     </div>
                   </div>
                   <div className={css.actions}>
-                    <button type="button" className={css.icon} onClick={() => app.move(idx, -1)} disabled={idx === 0} aria-label="上移">
+                    <button
+                      type="button"
+                      className={css.icon}
+                      onClick={() => app.top(idx)}
+                      disabled={idx === 0}
+                      aria-label="置顶"
+                    >
+                      <ArrowUpToLine size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      className={css.icon}
+                      onClick={() => app.move(idx, -1)}
+                      disabled={idx === 0}
+                      aria-label="上移"
+                    >
                       <ArrowUp size={14} />
                     </button>
                     <button
@@ -99,11 +119,17 @@ export function ModelsPanel(props: { app: App; onProviders: () => void }) {
         <div className={css.titleline}>
           <div className={css.title}>
             <h3>模型目录</h3>
-            <p>{app.stats.providers} 个 provider，{app.stats.models} 个模型，当前显示 {app.stats.shown} 个。</p>
+            <p>
+              {app.stats.providers} 个 provider，{app.stats.models} 个模型，当前显示 {app.stats.shown} 个。
+            </p>
           </div>
           <label className={css.search}>
             <Search size={14} />
-            <input value={app.q} onChange={(event) => app.setQ(event.target.value)} placeholder="搜索 provider 或模型" />
+            <input
+              value={app.q}
+              onChange={(event) => app.setQ(event.target.value)}
+              placeholder="搜索 provider 或模型"
+            />
           </label>
         </div>
 
@@ -126,7 +152,9 @@ export function ModelsPanel(props: { app: App; onProviders: () => void }) {
         ) : (
           <div className={css.catalog}>
             {app.groups.map((group, idx) => {
-              const all = group.items.every((item) => app.visible({ providerID: item.provider.id, modelID: item.id }, item))
+              const all = group.items.every((item) =>
+                app.visible({ providerID: item.provider.id, modelID: item.id }, item),
+              )
               const show = query || (open[group.id] ?? idx === 0)
 
               return (
@@ -167,7 +195,9 @@ export function ModelsPanel(props: { app: App; onProviders: () => void }) {
                                 <strong>{item.name}</strong>
                                 <span>{item.id}</span>
                                 {item.def ? <span>默认</span> : null}
-                                {app.latest.has(modelKey({ providerID: item.provider.id, modelID: item.id })) ? <span>最新</span> : null}
+                                {app.latest.has(modelKey({ providerID: item.provider.id, modelID: item.id })) ? (
+                                  <span>最新</span>
+                                ) : null}
                                 {item.free ? <span>免费</span> : null}
                               </div>
                               <div className={css.meta}>

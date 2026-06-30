@@ -105,7 +105,12 @@ export function useSettings() {
       touched,
       user: JSON.stringify(user),
     }
-    if (saved.current.chain === next.chain && saved.current.touched === next.touched && saved.current.user === next.user) return
+    if (
+      saved.current.chain === next.chain &&
+      saved.current.touched === next.touched &&
+      saved.current.user === next.user
+    )
+      return
 
     const push = saved.current.chain !== next.chain
     saved.current = next
@@ -139,6 +144,12 @@ export function useSettings() {
     )
   }
 
+  const top = (idx: number) => {
+    if (idx <= 0 || idx >= order.length) return
+    setTouched(true)
+    setChain([order[idx], ...order.slice(0, idx), ...order.slice(idx + 1)])
+  }
+
   const reset = () => {
     setTouched(false)
     setChain(autoModelChain(shown))
@@ -161,6 +172,7 @@ export function useSettings() {
     show,
     shown,
     stats,
+    top,
     user,
     visible,
   }
