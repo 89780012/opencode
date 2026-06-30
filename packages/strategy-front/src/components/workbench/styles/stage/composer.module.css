@@ -68,7 +68,10 @@
   bottom: 0.5rem;
   display: inline-flex;
   align-items: center;
-  gap: 0.38rem;
+}
+
+.action + .action {
+  margin-left: 0.38rem;
 }
 
 .action {

@@ -10,10 +10,19 @@
 }
 
 .head {
+  --tool-font: 0.76rem;
+  --tool-height: 2rem;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  gap: 0;
+}
+
+.head > * + * {
+  margin-left: 0.7rem;
+}
+
+.head > .flowtools {
+  margin-left: auto;
 }
 
 .flow {
@@ -61,30 +70,36 @@
 .switch {
   display: inline-flex;
   align-items: center;
-  gap: 0.15rem;
   box-sizing: border-box;
-  height: 1.95rem;
+  height: var(--tool-height);
   padding: 0.16rem;
   border: 1px solid #e2e8f0;
   border-radius: 0.5rem;
   background: #f8fafc;
 }
 
+.switch button + button {
+  margin-left: 0.15rem;
+}
+
 .switch button {
   height: 100%;
-  min-width: 2.55rem;
+  min-width: 2.7rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.22rem;
   border: 0;
   border-radius: 0.34rem;
   background: transparent;
   color: #64748b;
-  font-size: 0.75rem;
+  font-size: var(--tool-font);
   font-weight: 600;
   padding: 0 0.42rem;
   white-space: nowrap;
+}
+
+.switch button span {
+  margin-left: 0.22rem;
 }
 
 .switch button:hover {
@@ -102,12 +117,13 @@
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  width: 1.95rem;
-  height: 1.95rem;
+  width: var(--tool-height);
+  height: var(--tool-height);
   border: 1px solid #e2e8f0;
   border-radius: 0.5rem;
   background: #ffffff;
   color: #475569;
+  font-size: var(--tool-font);
   cursor: pointer;
   transition:
     background 0.15s,
@@ -123,11 +139,11 @@
 .zoomlabel {
   box-sizing: border-box;
   min-width: 3rem;
-  height: 1.95rem;
+  height: var(--tool-height);
   display: inline-block;
-  line-height: 1.95rem;
+  line-height: var(--tool-height);
   text-align: center;
-  font-size: 0.72rem;
+  font-size: var(--tool-font);
   font-weight: 600;
   color: #475569;
 }
@@ -135,9 +151,18 @@
 .actionbtn {
   box-sizing: border-box;
   min-width: 5.25rem;
-  min-height: 1.95rem;
+  height: var(--tool-height);
+  min-height: var(--tool-height);
+  border-radius: 0.5rem;
+  font-size: var(--tool-font);
+  font-weight: 600;
+  line-height: 1;
   padding: 0 0.64rem;
   vertical-align: middle;
+}
+
+.actionbtn span {
+  margin-left: 0.28rem;
 }
 
 .badge {

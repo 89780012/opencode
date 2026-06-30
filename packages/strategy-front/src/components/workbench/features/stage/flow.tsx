@@ -122,22 +122,22 @@ export function Flow(props: {
   return (
     <section className={css.root}>
       <div className={css.head}>
+        <div className={css.switch}>
+          <button type="button" className={mode === "chart" ? css.switch_on : ""} onClick={() => setMode("chart")}>
+            <Workflow size={13} />
+            <span>图</span>
+          </button>
+          <button type="button" className={mode === "source" ? css.switch_on : ""} onClick={() => setMode("source")}>
+            <Code2 size={13} />
+            <span>源码</span>
+          </button>
+        </div>
         <strong className={ui.sectiontitle}>
           <Workflow size={16} />
           <span>流程图</span>
           {props.flow?.manual ? <em className={css.badge}>手工修改</em> : null}
         </strong>
         <div className={css.flowtools}>
-          <div className={css.switch}>
-            <button type="button" className={mode === "chart" ? css.switch_on : ""} onClick={() => setMode("chart")}>
-              <Workflow size={13} />
-              <span>图</span>
-            </button>
-            <button type="button" className={mode === "source" ? css.switch_on : ""} onClick={() => setMode("source")}>
-              <Code2 size={13} />
-              <span>源码</span>
-            </button>
-          </div>
           {mode === "chart" ? (
             <>
               <button type="button" className={css.toolbtn} onClick={() => setZoom(clamp(zoom - ZOOM_STEP, ZOOM_MIN, ZOOM_MAX))}>
