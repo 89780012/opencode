@@ -56,9 +56,15 @@ export function Review(props: {
   const [pick, setPick] = useState("")
   const hist = app.cur.reviewHistory.find((item) => item.id === pick) ?? null
   const view = () => {
-    setPick("")
-    app.view()
+    if (pick) {
+      setPick("")
+      app.view("history")
+      return
+    }
+    app.view(app.cur.reviewView === "current" ? "history" : "current")
   }
+  const icon = app.cur.reviewView === "current" || pick ? <Clock3 size={14} /> : <History size={14} />
+  const label = app.cur.reviewView === "current" || pick ? "查看历史" : "查看当前"
 
   return (
     <aside className={css.root}>
@@ -90,9 +96,9 @@ export function Review(props: {
                   type="button"
                   className={css.action}
                   onClick={view}
-                  aria-label={app.cur.reviewView === "current" ? "查看历史" : "查看当前"}
+                  aria-label={label}
                 >
-                  {app.cur.reviewView === "current" ? <Clock3 size={14} /> : <History size={14} />}
+                  {icon}
                 </button>
                 <button type="button" className={css.action} onClick={props.onClose} aria-label="收起审查面板">
                   <X size={14} />

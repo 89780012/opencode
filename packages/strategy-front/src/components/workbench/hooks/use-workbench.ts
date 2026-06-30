@@ -184,6 +184,6 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
     review,
     backtest,
     show: () => dispatch(setStage("backtest")),
-    view: () => setView((item) => (item === "current" ? "history" : "current")),
+    view: (next?: "current" | "history") => setView((item) => next ?? (item === "current" ? "history" : "current")),
   }
 }
