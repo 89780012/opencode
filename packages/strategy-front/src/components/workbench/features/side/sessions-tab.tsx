@@ -183,7 +183,7 @@ export function SessionsTab(props: { open: Record<string, boolean>; onToggle: (k
   }
 
   return (
-    <div className={css.stack} style={{ fontSize: 12 }}>
+    <div className={css.stack}>
       <Fold
         open={props.open.sessions}
         icon={FolderTree}
