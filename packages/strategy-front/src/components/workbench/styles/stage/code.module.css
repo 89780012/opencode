@@ -43,6 +43,8 @@
   flex-direction: column;
   overflow: hidden;
   background: linear-gradient(180deg, rgba(226, 232, 240, 0.56), transparent 10rem), #f8fafc;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .split {
@@ -105,7 +107,7 @@
   border-radius: 0.46rem;
   background: transparent;
   color: #516276;
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   font-weight: 600;
   padding: 0.34rem 0.46rem;
   transition:
@@ -139,7 +141,7 @@
   min-width: 0;
   overflow: hidden;
   color: #172033;
-  font-size: 0.74rem;
+  font-size: 0.84rem;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -148,7 +150,7 @@
 .sidehead span {
   flex: none;
   color: #64748b;
-  font-size: 0.64rem;
+  font-size: 0.72rem;
 }
 
 .modes {
@@ -228,7 +230,7 @@
   border: 0;
   background: transparent;
   color: inherit;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   font-weight: 500;
   padding: 0.36rem 0.44rem;
 }
@@ -241,7 +243,7 @@
 
 .notab {
   color: #64748b;
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   padding: 0.52rem 0.7rem;
 }
 
@@ -258,7 +260,7 @@
 .error {
   flex: none;
   border-bottom: 1px solid #dce5ef;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   padding: 0.46rem 0.68rem;
 }
 
@@ -315,7 +317,7 @@
   place-items: center;
   padding: 1.5rem;
   color: #64748b;
-  font-size: 0.78rem;
+  font-size: 0.84rem;
   text-align: center;
 }
 
@@ -369,7 +371,7 @@
   border-radius: 0.38rem;
   background: transparent;
   color: #334155;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   padding: 0 0.45rem;
   text-align: left;
   position: relative;
@@ -436,7 +438,7 @@
   border-radius: 0.42rem;
   background: transparent;
   color: #334155;
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   padding: 0.32rem 0.45rem;
   text-align: left;
   transition:
@@ -470,7 +472,7 @@
 
 .changedir {
   color: #64748b;
-  font-size: 0.64rem;
+  font-size: 0.72rem;
 }
 
 .stat {
@@ -478,7 +480,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  font-size: 0.62rem;
+  font-size: 0.7rem;
   font-variant-numeric: tabular-nums;
 }
 
