@@ -151,9 +151,9 @@
 }
 
 .stepbox {
+  flex: 1;
   gap: 0;
-  min-height: 8.85rem;
-  max-height: 14rem;
+  min-height: 0;
   overflow-y: auto;
 }
 

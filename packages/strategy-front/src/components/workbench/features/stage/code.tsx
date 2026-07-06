@@ -41,7 +41,8 @@ const label = (paths: string[]) => {
 }
 
 const note = (file: WorkspaceFileContentResponse | null) => {
-  if (!file || file.previewable) return null
+  if (!file) return null
+  if (file.previewable && (!file.binary || file.content)) return null
   if (file.binary) return "二进制文件不能预览"
   if (file.reason === "too_large") return "预览文件太大"
   return "这个文件不能预览"

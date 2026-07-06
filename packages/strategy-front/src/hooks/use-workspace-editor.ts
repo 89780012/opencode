@@ -195,7 +195,7 @@ export function useWorkspaceEditor(input: Input) {
   const fileLoading = state.active ? (state.busy[state.active] ?? false) : false
   const fileSaving = state.active ? (state.saving[state.active] ?? false) : false
   const value = state.active ? (state.drafts[state.active] ?? state.files[state.active]?.content ?? "") : ""
-  const lock = !!input.readonly || !!file?.truncated || (!file?.previewable && !fileLoading)
+  const lock = !!input.readonly || !!file?.binary || !!file?.truncated || (!file?.previewable && !fileLoading)
   const dirtyCount = Object.values(state.dirty).filter(Boolean).length
   const savingAny = Object.values(state.saving).some(Boolean)
 
