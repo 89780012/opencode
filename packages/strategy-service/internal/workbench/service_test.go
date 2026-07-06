@@ -246,6 +246,13 @@ func hasProgress(events []ProgressEvent, kind string) bool {
 func TestSaveReviewUpdatesRunningReview(t *testing.T) {
 	svc := NewService(nil, nil, nil, "")
 	dir := t.TempDir()
+	ses := fmt.Sprintf("ses_%d", time.Now().UnixNano())
+	if _, err := svc.InitProjectState(context.Background(), ProjectStateInitReq{
+		WorkspacePath: dir,
+		SessionID:     ses,
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	run, err := svc.SaveReview(context.Background(), ReviewReq{
 		WorkspacePath: dir,
@@ -287,6 +294,25 @@ func TestSaveReviewUpdatesRunningReview(t *testing.T) {
 	}
 	if list[0].State != "failed" || list[0].Items[0].Name != "风控缺陷" {
 		t.Fatalf("running review was not updated: %#v", list[0])
+	}
+	prog, err := svc.ListProgress(context.Background(), ProgressList{WorkspacePath: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	reviews := make([]ProgressEvent, 0, 2)
+	for _, item := range prog.Events {
+		if strings.HasPrefix(item.Kind, "review.") {
+			reviews = append(reviews, item)
+		}
+	}
+	if len(reviews) != 2 {
+		t.Fatalf("review progress count = %d, want 2", len(reviews))
+	}
+	if reviews[0].Title != "开始第1轮审查" {
+		t.Fatalf("start title = %q", reviews[0].Title)
+	}
+	if reviews[1].Title != "第1轮审查结束" {
+		t.Fatalf("done title = %q", reviews[1].Title)
 	}
 }
 

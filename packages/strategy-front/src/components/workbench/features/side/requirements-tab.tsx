@@ -116,6 +116,7 @@ function Logic(props: { analysis: WorkbenchAnalysis | null }) {
 
 function Tick(props: { item: WorkbenchProgressEvent }) {
   if (props.item.state === "error") return <CircleAlert size={14} color="#ef4444" />
+  if (props.item.kind === "review.start") return <Clock3 size={14} color="#2563eb" />
   if (props.item.state === "running") return <LoaderCircle size={14} className={ui.spin} color="#2563eb" />
   return <CheckCircle2 size={14} color="#16a34a" />
 }
