@@ -246,6 +246,7 @@
   font-size: 0.895rem;
   line-height: 1.62;
   padding: 0;
+  overflow-wrap: anywhere;
 }
 
 .ai .card {
@@ -288,10 +289,15 @@
   color: #111827;
   font-size: 0.895rem;
   line-height: 1.66;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .markdown :global(p) {
   margin: 0.08rem 0 0.62rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .markdown :global(p:last-child) {
@@ -306,6 +312,9 @@
 
 .markdown :global(li) {
   margin: 0.18rem 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .markdown :global(blockquote) {
@@ -345,6 +354,9 @@
   -webkit-box-decoration-break: clone;
   font-variant-ligatures: none;
   text-rendering: geometricPrecision;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .markdown :global(pre) {

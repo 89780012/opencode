@@ -43,6 +43,17 @@ function Row(props: { item: Step }) {
   )
 }
 
+function Advice(props: { tips: string[] }) {
+  if (!props.tips.length) return null
+  return (
+    <ol className={css.advice}>
+      {props.tips.map((tip, idx) => (
+        <li key={`${idx}-${tip}`}>{tip}</li>
+      ))}
+    </ol>
+  )
+}
+
 export function Review(props: {
   open: boolean
   width: number
@@ -126,13 +137,7 @@ export function Review(props: {
                       {app.last.steps.map((item) => (
                         <Row key={item.text} item={item} />
                       ))}
-                      {app.last.suggestions.length ? (
-                        <div className={css.advice}>
-                          {app.last.suggestions.map((suggestion, index) => (
-                            <p key={index}>{suggestion}</p>
-                          ))}
-                        </div>
-                      ) : null}
+                      <Advice tips={app.last.suggestions} />
                     </div>
                   ) : (
                     <div className={ui.empty}>尚未发起审查</div>
@@ -154,13 +159,7 @@ export function Review(props: {
                       {hist.steps.map((item) => (
                         <Row key={item.text} item={item} />
                       ))}
-                      {hist.suggestions.length ? (
-                        <div className={css.advice}>
-                          {hist.suggestions.map((suggestion, index) => (
-                            <p key={index}>{suggestion}</p>
-                          ))}
-                        </div>
-                      ) : null}
+                      <Advice tips={hist.suggestions} />
                     </div>
                   ) : app.cur.reviewHistory.length ? (
                     <div className={css.list}>

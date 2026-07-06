@@ -136,6 +136,7 @@
   -webkit-overflow-scrolling: touch;
   padding: 1rem;
   background: rgba(249, 250, 251, 0.4);
+  overscroll-behavior: contain;
 }
 
 .box {
@@ -146,7 +147,7 @@
 .status {
   margin: 0 0 0.5rem;
   color: #0f172a;
-  font-size: 0.75rem;
+  font-size: 0.82rem;
   font-weight: 500;
 }
 
@@ -208,8 +209,8 @@
 .stepcopy p {
   margin: 0;
   color: #475569;
-  font-size: 0.66rem;
-  line-height: 1.45;
+  font-size: 0.76rem;
+  line-height: 1.55;
 }
 
 .stepcopy .fix {
@@ -218,9 +219,9 @@
 
 .stepmain strong {
   color: #0f172a;
-  font-size: 0.6875rem;
+  font-size: 0.78rem;
   font-weight: 500;
-  line-height: 1.35;
+  line-height: 1.45;
 }
 
 .stepicon {
@@ -249,7 +250,7 @@
 
 .stepright em {
   color: #64748b;
-  font-size: 0.625rem;
+  font-size: 0.72rem;
   font-style: normal;
   flex: none;
 }
@@ -265,15 +266,31 @@
 
 .advice {
   margin-top: 0.5rem;
+  margin-bottom: 0;
   padding-top: 0.25rem;
+  padding-left: 0.15rem;
   border-top: 1px solid #eef2f7;
+  counter-reset: advice-counter;
 }
 
-.advice p {
-  margin: 0;
+.advice li {
+  margin: 0.24rem 0 0;
   color: #ef4444;
-  font-size: 0.6875rem;
-  line-height: 1.55;
+  font-size: 0.76rem;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  counter-increment: advice-counter;
+  position: relative;
+  padding-left: 1.5rem;
+}
+
+.advice li::before {
+  content: counter(advice-counter) ".";
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-weight: bold;
+  color: #0f172a;
 }
 
 .submit {
@@ -309,7 +326,7 @@
   padding: 0.5rem 0;
   border-bottom: 1px solid #eef2f7;
   color: #334155;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   text-align: left;
 }
 
@@ -328,12 +345,13 @@
   gap: 0.45rem;
   margin-bottom: 0.25rem;
   color: #64748b;
-  font-size: 0.625rem;
+  font-size: 0.72rem;
 }
 
 .item p {
   margin: 0.14rem 0 0;
-  font-size: 0.6875rem;
+  font-size: 0.76rem;
+  line-height: 1.55;
 }
 
 @keyframes spin {
