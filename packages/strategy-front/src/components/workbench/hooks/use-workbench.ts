@@ -80,7 +80,10 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
   const [view, setView] = useState<"current" | "history">("current")
   const [reviewing, setReviewing] = useState(false)
   const flow = state.flowchart?.workspacePath === state.sessionPath ? state.flowchart : null
-  const rows = state.reviewPath === state.sessionPath ? state.reviews : []
+  const rows = useMemo(
+    () => (state.reviewPath === state.sessionPath ? state.reviews : []).slice().sort((a, b) => b.updatedAt - a.updatedAt),
+    [state.reviewPath, state.reviews, state.sessionPath],
+  )
   const row = rows[0] ?? null
   const cur = useMemo<SessionItem>(() => {
     const session = state.sessions.find((item) => item.id === state.active) ?? state.sessions[0]
