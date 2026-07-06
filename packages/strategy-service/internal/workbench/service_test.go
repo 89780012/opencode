@@ -331,6 +331,88 @@ func TestProgressDedupesImmediateDuplicate(t *testing.T) {
 	}
 }
 
+func TestSaveAnalysisSkipsUnchangedProgress(t *testing.T) {
+	svc := NewService(nil, nil, nil, "")
+	dir := t.TempDir()
+	ses := fmt.Sprintf("ses_%d", time.Now().UnixNano())
+
+	if _, err := svc.InitProjectState(context.Background(), ProjectStateInitReq{
+		WorkspacePath: dir,
+		SessionID:     ses,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	input := AnalysisReq{
+		WorkspacePath: dir,
+		State:         "done",
+		Items:         []string{"读取行情", "执行入场"},
+	}
+	first, err := svc.SaveAnalysis(context.Background(), input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := svc.SaveAnalysis(context.Background(), input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.UpdatedAt != first.UpdatedAt {
+		t.Fatalf("updatedAt = %d, want %d", second.UpdatedAt, first.UpdatedAt)
+	}
+	list, err := svc.ListProgress(context.Background(), ProgressList{WorkspacePath: dir, SessionID: ses})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if countProgress(list.Events, "analysis.done") != 1 {
+		t.Fatalf("events = %#v", list.Events)
+	}
+}
+
+func TestSaveFlowchartSkipsUnchangedProgress(t *testing.T) {
+	svc := NewService(nil, nil, nil, "")
+	dir := t.TempDir()
+	ses := fmt.Sprintf("ses_%d", time.Now().UnixNano())
+
+	if _, err := svc.InitProjectState(context.Background(), ProjectStateInitReq{
+		WorkspacePath: dir,
+		SessionID:     ses,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	input := FlowchartReq{
+		WorkspacePath: dir,
+		State:         "done",
+		Code:          "flowchart TD\nA[读取行情] --> B[执行入场]",
+	}
+	first, err := svc.SaveFlowchart(context.Background(), input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := svc.SaveFlowchart(context.Background(), input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.UpdatedAt != first.UpdatedAt {
+		t.Fatalf("updatedAt = %d, want %d", second.UpdatedAt, first.UpdatedAt)
+	}
+	list, err := svc.ListProgress(context.Background(), ProgressList{WorkspacePath: dir, SessionID: ses})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if countProgress(list.Events, "flowchart.done") != 1 {
+		t.Fatalf("events = %#v", list.Events)
+	}
+}
+
+func countProgress(events []ProgressEvent, kind string) int {
+	count := 0
+	for _, event := range events {
+		if event.Kind == kind {
+			count++
+		}
+	}
+	return count
+}
+
 func readJSON(t *testing.T, file string, out any) {
 	t.Helper()
 	body, err := os.ReadFile(file)

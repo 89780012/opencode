@@ -109,6 +109,21 @@ const initialState: State = {
   stage: "session",
 }
 
+function same(a: WorkbenchProgressEvent, b: WorkbenchProgressEvent) {
+  if (a.kind !== b.kind) return false
+  if (a.state !== b.state) return false
+  if (a.title !== b.title) return false
+  return a.source === b.source
+}
+
+function compact(list: WorkbenchProgressEvent[]) {
+  return list.reduce<WorkbenchProgressEvent[]>((all, item) => {
+    const prev = all[all.length - 1]
+    if (!prev || !same(prev, item)) return [...all, item]
+    return [...all.slice(0, -1), item]
+  }, [])
+}
+
 const slice = createSlice({
   name: "workbench",
   initialState,
@@ -141,15 +156,15 @@ const slice = createSlice({
     ) {
       state.progressPath = action.payload.workspacePath
       state.progressSession = action.payload.sessionId
-      state.progress = action.payload.events
+      state.progress = compact(action.payload.events)
     },
     upsertProgress(state, action: PayloadAction<{ workspacePath: string; event: WorkbenchProgressEvent }>) {
       state.progressPath = action.payload.workspacePath
       state.progressSession = action.payload.event.sessionId
-      state.progress = [
+      state.progress = compact([
         ...state.progress.filter((item) => item.id !== action.payload.event.id),
         action.payload.event,
-      ].sort((a, b) => a.createdAt - b.createdAt)
+      ].sort((a, b) => a.createdAt - b.createdAt))
     },
     upsertReview(state, action: PayloadAction<{ workspacePath: string; review: WorkbenchReview }>) {
       state.reviewPath = action.payload.workspacePath

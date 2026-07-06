@@ -353,6 +353,21 @@ func (s *Service) SaveAnalysis(ctx context.Context, req AnalysisReq) (AnalysisRo
 	if err != nil {
 		return AnalysisRow{}, err
 	}
+	prev, err := s.GetAnalysis(ctx, AnalysisGet{WorkspacePath: req.WorkspacePath, WorktreePath: req.WorktreePath})
+	if err != nil && !errors.Is(err, db.ErrNotFound) {
+		return AnalysisRow{}, err
+	}
+	same := err == nil && prev.State == req.State && prev.Text == req.Text && strings.Join(prev.Items, "\x00") == strings.Join(req.Items, "\x00")
+	if same {
+		return AnalysisRow{
+			WorkspacePath: req.WorkspacePath,
+			WorktreePath:  req.WorktreePath,
+			State:         req.State,
+			Items:         req.Items,
+			Text:          req.Text,
+			UpdatedAt:     prev.UpdatedAt,
+		}, nil
+	}
 	_, err = doc.ExecContext(ctx, `insert into workspace_analysis(workspace_path, worktree_path, state, items, text, updated_at) values (?, ?, ?, ?, ?, ?)
 on conflict(workspace_path, worktree_path) do update set state = excluded.state, items = excluded.items, text = excluded.text, updated_at = excluded.updated_at`,
 		req.WorkspacePath, req.WorktreePath, req.State, string(body), req.Text, now)
@@ -559,6 +574,15 @@ func (s *Service) SaveFlowchart(ctx context.Context, req FlowchartReq) (Flowchar
 		Manual:        manual,
 		Source:        source,
 		UpdatedAt:     time.Now().UnixMilli(),
+	}
+	prev, err := s.GetFlowchart(ctx, FlowchartGet{WorkspacePath: req.WorkspacePath, WorktreePath: req.WorktreePath})
+	if err != nil && !errors.Is(err, db.ErrNotFound) {
+		return FlowchartRow{}, err
+	}
+	same := err == nil && prev.State == row.State && prev.Code == row.Code && prev.Err == row.Err && prev.AnalysisHash == row.AnalysisHash && prev.Manual == row.Manual && prev.Source == row.Source
+	if same {
+		row.UpdatedAt = prev.UpdatedAt
+		return row, nil
 	}
 	if err := s.saveFlow(ctx, row); err != nil {
 		return FlowchartRow{}, err

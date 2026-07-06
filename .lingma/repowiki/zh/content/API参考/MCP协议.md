@@ -17,7 +17,19 @@
 - [packages/strategy-service/internal/web/mcp_api_test.go](file://packages/strategy-service/internal/web/mcp_api_test.go)
 - [packages/opencode/test/mcp/headers.test.ts](file://packages/opencode/test/mcp/headers.test.ts)
 - [packages/opencode/test/mcp/oauth-auto-connect.test.ts](file://packages/opencode/test/mcp/oauth-auto-connect.test.ts)
+- [packages/opencode/src/bus/index.ts](file://packages/opencode/src/bus/index.ts)
+- [packages/opencode/src/bus/global.ts](file://packages/opencode/src/bus/global.ts)
+- [packages/strategy-front/src/hooks/use-mcp-page.ts](file://packages/strategy-front/src/hooks/use-mcp-page.ts)
+- [packages/strategy-front/src/components/mcp/mcp-page.tsx](file://packages/strategy-front/src/components/mcp/mcp-page.tsx)
+- [packages/opencode/src/server/routes/mcp.ts](file://packages/opencode/src/server/routes/mcp.ts)
 </cite>
+
+## 更新摘要
+**所做更改**
+- 新增MCP工具变更事件广播功能章节
+- 更新MCP客户端管理与工具发现部分，增加事件广播机制
+- 新增事件总线与工具变更通知的架构说明
+- 补充MCP工具变更事件在前端的使用示例
 
 ## 目录
 1. [简介](#简介)
@@ -32,49 +44,54 @@
 10. [附录](#附录)
 
 ## 简介
-本文件系统性阐述 OpenCode 的 MCP（Model Context Protocol）协议实现，涵盖服务器配置、协议规范与消息格式、工具发现与执行、上下文管理机制、客户端集成与连接协商、OAuth 认证流程、以及与 OpenCode 代理系统的集成方式与最佳实践。文档基于仓库中的实际实现进行分析，提供架构图、序列图与流程图，帮助开发者快速理解并正确使用 MCP。
+本文件系统性阐述 OpenCode 的 MCP（Model Context Protocol）协议实现，涵盖服务器配置、协议规范与消息格式、工具发现与执行、上下文管理机制、客户端集成与连接协商、OAuth 认证流程、事件广播机制、以及与 OpenCode 代理系统的集成方式与最佳实践。文档基于仓库中的实际实现进行分析，提供架构图、序列图与流程图，帮助开发者快速理解并正确使用 MCP。
 
 ## 项目结构
 OpenCode 的 MCP 实现主要分布在以下模块：
 - 配置与类型定义：负责解析与校验 MCP 配置，定义本地与远程服务器类型、OAuth 配置等
-- MCP 核心逻辑：负责连接管理、工具发现、资源读取、通知处理与状态维护
+- MCP 核心逻辑：负责连接管理、工具发现、资源读取、通知处理与状态维护，包括事件广播机制
 - OAuth 支持：提供 OAuth 客户端能力、回调服务与令牌持久化
 - CLI 管理：提供命令行工具用于添加、列出、认证、调试 MCP 服务器
 - 文档与前端类型：提供配置文档与前端类型定义
 - SDK 生成：生成 JS SDK 的类型与接口定义
 - 会话与资源：在对话中读取 MCP 资源内容
+- 事件总线：提供全局事件广播与订阅机制
 
 ```mermaid
 graph TB
 subgraph "配置与类型"
 CFG["配置解析<br/>config.ts"]
 TYPES["类型定义<br/>types.gen.ts"]
-end
+END
 subgraph "MCP核心"
 MCP_IDX["MCP入口<br/>mcp/index.ts"]
 MCP_AUTH["认证存储<br/>mcp/auth.ts"]
 MCP_OAUTH["OAuth提供者<br/>mcp/oauth-provider.ts"]
 MCP_CB["OAuth回调<br/>mcp/oauth-callback.ts"]
-end
+EVENT_BUS["事件总线<br/>bus/index.ts"]
+END
 subgraph "CLI与文档"
 CLI["MCP命令<br/>cli/cmd/mcp.ts"]
 DOC["配置文档<br/>web/mcp-servers.mdx"]
 FRONT_TYPES["前端类型<br/>strategy-front/types/mcp.ts"]
-end
+END
 subgraph "SDK与会话"
 SDK_GEN["SDK生成<br/>sdk.gen.ts"]
 SESSION["会话资源<br/>session/prompt.ts"]
-end
+MCP_PAGE["MCP页面<br/>strategy-front/mcp-page.tsx"]
+END
 CFG --> MCP_IDX
 TYPES --> MCP_IDX
 MCP_IDX --> MCP_AUTH
 MCP_IDX --> MCP_OAUTH
 MCP_OAUTH --> MCP_CB
+MCP_IDX --> EVENT_BUS
 CLI --> MCP_IDX
 DOC --> CLI
 FRONT_TYPES --> CLI
 SDK_GEN --> CLI
 SESSION --> MCP_IDX
+MCP_PAGE --> EVENT_BUS
 ```
 
 **图表来源**
@@ -83,12 +100,14 @@ SESSION --> MCP_IDX
 - [packages/opencode/src/mcp/auth.ts:1-131](file://packages/opencode/src/mcp/auth.ts#L1-L131)
 - [packages/opencode/src/mcp/oauth-provider.ts:1-186](file://packages/opencode/src/mcp/oauth-provider.ts#L1-L186)
 - [packages/opencode/src/mcp/oauth-callback.ts:1-193](file://packages/opencode/src/mcp/oauth-callback.ts#L1-L193)
+- [packages/opencode/src/bus/index.ts:1-105](file://packages/opencode/src/bus/index.ts#L1-L105)
 - [packages/opencode/src/cli/cmd/mcp.ts:1-120](file://packages/opencode/src/cli/cmd/mcp.ts#L1-L120)
 - [packages/web/src/content/docs/zh-cn/mcp-servers.mdx:1-120](file://packages/web/src/content/docs/zh-cn/mcp-servers.mdx#L1-L120)
 - [packages/strategy-front/src/types/mcp.ts:1-71](file://packages/strategy-front/src/types/mcp.ts#L1-L71)
 - [packages/sdk/js/src/v2/gen/sdk.gen.ts:3014-3091](file://packages/sdk/js/src/v2/gen/sdk.gen.ts#L3014-L3091)
 - [packages/sdk/js/src/v2/gen/types.gen.ts:1236-1303](file://packages/sdk/js/src/v2/gen/types.gen.ts#L1236-L1303)
 - [packages/opencode/src/session/prompt.ts:1001-1035](file://packages/opencode/src/session/prompt.ts#L1001-L1035)
+- [packages/strategy-front/src/components/mcp/mcp-page.tsx:1-300](file://packages/strategy-front/src/components/mcp/mcp-page.tsx#L1-L300)
 
 **章节来源**
 - [packages/opencode/src/config/config.ts:563-624](file://packages/opencode/src/config/config.ts#L563-L624)
@@ -96,19 +115,23 @@ SESSION --> MCP_IDX
 - [packages/opencode/src/mcp/auth.ts:1-131](file://packages/opencode/src/mcp/auth.ts#L1-L131)
 - [packages/opencode/src/mcp/oauth-provider.ts:1-186](file://packages/opencode/src/mcp/oauth-provider.ts#L1-L186)
 - [packages/opencode/src/mcp/oauth-callback.ts:1-193](file://packages/opencode/src/mcp/oauth-callback.ts#L1-L193)
+- [packages/opencode/src/bus/index.ts:1-105](file://packages/opencode/src/bus/index.ts#L1-L105)
 - [packages/opencode/src/cli/cmd/mcp.ts:1-120](file://packages/opencode/src/cli/cmd/mcp.ts#L1-L120)
 - [packages/web/src/content/docs/zh-cn/mcp-servers.mdx:1-120](file://packages/web/src/content/docs/zh-cn/mcp-servers.mdx#L1-L120)
 - [packages/strategy-front/src/types/mcp.ts:1-71](file://packages/strategy-front/src/types/mcp.ts#L1-L71)
 - [packages/sdk/js/src/v2/gen/sdk.gen.ts:3014-3091](file://packages/sdk/js/src/v2/gen/sdk.gen.ts#L3014-L3091)
 - [packages/sdk/js/src/v2/gen/types.gen.ts:1236-1303](file://packages/sdk/js/src/v2/gen/types.gen.ts#L1236-L1303)
 - [packages/opencode/src/session/prompt.ts:1001-1035](file://packages/opencode/src/session/prompt.ts#L1001-L1035)
+- [packages/strategy-front/src/components/mcp/mcp-page.tsx:1-300](file://packages/strategy-front/src/components/mcp/mcp-page.tsx#L1-L300)
 
 ## 核心组件
 - 配置与类型系统：定义本地与远程 MCP 服务器配置、OAuth 配置、超时等字段，并提供严格的类型校验
-- MCP 客户端管理：负责连接建立、工具列表发现、资源读取、通知监听与状态维护
+- MCP 客户端管理：负责连接建立、工具列表发现、资源读取、通知监听、状态维护与事件广播
 - OAuth 认证链路：提供 OAuth 客户端元数据、令牌存储、动态客户端注册、回调服务与状态参数管理
+- 事件总线系统：提供全局事件广播、订阅与取消订阅机制，支持工具变更事件的实时通知
 - CLI 管理工具：提供添加、列出、认证、登出、调试 MCP 服务器的命令行接口
 - 会话与资源：在对话中读取 MCP 资源内容，支持文本与二进制内容处理
+- 前端管理界面：提供 MCP 服务器的可视化管理界面，支持实时状态更新
 
 **章节来源**
 - [packages/opencode/src/config/config.ts:563-624](file://packages/opencode/src/config/config.ts#L563-L624)
@@ -116,11 +139,13 @@ SESSION --> MCP_IDX
 - [packages/opencode/src/mcp/auth.ts:1-131](file://packages/opencode/src/mcp/auth.ts#L1-L131)
 - [packages/opencode/src/mcp/oauth-provider.ts:26-186](file://packages/opencode/src/mcp/oauth-provider.ts#L26-L186)
 - [packages/opencode/src/mcp/oauth-callback.ts:54-193](file://packages/opencode/src/mcp/oauth-callback.ts#L54-L193)
+- [packages/opencode/src/bus/index.ts:41-105](file://packages/opencode/src/bus/index.ts#L41-L105)
 - [packages/opencode/src/cli/cmd/mcp.ts:138-279](file://packages/opencode/src/cli/cmd/mcp.ts#L138-L279)
 - [packages/opencode/src/session/prompt.ts:1001-1035](file://packages/opencode/src/session/prompt.ts#L1001-L1035)
+- [packages/strategy-front/src/components/mcp/mcp-page.tsx:160-300](file://packages/strategy-front/src/components/mcp/mcp-page.tsx#L160-L300)
 
 ## 架构总览
-MCP 在 OpenCode 中的架构围绕“配置驱动 + SDK 客户端 + OAuth 认证 + CLI 管理”的模式构建。配置层负责解析与校验 MCP 服务器配置；MCP 核心负责与服务器建立连接、发现工具与资源、处理通知；OAuth 提供者与回调服务负责认证流程；CLI 提供运维与调试能力；会话层在对话中消费 MCP 资源。
+MCP 在 OpenCode 中的架构围绕"配置驱动 + SDK 客户端 + OAuth 认证 + 事件总线 + CLI 管理"的模式构建。配置层负责解析与校验 MCP 服务器配置；MCP 核心负责与服务器建立连接、发现工具与资源、处理通知并通过事件总线广播状态变化；OAuth 提供者与回调服务负责认证流程；事件总线提供全局事件广播机制；CLI 提供运维与调试能力；会话层在对话中消费 MCP 资源；前端界面提供可视化管理。
 
 ```mermaid
 graph TB
@@ -130,10 +155,13 @@ CLIENT --> TRANS["传输层<br/>StreamableHTTP/SSE/STDIO"]
 MCP_CORE --> AUTH_STORE["认证存储<br/>mcp-auth.json"]
 MCP_CORE --> OAUTH_PROVIDER["OAuth提供者<br/>OAuthClientProvider"]
 OAUTH_PROVIDER --> OAUTH_CB["OAuth回调服务<br/>Bun.serve"]
+MCP_CORE --> EVENT_BUS["事件总线<br/>Bus.publish()"]
+EVENT_BUS --> FRONTEND["前端界面<br/>MCP页面组件"]
 CLI["CLI命令<br/>opencode mcp"] --> MCP_CORE
 DOC["配置文档<br/>mcp-servers.mdx"] --> CLI
 SDK["JS SDK生成<br/>types.gen.ts/sdk.gen.ts"] --> CLI
 SESSION["会话资源<br/>MCP.readResource()"] --> MCP_CORE
+FRONTEND --> EVENT_BUS
 ```
 
 **图表来源**
@@ -141,11 +169,13 @@ SESSION["会话资源<br/>MCP.readResource()"] --> MCP_CORE
 - [packages/opencode/src/mcp/index.ts:328-537](file://packages/opencode/src/mcp/index.ts#L328-L537)
 - [packages/opencode/src/mcp/oauth-provider.ts:26-186](file://packages/opencode/src/mcp/oauth-provider.ts#L26-L186)
 - [packages/opencode/src/mcp/oauth-callback.ts:60-138](file://packages/opencode/src/mcp/oauth-callback.ts#L60-L138)
+- [packages/opencode/src/bus/index.ts:41-105](file://packages/opencode/src/bus/index.ts#L41-L105)
 - [packages/opencode/src/cli/cmd/mcp.ts:53-65](file://packages/opencode/src/cli/cmd/mcp.ts#L53-L65)
 - [packages/web/src/content/docs/zh-cn/mcp-servers.mdx:1-120](file://packages/web/src/content/docs/zh-cn/mcp-servers.mdx#L1-L120)
 - [packages/sdk/js/src/v2/gen/types.gen.ts:1236-1303](file://packages/sdk/js/src/v2/gen/types.gen.ts#L1236-L1303)
 - [packages/sdk/js/src/v2/gen/sdk.gen.ts:3014-3091](file://packages/sdk/js/src/v2/gen/sdk.gen.ts#L3014-L3091)
 - [packages/opencode/src/session/prompt.ts:1001-1035](file://packages/opencode/src/session/prompt.ts#L1001-L1035)
+- [packages/strategy-front/src/components/mcp/mcp-page.tsx:160-300](file://packages/strategy-front/src/components/mcp/mcp-page.tsx#L160-L300)
 
 ## 详细组件分析
 
@@ -193,6 +223,9 @@ McpRemoteConfig --> McpOAuthConfig : "使用"
 - 工具发现：通过 listTools 获取工具列表，转换为 AI SDK Tool 类型，支持超时控制
 - 资源与提示：支持 listResources 与 getPrompt，用于资源读取与提示获取
 - 状态管理：维护连接状态（connected/disabled/failed/needs_auth/needs_client_registration）
+- 事件广播：当收到工具列表变更通知时，通过事件总线广播工具变更事件
+
+**更新** 新增事件广播机制，当检测到工具列表变更时自动广播通知
 
 ```mermaid
 sequenceDiagram
@@ -201,12 +234,15 @@ participant CLI as "CLI命令"
 participant MCP as "MCP核心"
 participant Client as "MCP客户端"
 participant Trans as "传输层"
+participant Bus as "事件总线"
 User->>CLI : opencode mcp add/auth/list
 CLI->>MCP : add/connect/status
 MCP->>Client : new Client()
 Client->>Trans : connect()
 Trans-->>Client : 连接成功/失败
 Client-->>MCP : 状态与工具列表
+MCP->>Bus : 广播工具变更事件
+Bus-->>Frontend : 实时更新界面
 MCP-->>CLI : 返回状态与工具
 CLI-->>User : 显示结果
 ```
@@ -214,11 +250,50 @@ CLI-->>User : 显示结果
 **图表来源**
 - [packages/opencode/src/cli/cmd/mcp.ts:138-279](file://packages/opencode/src/cli/cmd/mcp.ts#L138-L279)
 - [packages/opencode/src/mcp/index.ts:328-537](file://packages/opencode/src/mcp/index.ts#L328-L537)
+- [packages/opencode/src/bus/index.ts:41-105](file://packages/opencode/src/bus/index.ts#L41-L105)
 
 **章节来源**
 - [packages/opencode/src/mcp/index.ts:119-148](file://packages/opencode/src/mcp/index.ts#L119-L148)
 - [packages/opencode/src/mcp/index.ts:609-649](file://packages/opencode/src/mcp/index.ts#L609-L649)
 - [packages/opencode/src/mcp/index.ts:672-691](file://packages/opencode/src/mcp/index.ts#L672-L691)
+- [packages/opencode/src/mcp/index.ts:111-117](file://packages/opencode/src/mcp/index.ts#L111-L117)
+
+### 事件总线系统
+- 全局事件广播：提供 Bus.publish 方法用于发布事件到全局事件总线
+- 事件订阅：支持按事件类型订阅，包括通配符订阅
+- 工具变更事件：定义了 EventMcpToolsChanged 事件类型，包含服务器名称属性
+- 事件传播：事件通过 GlobalBus 广播到所有订阅者，包括前端界面组件
+
+**新增** 事件总线系统为 MCP 工具变更提供了实时通知机制
+
+```mermaid
+classDiagram
+class Bus {
++publish(def, properties)
++subscribe(def, callback)
++once(def, callback)
++subscribeAll(callback)
+}
+class ToolsChanged {
++type : "mcp.tools.changed"
++properties : {server : string}
+}
+class GlobalBus {
++emit(event, payload)
+}
+Bus --> ToolsChanged : "发布"
+ToolsChanged --> GlobalBus : "广播"
+```
+
+**图表来源**
+- [packages/opencode/src/bus/index.ts:41-105](file://packages/opencode/src/bus/index.ts#L41-L105)
+- [packages/opencode/src/mcp/index.ts:42-47](file://packages/opencode/src/mcp/index.ts#L42-L47)
+- [packages/opencode/src/bus/global.ts:1-10](file://packages/opencode/src/bus/global.ts#L1-L10)
+
+**章节来源**
+- [packages/opencode/src/bus/index.ts:41-105](file://packages/opencode/src/bus/index.ts#L41-L105)
+- [packages/opencode/src/mcp/index.ts:42-47](file://packages/opencode/src/mcp/index.ts#L42-L47)
+- [packages/opencode/src/bus/global.ts:1-10](file://packages/opencode/src/bus/global.ts#L1-L10)
 
 ### OAuth 认证与回调
 - OAuth 提供者：实现 OAuthClientProvider 接口，支持客户端信息获取/保存、令牌获取/保存、状态参数管理、授权跳转
@@ -283,6 +358,30 @@ Error --> End
 - [packages/opencode/src/session/prompt.ts:1001-1035](file://packages/opencode/src/session/prompt.ts#L1001-L1035)
 - [packages/opencode/src/mcp/index.ts:721-746](file://packages/opencode/src/mcp/index.ts#L721-L746)
 
+### 前端 MCP 管理界面
+- MCP 页面组件：提供 MCP 服务器的可视化管理界面，支持连接状态展示、操作按钮、统计信息
+- 实时状态更新：通过事件总线接收工具变更事件，实时更新界面状态
+- 操作交互：支持连接/断开、认证、编辑、启用/禁用等操作
+
+**新增** 前端界面集成了事件总线，能够实时响应 MCP 工具变更
+
+```mermaid
+flowchart TD
+Frontend["前端MCP页面"] --> EventBus["事件总线订阅"]
+EventBus --> ToolsChanged["工具变更事件"]
+ToolsChanged --> UpdateUI["更新界面状态"]
+UpdateUI --> Stats["刷新统计信息"]
+UpdateUI --> Cards["更新服务器卡片"]
+```
+
+**图表来源**
+- [packages/strategy-front/src/components/mcp/mcp-page.tsx:160-300](file://packages/strategy-front/src/components/mcp/mcp-page.tsx#L160-L300)
+- [packages/strategy-front/src/hooks/use-mcp-page.ts:35-330](file://packages/strategy-front/src/hooks/use-mcp-page.ts#L35-L330)
+
+**章节来源**
+- [packages/strategy-front/src/components/mcp/mcp-page.tsx:160-300](file://packages/strategy-front/src/components/mcp/mcp-page.tsx#L160-L300)
+- [packages/strategy-front/src/hooks/use-mcp-page.ts:35-330](file://packages/strategy-front/src/hooks/use-mcp-page.ts#L35-L330)
+
 ### CLI 管理与调试
 - 添加服务器：支持本地与远程服务器，自动写入配置文件
 - 列表与状态：展示服务器状态与认证状态
@@ -319,6 +418,7 @@ Debug --> TestConn["测试连接与OAuth发现"]
 - CLI 依赖：CLI 命令依赖 MCP 核心与配置模块
 - 前端类型：前端组件依赖 McpCfg、McpStatus 等类型定义
 - 会话依赖：会话模块依赖 MCP 核心的资源读取能力
+- 事件总线依赖：MCP 核心依赖事件总线模块进行工具变更通知
 
 ```mermaid
 graph LR
@@ -328,6 +428,8 @@ SDK["@modelcontextprotocol/sdk"] --> MCP_IDX
 CLI["cli/cmd/mcp.ts"] --> MCP_IDX
 FRONT_TYPES["strategy-front/types/mcp.ts"] --> CLI
 SESSION["session/prompt.ts"] --> MCP_IDX
+EVENT_BUS["bus/index.ts"] --> MCP_IDX
+MCP_PAGE["strategy-front/mcp-page.tsx"] --> EVENT_BUS
 ```
 
 **图表来源**
@@ -337,6 +439,8 @@ SESSION["session/prompt.ts"] --> MCP_IDX
 - [packages/opencode/src/cli/cmd/mcp.ts:1-17](file://packages/opencode/src/cli/cmd/mcp.ts#L1-L17)
 - [packages/strategy-front/src/types/mcp.ts:1-71](file://packages/strategy-front/src/types/mcp.ts#L1-L71)
 - [packages/opencode/src/session/prompt.ts:1001-1035](file://packages/opencode/src/session/prompt.ts#L1001-L1035)
+- [packages/opencode/src/bus/index.ts:1-105](file://packages/opencode/src/bus/index.ts#L1-L105)
+- [packages/strategy-front/src/components/mcp/mcp-page.tsx:1-300](file://packages/strategy-front/src/components/mcp/mcp-page.tsx#L1-L300)
 
 **章节来源**
 - [packages/opencode/src/config/config.ts:563-624](file://packages/opencode/src/config/config.ts#L563-L624)
@@ -345,20 +449,26 @@ SESSION["session/prompt.ts"] --> MCP_IDX
 - [packages/opencode/src/cli/cmd/mcp.ts:1-17](file://packages/opencode/src/cli/cmd/mcp.ts#L1-L17)
 - [packages/strategy-front/src/types/mcp.ts:1-71](file://packages/strategy-front/src/types/mcp.ts#L1-L71)
 - [packages/opencode/src/session/prompt.ts:1001-1035](file://packages/opencode/src/session/prompt.ts#L1001-L1035)
+- [packages/opencode/src/bus/index.ts:1-105](file://packages/opencode/src/bus/index.ts#L1-L105)
+- [packages/strategy-front/src/components/mcp/mcp-page.tsx:1-300](file://packages/strategy-front/src/components/mcp/mcp-page.tsx#L1-L300)
 
 ## 性能考虑
 - 连接超时：默认超时时间为 30 秒，可通过配置覆盖；远程服务器默认超时为 5000ms
 - 工具发现：工具列表获取与转换为 AI SDK Tool 的过程涉及网络与类型转换，建议合理设置超时
 - 传输选择：StreamableHTTP 与 SSE 传输在连接失败时会回退到下一个传输，提高可用性
 - 资源读取：资源内容可能较大，建议在会话中按需读取并缓存必要内容
+- 事件广播：事件总线采用异步广播机制，避免阻塞主流程，支持大量订阅者的高效通知
 
-[本节为通用指导，不直接分析具体文件]
+**更新** 新增事件广播性能考虑，包括异步广播机制和大量订阅者处理
 
 ## 故障排除指南
 - 连接失败：检查服务器 URL、网络连通性、超时设置与传输类型
 - OAuth 失败：确认服务器是否支持动态客户端注册、客户端凭据是否正确、回调端口是否被占用
 - 认证状态异常：使用调试命令检查状态、令牌与客户端信息，必要时重新认证或登出
 - 资源读取失败：确认资源 URI 是否正确、客户端是否存在、内容类型是否受支持
+- 事件广播问题：检查事件总线订阅状态、工具变更通知是否正常触发、前端界面是否正确接收事件
+
+**更新** 新增事件广播相关故障排除指导
 
 **章节来源**
 - [packages/opencode/src/mcp/index.ts:382-448](file://packages/opencode/src/mcp/index.ts#L382-L448)
@@ -368,9 +478,7 @@ SESSION["session/prompt.ts"] --> MCP_IDX
 - [packages/opencode/test/mcp/oauth-auto-connect.test.ts:104-140](file://packages/opencode/test/mcp/oauth-auto-connect.test.ts#L104-L140)
 
 ## 结论
-OpenCode 的 MCP 实现通过配置驱动、SDK 客户端、OAuth 认证与 CLI 管理的协同，提供了完整的工具发现、执行与上下文管理能力。其设计强调安全性（OAuth 动态注册与令牌存储）、可维护性（严格的类型校验与状态管理）与易用性（CLI 与文档支持）。结合本文档的架构图、序列图与流程图，开发者可以快速理解并正确集成 MCP 服务器，提升 OpenCode 代理系统的功能扩展性与稳定性。
-
-[本节为总结性内容，不直接分析具体文件]
+OpenCode 的 MCP 实现通过配置驱动、SDK 客户端、OAuth 认证、事件总线与 CLI 管理的协同，提供了完整的工具发现、执行与上下文管理能力。其设计强调安全性（OAuth 动态注册与令牌存储）、可维护性（严格的类型校验与状态管理）、实时性（事件总线广播机制）与易用性（CLI 与文档支持）。新增的事件广播功能使得 MCP 工具变更能够实时反映在前端界面中，提升了用户体验。结合本文档的架构图、序列图与流程图，开发者可以快速理解并正确集成 MCP 服务器，提升 OpenCode 代理系统的功能扩展性与稳定性。
 
 ## 附录
 
@@ -386,14 +494,20 @@ OpenCode 的 MCP 实现通过配置驱动、SDK 客户端、OAuth 认证与 CLI 
 ### MCP 服务器部署与监控
 - 部署：确保服务器支持 MCP 协议版本，正确配置 CORS 与认证
 - 监控：关注连接状态、工具数量、资源访问频率与错误率，定期清理过期令牌
+- 事件监控：监控事件总线的事件发布频率与前端界面的事件响应延迟
 
-[本节为通用指导，不直接分析具体文件]
+**更新** 新增事件监控指导
 
 ### 与 OpenCode 代理系统的集成最佳实践
 - 合理配置 enabled 与 timeout，避免过多工具导致上下文膨胀
 - 使用 CLI 管理服务器生命周期，定期检查认证状态
 - 在会话中按需读取资源，避免不必要的网络开销
+- 利用事件总线实现实时状态同步，提升用户体验
+- 前端界面应正确处理工具变更事件，及时更新显示状态
+
+**更新** 新增事件总线集成最佳实践
 
 **章节来源**
 - [packages/web/src/content/docs/zh-cn/mcp-servers.mdx:1-120](file://packages/web/src/content/docs/zh-cn/mcp-servers.mdx#L1-L120)
 - [packages/opencode/src/cli/cmd/mcp.ts:67-136](file://packages/opencode/src/cli/cmd/mcp.ts#L67-L136)
+- [packages/strategy-front/src/hooks/use-mcp-page.ts:35-330](file://packages/strategy-front/src/hooks/use-mcp-page.ts#L35-L330)

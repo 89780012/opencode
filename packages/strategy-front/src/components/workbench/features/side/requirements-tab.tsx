@@ -187,7 +187,7 @@ export function RequirementsTab(props: {
       >
         <div className={css.stepbox}>
           {props.progress.length ? (
-            props.progress.slice(-8).map((item) => (
+            props.progress.map((item) => (
               <div key={item.id} className={css.step}>
                 <div className={css.progress}>
                   <span className={css.stepicon}>
