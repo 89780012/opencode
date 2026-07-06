@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { batch } from "react-redux"
 import { chatApi, permissionApi, questionApi } from "@/api/modules"
 import { toast } from "sonner"
 import { buildRequestParts } from "@/lib/build-request-parts"
@@ -74,6 +75,23 @@ function path(base: string) {
 }
 
 const sessions: ChatSessionSummary[] = []
+const frame = 16
+
+type Delta = Extract<ChatEvent, { type: "message.part.delta" }>
+
+function delta(event: Delta) {
+  return `d:${event.properties.messageID}:${event.properties.partID}:${event.properties.field}`
+}
+
+function merge(prev: Delta, next: Delta): Delta {
+  return {
+    ...next,
+    properties: {
+      ...next.properties,
+      delta: prev.properties.delta + next.properties.delta,
+    },
+  }
+}
 
 function readDrafts() {
   if (typeof window === "undefined") return {}
@@ -134,14 +152,55 @@ function useEvents(workspacePath?: string | null) {
     url.searchParams.set("directory", workspacePath)
 
     const src = new EventSource(url)
+    const keys = new Map<string, number>()
+    let queue: ChatEvent[] = []
+    let timer: number | undefined
+    const clear = (event: ChatEvent) => {
+      if (event.type !== "message.part.updated" && event.type !== "message.part.removed") return
+      const id = event.type === "message.part.updated" ? event.properties.part.id : event.properties.partID
+      const msg = event.type === "message.part.updated" ? event.properties.part.messageID : event.properties.messageID
+      Array.from(keys.keys())
+        .filter((item) => item.startsWith(`d:${msg}:${id}:`))
+        .forEach((item) => keys.delete(item))
+    }
+    const flush = () => {
+      if (timer) {
+        window.clearTimeout(timer)
+      }
+      timer = undefined
+      const events = queue
+      queue = []
+      keys.clear()
+      if (events.length === 0) return
+      batch(() => {
+        events.forEach((event) => {
+          dispatch(applyWorkspaceEvent({ workspace: workspacePath, event }))
+        })
+      })
+    }
+    const push = (event: ChatEvent) => {
+      if (event.type === "message.part.delta") {
+        const id = delta(event)
+        const idx = keys.get(id)
+        if (idx !== undefined && queue[idx]?.type === "message.part.delta") {
+          queue[idx] = merge(queue[idx], event)
+          return
+        }
+        keys.set(id, queue.length)
+      }
+      clear(event)
+      queue.push(event)
+      timer ??= window.setTimeout(flush, frame)
+    }
     src.onmessage = (msg) => {
       // 数据格式 data: {"type":"server.heartbeat","properties":{}}
       const event = parse(msg.data)
       if (!event) return
-      dispatch(applyWorkspaceEvent({ workspace: workspacePath, event }))
+      push(event)
     }
 
     return () => {
+      flush()
       src.close()
     }
   }, [dispatch, workspacePath])

@@ -9,7 +9,7 @@ import {
   FileCode2,
   LoaderCircle,
 } from "lucide-react"
-import { memo, useEffect, useState, type ReactNode } from "react"
+import { memo, useEffect, useMemo, useState, type ReactNode } from "react"
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation"
 import { Response } from "@/components/ai-elements/response"
 import { selectSessionParts, useAppSelector } from "@/store"
@@ -40,6 +40,16 @@ type Block =
       key: string
       parts: ChatPart[]
     }
+
+type Data = {
+  info: ChatAssistantMessage
+  parts: ChatPart[]
+}
+
+function same(a: Data[], b: Data[]) {
+  if (a.length !== b.length) return false
+  return a.every((item, idx) => item.info === b[idx]?.info && item.parts === b[idx]?.parts)
+}
 
 function clean(value?: string) {
   return value?.replace(ansi, "") ?? ""
@@ -463,7 +473,7 @@ const Item = memo(function Item(props: { info: ChatMessageInfo; onOpenDiff?: (fi
   const user = props.info.role === "user"
   const synthetic = body.length > 0 && body.every((part: ChatPart) => part.type === "text" && part.synthetic)
   const fromUser = user && !synthetic
-  const list = blocks(body, props.info.role)
+  const list = useMemo(() => blocks(body, props.info.role), [body, props.info.role])
   const trace = !user && list.length === 1 && list[0]?.type === "proc"
 
   if (list.length === 0 && !msg) return null
@@ -499,18 +509,24 @@ const Item = memo(function Item(props: { info: ChatMessageInfo; onOpenDiff?: (fi
 })
 
 const Group = memo(function Group(props: { infos: ChatAssistantMessage[]; onOpenDiff?: (file: string) => void }) {
-  const data = useAppSelector((state) =>
-    props.infos.map((info) => ({
-      info,
-      parts: selectSessionParts(state, info.id),
-    })),
+  const data = useAppSelector(
+    (state) =>
+      props.infos.map((info) => ({
+        info,
+        parts: selectSessionParts(state, info.id),
+      })),
+    same,
   )
-  const body = data.flatMap((item) => item.parts)
-  const list = blocks(body, "assistant")
-  const msg = data
-    .map((item) => err(item.info))
-    .filter((item) => item)
-    .at(-1)
+  const body = useMemo(() => data.flatMap((item) => item.parts), [data])
+  const list = useMemo(() => blocks(body, "assistant"), [body])
+  const msg = useMemo(
+    () =>
+      data
+        .map((item) => err(item.info))
+        .filter((item) => item)
+        .at(-1),
+    [data],
+  )
 
   if (list.length === 0 && !msg) return null
 
@@ -561,6 +577,7 @@ export function SessionMessageList(props: {
   }, [props.status])
 
   const note = props.status.type === "retry" ? props.status : retry
+  const list = useMemo(() => entries(props.messages), [props.messages])
 
   return (
     <Conversation className={css.body} autoScroll={false}>
@@ -570,7 +587,7 @@ export function SessionMessageList(props: {
             <LoaderCircle className={common.spin} size={20} />
           </div>
         ) : null}
-        {entries(props.messages).map((item) =>
+        {list.map((item) =>
           item.type === "group" ? (
             <Group key={`${item.parent}:${item.infos[0]?.id ?? ""}`} infos={item.infos} onOpenDiff={props.onOpenDiff} />
           ) : (
