@@ -139,6 +139,7 @@
   overflow: auto;
   overflow-x: hidden;
   overflow-y: auto;
+  overflow-anchor: none;
   -webkit-overflow-scrolling: touch;
   display: block;
   padding: 0.85rem 1.2rem 1.4rem;

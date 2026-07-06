@@ -149,7 +149,7 @@ export const Conversation = ({
     if (!node) return
     if (typeof ResizeObserver === "undefined") {
       const onResize = () => {
-        if (last.current) {
+        if (last.current && autoScroll && !free.current) {
           jump()
         }
         sync()
@@ -165,7 +165,7 @@ export const Conversation = ({
       }
       frame.current = requestAnimationFrame(() => {
         frame.current = 0
-        if (last.current && autoScroll) {
+        if (last.current && autoScroll && !free.current) {
           jump()
         }
         sync()
@@ -179,7 +179,7 @@ export const Conversation = ({
       }
       obs.disconnect()
     }
-  }, [jump, stop, sync])
+  }, [autoScroll, jump, stop, sync])
 
   return (
     <Context.Provider value={{ body, wrap, bot, jump, setBody }}>
@@ -190,7 +190,7 @@ export const Conversation = ({
           role="log"
           {...props}
           onWheel={(event) => {
-            if (event.deltaY < 0) {
+            if (event.deltaY < 0 || (free.current && event.deltaY !== 0)) {
               leave()
             }
             onWheel?.(event)
@@ -200,7 +200,7 @@ export const Conversation = ({
             const next = node.scrollHeight - node.clientHeight - node.scrollTop <= GAP
             const dir = node.scrollTop - top.current
             top.current = node.scrollTop
-            if (!free.current && dir < 0 && !next) {
+            if (!free.current && (dir < 0 || (!autoScroll && !next))) {
               free.current = true
               last.current = false
             }
