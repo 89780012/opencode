@@ -709,12 +709,21 @@ on conflict(id) do update set state = excluded.state, summary = excluded.summary
 	if err != nil {
 		return ReviewRow{}, err
 	}
+	session, err := s.progressSession(ctx, req.WorkspacePath)
+	if err != nil {
+		return ReviewRow{}, err
+	}
+	title, err := reviewTitle(ctx, req.WorkspacePath, session, req.State)
+	if err != nil {
+		return ReviewRow{}, err
+	}
 	if err := s.pushProgress(ctx, req.WorkspacePath, progressInput{
-		kind:   progressKindReview(req.State),
-		state:  progressState(req.State),
-		title:  "审查",
-		detail: req.Summary,
-		source: "service",
+		session: session,
+		kind:    progressKindReview(req.State),
+		state:   progressState(req.State),
+		title:   title,
+		detail:  req.Summary,
+		source:  "service",
 	}); err != nil {
 		return ReviewRow{}, err
 	}
@@ -1111,6 +1120,48 @@ func progressState(state string) string {
 		return "error"
 	}
 	return "done"
+}
+
+func reviewTitle(ctx context.Context, workspace string, session string, state string) (string, error) {
+	round, err := reviewRound(ctx, workspace, session, state)
+	if err != nil {
+		return "", err
+	}
+	if state == "running" {
+		return fmt.Sprintf("开始第%d轮审查", round), nil
+	}
+	if state == "error" {
+		return fmt.Sprintf("第%d轮审查异常", round), nil
+	}
+	return fmt.Sprintf("第%d轮审查结束", round), nil
+}
+
+func reviewRound(ctx context.Context, workspace string, session string, state string) (int, error) {
+	if session == "" {
+		return 1, nil
+	}
+	doc, err := db.Open()
+	if err != nil {
+		return 0, err
+	}
+	var count int
+	err = doc.QueryRowContext(ctx, `select count(*) from session_progress_events where workspace_path = ? and session_id = ? and kind = ?`,
+		workspace, session, "review.start").Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	if state == "running" {
+		return count + 1, nil
+	}
+	if count > 0 {
+		return count, nil
+	}
+	err = doc.QueryRowContext(ctx, `select count(*) from session_progress_events where workspace_path = ? and session_id = ? and kind in ('review.done', 'review.error')`,
+		workspace, session).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	return count + 1, nil
 }
 
 func pickSummary(text string, list []string) string {

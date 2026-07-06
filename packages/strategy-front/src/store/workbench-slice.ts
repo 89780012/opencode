@@ -117,11 +117,26 @@ function same(a: WorkbenchProgressEvent, b: WorkbenchProgressEvent) {
 }
 
 function compact(list: WorkbenchProgressEvent[]) {
-  return list.reduce<WorkbenchProgressEvent[]>((all, item) => {
+  const state = { start: 0, end: 0 }
+  return list.map((item) => title(item, state)).reduce<WorkbenchProgressEvent[]>((all, item) => {
     const prev = all[all.length - 1]
     if (!prev || !same(prev, item)) return [...all, item]
     return [...all.slice(0, -1), item]
   }, [])
+}
+
+function title(item: WorkbenchProgressEvent, state: { start: number; end: number }) {
+  if (item.kind === "review.start") {
+    state.start++
+    if (item.title !== "审查" && item.title !== "review.start") return item
+    return { ...item, title: `开始第${state.start}轮审查` }
+  }
+  if (item.kind !== "review.done" && item.kind !== "review.error") return item
+  state.end++
+  const round = Math.max(state.start, state.end)
+  if (item.title !== "审查" && item.title !== "review.done" && item.title !== "review.error") return item
+  if (item.kind === "review.error") return { ...item, title: `第${round}轮审查异常` }
+  return { ...item, title: `第${round}轮审查结束` }
 }
 
 const slice = createSlice({
