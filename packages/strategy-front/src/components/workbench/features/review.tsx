@@ -128,7 +128,9 @@ export function Review(props: {
                       ))}
                       {app.last.suggestions.length ? (
                         <div className={css.advice}>
-                          <p>{app.last.suggestions.join(", ")}</p>
+                          {app.last.suggestions.map((suggestion, index) => (
+                            <p key={index}>{suggestion}</p>
+                          ))}
                         </div>
                       ) : null}
                     </div>
@@ -154,7 +156,9 @@ export function Review(props: {
                       ))}
                       {hist.suggestions.length ? (
                         <div className={css.advice}>
-                          <p>{hist.suggestions.join(", ")}</p>
+                          {hist.suggestions.map((suggestion, index) => (
+                            <p key={index}>{suggestion}</p>
+                          ))}
                         </div>
                       ) : null}
                     </div>

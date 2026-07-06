@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"unicode"
+	"unicode/utf16"
 	"unicode/utf8"
 )
 
@@ -61,8 +63,8 @@ func fullPath(root string, path string) (string, error) {
 		return "", errors.New("path is required")
 	}
 
-	full := filepath.Clean(path)  //全路径
-	rel, err := filepath.Rel(root, full)  //相对路径
+	full := filepath.Clean(path)         //全路径
+	rel, err := filepath.Rel(root, full) //相对路径
 	if err != nil {
 		return "", err
 	}
@@ -171,6 +173,108 @@ func read(path string) ([]byte, int64, bool, error) {
 	}
 
 	return body, info.Size(), info.Size() > limit, nil
+}
+
+func decode(body []byte) (string, bool) {
+	if len(body) == 0 {
+		return "", true
+	}
+	if bytes.IndexByte(body, 0) >= 0 {
+		return utf16text(body)
+	}
+	if utf8.Valid(body) {
+		return string(body), true
+	}
+	if value, ok := utf16text(body); ok {
+		return value, true
+	}
+	if !text(body) {
+		return "", false
+	}
+	return strings.ToValidUTF8(string(body), ""), true
+}
+
+func utf16text(body []byte) (string, bool) {
+	start := 0
+	le := false
+	if bytes.HasPrefix(body, []byte{0xff, 0xfe}) {
+		start = 2
+		le = true
+	} else if bytes.HasPrefix(body, []byte{0xfe, 0xff}) {
+		start = 2
+	} else {
+		guess, ok := utf16le(body)
+		if !ok {
+			return "", false
+		}
+		le = guess
+	}
+
+	units := make([]uint16, 0, (len(body)-start)/2)
+	for i := start; i+1 < len(body); i += 2 {
+		if le {
+			units = append(units, uint16(body[i])|uint16(body[i+1])<<8)
+			continue
+		}
+		units = append(units, uint16(body[i])<<8|uint16(body[i+1]))
+	}
+
+	value := string(utf16.Decode(units))
+	if !readable(value) {
+		return "", false
+	}
+	return value, true
+}
+
+func utf16le(body []byte) (bool, bool) {
+	head := body
+	if len(head) > peek {
+		head = head[:peek]
+	}
+	pairs := len(head) / 2
+	if pairs == 0 {
+		return false, false
+	}
+
+	var even int
+	var odd int
+	for i := 0; i+1 < len(head); i += 2 {
+		if head[i] == 0 {
+			even++
+		}
+		if head[i+1] == 0 {
+			odd++
+		}
+	}
+
+	if float64(odd)/float64(pairs) >= 0.3 {
+		return true, true
+	}
+	if float64(even)/float64(pairs) >= 0.3 {
+		return false, true
+	}
+	return false, false
+}
+
+func readable(value string) bool {
+	if value == "" {
+		return true
+	}
+
+	var hit int
+	var total int
+	for _, ch := range value {
+		total++
+		if ch == '\n' || ch == '\r' || ch == '\t' {
+			hit++
+			continue
+		}
+		if ch != utf8.RuneError && unicode.IsPrint(ch) {
+			hit++
+		}
+	}
+
+	return float64(hit)/float64(total) >= 0.9
 }
 
 // text 粗略判断一段内容是否可按文本方式预览。

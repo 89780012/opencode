@@ -546,7 +546,8 @@ func (s *Service) Content(path string, file string) (FileContentResult, error) {
 		return FileContentResult{}, err
 	}
 
-	if !text(body) {
+	value, ok := decode(body)
+	if !ok {
 		slog.Debug("workspace content: binary file", "file", rel, "size", size)
 		return FileContentResult{
 			WorkspacePath: dir,
@@ -562,7 +563,7 @@ func (s *Service) Content(path string, file string) (FileContentResult, error) {
 	return FileContentResult{
 		WorkspacePath: dir,
 		Path:          filepath.ToSlash(rel),
-		Content:       strings.ToValidUTF8(string(body), ""),
+		Content:       value,
 		Size:          size,
 		Previewable:   true,
 		Truncated:     cut,
