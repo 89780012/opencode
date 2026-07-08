@@ -664,11 +664,11 @@
     transform 0.16s ease;
 }
 
-.foldhead:hover {
+/* .foldhead:hover {
   border-color: transparent;
   background: transparent;
   color: #111827;
-}
+} */
 
 .foldtitle {
   min-width: 0;
