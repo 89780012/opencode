@@ -1,17 +1,8 @@
-import {
-  ChevronDown,
-  ChevronRight,
-  FolderTree,
-  HelpCircle,
-  MessageCircle,
-  Pencil,
-  Plus,
-  Trash2,
-  type LucideIcon,
-} from "lucide-react"
+import { FolderTree, HelpCircle, MessageCircle, Pencil, Plus, Trash2, type LucideIcon } from "lucide-react"
 import { useState, type ReactNode } from "react"
 import { useWorkbenchModal } from "../../hooks/use-workbench-modal"
 import { type WorkbenchQuestion, useWorkbenchQuestion } from "../../hooks/use-workbench-question"
+import { Compact } from "../../layout/compact"
 import { Modal } from "../modal"
 import ui from "../../../shared/styles/ui.module.css"
 import css from "../../styles/side/side.module.css"
@@ -25,27 +16,10 @@ function Fold(props: {
   action?: ReactNode
   children: ReactNode
 }) {
-  const Icon = props.icon
-
   return (
-    <section className={`${css.group} ${props.open ? css.groupopen : css.groupshut}`}>
-      <button type="button" className={css.grouphead} onClick={props.onToggle}>
-        <span className={css.groupleft}>
-          {props.open ? (
-            <ChevronDown size={14} className={css.groupicon} />
-          ) : (
-            <ChevronRight size={14} className={css.groupicon} />
-          )}
-          <Icon size={14} className={css.groupicon} />
-          <span>{props.title}</span>
-        </span>
-        <span className={css.groupright}>
-          <span className={css.groupmeta}>{props.count}</span>
-          {props.action ? <span className={css.groupaction}>{props.action}</span> : null}
-        </span>
-      </button>
-      {props.open ? <div className={css.groupbody}>{props.children}</div> : null}
-    </section>
+    <Compact open={props.open} icon={props.icon} title={props.title} meta={props.count} action={props.action} onToggle={props.onToggle}>
+      {props.children}
+    </Compact>
   )
 }
 

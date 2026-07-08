@@ -15,7 +15,7 @@ import { useWorkbench } from "../../hooks/use-workbench"
 
 const init = {
   sessions: true,
-  issues: true,
+  issues: false,
   requirements: true,
   logic: true,
   progress: false,
