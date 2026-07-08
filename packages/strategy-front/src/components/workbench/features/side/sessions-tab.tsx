@@ -245,7 +245,18 @@ export function SessionsTab(props: { open: Record<string, boolean>; onToggle: (k
         <div className={`${css.issuelist} ${ui.scroll}`}>
           {questions.questions.length ? (
             questions.questions.map((item) => (
-              <button key={item.id} type="button" className={css.issue} onClick={() => questions.select(item.sessionId)}>
+              <div
+                key={item.id}
+                role="button"
+                tabIndex={0}
+                className={css.issue}
+                onClick={() => questions.select(item.sessionId)}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter" && event.key !== " ") return
+                  event.preventDefault()
+                  questions.select(item.sessionId)
+                }}
+              >
                 <div className={css.rowtop}>
                   <span className={css.issuehead}>
                     <MessageCircle size={12} />
@@ -264,7 +275,7 @@ export function SessionsTab(props: { open: Record<string, boolean>; onToggle: (k
                   </button>
                 </div>
                 <p>{item.body}</p>
-              </button>
+              </div>
             ))
           ) : (
             <div className={ui.empty}>暂无用户提问</div>
