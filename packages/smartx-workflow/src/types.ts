@@ -1,9 +1,3 @@
-export type Flow = {
-  session: string
-  pendingLogCount: number
-  pendingDebugCount: number
-}
-
 export type Analysis = {
   workspace: string
   worktree: string
@@ -101,12 +95,6 @@ export type Pending =
       worktreePath: string
       state: "passed" | "failed" | "error"
       reviewText: string
-    }
-  | {
-      kind: "debug"
-      workspacePath: string
-      worktreePath: string
-      sessionID: string
     }
 
 export type Fix = {

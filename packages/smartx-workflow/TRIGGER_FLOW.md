@@ -28,18 +28,6 @@ flowchart TD
   D --> D1[workspace.system]
   D1 --> D2{是否已处理}
   D2 -->|是| D3[注入 workspace 提示]
-  D2 -->|否| D4[pairing.transform]
-
-  E --> E1[workspace.before]
-  E1 --> E2[硬门禁 / 启动态标记]
-
-  F --> F1[workspace.after]
-  F1 --> F2[推进 workspace / memory / pending]
-  F2 --> F3[pairing.after]
-  F3 --> F4[推进 session 配对计数]
-```
-
----
 
 ## 1. `event` 触发时机
 
@@ -118,89 +106,6 @@ flowchart TD
 
 1. 先跑 `workspace.system`
 2. 如果 `workspace.system` 已经注入了提示，就直接结束
-3. 否则再跑 `pairing.transform`
-
-也就是说：
-
-- workspace 级约束优先级更高
-- session 配对提醒优先级更低
-
-### `workspace.system` 的优先级顺序
-
-实际顺序就是代码里的 `step(...)` 顺序：
-
-1. `project_save`
-2. `project_resume`
-3. `save`
-4. `fix`
-5. `review`
-6. `final`
-7. `close`
-8. `boot`
-9. `chart`
-10. `refresh`
-11. `finalizing`
-
-谁先命中，谁就吃掉这轮 system 注入。
-
-```mermaid
-flowchart TD
-  A[system.transform] --> B[sync 当前 analysis/chart/project]
-  B --> C[折叠成统一 view]
-
-  C --> D{project memory stale 且该收尾?}
-  D -->|是| D1[注入 save_project_state 提示]
-  D -->|否| E{project memory 未恢复?}
-
-  E -->|是| E1[注入 resume/init_project_state 提示]
-  E -->|否| F{存在 pending save?}
-
-  F -->|是| F1[注入 save_analysis / save_flowchart / save_review 提示]
-  F -->|否| G{存在 fix 队列?}
-
-  G -->|是| G1[注入修复指令]
-  G -->|否| H{用户请求 review?}
-
-  H -->|是且 dirty| H1[注入 refresh 提示]
-  H -->|是且 ready| H2[注入 noteReview]
-  H -->|否| I{用户请求 final?}
-
-  I -->|是且 dirty| I1[reset 为 final 模式并注入 noteFinal]
-  I -->|否| J{是否自然收尾?}
-
-  J -->|是| J1[注入 noteClose]
-  J -->|否| K{life = idle?}
-
-  K -->|是| K1[注入 noteBoot]
-  K -->|否| L{analysis done 但 chart 未完成?}
-
-  L -->|是| L1[注入 noteChart]
-  L -->|否| M{life = refreshing?}
-
-  M -->|是| M1[注入 noteRefresh]
-  M -->|否| N{life = finalizing?}
-
-  N -->|是| N1[注入 noteFinal]
-  N -->|否| O[交给 pairing.transform]
-```
-
-### `pairing.transform` 什么时候才会运行
-
-只有当 `workspace.system` 没插任何提示时，才轮到它。
-
-它只关心两组配对约束：
-
-1. `smartx_start -> smartx_logs`
-2. `smartx-develop -> smartx-debug`
-
-```mermaid
-flowchart TD
-  A[pairing.transform] --> B{当前 session 有未配对动作吗}
-  B -->|否| C[不注入]
-  B -->|是| D[注入顺序提醒]
-```
-
----
 
 ## 4. `tool.execute.before` 触发时机
 
@@ -245,8 +150,6 @@ flowchart TD
 
   C --> I
   I --> J{启动 flowchart agent?}
-  J -->|是| J1[chart = generating]
-  J -->|否| K{启动 review agent?}
   K -->|是| K1[先保存 running review]
   K -->|否| L{启动 analysis agent?}
   L -->|是| L1[analysis = running]
@@ -275,10 +178,9 @@ flowchart TD
 6. `save_analysis`
 7. `save_chart`
 8. `save_review`
-9. `start_debug`
-10. `chart_done`
-11. `review_done`
-12. `analysis_done`
+9. `chart_done`
+10. `review_done`
+11. `analysis_done`
 
 ```mermaid
 flowchart TD
@@ -307,12 +209,9 @@ flowchart TD
   H -->|否| I{save_review 成功?}
 
   I -->|是且全 passed| I1[清 fix]
-  I1 --> I2[排队 debug pending]
+  I1 --> K{flowchart agent 返回?}
   I -->|是但未全 passed| I3[保留或更新 fix]
-  I -->|否| J{smartx_start 成功且存在 debug pending?}
 
-  J -->|是| J1[清掉 debug pending]
-  J -->|否| K{flowchart agent 返回?}
 
   K -->|是| K1[chart_done]
   K1 --> K2[写入 flowchart pending]
@@ -330,22 +229,6 @@ flowchart TD
 
 ---
 
-## 6. `pairing.after` 触发时机
-
-`workspace.after` 跑完后，还会继续跑 `pairing.after`。
-
-它只更新 session 级计数，不碰 workspace 基线状态。
-
-```mermaid
-flowchart TD
-  A[pairing.after] --> B{这次调用属于关键配对动作吗}
-  B -->|否| C[忽略]
-  B -->|是| D[取出旧 flow]
-  D --> E[touch 更新 logs/debug 计数]
-  E --> F[写回 mem]
-```
-
----
 
 ## 7. 你可以怎么读这套触发时机
 
@@ -381,7 +264,7 @@ chat.message 负责记需求意图
 system.transform 负责决定下一步该做什么
 tool.execute.before 负责阻止现在不能做的事
 tool.execute.after 负责把已经发生的事写回状态机
-pairing 负责 session 级顺序约束
+- 不再维护 session 级调试顺序约束
 workspace 负责 baseline / review / final / project memory 约束
 ```
 

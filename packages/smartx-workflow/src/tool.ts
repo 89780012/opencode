@@ -1,10 +1,5 @@
-import type { Call } from "./types.js"
+﻿import type { Call } from "./types.js"
 
-export const dev = "smartx-develop"
-export const dbg = "smartx-debug"
-
-const starts = new Set(["smartx_start", "smartx-start"])
-const logsx = new Set(["smartx_logs", "smartx_log"])
 const analyzer = "workspace-analyzer"
 const chart = "strategy-flowchart-generator"
 const reviewer = "strategy-reviewer"
@@ -19,17 +14,6 @@ function item(input: Call | string): Call {
 export function mcp(input: { tool: string }, name: string) {
   return input.tool === name || input.tool.endsWith("_" + name)
 }
-
-/** 判断是否触发了 SmartX 调试启动工具。 */
-export function start(input: { tool: string }) {
-  return starts.has(input.tool)
-}
-
-/** 判断是否触发了 SmartX 调试日志工具。 */
-export function logs(input: { tool: string }) {
-  return logsx.has(input.tool)
-}
-
 /** 从 skill 调用里提取 skill 名称；非 skill 调用返回空字符串。 */
 export function skill(input: { tool: string; args?: unknown }) {
   if (input.tool !== "skill") return ""
@@ -37,16 +21,6 @@ export function skill(input: { tool: string; args?: unknown }) {
   const args = input.args as Record<string, unknown>
   return typeof args.name === "string" ? args.name : ""
 }
-
-/** 判断某次调用是否属于 session 配对约束需要追踪的关键动作。 */
-export function seen(input: Call | string) {
-  const call = item(input)
-  if (start(call) || logs(call)) return true
-  if (call.tool !== "skill") return false
-  const name = skill(call)
-  return name === dev || name === dbg
-}
-
 /** 判断是否启动了 workspace 分析子 agent。 */
 export function analyze(input: Call | string) {
   const call = item(input)
@@ -77,7 +51,6 @@ export type Kind =
   | "review"
   | "save"
   | "refresh"
-  | "debug"
   | "project_init"
   | "project_resume"
   | "project_get"
@@ -94,10 +67,7 @@ export function kind(input: { tool: string; args?: unknown }) {
   if (mcp(input, "validate_project_state")) return "project_validate" as const
   if (mcp(input, "refresh_workspace")) return "refresh" as const
   if (mcp(input, "save_analysis") || mcp(input, "save_flowchart")) return "save" as const
-  if (start(input)) return "debug" as const
-  const name = skill(input)
-  if (name === dev) return "write" as const
-  if (name === dbg) return "debug" as const
+  if (skill(input) === "smartx-develop") return "write" as const
   if (input.tool === "task") {
     const args = input.args
     const sub = args && typeof args === "object" ? (args as Record<string, unknown>).subagent_type : undefined
@@ -105,7 +75,8 @@ export function kind(input: { tool: string; args?: unknown }) {
     if (sub === chart) return "chart" as const
     if (sub === reviewer) return "review" as const
   }
-  if (["read", "grep", "glob", "ls", "list", "codesearch", "lsp", "webfetch", "websearch"].includes(input.tool)) return "read" as const
+  if (["read", "grep", "glob", "ls", "list", "codesearch", "lsp", "webfetch", "websearch"].includes(input.tool))
+    return "read" as const
   if (["edit", "write", "apply_patch", "multiedit"].includes(input.tool)) return "write" as const
   if (input.tool === "bash") return "exec" as const
   return "other" as const

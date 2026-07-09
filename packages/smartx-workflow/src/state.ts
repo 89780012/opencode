@@ -3,7 +3,6 @@ export type {
   Call,
   Chart,
   Dirt,
-  Flow,
   Life,
   Mode,
   Project,
@@ -12,13 +11,11 @@ export type {
 export {
   doneAnalysis,
   doneChart,
-  fresh,
   freshAnalysis,
   freshChart,
   key,
   requestAnalysis,
   requestChart,
-  touch,
   validAnalysis,
   validChart,
   validProject,
@@ -26,10 +23,9 @@ export {
 
 export { items, mermaid, result, reviewState, reviewText, serial, wantsFinal, wantsReview } from "./parse.js"
 
-export { analyze, flowchart, review, seen } from "./tool.js"
+export { analyze, flowchart, review } from "./tool.js"
 
 export {
-  note,
   noteAnalysis,
   noteBoot,
   noteChart,

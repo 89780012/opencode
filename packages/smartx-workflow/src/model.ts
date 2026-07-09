@@ -1,36 +1,8 @@
-import { dbg, dev, logs, skill, start } from "./tool.js"
-import type { Analysis, Call, Chart, Flow, Project } from "./types.js"
-
-/** 统一把字符串调用包装成标准调用对象，方便复用识别逻辑。 */
-function item(input: Call | string): Call {
-  if (typeof input === "string") return { tool: input }
-  return input
-}
-
-/** 创建一个新的 session 配对状态。 */
-export function fresh(session: string): Flow {
-  return {
-    session,
-    pendingLogCount: 0,
-    pendingDebugCount: 0,
-  }
-}
+import type { Analysis, Chart, Project } from "./types.js"
 
 /** 生成 workspace + worktree 维度的稳定 key。 */
 export function key(workspace: string, worktree = workspace) {
   return workspace + "\x00" + (worktree || workspace)
-}
-
-/** 根据一次关键调用推进 session 配对状态。 */
-export function touch(flow: Flow, input: Call | string): Flow {
-  const call = item(input)
-  const name = skill(call)
-  if (start(call)) return { ...flow, pendingLogCount: flow.pendingLogCount + 1 }
-  if (logs(call)) return { ...flow, pendingLogCount: Math.max(0, flow.pendingLogCount - 1) }
-  if (call.tool !== "skill") return flow
-  if (name === dev) return { ...flow, pendingDebugCount: flow.pendingDebugCount + 1 }
-  if (name === dbg) return { ...flow, pendingDebugCount: Math.max(0, flow.pendingDebugCount - 1) }
-  return flow
 }
 
 /** 标记“等待分析开始”的 analysis 状态。 */

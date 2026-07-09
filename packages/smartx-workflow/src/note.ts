@@ -1,22 +1,6 @@
-import type { Analysis, Fix, Flow, Pending } from "./types.js"
+import type { Analysis, Fix, Pending } from "./types.js"
 
 export const limit = 3
-
-/** 生成 session 级顺序提醒，要求 smartx_start/logs 与 develop/debug 成对闭环。 */
-export function note(flow: Flow) {
-  const out = ["当前 session 已启用 SmartX 工作流顺序约束。"]
-  if (flow.pendingLogCount > 0) {
-    out.push("`smartx_start` 和 `smartx_logs` 是一对有前后顺序的调用。")
-    out.push(`在结束当前回复前，你还需要再调用 ${flow.pendingLogCount} 次 \`smartx_logs\`。`)
-    out.push("如果已经调用了 `smartx_start`，下一步先调用 `smartx_logs`，不要直接结束回复。")
-  }
-  if (flow.pendingDebugCount > 0) {
-    out.push("`smartx-develop` 和 `smartx-debug` 是一对有前后顺序的 skill 调用。")
-    out.push(`在结束当前回复前，你还需要再调用 ${flow.pendingDebugCount} 次 \`skill({ name: \"smartx-debug\" })\`。`)
-    out.push("如果已经调用了 `smartx-develop`，下一步先调用 `smartx-debug`，不要直接结束回复。")
-  }
-  return out.join("\n")
-}
 
 /** 生成 review 阶段的系统提示，约束主 agent 先取需求、再审查、再保存。 */
 export function noteReview(input: { workspace: string; worktree: string; sessionID: string }) {
@@ -33,8 +17,8 @@ export function noteReview(input: { workspace: string; worktree: string; session
     "6. 只有 `smartx_save_review.items` 里所有检查项的 status 都是 `passed`，才算审查完全通过；只要任一项是 `warning`、`failed` 或 `error`，都按未通过处理。",
     "7. 如果保存后的审查结果存在非 `passed` 项，主 agent 必须自己修复代码，不要让 `strategy-reviewer` 代修。",
     "8. 第 1、2 轮审查只要存在非 `passed` 项，保存后必须修复，并在修复完成后再次调用 `strategy-reviewer` 复审。",
-    "9. 第 3 轮如果全部 `passed`，保存后进入后续分析、流程图和调试流程；如果第 3 轮仍有非 `passed` 项，也必须先保存，再完成最后一次修复，然后直接给出最终结论，不再自动发起第 4 轮复审。",
-    "10. 审查全部通过并保存后，工作流还会要求重新分析当前代码、重新生成并保存策略流程图，然后再调 `smartx_start` 开始调试。",
+    "9. 第 3 轮如果全部 `passed`，保存后进入后续分析、流程图和最终收口；如果第 3 轮仍有非 `passed` 项，也必须先保存，再完成最后一次修复，然后直接给出最终结论，不再自动发起第 4 轮复审。",
+    "10. 审查全部通过并保存后，工作流会要求重新分析当前代码、重新生成并保存策略流程图，然后再进入最终收口。",
     "11. `smartx_save_review` 的 `summary`、`items`、`items[].name`、`items[].detail`、`items[].suggestion`、`suggestions` 必须使用中文。",
     "12. MCP 保存成功后，再用中文简短回复用户审查结果和已执行的修复概况。",
     "",
@@ -146,7 +130,7 @@ export function noteFix(input: Fix) {
     "- 修改范围聚焦在 SmartX 策略缺陷和用户需求上。",
     "- 修改后，从对应 package 或项目目录运行合理的本地验证。",
     last
-      ? "- 这是最后一次自动修复。不要再调用 `strategy-reviewer`，也不要调 `smartx_start`；验证后直接用中文给出最终结论，并总结第 3 轮审查结果和最后修复内容。"
+      ? "- 这是最后一次自动修复。不要再调用 `strategy-reviewer`；验证后直接用中文给出最终结论，并总结第 3 轮审查结果和最后修复内容。"
       : "- 然后再次调用 `task` 工具，使用 `subagent_type: strategy-reviewer` 和 `description: Review strategy implementation` 进行复审。",
     last ? "" : "- 传给 reviewer 的 prompt 必须包含相同的需求上下文，以及本轮修复摘要。",
     "- 在新的 `strategy-reviewer` 审查完成前，不要再次调用 `smartx_save_review`。",
@@ -156,17 +140,6 @@ export function noteFix(input: Fix) {
   ]
     .filter(Boolean)
     .join("\n")
-}
-
-/** 生成 review 全通过后进入调试阶段的提示。 */
-export function noteDebug(input: Extract<Pending, { kind: "debug" }>) {
-  return [
-    "SmartX 策略审查已经全部通过，最新分析和策略流程图也已经保存。",
-    "下一步必须开始调试流程：请调用 `smartx_start`。",
-    `调试工作区：${input.workspacePath}`,
-    `调试 worktree：${input.worktreePath}`,
-    "调用成功后，顺序约束会继续要求你调用 `smartx_logs` 查看调试日志。",
-  ].join("\n")
 }
 
 /** 根据 pending 类型生成对应的“先保存再继续”提示。 */
@@ -209,7 +182,6 @@ export function noteSave(input: Pending) {
       "MCP 保存成功后，再继续当前任务。",
     ].join("\n")
   }
-  if (input.kind === "debug") return noteDebug(input)
   return [
     "策略流程图任务已经完成。继续之前，必须调用 strategy-service MCP 工具 `smartx_save_flowchart`，参数严格使用下面这段 JSON：",
     JSON.stringify(

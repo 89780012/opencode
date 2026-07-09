@@ -16,8 +16,7 @@ description: 管理 `.project-state/` 项目记忆的恢复、保存与校验。
 1. `resume_project_state` 或 `init_project_state`
 2. `workspace-analyzer / save_analysis / strategy-flowchart-generator / save_flowchart`（需要时）
 3. `smartx-develop`
-4. `smartx-debug`
-5. `save_project_state`
+4. `save_project_state`
 6. 最终总结 / 交接
 
 只读问答、纯解释、纯检索可以不启用这套协议；一旦进入持续推进，就必须走完整链路。

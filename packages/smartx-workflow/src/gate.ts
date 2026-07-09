@@ -21,8 +21,6 @@ export function gate(state: View, toolKind: Kind) {
       : "SmartX workflow requires initializing project memory through init_project_state before sustained work."
   }
   if (state.pendingSave?.kind === "review") return state.life === "ready" || state.life === "dirty" ? "" : ""
-  // 审查结果保存后，调试工具调用被允许
-  if (state.pendingSave?.kind === "debug" && toolKind === "debug") return ""
   // idle 状态：等待基线初始化
   if (state.life === "idle") {
     // 只读操作、分析操作、刷新操作和其他操作被允许
@@ -112,7 +110,6 @@ export function closing(
   state: View,
   input: {
     sub: boolean
-    hold: boolean
     review: boolean
     final: boolean
     fix: boolean
@@ -121,7 +118,7 @@ export function closing(
   if (input.sub) return false
   if (state.projectMemory.needsSave) return false
   if (state.life !== "dirty" || state.pendingSave) return false
-  if (input.hold || input.review || input.final) return false
+  if (input.review || input.final) return false
   return !input.fix
 }
 
@@ -130,7 +127,6 @@ export function saving(
   state: View,
   input: {
     sub: boolean
-    hold: boolean
     review: boolean
     final: boolean
     fix: boolean
@@ -138,7 +134,7 @@ export function saving(
 ) {
   if (input.sub) return false
   if (!state.projectMemory.hasRestoredState || !state.projectMemory.needsSave || state.pendingSave) return false
-  if (input.hold || input.review) return false
+  if (input.review) return false
   if (input.final) return true
   if (state.life !== "dirty") return false
   return !input.fix

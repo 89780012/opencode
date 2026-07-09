@@ -38,10 +38,9 @@ permission:
 2. workspace baseline
    - 初次进入或 baseline 过期时：`workspace-analyzer -> smartx_save_analysis -> strategy-flowchart-generator -> smartx_save_flowchart`
 3. `smartx-develop`
-4. `smartx-debug`
-5. `project-manager`
+4. `project-manager`
    - 本轮有新进展时：`save_project_state`
-6. 最终总结 / 交接
+5. 最终总结 / 交接
 
 这条链路里，恢复和保存都不是软建议，而是强制操作。
 
@@ -52,8 +51,6 @@ permission:
   - 对应 MCP 工具：`init_project_state` / `resume_project_state` / `get_project_state` / `save_project_state` / `validate_project_state`
 - `smartx-develop`
   - 负责基于本地证据推进实现
-- `smartx-debug`
-  - 负责启动、看日志、定位问题、修复并验证
 
 ## 工作原则
 

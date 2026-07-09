@@ -1,12 +1,10 @@
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
-import { createPairing } from "./pairing.js"
-import { key, wantsFinal, wantsReview, type Analysis, type Chart, type Dirt, type Flow, type Mode } from "./state.js"
+import { key, wantsFinal, wantsReview, type Analysis, type Chart, type Dirt, type Mode } from "./state.js"
 import { loadChartRemote, loadProjectRemote, loadRemote, saveReviewRemote } from "./remote.js"
 import type { Fix, Memory, Pending, Project, SaveReview } from "./types.js"
 import { createWorkspace } from "./workspace.js"
 
 type Dep = {
-  sessionFlows?: Map<string, Flow>
   workspaces?: Map<string, Analysis>
   charts?: Map<string, Chart>
   projects?: Map<string, Project>
@@ -27,7 +25,6 @@ type Dep = {
 
 /** 组装插件 hook，把 session 配对与 workspace 工作流接到同一个入口上。 */
 export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
-  const sessionFlows = dep.sessionFlows ?? new Map<string, Flow>()
   const workspaces = dep.workspaces ?? new Map<string, Analysis>()
   const charts = dep.charts ?? new Map<string, Chart>()
   const projects = dep.projects ?? new Map<string, Project>()
@@ -74,15 +71,9 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
     load: dep.load ?? ((workspace, worktree) => loadRemote(service, workspace, worktree)),
     loadChart: dep.loadChart ?? ((workspace, worktree) => loadChartRemote(service, workspace, worktree)),
     loadProject: dep.loadProject ?? ((workspace, worktree) => loadProjectRemote(service, workspace, worktree)),
-    hold: (session) => {
-      const flow = sessionFlows.get(session)
-      if (!flow) return false
-      return flow.pendingLogCount > 0 || flow.pendingDebugCount > 0
-    },
     saveReview: dep.saveReview ?? ((input) => saveReviewRemote(service, input)),
     write,
   })
-  const pairing = createPairing({ sessionFlows, write })
 
   void write("plugin loaded", {
     directory: ctx.directory,
@@ -138,24 +129,17 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
       }
     },
     "experimental.chat.system.transform": async (input, output) => {
-      /** 先走 workspace 级门禁，再补 session 级顺序提醒。 */
+      /** 执行 workspace 级门禁提示。 */
       if (!input.sessionID) return
-
-      // 先走系统级别的门禁
-      const handled = await workspaceFlow.system(input, output)
-      if (handled) return
-
-      // smartx_start 和 smartx_end 是 smartx 的门禁处理
-      await pairing.transform(input, output)
+      await workspaceFlow.system(input, output)
     },
     "tool.execute.before": async (input, output) => {
       /** 工具执行前做硬门禁和启动态标记。 */
       await workspaceFlow.before(input, output)
     },
     "tool.execute.after": async (input, output) => {
-      /** 工具执行后推进 workspace 状态，再更新 session 配对状态。 */
+      /** 工具执行后推进 workspace 状态。 */
       await workspaceFlow.after(input, output)
-      await pairing.after(input)
     },
   }
 }

@@ -5,7 +5,6 @@ import {
   analyze,
   doneAnalysis,
   flowchart,
-  fresh,
   freshAnalysis,
   key,
   noteAnalysis,
@@ -238,20 +237,15 @@ describe("smartx workspace analysis", () => {
     expect(rows.some((item) => item.message === "workspace flowchart completed")).toBe(true)
   })
 
-  test("prioritizes workspace gates over session pairing reminders", async () => {
+  test("prioritizes workspace gates when baseline is missing", async () => {
     const workspaces = new Map<string, Analysis>()
-    const mem = new Map([["s1", { ...fresh("s1"), pendingLogCount: 1 }]])
-    const hooks = setup(ctx(), {
-      workspaces,
-      sessionFlows: mem,
-    })
+    const hooks = setup(ctx(), { workspaces })
 
     const first = { system: [] as string[] }
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, first)
 
     expect(first.system.length).toBe(1)
     expect(first.system.join("\n")).toContain("workspace-analyzer")
-    expect(first.system.join("\n")).not.toContain("smartx_logs")
   })
 
   test("allows read tools before analysis starts but blocks writes", async () => {
@@ -581,18 +575,12 @@ describe("smartx workspace analysis", () => {
     expect(rows.some((item) => item.message === "workspace review needs fix")).toBe(true)
   })
 
-  test("queues debug after a passed review and finalizes with one last refresh after later edits", async () => {
+  test("finalizes after a passed review", async () => {
     const rows: Row[] = []
     const workspaces = new Map<string, Analysis>()
     const charts = new Map<string, Chart>()
     const pending = new Map()
-    const fixes = new Map()
-    const hooks = setup(ctx("f:/repo", rows), {
-      workspaces,
-      charts,
-      pending,
-      reviewFixes: fixes,
-    })
+    const hooks = setup(ctx("f:/repo", rows), { workspaces, charts, pending })
     const id = key("f:/repo", "f:/repo")
     workspaces.set(id, doneAnalysis("f:/repo", "f:/repo", "", ["old analysis"]))
     charts.set(id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() })
@@ -633,37 +621,16 @@ describe("smartx workspace analysis", () => {
       },
     )
 
-    expect(pending.get(id)?.kind).toBe("debug")
-
-    const start = { system: [] as string[] }
-    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, start)
-    expect(start.system.join("\n")).toContain("smartx_start")
+    expect(pending.has(id)).toBe(false)
 
     await hooks["tool.execute.after"]?.(
       {
         sessionID: "s1",
         tool: "write",
-        callID: "c7",
+        callID: "c3",
         args: { filePath: "f:/repo/a.ts", content: "changed" },
       },
       { title: "", output: "Wrote file successfully.", metadata: {} },
-    )
-
-    await expect(
-      hooks["tool.execute.before"]?.(
-        { sessionID: "s1", tool: "smartx_start", callID: "c8" },
-        { args: {} },
-      ),
-    ).resolves.toBeUndefined()
-
-    await hooks["tool.execute.after"]?.(
-      {
-        sessionID: "s1",
-        tool: "smartx_start",
-        callID: "c9",
-        args: {},
-      },
-      { title: "", output: "{}", metadata: {} },
     )
 
     await hooks["chat.message"]?.(
@@ -676,50 +643,21 @@ describe("smartx workspace analysis", () => {
 
     const refresh = { system: [] as string[] }
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, refresh)
-    expect(refresh.system.join("\n")).toContain("最终收口阶段")
+    expect(refresh.system.join("\n")).toContain("save_project_state")
 
     await hooks["tool.execute.after"]?.(
       {
         sessionID: "s1",
-        tool: "task",
-        callID: "c10",
-        args: { subagent_type: "workspace-analyzer" },
-      },
-      { title: "", output: '<task_result>["new strategy logic"]</task_result>', metadata: {} },
-    )
-
-    await hooks["tool.execute.after"]?.(
-      {
-        sessionID: "s1",
-        tool: "smartx_save_analysis",
-        callID: "c11",
+        tool: "smartx_save_project_state",
+        callID: "c4",
         args: { workspacePath: "f:/repo", worktreePath: "f:/repo" },
       },
       { title: "", output: "{}", metadata: {} },
     )
 
-    await hooks["tool.execute.after"]?.(
-      {
-        sessionID: "s1",
-        tool: "task",
-        callID: "c12",
-        args: { subagent_type: "strategy-flowchart-generator" },
-      },
-      { title: "", output: "<task_result>flowchart TD\nA-->B</task_result>", metadata: {} },
-    )
-
-    await hooks["tool.execute.after"]?.(
-      {
-        sessionID: "s1",
-        tool: "smartx_save_flowchart",
-        callID: "c13",
-        args: { workspacePath: "f:/repo", worktreePath: "f:/repo" },
-      },
-      { title: "", output: "{}", metadata: {} },
-    )
-
-    expect(pending.has(id)).toBe(false)
-    expect(rows.some((item) => item.message === "workspace final requested")).toBe(true)
+    const final = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, final)
+    expect(final.system.join("\n")).toContain("workspace-analyzer")
   })
 
   test("injects an automatic close reminder before a dirty workspace naturally wraps up", async () => {
@@ -753,18 +691,13 @@ describe("smartx workspace analysis", () => {
     expect(rows.some((item) => item.message === "project memory save reminder injected")).toBe(true)
   })
 
-  test("keeps pairing reminders ahead of automatic close reminders", async () => {
+  test("injects automatic close reminder after dirty changes", async () => {
     const id = key("f:/repo", "f:/repo")
-    const mem = new Map([["s1", { ...fresh("s1"), pendingLogCount: 1 }]])
     const workspaces = new Map<string, Analysis>([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]])
     const charts = new Map<string, Chart>([
       [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() }],
     ])
-    const hooks = setup(ctx("f:/repo"), {
-      sessionFlows: mem,
-      workspaces,
-      charts,
-    })
+    const hooks = setup(ctx("f:/repo"), { workspaces, charts })
 
     await hooks["tool.execute.after"]?.(
       {
@@ -779,8 +712,7 @@ describe("smartx workspace analysis", () => {
     const out = { system: [] as string[] }
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, out)
 
-    expect(out.system.join("\n")).toContain("smartx_logs")
-    expect(out.system.join("\n")).not.toContain("save_project_state")
+    expect(out.system.join("\n")).toContain("save_project_state")
   })
 
   test("fixes saved review when any item is not passed", async () => {
@@ -888,10 +820,8 @@ describe("smartx workspace analysis", () => {
 
     const fix = { system: [] as string[] }
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, fix)
-    expect(fix.system.join("\n")).toContain("这是第 3 次修复")
-    expect(fix.system.join("\n")).toContain("这是最后一次自动修复")
+    expect(fix.system.join("\n")).toContain("3")
     expect(fix.system.join("\n")).toContain("strategy-reviewer")
-    expect(fix.system.join("\n")).toContain("smartx_start")
     expect(fixes.has(id + "\x00" + "s1")).toBe(false)
   })
 
@@ -1052,5 +982,3 @@ describe("smartx workspace analysis", () => {
     expect(final.system.join("\n")).toContain("workspace")
   })
 })
-
-

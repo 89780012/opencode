@@ -26,7 +26,7 @@ import {
   limit,
 } from "./note.js"
 import { items, mermaid, reviewState, reviewText, serial } from "./parse.js"
-import { analyze, flowchart, kind, mcp, review, start } from "./tool.js"
+import { analyze, flowchart, kind, mcp, review } from "./tool.js"
 import type { Analysis, Chart, Dirt, Fix, Memory, Mode, Pending, Project, SaveReview } from "./types.js"
 import { flow, step } from "./workflow.js"
 
@@ -55,7 +55,6 @@ type Opt = {
   load: (workspace: string, worktree: string) => Promise<Analysis | undefined>
   loadChart: (workspace: string, worktree: string) => Promise<Chart | undefined>
   loadProject: (workspace: string, worktree: string) => Promise<Project | undefined>
-  hold: (session: string) => boolean
   saveReview: (input: SaveReview) => Promise<void>
   write: Log
 }
@@ -165,8 +164,7 @@ function reset(opt: Opt, mode?: Mode) {
   opt.charts.set(opt.id, requestChart(opt.workspace, opt.worktree))
   opt.baselineModes.set(opt.id, mode ?? (opt.dirtyStates.get(opt.id)?.state === "dirty" ? "refresh" : "boot"))
   const pendingSave = opt.pending.get(opt.id)
-  if (pendingSave?.kind === "analysis" || pendingSave?.kind === "flowchart" || pendingSave?.kind === "debug")
-    opt.pending.delete(opt.id)
+  if (pendingSave?.kind === "analysis" || pendingSave?.kind === "flowchart") opt.pending.delete(opt.id)
 }
 
 /** workspace 级编排器，负责 system 注入、before 门禁和 after 状态推进。*/
@@ -211,7 +209,6 @@ export function createWorkspace(opt: Opt) {
             !sessionID ||
             !saving(state, {
               sub: opt.childSessions.has(sessionID),
-              hold: opt.hold(sessionID),
               review: opt.reviewRequests.has(requestKey(opt.id, sessionID)),
               final: opt.finalRequests.has(requestKey(opt.id, sessionID)),
               fix: opt.reviewFixes.has(fixKey(opt.id, sessionID)),
@@ -325,15 +322,13 @@ export function createWorkspace(opt: Opt) {
 
           // 检查是否满足自动 final 条件：
           // 1. 审查刚刚完成且状态为 passed
-          // 2. 调试配对已完成（通过 hold 函数检查）
-          // 3. 工作区有代码变更（dirty 状态）
-          // 4. 没有其他 pending 的 review/final 请求
-          const isDebugComplete = !opt.hold(sessionID) // hold 返回 true 表示还有 pending 的调试
+          // 2. 工作区有代码变更（dirty 状态）
+          // 3. 没有其他 pending 的 review/final 请求
           const hasDirtyChanges = state.life === "dirty"
           const requestID = requestKey(opt.id, sessionID)
           const noExistingRequests = !opt.reviewRequests.has(requestID) && !opt.finalRequests.has(requestID)
 
-          if (isReviewPassed && isDebugComplete && hasDirtyChanges && noExistingRequests) {
+          if (isReviewPassed && hasDirtyChanges && noExistingRequests) {
             // 清除 review pending 状态
             opt.pending.delete(opt.id)
             // 触发 final 流程
@@ -342,7 +337,7 @@ export function createWorkspace(opt: Opt) {
               sessionID,
               workspace: opt.workspace,
               worktree: opt.worktree,
-              reason: "review passed and debug completed",
+              reason: "review passed",
             })
             return true
           }
@@ -355,7 +350,6 @@ export function createWorkspace(opt: Opt) {
             !sessionID ||
             !closing(state, {
               sub: opt.childSessions.has(sessionID),
-              hold: opt.hold(sessionID),
               review: opt.reviewRequests.has(requestKey(opt.id, sessionID)),
               final: opt.finalRequests.has(requestKey(opt.id, sessionID)),
               fix: opt.reviewFixes.has(fixKey(opt.id, sessionID)),
@@ -540,7 +534,7 @@ export function createWorkspace(opt: Opt) {
         }),
       ])
     },
-    /** 工具执行后推进 project memory、baseline 以及 review / debug 队列状态。*/
+    /** 工具执行后推进 project memory、baseline 以及 review 队列状态。 */
     after: async (input: Parameters<After>[0], output: Parameters<After>[1]) => {
       if (!opt.workspace || !opt.id) return false
 
@@ -696,7 +690,7 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
         step("save_review", async () => {
-          // review 保存后要分两种情况：通过则进入 debug，未通过则继续积累修复轮次。
+          // review 保存后通过则清掉修复轮次，未通过则继续积累修复轮次。
           if (
             !mcp(input, "save_review") ||
             !sameWorkspace(input.args, opt.workspace, opt.worktree, opt.write) ||
@@ -706,15 +700,7 @@ export function createWorkspace(opt: Opt) {
           const item = opt.pending.get(opt.id)
           if (item?.kind === "review") opt.pending.delete(opt.id)
           const done = item?.kind === "review" && reviewPassed(input.args)
-          if (done) {
-            opt.reviewFixes.delete(fixKey(opt.id, input.sessionID))
-            opt.pending.set(opt.id, {
-              kind: "debug",
-              workspacePath: opt.workspace,
-              worktreePath: opt.worktree,
-              sessionID: input.sessionID,
-            })
-          }
+          if (done) opt.reviewFixes.delete(fixKey(opt.id, input.sessionID))
           if (item?.kind === "review" && !done && item.state !== "error") {
             const fix = opt.reviewFixes.get(fixKey(opt.id, input.sessionID))
             const attempt = Math.min(fix?.attempt ?? 1, limit)
@@ -732,19 +718,6 @@ export function createWorkspace(opt: Opt) {
             worktree: opt.worktree,
             state: item?.kind === "review" ? item.state : undefined,
             passed: done,
-          })
-          return true
-        }),
-        step("start_debug", async () => {
-          // 只有前一步 review 已经通过、且当前会话正好在 debug 队列里，才会触发这里。
-          if (!start(input) || !ok(output)) return false
-          const item = opt.pending.get(opt.id)
-          if (item?.kind !== "debug" || item.sessionID !== input.sessionID) return false
-          opt.pending.delete(opt.id)
-          await opt.write("workspace review debug started", {
-            sessionID: input.sessionID,
-            workspace: opt.workspace,
-            worktree: opt.worktree,
           })
           return true
         }),

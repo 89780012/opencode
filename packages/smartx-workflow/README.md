@@ -2,22 +2,12 @@
 
 `smartx-workflow` 是给 SmartX 策略开发流程加顺序约束的插件。
 
-现在它同时维护三条约束轴：
+现在它维护两条约束轴：
 
-1. 会话级顺序约束
-2. workspace baseline 约束
-3. project memory 约束
+1. workspace baseline 约束
+2. project memory 约束
 
-## 1. 会话级顺序约束
-
-插件持续跟踪两组顺序：
-
-- `smartx_start` / `smartx-start` -> `smartx_logs`
-- `skill({ name: "smartx-develop" })` -> `skill({ name: "smartx-debug" })`
-
-只要前一步发生、后一步还没补齐，插件就会在下一轮模型生成前注入提醒。
-
-## 2. Workspace Baseline 约束
+## 1. Workspace Baseline 约束
 
 workspace baseline 由两份产物组成：
 
@@ -50,7 +40,7 @@ workspace baseline 由两份产物组成：
 
 当进入 review 或 final wrap-up 时，workflow 会要求刷新 baseline。
 
-## 3. Project Memory 约束
+## 2. Project Memory 约束
 
 project memory 使用 `.project-state/` 作为工作区记忆。
 
@@ -67,8 +57,7 @@ project memory 使用 `.project-state/` 作为工作区记忆。
 1. `resume_project_state` 或 `init_project_state`
 2. baseline 初始化 / 刷新（需要时）
 3. `smartx-develop`
-4. `smartx-debug`
-5. `save_project_state`
+4. `save_project_state`
 6. 最终总结
 
 ### 恢复规则
