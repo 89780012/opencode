@@ -5,6 +5,7 @@ import {
   Clock3,
   FileText,
   LoaderCircle,
+  Settings,
   Workflow,
 } from "lucide-react"
 import { useAppDispatch } from "@/store"
@@ -36,7 +37,8 @@ function FlowState(props: { analysis: WorkbenchAnalysis | null; flowchart: Workb
   const marks: Mark[] = [
     {
       key: "analysis",
-      label: props.analysis?.state === "done" ? "分析完成" : props.analysis?.state === "running" ? "分析中" : "等待分析",
+      label:
+        props.analysis?.state === "done" ? "分析完成" : props.analysis?.state === "running" ? "分析中" : "等待分析",
       tone: props.analysis?.state === "done" ? "done" : props.analysis?.state === "running" ? "running" : "pending",
     },
     {
@@ -123,7 +125,27 @@ function Tick(props: { item: WorkbenchProgressEvent }) {
 
 function stamp(value: number) {
   if (!value) return ""
-  return new Date(value).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })
+  return new Date(value).toLocaleString("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
+function text(data: Record<string, unknown>, key: string) {
+  const value = data[key]
+  if (typeof value === "string") return value
+  if (typeof value === "number") return `${value}`
+  return "--"
+}
+
+function label(status: string) {
+  if (status === "running") return "运行中"
+  if (status === "pending") return "启动中"
+  if (status === "failed") return "失败"
+  if (status === "done") return "完成"
+  return status
 }
 
 export function RequirementsTab(props: {
@@ -135,13 +157,19 @@ export function RequirementsTab(props: {
   risk: string
   hint: string
   onToggle: (key: string) => void
-  onBacktest: (idx: number) => void
+  onBacktest: (id: string) => void
+  onConfig: () => void
 }) {
   const dispatch = useAppDispatch()
 
   return (
     <div className={css.stack}>
-      <Compact open={props.open.requirements} icon={FileText} title="需求理解" onToggle={() => props.onToggle("requirements")}>
+      <Compact
+        open={props.open.requirements}
+        icon={FileText}
+        title="需求理解"
+        onToggle={() => props.onToggle("requirements")}
+      >
         <div className={css.reqbox}>
           {props.cur.analyzedRequirements.length ? (
             props.cur.analyzedRequirements.map((item, idx) => (
@@ -207,17 +235,37 @@ export function RequirementsTab(props: {
         </div>
       </Compact>
 
-      <Compact open={props.open.backtest} icon={ChartColumn} title="回测记录" onToggle={() => props.onToggle("backtest")}>
-        <div className={`${css.logbox} ${ui.scroll}`}>
+      <Compact
+        open={props.open.backtest}
+        icon={ChartColumn}
+        title="回测记录"
+        onToggle={() => props.onToggle("backtest")}
+        action={
+          <button type="button" className={css.tag} onClick={props.onConfig} aria-label="回测配置">
+            <Settings size={12} />
+            <span>配置</span>
+          </button>
+        }
+      >
+        <div className={`${css.logbox} ${css.backtests} ${ui.scroll}`}>
           {props.cur.backtestHistory.length ? (
             props.cur.backtestHistory.map((item, idx) => (
-              <button key={`${item.time}-${idx}`} type="button" className={css.log} onClick={() => props.onBacktest(idx)}>
-                <div className={css.rowtop}>
-                  <span className={css.logtitle}>回测 #{props.cur.backtestHistory.length - idx}</span>
-                  <span>{item.time}</span>
+              <button
+                key={item.id}
+                type="button"
+                className={`${css.log} ${css.backtest}`}
+                onClick={() => props.onBacktest(item.id)}
+              >
+                <div className={css.btrow}>
+                  <span className={css.btname}>回测 #{props.cur.backtestHistory.length - idx}</span>
+                  <span className={css.bttime}>{stamp(item.startedAt)}</span>
                 </div>
-                <p className={css.logic}>
-                  收益: {item.results.totalReturn} / 夏普: {item.results.sharpe}
+                <p className={css.btmeta}>
+                  <span className={`${css.btstatus} ${css[`btstatus_${item.status}`] || ""}`}>
+                    {label(item.status)}
+                  </span>
+                  <span>收益: {text(item.summary, "total_return")}</span>
+                  <span>夏普: {text(item.summary, "sharpe_ratio")}</span>
                 </p>
               </button>
             ))

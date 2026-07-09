@@ -291,6 +291,17 @@ button:focus,
   outline: none;
 }
 
+.toaster,
+[data-sonner-toaster] {
+  position: fixed !important;
+  z-index: 2147483647 !important;
+}
+
+.toaster [data-sonner-toast],
+[data-sonner-toaster] [data-sonner-toast] {
+  z-index: 2147483647 !important;
+}
+
 .response-body [data-streamdown="code-block-actions"],
 .response-body [data-streamdown="mermaid-block-actions"],
 .response-body [data-streamdown="table-wrapper"] > div:first-child,

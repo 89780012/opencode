@@ -3,6 +3,7 @@ package smartx
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -36,6 +37,36 @@ type Result struct {
 	Account  string `json:"account"`
 	WindowId string `json:"window_id"`
 	Output   string `json:"output"`
+}
+
+type BacktestInput struct {
+	PluginID string         `json:"pluginId"`
+	Config   map[string]any `json:"config"`
+}
+
+type BacktestResult struct {
+	BtID     string          `json:"btId"`
+	LogPath  string          `json:"logPath"`
+	PluginID string          `json:"pluginId"`
+	Raw      json.RawMessage `json:"raw"`
+	Output   string          `json:"output"`
+}
+
+type ProgressInput struct {
+	PluginID string `json:"pluginId"`
+	BtID     string `json:"btId"`
+}
+
+type ProgressResult struct {
+	BtID      string          `json:"btId"`
+	Status    float64         `json:"status"`
+	Progress  float64         `json:"progress"`
+	Running   bool            `json:"isRunning"`
+	Finished  bool            `json:"isFinished"`
+	Summary   json.RawMessage `json:"summary"`
+	DataFiles json.RawMessage `json:"dataFiles"`
+	Raw       json.RawMessage `json:"raw"`
+	Output    string          `json:"output"`
 }
 
 type feed struct {
@@ -92,6 +123,60 @@ func (s *Service) Start(ctx context.Context, in Input) (Result, error) {
 	}
 	slog.Info("start strategy run", "result", result)
 	return result, nil
+}
+
+func (s *Service) Backtest(ctx context.Context, in BacktestInput) (BacktestResult, error) {
+	name := module(in.PluginID)
+	if name == "" {
+		return BacktestResult{}, errors.New("pluginId is required")
+	}
+	body, err := json.Marshal(in.Config)
+	if err != nil {
+		return BacktestResult{}, err
+	}
+	out, err := s.backtest(ctx, name, string(body))
+	if err != nil {
+		return BacktestResult{}, err
+	}
+	raw, err := data(out)
+	if err != nil {
+		return BacktestResult{}, err
+	}
+	row := BacktestResult{Raw: raw, Output: out}
+	if err := json.Unmarshal(raw, &row); err != nil {
+		return BacktestResult{}, err
+	}
+	return row, nil
+}
+
+func (s *Service) BacktestProgress(ctx context.Context, in ProgressInput) (ProgressResult, error) {
+	name := module(in.PluginID)
+	if name == "" {
+		return ProgressResult{}, errors.New("pluginId is required")
+	}
+	out, err := s.progress(ctx, name, strings.TrimSpace(in.BtID))
+	if err != nil {
+		return ProgressResult{}, err
+	}
+	raw, err := data(out)
+	if err != nil {
+		return ProgressResult{}, err
+	}
+	row := progressDoc{}
+	if err := json.Unmarshal(raw, &row); err != nil {
+		return ProgressResult{}, err
+	}
+	return ProgressResult{
+		BtID:      row.BtID,
+		Status:    row.Status,
+		Progress:  row.Progress,
+		Running:   row.Running,
+		Finished:  row.Finished || row.Status == 200,
+		Summary:   safe(row.Performance.Summary),
+		DataFiles: safe(row.Performance.DataFiles),
+		Raw:       raw,
+		Output:    out,
+	}, nil
 }
 
 func (f *feed) add(text string) {
@@ -211,6 +296,58 @@ func norm(text string) string {
 	return text
 }
 
+func module(name string) string {
+	name = strings.TrimSpace(name)
+	name = strings.TrimSuffix(name, "-local")
+	if name == "" {
+		return ""
+	}
+	return name + "-local"
+}
+
+func data(text string) (json.RawMessage, error) {
+	body := tidy(text)
+	idx := strings.LastIndex(body, "data:")
+	if idx < 0 {
+		return nil, fmt.Errorf("smartx response data not found: %s", body)
+	}
+	raw := strings.TrimSpace(body[idx+len("data:"):])
+	start := strings.Index(raw, "{")
+	if start < 0 {
+		return nil, fmt.Errorf("smartx response json not found: %s", body)
+	}
+	raw = raw[start:]
+	depth := 0
+	end := -1
+	for idx, char := range raw {
+		if char == '{' {
+			depth++
+		}
+		if char == '}' {
+			depth--
+			if depth == 0 {
+				end = idx + 1
+				break
+			}
+		}
+	}
+	if end < 0 {
+		return nil, fmt.Errorf("smartx response json incomplete: %s", body)
+	}
+	raw = raw[:end]
+	if !json.Valid([]byte(raw)) {
+		return nil, fmt.Errorf("smartx response json invalid: %s", raw)
+	}
+	return json.RawMessage(raw), nil
+}
+
+func safe(raw json.RawMessage) json.RawMessage {
+	if len(raw) == 0 || !json.Valid(raw) {
+		return json.RawMessage("{}")
+	}
+	return raw
+}
+
 func login(account string, id string) string {
 	return fmt.Sprintf("login %s %s", account, id)
 }
@@ -228,4 +365,28 @@ func live(text string) bool {
 	body = strings.ToLower(body)
 	body = strings.NewReplacer(" ", "", "\n", "", "\t", "").Replace(body)
 	return strings.Contains(body, "extension正在运行") || strings.Contains(body, "extensionisrunning")
+}
+
+func startBacktest(name string, body string) string {
+	return fmt.Sprintf("startBackTest %s %s", name, body)
+}
+
+func queryBacktest(name string, id string) string {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return fmt.Sprintf("queryBackTestProgress %s", name)
+	}
+	return fmt.Sprintf("queryBackTestProgress %s %s", name, id)
+}
+
+type progressDoc struct {
+	BtID        string `json:"btId"`
+	Status      float64
+	Progress    float64 `json:"progress"`
+	Running     bool    `json:"isRunning"`
+	Finished    bool    `json:"isFinished"`
+	Performance struct {
+		Summary   json.RawMessage `json:"summary"`
+		DataFiles json.RawMessage `json:"dataFiles"`
+	} `json:"performance"`
 }

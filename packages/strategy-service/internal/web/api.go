@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"strategy-service/internal/backtest"
 	cfg "strategy-service/internal/config"
 	"strategy-service/internal/logs"
 	"strategy-service/internal/modelchain"
@@ -30,6 +31,7 @@ type API struct {
 	summary  *summary.Service
 	chain    *modelchain.Service
 	bench    *workbench.Service
+	back     *backtest.Service
 
 	socketHandlers map[string]socketHandlerFunc
 }
@@ -76,6 +78,7 @@ func NewAPI(run *rt.Service, op *oc.Service, cfg *cfg.Store, sx *smartx.Service,
 		summary:  summary,
 		chain:    chain,
 		bench:    workbench.NewService(op, chain, question, smartURL),
+		back:     backtest.NewService(sx),
 	}
 	api.bench.SetEvent(func(ctx context.Context, kind string, payload json.RawMessage) {
 		_ = ctx
@@ -143,6 +146,14 @@ func (a *API) Register(r *gin.Engine) {
 	bench.POST("/project-state/resume", a.workbenchProjectStateResume)
 	bench.POST("/project-state/save", a.workbenchProjectStateSave)
 	bench.POST("/project-state/validate", a.workbenchProjectStateValidate)
+
+	back := api.Group("/backtest")
+	back.GET("/config", a.backtestConfigGet)
+	back.PUT("/config", a.backtestConfigPut)
+	back.POST("/run", a.backtestRun)
+	back.GET("/runs", a.backtestRuns)
+	back.GET("/runs/:id", a.backtestRunGet)
+	back.POST("/runs/:id/refresh", a.backtestRunRefresh)
 
 	sum := api.Group("/summary")
 	sum.GET("/session", a.summaryGet)

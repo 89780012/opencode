@@ -4,6 +4,7 @@ import { Side } from "./features/side"
 import { StageView } from "./features/stage"
 import { usePanels } from "./hooks/use-panels"
 import { useWorkbenchAnalysisSync } from "./hooks/use-workbench-analysis"
+import { useWorkbenchBacktestSync } from "./hooks/use-workbench-backtest"
 import { useWorkbenchFlowchartSync } from "./hooks/use-workbench-flowchart"
 import { useWorkbenchQuestionSync } from "./hooks/use-workbench-question"
 import { useWorkbenchReviewSync } from "./hooks/use-workbench-review"
@@ -16,6 +17,7 @@ export function Workbench() {
   useWorkbenchSessionSync()
   useWorkbenchQuestionSync()
   useWorkbenchAnalysisSync()
+  useWorkbenchBacktestSync()
   useWorkbenchFlowchartSync()
   useWorkbenchReviewSync()
 

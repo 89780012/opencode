@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react"
-import { modelChainApi } from "@/api/modules"
+import { backtestApi, modelChainApi } from "@/api/modules"
 import { toast } from "sonner"
-import { selectWorkbench, selectWorkbenchProgress, useAppDispatch, useAppSelector } from "@/store"
-import { setActive, setStage } from "@/store/workbench-slice"
-import { code, createBacktest, createTimeline, type FlowStatus, type ReviewStatus, type SessionItem, type StepStatus, type TimelineEvent } from "../data"
+import { selectWorkbench, selectWorkbenchBacktests, selectWorkbenchProgress, useAppDispatch, useAppSelector } from "@/store"
+import { setActive, setBacktestActive, setStage, upsertBacktest } from "@/store/workbench-slice"
+import { code, createTimeline, type FlowStatus, type ReviewStatus, type SessionItem, type StepStatus, type TimelineEvent } from "../data"
 import { useWorkbenchProgressSync } from "./use-workbench-progress"
+import type { BacktestConfig } from "@/types/backtest"
 
 function status(state?: string): ReviewStatus {
   if (state === "running") return "running"
@@ -25,8 +26,8 @@ function stamp(value?: number) {
   return new Date(value).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })
 }
 
-function prompt() {
-  return "审查"
+function plugin(path: string) {
+  return path.split(/[\\/]/).filter(Boolean).at(-1)?.replace(/-local$/, "") ?? ""
 }
 
 function empty(): SessionItem {
@@ -66,7 +67,12 @@ function map(event: ReturnType<typeof selectWorkbenchProgress>[number]): Timelin
     id: event.id,
     type,
     label: event.title || event.kind,
-    time: new Date(event.createdAt).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }),
+    time: new Date(event.createdAt).toLocaleString("zh-CN", {
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
     description: event.detail || event.kind,
     diffSummary: event.detail || undefined,
   }
@@ -77,8 +83,10 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
   const state = useAppSelector(selectWorkbench)
   useWorkbenchProgressSync(state.sessionPath, state.active)
   const prog = useAppSelector((item) => selectWorkbenchProgress(item, state.sessionPath, state.active))
+  const runs = useAppSelector((item) => selectWorkbenchBacktests(item, state.sessionPath, state.active))
   const [view, setView] = useState<"current" | "history">("current")
   const [reviewing, setReviewing] = useState(false)
+  const [testing, setTesting] = useState(false)
   const flow = state.flowchart?.workspacePath === state.sessionPath ? state.flowchart : null
   const rows = useMemo(
     () => (state.reviewPath === state.sessionPath ? state.reviews : []).slice().sort((a, b) => b.updatedAt - a.updatedAt),
@@ -113,7 +121,7 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
         })),
         suggestions: [item.summary, ...item.suggestions].filter((tip) => tip),
       }))
-    const back = createBacktest()
+    const back = runs.find((item) => item.id === state.backtestActive) ?? runs[0] ?? null
     return {
       ...empty(),
       id: session.id,
@@ -129,12 +137,12 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
       flowchartStatus:
         flow?.state === "generating" ? "generating" : flow?.state === "done" && flow.code ? "done" : ("idle" as FlowStatus),
       flowchartCode: flow?.state === "done" ? flow.code : "",
-      backtestStatus: "done",
+      backtestStatus: back?.status === "pending" || back?.status === "running" ? "running" : back ? "done" : "idle",
       backtestResults: back,
-      backtestHistory: [{ time: "09:45", results: back }],
+      backtestHistory: runs,
       timelineEvents: prog.length > 0 ? prog.map(map) : createTimeline(session.title),
     }
-  }, [flow, prog, row, rows, state.active, state.sessions, state.sessionPath, view])
+  }, [flow, prog, row, rows, runs, state.active, state.backtestActive, state.sessions, view])
   const last = cur.reviewHistory.at(-1) ?? null
   const risk = useMemo(() => {
     if (cur.reviewStatus === "passed") return "审查已通过"
@@ -145,7 +153,7 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
   const hint = useMemo(() => {
     const list = [risk]
     if (cur.flowchartStatus === "done") list.push("流程图已生成")
-    if (cur.backtestStatus === "done" && cur.backtestResults) list.push(`回测收益 ${cur.backtestResults.totalReturn}`)
+    if (cur.backtestStatus === "done" && cur.backtestResults) list.push("回测已完成")
     return list.join(" / ")
   }, [cur.backtestResults, cur.backtestStatus, cur.flowchartStatus, risk])
 
@@ -161,7 +169,7 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
       await modelChainApi.sendPrompt({
         workspacePath: state.sessionPath,
         sessionId: state.active,
-        parts: [{ type: "text", text: prompt() }],
+        parts: [{ type: "text", text: "审查" }],
       })
     } catch {
       toast.error("提交审查失败")
@@ -170,8 +178,28 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
     }
   }
 
-  const backtest = async () => {
+  const backtest = async (cfg?: BacktestConfig) => {
     dispatch(setStage("backtest"))
+    if (testing) return
+    if (!state.sessionPath || !state.active) {
+      toast.error("请先创建或选择一个会话")
+      return
+    }
+    setTesting(true)
+    try {
+      const run = await backtestApi.run({
+        workspacePath: state.sessionPath,
+        sessionId: state.active,
+        pluginId: plugin(state.sessionPath),
+        config: cfg,
+      })
+      dispatch(upsertBacktest({ workspacePath: state.sessionPath, run }))
+      toast.success("回测已开始")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "启动回测失败")
+    } finally {
+      setTesting(false)
+    }
   }
 
   return {
@@ -183,10 +211,14 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
     risk,
     hint,
     reviewing,
+    testing,
     setActive: (id: string) => dispatch(setActive(id)),
     review,
     backtest,
-    show: () => dispatch(setStage("backtest")),
+    show: (id?: string) => {
+      if (id) dispatch(setBacktestActive(id))
+      dispatch(setStage("backtest"))
+    },
     view: (next?: "current" | "history") => setView((item) => next ?? (item === "current" ? "history" : "current")),
   }
 }

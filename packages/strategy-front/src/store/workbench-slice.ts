@@ -1,5 +1,6 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit"
 import { type Stage } from "@/components/workbench/data"
+import type { BacktestRun } from "@/types/backtest"
 
 export type WorkbenchSession = {
   id: string
@@ -87,6 +88,10 @@ type State = {
   progress: WorkbenchProgressEvent[]
   progressPath: string
   progressSession: string
+  backtests: BacktestRun[]
+  backtestPath: string
+  backtestSession: string
+  backtestActive: string
   active: string
   stage: Stage
 }
@@ -105,6 +110,10 @@ const initialState: State = {
   progress: [],
   progressPath: "",
   progressSession: "",
+  backtests: [],
+  backtestPath: "",
+  backtestSession: "",
+  backtestActive: "",
   active: "",
   stage: "session",
 }
@@ -181,6 +190,25 @@ const slice = createSlice({
         action.payload.event,
       ].sort((a, b) => a.createdAt - b.createdAt))
     },
+    setBacktests(state, action: PayloadAction<{ workspacePath: string; sessionId: string; runs: BacktestRun[] }>) {
+      state.backtestPath = action.payload.workspacePath
+      state.backtestSession = action.payload.sessionId
+      state.backtests = action.payload.runs
+      if (state.backtests.some((item) => item.id === state.backtestActive)) return
+      state.backtestActive = state.backtests[0]?.id ?? ""
+    },
+    upsertBacktest(state, action: PayloadAction<{ workspacePath: string; run: BacktestRun }>) {
+      state.backtestPath = action.payload.workspacePath
+      state.backtestSession = action.payload.run.sessionId
+      state.backtests = [
+        action.payload.run,
+        ...state.backtests.filter((item) => item.id !== action.payload.run.id),
+      ].sort((a, b) => b.updatedAt - a.updatedAt)
+      state.backtestActive = action.payload.run.id
+    },
+    setBacktestActive(state, action: PayloadAction<string>) {
+      state.backtestActive = action.payload
+    },
     upsertReview(state, action: PayloadAction<{ workspacePath: string; review: WorkbenchReview }>) {
       state.reviewPath = action.payload.workspacePath
       const stale = action.payload.review.state !== "running"
@@ -224,6 +252,8 @@ export const {
   deleteSession,
   setAnalysis,
   setActive,
+  setBacktestActive,
+  setBacktests,
   setFlowchart,
   setQuestions,
   setProgress,
@@ -231,6 +261,7 @@ export const {
   setSessions,
   setStage,
   upsertProgress,
+  upsertBacktest,
   upsertReview,
   upsertSession,
 } = slice.actions

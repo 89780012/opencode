@@ -1,3 +1,5 @@
+import type { BacktestRun } from "@/types/backtest"
+
 export type Role = "ai" | "user"
 export type Stage = "session" | "flowchart" | "code" | "backtest" | "timeline"
 export type SidebarTab = "requirements" | "sessions"
@@ -28,18 +30,6 @@ export interface ReviewRecord {
   suggestions: string[]
 }
 
-export interface BacktestResult {
-  totalReturn: string
-  sharpe: string
-  maxDrawdown: string
-  winRate: string
-}
-
-export interface BacktestRecord {
-  time: string
-  results: BacktestResult
-}
-
 export interface TimelineEvent {
   id: string
   type: EventType
@@ -65,8 +55,8 @@ export interface SessionItem {
   flowchartStatus: FlowStatus
   flowchartCode: string
   backtestStatus: BacktestStatus
-  backtestResults: BacktestResult | null
-  backtestHistory: BacktestRecord[]
+  backtestResults: BacktestRun | null
+  backtestHistory: BacktestRun[]
   timelineEvents: TimelineEvent[]
 }
 
@@ -107,7 +97,7 @@ export function createTimeline(name: string): TimelineEvent[] {
       type: "requirement",
       label: "需求理解",
       time: "2026-05-27 09:20",
-      description: `确认《${name}》的核心需求与约束边界。`,
+      description: `确认「${name}」的核心需求与约束边界。`,
     },
     {
       id: "evt-code-1",
@@ -169,13 +159,4 @@ export function createFlowchart() {
   F -- 否 --> H{PNL >= 5%?}
   H -- 是 --> I[止盈]
   H -- 否 --> J[继续持有]`
-}
-
-export function createBacktest(): BacktestResult {
-  return {
-    totalReturn: "12.4%",
-    sharpe: "1.18",
-    maxDrawdown: "6.7%",
-    winRate: "57.2%",
-  }
 }

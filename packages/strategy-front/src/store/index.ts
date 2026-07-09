@@ -171,3 +171,10 @@ export function selectWorkbenchProgress(state: RootState, path?: string | null, 
   if (state.workbench.progressSession !== session) return []
   return state.workbench.progress
 }
+
+export function selectWorkbenchBacktests(state: RootState, path?: string | null, session?: string | null) {
+  if (!path || !session) return []
+  if (state.workbench.backtestPath !== path) return []
+  if (state.workbench.backtestSession !== session) return []
+  return state.workbench.backtests
+}

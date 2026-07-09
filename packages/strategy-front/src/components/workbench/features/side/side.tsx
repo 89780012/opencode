@@ -13,6 +13,12 @@ import css from "../../styles/side/side.module.css"
 import { RequirementsTab, SessionsTab } from "./side-tabs"
 import { useWorkbench } from "../../hooks/use-workbench"
 
+function settings() {
+  const event = document.createEvent("CustomEvent")
+  event.initCustomEvent("strategy-settings-open", true, true, { tab: "backtest" })
+  window.dispatchEvent(event)
+}
+
 const init = {
   sessions: true,
   issues: false,
@@ -76,6 +82,7 @@ export function Side() {
           hint={app.hint}
           onToggle={flip}
           onBacktest={app.show}
+          onConfig={settings}
         />
       )}
     </aside>

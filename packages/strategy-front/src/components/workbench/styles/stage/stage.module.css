@@ -272,12 +272,52 @@
   font-size: 1rem;
 }
 
+.detail {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.detail div {
+  min-width: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.65rem;
+  background: #ffffff;
+  padding: 0.7rem;
+}
+
+.detail span {
+  display: block;
+  color: #64748b;
+  font-size: 0.72rem;
+}
+
+.detail strong {
+  display: block;
+  min-width: 0;
+  margin-top: 0.28rem;
+  overflow: hidden;
+  color: #0f172a;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wide {
+  grid-column: 1 / -1;
+}
+
 @media (max-width: 920px) {
   .head {
     flex-wrap: wrap;
   }
 
   .metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .detail {
     grid-template-columns: 1fr;
   }
 }
