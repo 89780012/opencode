@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -426,6 +427,110 @@ func TestSaveFlowchartSkipsUnchangedProgress(t *testing.T) {
 	}
 	if countProgress(list.Events, "flowchart.done") != 1 {
 		t.Fatalf("events = %#v", list.Events)
+	}
+}
+
+func TestSaveRequirementsReplacesCurrentSession(t *testing.T) {
+	ctx := context.Background()
+	doc, err := db.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := t.TempDir()
+	id := fmt.Sprintf("ses_requirements_%d", time.Now().UnixNano())
+	now := time.Now().UnixMilli()
+	_, err = doc.ExecContext(ctx, `insert into sessions(id, workspace_path, title, body, analysis, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?)`,
+		id, path, "requirements", "{}", "", now, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = doc.ExecContext(context.Background(), "delete from workspace_requirements where session_id = ?", id)
+		_, _ = doc.ExecContext(context.Background(), "delete from sessions where id = ?", id)
+	})
+
+	svc := NewService(nil, nil, nil, "")
+	first, err := svc.SaveRequirements(ctx, RequirementsSave{
+		WorkspacePath: path,
+		SessionID:     id,
+		Requirements:  []string{" first ", "second", "first"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(first.Requirements, []string{"first", "second", "first"}) {
+		t.Fatalf("requirements = %#v", first.Requirements)
+	}
+	loaded, err := svc.GetRequirements(ctx, RequirementsGet{WorkspacePath: path, SessionID: id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(loaded.Requirements, first.Requirements) {
+		t.Fatalf("loaded requirements = %#v", loaded.Requirements)
+	}
+	list, err := svc.ListSessions(ctx, SessionList{WorkspacePath: path})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list.Sessions) != 1 || !slices.Equal(list.Sessions[0].Requirements, first.Requirements) {
+		t.Fatalf("session requirements = %#v", list.Sessions)
+	}
+
+	second, err := svc.SaveRequirements(ctx, RequirementsSave{
+		WorkspacePath: path,
+		SessionID:     id,
+		Requirements:  []string{"replacement"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(second.Requirements, []string{"replacement"}) {
+		t.Fatalf("replacement = %#v", second.Requirements)
+	}
+	var updated int64
+	if err := doc.QueryRowContext(ctx, "select updated_at from sessions where id = ?", id).Scan(&updated); err != nil {
+		t.Fatal(err)
+	}
+	if updated != now {
+		t.Fatalf("session updated_at = %d, want %d", updated, now)
+	}
+
+	invalid := []RequirementsSave{
+		{WorkspacePath: path, SessionID: id},
+		{WorkspacePath: path, SessionID: id, Requirements: []string{" "}},
+		{WorkspacePath: path + "-other", SessionID: id, Requirements: []string{"other"}},
+		{WorkspacePath: path, SessionID: id + "-missing", Requirements: []string{"other"}},
+	}
+	for _, req := range invalid {
+		if _, err := svc.SaveRequirements(ctx, req); err == nil {
+			t.Fatalf("SaveRequirements(%#v) succeeded", req)
+		}
+	}
+	loaded, err = svc.GetRequirements(ctx, RequirementsGet{WorkspacePath: path, SessionID: id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(loaded.Requirements, []string{"replacement"}) {
+		t.Fatalf("requirements changed after invalid save: %#v", loaded.Requirements)
+	}
+
+	empty, err := svc.SaveRequirements(ctx, RequirementsSave{
+		WorkspacePath: path,
+		SessionID:     id,
+		Requirements:  []string{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if empty.Requirements == nil || len(empty.Requirements) != 0 {
+		t.Fatalf("empty requirements = %#v", empty.Requirements)
+	}
+	loaded, err = svc.GetRequirements(ctx, RequirementsGet{WorkspacePath: path, SessionID: id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.Requirements == nil || len(loaded.Requirements) != 0 {
+		t.Fatalf("loaded empty requirements = %#v", loaded.Requirements)
 	}
 }
 

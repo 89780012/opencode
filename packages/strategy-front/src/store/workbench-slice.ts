@@ -162,6 +162,16 @@ const slice = createSlice({
       state.questionPath = action.payload.workspacePath
       state.questions = action.payload.questions
     },
+    setRequirements(
+      state,
+      action: PayloadAction<{ workspacePath: string; sessionId: string; requirements: string[] }>,
+    ) {
+      const session = state.sessions.find(
+        (item) => item.id === action.payload.sessionId && item.workspacePath === action.payload.workspacePath,
+      )
+      if (!session) return
+      session.requirements = action.payload.requirements
+    },
     setAnalysis(state, action: PayloadAction<{ workspacePath: string; analysis: WorkbenchAnalysis | null }>) {
       state.analysisPath = action.payload.workspacePath
       state.analysis = action.payload.analysis
@@ -257,6 +267,7 @@ export const {
   setFlowchart,
   setQuestions,
   setProgress,
+  setRequirements,
   setReviews,
   setSessions,
   setStage,

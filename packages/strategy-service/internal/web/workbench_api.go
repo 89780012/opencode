@@ -26,6 +26,30 @@ func (a *API) workbenchIdentify(c *gin.Context) {
 	ok(c, data)
 }
 
+func (a *API) workbenchRequirementsPut(c *gin.Context) {
+	body := workbench.RequirementsSave{}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		bad(c, err)
+		return
+	}
+
+	data, err := a.bench.SaveRequirements(c.Request.Context(), body)
+	if errors.Is(err, db.ErrNotFound) {
+		fail(c, 404, "session not found", nil)
+		return
+	}
+	if errors.Is(err, workbench.ErrInput) {
+		bad(c, err)
+		return
+	}
+	if err != nil {
+		fail(c, 500, "failed to save requirements", nil)
+		return
+	}
+
+	ok(c, data)
+}
+
 func (a *API) workbenchAnalysisGet(c *gin.Context) {
 	req := workbench.AnalysisGet{}
 	if err := c.ShouldBindQuery(&req); err != nil {

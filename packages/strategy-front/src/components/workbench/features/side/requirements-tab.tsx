@@ -3,7 +3,6 @@ import {
   CheckCircle2,
   CircleAlert,
   Clock3,
-  FileText,
   LoaderCircle,
   Settings,
   Workflow,
@@ -17,6 +16,7 @@ import {
 } from "@/store/workbench-slice"
 import { type SessionItem } from "../../data"
 import { Compact } from "../../layout/compact"
+import { RequirementEditor } from "./requirement-editor"
 import ui from "../../../shared/styles/ui.module.css"
 import css from "../../styles/side/side.module.css"
 
@@ -149,6 +149,7 @@ function label(status: string) {
 }
 
 export function RequirementsTab(props: {
+  path: string
   cur: SessionItem
   analysis: WorkbenchAnalysis | null
   flowchart: WorkbenchFlowchart | null
@@ -164,25 +165,14 @@ export function RequirementsTab(props: {
 
   return (
     <div className={css.stack}>
-      <Compact
+      <RequirementEditor
+        key={`${props.path}\u0000${props.cur.id}`}
+        path={props.path}
+        id={props.cur.id}
+        items={props.cur.analyzedRequirements}
         open={props.open.requirements}
-        icon={FileText}
-        title="需求理解"
         onToggle={() => props.onToggle("requirements")}
-      >
-        <div className={css.reqbox}>
-          {props.cur.analyzedRequirements.length ? (
-            props.cur.analyzedRequirements.map((item, idx) => (
-              <div key={item} className={css.reqrow}>
-                <span>{idx + 1}.</span>
-                <p>{item}</p>
-              </div>
-            ))
-          ) : (
-            <div className={ui.empty}>暂无需求理解</div>
-          )}
-        </div>
-      </Compact>
+      />
 
       <Compact
         open={props.open.logic}

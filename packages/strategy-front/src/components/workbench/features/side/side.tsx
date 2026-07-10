@@ -75,6 +75,7 @@ export function Side() {
         <SessionsTab open={open} onToggle={flip} />
       ) : (
         <RequirementsTab
+          path={path}
           cur={app.cur}
           analysis={analysis}
           flowchart={flowchart}

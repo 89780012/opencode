@@ -14,6 +14,7 @@ This spec describes the current OpenCode monorepo. Use it before coding so chang
 | [Console Cloud](./console-cloud.md) | Editing `packages/console/*`, auth, billing, workspace services, SST resources, or functions |
 | [SDK Plugin Script](./sdk-plugin-script.md) | Editing generated SDK, plugin APIs, release scripts, or shared script helpers |
 | [Testing And Quality](./testing-quality.md) | Choosing verification commands, test style, mocks, type checks, or formatting |
+| [Strategy Workbench](./strategy-workbench.md) | Editing the strategy workbench session requirements API, persistence, or editor synchronization |
 
 ## Repository Map
 
@@ -34,4 +35,3 @@ This spec describes the current OpenCode monorepo. Use it before coding so chang
 - Prefer Bun APIs and workspace package imports already used in the target package.
 - Use the root style guide from `AGENTS.md`: short names, `const`, early returns, no unnecessary destructuring, no new `any` unless unavoidable at a generated/API boundary.
 - Search before changing constants, config keys, route operation IDs, event names, schema fields, generated artifacts, or public plugin/SDK types.
-

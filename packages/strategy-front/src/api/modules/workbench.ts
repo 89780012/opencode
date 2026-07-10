@@ -14,6 +14,12 @@ export type Analyze = {
   model: string
 }
 
+export type RequirementList = {
+  workspacePath: string
+  sessionId: string
+  requirements: string[]
+}
+
 export type Flowchart = {
   workspacePath: string
   worktreePath: string
@@ -37,6 +43,9 @@ export type FlowchartSave = {
 export const workbenchApi = {
   identify(message: string) {
     return request.post<Analyze, { message: string }>("/workbench/requirements/identify", { message }, { timeout: 60000 })
+  },
+  saveRequirements(input: RequirementList) {
+    return request.put<RequirementList, RequirementList>("/workbench/requirements", input)
   },
   saveFlowchart(input: FlowchartSave) {
     return request.post<Flowchart, FlowchartSave>("/workbench/flowchart", { ...input, state: input.state ?? "done" })

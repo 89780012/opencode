@@ -53,6 +53,8 @@ type projectFiles struct {
 
 var projectStateRequired = []string{"feature-list.json", "progress.md", "session-log.md", "state.json"}
 
+var ErrInput = errors.New("invalid input")
+
 const progressDedupeWindow = 2 * time.Second
 
 type Service struct {
@@ -308,6 +310,60 @@ func (s *Service) GetRequirements(ctx context.Context, req RequirementsGet) (Req
 		WorkspacePath: req.WorkspacePath,
 		SessionID:     req.SessionID,
 		Requirements:  reqs,
+	}, nil
+}
+
+func (s *Service) SaveRequirements(ctx context.Context, req RequirementsSave) (RequirementsRow, error) {
+	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
+	req.SessionID = strings.TrimSpace(req.SessionID)
+	if req.WorkspacePath == "" {
+		return RequirementsRow{}, fmt.Errorf("%w: workspacePath is required", ErrInput)
+	}
+	if req.SessionID == "" {
+		return RequirementsRow{}, fmt.Errorf("%w: sessionId is required", ErrInput)
+	}
+	if req.Requirements == nil {
+		return RequirementsRow{}, fmt.Errorf("%w: requirements is required", ErrInput)
+	}
+	items := make([]string, len(req.Requirements))
+	for idx, item := range req.Requirements {
+		items[idx] = strings.TrimSpace(item)
+		if items[idx] == "" {
+			return RequirementsRow{}, fmt.Errorf("%w: requirements[%d] is required", ErrInput, idx)
+		}
+	}
+
+	doc, err := db.Open()
+	if err != nil {
+		return RequirementsRow{}, err
+	}
+	tx, err := doc.BeginTx(ctx, nil)
+	if err != nil {
+		return RequirementsRow{}, err
+	}
+	defer tx.Rollback()
+
+	var workspace string
+	err = tx.QueryRowContext(ctx, "select workspace_path from sessions where id = ?", req.SessionID).Scan(&workspace)
+	if err == sql.ErrNoRows {
+		return RequirementsRow{}, db.ErrNotFound
+	}
+	if err != nil {
+		return RequirementsRow{}, err
+	}
+	if workspace != req.WorkspacePath {
+		return RequirementsRow{}, db.ErrNotFound
+	}
+	if err := saveReqs(ctx, tx, req.WorkspacePath, req.SessionID, items, time.Now().UnixMilli()); err != nil {
+		return RequirementsRow{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return RequirementsRow{}, err
+	}
+	return RequirementsRow{
+		WorkspacePath: req.WorkspacePath,
+		SessionID:     req.SessionID,
+		Requirements:  items,
 	}, nil
 }
 
@@ -1363,6 +1419,10 @@ type scanner interface {
 	Scan(...any) error
 }
 
+type execer interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}
+
 func scanSession(rows scanner) (SessionRow, error) {
 	var row SessionRow
 	var body string
@@ -1428,7 +1488,7 @@ func loadReqs(ctx context.Context, doc *sql.DB, workspace string, id string) ([]
 	return clean(out), nil
 }
 
-func saveReqs(ctx context.Context, doc *sql.DB, workspace string, id string, reqs []string, now int64) error {
+func saveReqs(ctx context.Context, doc execer, workspace string, id string, reqs []string, now int64) error {
 	body, err := json.Marshal(clean(reqs))
 	if err != nil {
 		return err

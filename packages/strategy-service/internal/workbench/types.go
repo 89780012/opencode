@@ -100,6 +100,12 @@ type RequirementsGet struct {
 	SessionID     string `form:"sessionId" json:"sessionId"`
 }
 
+type RequirementsSave struct {
+	WorkspacePath string   `json:"workspacePath"`
+	SessionID     string   `json:"sessionId"`
+	Requirements  []string `json:"requirements"`
+}
+
 type RequirementsRow struct {
 	WorkspacePath string   `json:"workspacePath"`
 	SessionID     string   `json:"sessionId"`

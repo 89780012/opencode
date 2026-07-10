@@ -133,6 +133,7 @@ func (a *API) Register(r *gin.Engine) {
 
 	bench := api.Group("/workbench")
 	bench.POST("/requirements/identify", a.workbenchIdentify)
+	bench.PUT("/requirements", a.workbenchRequirementsPut)
 	bench.GET("/analysis", a.workbenchAnalysisGet)
 	bench.POST("/analysis", a.workbenchAnalysisPut)
 	bench.GET("/flowchart", a.workbenchFlowchartGet)
