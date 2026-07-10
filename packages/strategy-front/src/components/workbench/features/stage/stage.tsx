@@ -2,6 +2,7 @@ import { useState } from "react"
 import { useChatRuntime } from "@/hooks/use-chat-runtime"
 import { useAppDispatch } from "@/store"
 import { updateSessionAbortStatus } from "@/store/chat-session-slice"
+import { setStage } from "@/store/workbench-slice"
 import common from "../../styles/session/session-common.module.css"
 import { useStage } from "../../hooks/use-stage"
 import { useWorkbenchChat } from "../../hooks/use-workbench-chat"
@@ -16,7 +17,6 @@ export function StageView() {
   const dispatch = useAppDispatch()
   const stage = useStage()
   const real = useWorkbenchChat()
-  const [draft, setDraft] = useState("")
   const [mode, setMode] = useState<"narrow" | "full">("narrow")
   const chat = useChatRuntime({
     workspacePath: real.workspace?.path,
@@ -64,20 +64,16 @@ export function StageView() {
       {stage.stage === "backtest" ? <Backtest cur={stage.cur} onRun={() => void stage.backtest()} /> : null}
       {stage.stage === "timeline" ? <TimelineStage cur={stage.cur} active={stage.active} /> : null}
       <Composer
-        busy={session ? chat.busy : false}
-        disabled={session ? real.chat.creating : false}
-        submitting={session ? chat.submitting || real.chat.creating : false}
-        value={session ? chat.draft.text : draft}
+        busy={chat.busy}
+        disabled={real.chat.creating}
+        submitting={chat.submitting || real.chat.creating}
+        value={chat.draft.text}
         mode={session ? mode : "narrow"}
-        onAbort={session ? () => void real.abort() : undefined}
-        onChange={session ? chat.draft.setText : setDraft}
+        onAbort={() => void real.abort()}
+        onChange={chat.draft.setText}
         onSend={(text) => {
-          if (!session) {
-            //非session 面板先置空
-            setDraft("")
-            return
-          }
           dispatch(updateSessionAbortStatus({ sessionId: real.chat.selectedSessionId || "", status: false }))
+          dispatch(setStage("session"))
           void chat.submit({ text })
         }}
       />
