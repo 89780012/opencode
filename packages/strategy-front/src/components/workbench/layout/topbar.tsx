@@ -5,7 +5,7 @@ import { useWorkbench } from "../hooks/use-workbench"
 import shell from "../styles/layout/shell.module.css"
 
 const tabs = [
-  { key: "session", icon: MessageSquareMore, label: "会话与审查" },
+  { key: "session", icon: MessageSquareMore, label: "对话与审查" },
   { key: "flowchart", icon: Workflow, label: "流程图" },
   { key: "code", icon: Code, label: "代码" },
   { key: "backtest", icon: ChartColumn, label: "回测" },
@@ -34,7 +34,6 @@ export function Topbar() {
           )
         })}
       </div>
-      <div className={shell.current}>当前会话：{app.cur.name}</div>
     </div>
   )
 }

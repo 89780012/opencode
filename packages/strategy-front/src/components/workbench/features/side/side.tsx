@@ -51,7 +51,9 @@ export function Side() {
     <aside className={css.root}>
       <div className={css.logo}>
         <Sparkles size={15} />
-        <span>OpenCode</span>
+        <span className={css.current} title={app.cur.name} >
+          {app.cur.name}
+        </span>
       </div>
 
       <div className={css.tabs}>
@@ -61,11 +63,11 @@ export function Side() {
           onClick={() => setTab("requirements")}
         >
           <ClipboardList size={14} />
-          <span>需求面板</span>
+          <span>设计面板</span>
         </button>
         <button type="button" className={tab === "sessions" ? css.tabon : ""} onClick={() => setTab("sessions")}>
           <MessageSquareMore size={14} />
-          <span>会话列表</span>
+          <span>对话列表</span>
         </button>
       </div>
 
