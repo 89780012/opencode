@@ -141,6 +141,12 @@ export function selectWorkbench(state: RootState) {
   return state.workbench
 }
 
+export function selectRequirementReview(state: RootState, path?: string | null, session?: string | null) {
+  if (!path || !session) return 0
+  const review = state.workbench.requirementReviews[path]?.[session]
+  return review?.pending ? review.revision : 0
+}
+
 export function selectWorkbenchQuestions(state: RootState, path?: string | null) {
   if (!path) return empty
   if (state.workbench.questionPath !== path) return empty

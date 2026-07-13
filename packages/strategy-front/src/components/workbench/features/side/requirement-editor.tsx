@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import { workbenchApi } from "@/api/modules"
 import { useAppDispatch } from "@/store"
-import { setRequirements } from "@/store/workbench-slice"
+import { markRequirementReview, setRequirements } from "@/store/workbench-slice"
 import { Compact } from "../../layout/compact"
 import ui from "../../../shared/styles/ui.module.css"
 import css from "../../styles/side/side.module.css"
@@ -122,6 +122,7 @@ export function RequirementEditor(props: {
         },
       )
       dispatch(setRequirements(data))
+      dispatch(markRequirementReview({ workspacePath: data.workspacePath, sessionId: data.sessionId }))
       if (active.current !== token || request.current !== gen) return
       setDraft(rows(data.requirements))
       setEdit(false)

@@ -132,6 +132,7 @@ export default defineConfig(({ command, mode }) => {
               "/api": {
                 target: apiProxyTarget,
                 changeOrigin: true,
+                ws: true,
               },
               "/opencode": {
                 target: opencodeProxyTarget,

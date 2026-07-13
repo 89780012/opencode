@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { activeBacktest, backtestKey } from "../src/lib/backtest"
+import { action, activeBacktest, backtestKey } from "../src/lib/backtest"
 import {
   addBacktest,
   setBacktestActive,
@@ -95,7 +95,7 @@ describe("workbench backtests", () => {
           sessionId: "session-a",
           status: "running",
           statusCode: 0,
-          progress: 0,
+          progress: 42,
           error: "",
           revision: 2,
           updatedAt: 2000,
@@ -123,7 +123,7 @@ describe("workbench backtests", () => {
     )
 
     expect(stale.backtestActive).toBe("history")
-    expect(stale.backtests.find((item) => item.id === "run-1")?.progress).toBe(0)
+    expect(stale.backtests.find((item) => item.id === "run-1")?.progress).toBe(42)
     expect(activeBacktest(stale.backtests)?.id).toBe("run-1")
   })
 
@@ -185,5 +185,17 @@ describe("workbench backtests", () => {
     expect(failed.status).toBe("failed")
     expect(activeBacktest([failed])).toBeNull()
     expect(backtestKey()).toMatch(/^[0-9a-z-]{10,}$/i)
+  })
+
+  test("labels the first run separately from retries and active progress", () => {
+    expect(action(null, null, false)).toBe("运行回测")
+    expect(action(null, run({ status: "done", progress: 100 }), false)).toBe("重新运行")
+    expect(action(null, run({ status: "failed" }), false)).toBe("重试")
+    expect(action(run({ status: "pending", progress: 0 }), null, false)).toBe("正在启动")
+    expect(action(run({ status: "running", progress: 42.4 }), null, false)).toBe("回测 42%")
+    expect(action(run({ status: "running", progress: 42.4 }), run({ status: "done", progress: 100 }), false)).toBe(
+      "回测 42%",
+    )
+    expect(action(null, null, true)).toBe("提交中")
   })
 })

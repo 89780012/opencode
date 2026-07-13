@@ -32,6 +32,9 @@
 - 成功响应使用 `{ code: 200, msg: "ok", data }`，`data` 返回规范化后的列表。
 - 保存只更新 `workspace_requirements.updated_at`，不得更新 `sessions.updated_at`，不得触发 AI、分析、流程图、回测或进度事件。
 - 前端成功后只按响应中的 `workspacePath + sessionId` 更新 Redux。已发出的写请求不得因切换视图而取消，因为客户端取消不能保证服务端事务未提交；请求代次只用于隔离草稿、toast 和本地保存状态。
+- 成功保存且列表实际变化后，前端必须独立按响应中的 `workspacePath + sessionId` 递增页面生命周期内的待重审版本，即使该工作区的会话列表已被另一工作区替换。更新已加载会话数据可以因目标不存在而跳过，但记录成功保存不得依赖目标会话仍在当前缓存中。
+- 待重审提示显示在主区域顶部；保存接口本身仍不得触发 AI。用户点击“审查并修改”后才通过当前会话发送“需求已变更，请根据最新需求重新审查并修改策略代码。”。
+- 待重审提示允许关闭、跨会话切换保留、刷新后清空。发送失败不得清除；发送成功只清除点击时捕获的版本，期间再次保存产生的新版本必须保留。横条发送固定指令时不得清空用户已有的会话草稿。
 - 需求编辑器必须以工作区和会话作为 React `key`，确保旧草稿不会在 effect 执行前短暂绑定到新会话。
 
 ### 4. 校验与错误矩阵
@@ -55,7 +58,7 @@
 
 - 服务测试：覆盖有序替换、重复文本、幂等、清空、空白拒绝、会话缺失、工作区错配和 `sessions.updated_at` 不变。
 - API 测试：断言 `400 / 404 / 500` 分类、空数组响应为 `[]`，并验证拒绝后存量不变。
-- 前端测试：断言 reducer 只更新工作区和会话均匹配的记录。
+- 前端测试：断言 reducer 只更新工作区和会话均匹配的记录，并覆盖待重审版本的作用域隔离、工作区切换后的迟到保存、无变化不标记、旧版本不清除新提示和删除会话清理。
 - 变更后从各包目录运行 `go test ./...`、`go build ./...`、`bun test ./test/requirements.test.ts`、`bun run typecheck`、相关文件 ESLint 和 `bun run build`。
 
 ### 7. Wrong vs Correct
@@ -71,7 +74,8 @@ controller.abort()
 
 ```ts
 const data = await workbenchApi.saveRequirements(input)
-dispatch(setRequirements(data))
+dispatch(setRequirements(data)) // 仅更新仍在缓存中的会话
+dispatch(markRequirementReview({ workspacePath: data.workspacePath, sessionId: data.sessionId }))
 if (active.current !== token || request.current !== gen) return
 // 只有当前编辑器才更新草稿和提示。
 ```
@@ -84,6 +88,10 @@ bad(c, err)
 ```
 
 正确：参数错误映射 `400`，资源缺失或归属错配映射 `404`，未知持久化错误映射通用 `500`。
+
+错误：需求保存成功后直接调用 AI，或发送旧版本重审指令成功时无条件清除提示。
+
+正确：保存成功只标记版本化待重审状态；用户显式点击后发送，且只按点击时捕获的版本清除。
 
 ### 8. 旧 Electron WebView 布局契约
 
@@ -164,6 +172,7 @@ function fit(node: HTMLTextAreaElement | null) {
 - 状态变更必须先持久化并递增 `revision`，再广播轻量 `backtest.updated`；终态完整结果通过详情接口读取。
 - 前端首次进入、切换会话和 `socket.open` 时读取 HTTP 快照；Socket 事件以及启动、列表、详情和 refresh 返回的所有 HTTP 快照都必须按 `workspacePath + sessionId + id + revision` 合并，较低 revision 不得覆盖较高 revision，同 revision 的详情可以补齐完整结果。
 - 普通进度更新不得改变用户选中的历史报告。流程图入口在任务活动期间只导航到回测面板，不得重新提交。
+- 回测面板的 `pending` 和 `running` 状态都必须同时展示阶段和数字百分比；初始 `pending` 的 `0%` 不得被“等待受理”等阶段文案替代。
 - 旧数据库必须通过可重复增量迁移增加字段和作用域幂等索引，不能只修改 `create table if not exists`。
 
 ### 4. 校验与错误矩阵

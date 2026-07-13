@@ -74,9 +74,15 @@ export type WorkbenchProgressEvent = {
   createdAt: number
 }
 
+type RequirementReview = {
+  revision: number
+  pending: boolean
+}
+
 type State = {
   sessions: WorkbenchSession[]
   sessionPath: string
+  requirementReviews: Record<string, Record<string, RequirementReview>>
   questions: WorkbenchQuestion[]
   questionPath: string
   analysis: WorkbenchAnalysis | null
@@ -99,6 +105,7 @@ type State = {
 const initialState: State = {
   sessions: [],
   sessionPath: "",
+  requirementReviews: {},
   questions: [],
   questionPath: "",
   analysis: null,
@@ -170,7 +177,27 @@ const slice = createSlice({
         (item) => item.id === action.payload.sessionId && item.workspacePath === action.payload.workspacePath,
       )
       if (!session) return
+      if (
+        session.requirements.length === action.payload.requirements.length &&
+        session.requirements.every((item, index) => item === action.payload.requirements[index])
+      ) return
       session.requirements = action.payload.requirements
+    },
+    markRequirementReview(state, action: PayloadAction<{ workspacePath: string; sessionId: string }>) {
+      state.requirementReviews[action.payload.workspacePath] ??= {}
+      const review = state.requirementReviews[action.payload.workspacePath][action.payload.sessionId]
+      state.requirementReviews[action.payload.workspacePath][action.payload.sessionId] = {
+        revision: (review?.revision ?? 0) + 1,
+        pending: true,
+      }
+    },
+    clearRequirementReview(
+      state,
+      action: PayloadAction<{ workspacePath: string; sessionId: string; revision: number }>,
+    ) {
+      const review = state.requirementReviews[action.payload.workspacePath]?.[action.payload.sessionId]
+      if (!review?.pending || review.revision !== action.payload.revision) return
+      review.pending = false
     },
     setAnalysis(state, action: PayloadAction<{ workspacePath: string; analysis: WorkbenchAnalysis | null }>) {
       state.analysisPath = action.payload.workspacePath
@@ -275,7 +302,15 @@ const slice = createSlice({
       }
     },
     deleteSession(state, action: PayloadAction<{ id: string }>) {
+      const session = state.sessions.find((item) => item.id === action.payload.id)
       state.sessions = state.sessions.filter((item) => item.id !== action.payload.id)
+      if (session) {
+        const reviews = state.requirementReviews[session.workspacePath]
+        if (reviews) {
+          delete reviews[action.payload.id]
+          if (Object.keys(reviews).length === 0) delete state.requirementReviews[session.workspacePath]
+        }
+      }
       if (state.active !== action.payload.id) return
       state.active = state.sessions[0]?.id ?? ""
     },
@@ -295,8 +330,10 @@ const slice = createSlice({
 
 export const {
   addBacktest,
+  clearRequirementReview,
   deleteQuestion,
   deleteSession,
+  markRequirementReview,
   setAnalysis,
   setActive,
   setBacktestActive,

@@ -13,8 +13,9 @@ permission:
   task: deny
   webfetch: deny
   websearch: deny
-  external_directory:
-    "*": allow
+  external_directory: {
+      "~/.xtp-smart/plugins/**": "allow"
+  }
 ---
 
 你是一个“策略流程图生成”子 agent。

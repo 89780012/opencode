@@ -1,5 +1,6 @@
 import { ChartColumn, CircleAlert, Clock3, LoaderCircle, Play } from "lucide-react"
 import { useEffect, useState } from "react"
+import { action } from "@/lib/backtest"
 import type { BacktestRun } from "@/types/backtest"
 import type { SessionItem } from "../../data"
 import ui from "../../../shared/styles/ui.module.css"
@@ -62,7 +63,8 @@ function Progress(props: { run: BacktestRun; now: number; compact?: boolean }) {
         aria-label="回测进度"
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-valuenow={props.run.status === "pending" ? undefined : progress}
+        aria-valuenow={progress}
+        aria-valuetext={`${status(props.run.status)} ${progress}%`}
       >
         <span className={props.run.status === "pending" ? css.runbar_pending : ""} style={{ width: `${progress}%` }} />
       </div>
@@ -113,7 +115,16 @@ function Detail(props: { run: BacktestRun }) {
 }
 
 function Result(props: { result: BacktestRun | null; now: number }) {
-  if (!props.result) return <div className={ui.empty}>暂无回测结果</div>
+  if (!props.result) {
+    return (
+      <div className={css.reportempty}>
+        <span>
+          <ChartColumn size={20} />
+        </span>
+        <strong>尚未运行回测</strong>
+      </div>
+    )
+  }
   if (props.result.status === "pending" || props.result.status === "running") {
     return <Progress run={props.result} now={props.now} />
   }
@@ -156,15 +167,6 @@ function Result(props: { result: BacktestRun | null; now: number }) {
   )
 }
 
-function action(props: { cur: SessionItem; busy: boolean }) {
-  if (props.busy) return "提交中"
-  if (props.cur.backtestRun?.status === "pending") return "正在启动"
-  if (props.cur.backtestRun) return `回测 ${Math.round(props.cur.backtestRun.progress)}%`
-  if (props.cur.backtestStatus === "failed") return "重试"
-  if (props.cur.backtestStatus === "done") return "重新运行"
-  return "运行回测"
-}
-
 export function Backtest(props: { cur: SessionItem; busy: boolean; onRun: () => void }) {
   const [now, setNow] = useState(0)
   const run = props.cur.backtestRun
@@ -189,12 +191,14 @@ export function Backtest(props: { cur: SessionItem; busy: boolean; onRun: () => 
           onClick={props.onRun}
         >
           {run || props.busy ? <LoaderCircle size={14} className={ui.spin} /> : <Play size={14} />}
-          <span>{action(props)}</span>
+          <span>{action(run, props.cur.backtestResults, props.busy)}</span>
         </button>
       </div>
       <div className={`${css.report} ${ui.scroll}`}>
-        {run && run.id !== props.cur.backtestResults?.id ? <Progress run={run} now={now} compact /> : null}
-        <Result result={props.cur.backtestResults} now={now} />
+        {run ? <Progress run={run} now={now} compact={run.id !== props.cur.backtestResults?.id} /> : null}
+        {!run || (props.cur.backtestResults && run.id !== props.cur.backtestResults.id) ? (
+          <Result result={props.cur.backtestResults} now={now} />
+        ) : null}
       </div>
     </section>
   )

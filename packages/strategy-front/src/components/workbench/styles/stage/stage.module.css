@@ -319,6 +319,38 @@
   margin-top: 0.75rem;
 }
 
+.reportempty {
+  min-height: 12rem;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+}
+
+.reportempty > * + * {
+  margin-top: 0.55rem;
+}
+
+.reportempty > span {
+  width: 2.4rem;
+  height: 2.4rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #dbe3ec;
+  border-radius: 0.5rem;
+  background: #f8fafc;
+  color: #475569;
+}
+
+.reportempty > strong {
+  color: #475569;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
 .runstate {
   border: 1px solid #bfdbfe;
   border-radius: 0.5rem;

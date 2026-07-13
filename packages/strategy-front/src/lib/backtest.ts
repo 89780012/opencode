@@ -70,3 +70,13 @@ export function isBacktestRun(value: unknown): value is BacktestRun {
 export function activeBacktest(runs: BacktestRun[]) {
   return runs.find((run) => run.status === "pending" || run.status === "running") ?? null
 }
+
+export function action(run: BacktestRun | null, result: BacktestRun | null, busy: boolean) {
+  if (busy) return "提交中"
+  if (run?.status === "pending") return "正在启动"
+  if (run) return `回测 ${Math.round(run.progress)}%`
+  if (!result) return "运行回测"
+  if (result.status === "failed") return "重试"
+  if (result.status === "done") return "重新运行"
+  return "运行回测"
+}

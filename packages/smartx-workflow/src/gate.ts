@@ -67,23 +67,23 @@ export function gate(state: View, toolKind: Kind) {
   //   return ""
   // }
   // refreshing 状态：代码变更后正在刷新基线
-  if (state.life === "refreshing") {
-    // 只读操作、分析操作、流程图操作、保存操作、刷新操作和项目初始化操作被允许
-    if (
-      toolKind === "read" ||
-      toolKind === "analyze" ||
-      toolKind === "chart" ||
-      toolKind === "save" ||
-      toolKind === "refresh" ||
-      toolKind === "project_init" ||
-      toolKind === "project_resume" ||
-      toolKind === "project_get" ||
-      toolKind === "project_validate"
-    )
-      return ""
-    // 其他操作需要等待基线刷新完成
-    return "SmartX workflow is refreshing the workspace baseline after code changes. Finish analysis and flowchart first."
-  }
+  // if (state.life === "refreshing") {
+  //   // 只读操作、分析操作、流程图操作、保存操作、刷新操作和项目初始化操作被允许
+  //   if (
+  //     toolKind === "read" ||
+  //     toolKind === "analyze" ||
+  //     toolKind === "chart" ||
+  //     toolKind === "save" ||
+  //     toolKind === "refresh" ||
+  //     toolKind === "project_init" ||
+  //     toolKind === "project_resume" ||
+  //     toolKind === "project_get" ||
+  //     toolKind === "project_validate"
+  //   )
+  //     return ""
+  //   // 其他操作需要等待基线刷新完成
+  //   return "SmartX workflow is refreshing the workspace baseline after code changes. Finish analysis and flowchart first."
+  // }
   // finalizing 状态：正在生成最终快照
   if (state.life === "finalizing") {
     // 只读操作、分析操作、流程图操作、保存操作、刷新操作和项目初始化操作被允许

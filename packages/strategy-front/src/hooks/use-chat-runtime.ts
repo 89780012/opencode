@@ -433,7 +433,7 @@ function useSubmit(input: {
   const [submitting, setSubmitting] = useState(false)
 
   const submit = useCallback(
-    async (msg: PromptInputMessage) => {
+    async (msg: PromptInputMessage, opts?: { clear?: boolean }) => {
       if (!input.workspacePath) {
         return
       }
@@ -452,7 +452,7 @@ function useSubmit(input: {
         }
         input.selectSession(sessionId)
         await chatApi.sendPrompt(input.workspacePath, sessionId, { parts })
-        input.onSubmitted?.()
+        if (opts?.clear !== false) input.onSubmitted?.()
       } finally {
         setSubmitting(false)
       }
@@ -484,9 +484,9 @@ export function useChatRuntime(input: Input) {
   })
 
   const submit = useCallback(
-    async (msg: PromptInputMessage) => {
+    async (msg: PromptInputMessage, opts?: { clear?: boolean }) => {
       try {
-        await prompt.submit(msg)
+        await prompt.submit(msg, opts)
 
         return true
       } catch (err) {
