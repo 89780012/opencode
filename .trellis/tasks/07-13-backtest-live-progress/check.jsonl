@@ -1,0 +1,4 @@
+{"file":".trellis/spec/testing-quality.md","reason":"校验后端与前端测试、类型检查和构建门禁"}
+{"file":".trellis/spec/strategy-workbench.md","reason":"复核会话隔离、进度事件和旧 WebView 约束"}
+{"file":".trellis/tasks/07-13-backtest-live-progress/prd.md","reason":"逐项验证验收标准"}
+{"file":".trellis/tasks/07-13-backtest-live-progress/design.md","reason":"复核状态机、断线恢复、幂等和兼容边界"}

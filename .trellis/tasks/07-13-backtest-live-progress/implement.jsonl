@@ -1,0 +1,5 @@
+{"file":".trellis/spec/monorepo.md","reason":"约束跨包边界、包内命令和生成文件处理方式"}
+{"file":".trellis/spec/strategy-workbench.md","reason":"约束工作台会话隔离、事件同步和旧 Electron WebView 兼容性"}
+{"file":".trellis/tasks/07-13-backtest-live-progress/prd.md","reason":"提供已确认需求、业务码决策和验收标准"}
+{"file":".trellis/tasks/07-13-backtest-live-progress/design.md","reason":"提供回测 Manager、WebSocket 与前端状态设计"}
+{"file":".trellis/tasks/07-13-backtest-live-progress/implement.md","reason":"提供实施顺序、验证命令和回滚点"}

@@ -126,3 +126,92 @@ function fit(node: HTMLTextAreaElement | null) {
 ```
 
 - 样式变更后必须运行 `bun run build` 检验 legacy 产物，并在实际旧 Electron WebView 中检查 220px、300px 和 460px 面板宽度：条目不得黏连或横向溢出，底部操作区必须始终可见。
+
+## 场景：异步回测进度与实时状态
+
+### 1. 范围与触发条件
+
+- 修改 `packages/strategy-front` 的回测入口、状态同步和报告面板，或修改 `packages/strategy-service` 的回测 API、持久化和 SmartX 调用时，必须遵守本契约。
+- 回测是服务端慢任务。任务生命周期属于 `strategy-service`，不能由浏览器定时器驱动；WebSocket 只传递增量通知，SQLite 和 HTTP 查询是事实来源。
+
+### 2. 签名
+
+- 启动：`POST /api/backtest/run`
+- 列表：`GET /api/backtest/runs?workspacePath=<path>&sessionId=<id>`
+- 详情：`GET /api/backtest/runs/:id`
+- 兼容快照：`POST /api/backtest/runs/:id/refresh`，只读，不得主动查询 SmartX。
+- 事件：`backtest.updated`
+- 存储：`backtest_runs.request_key`、`backtest_runs.revision`
+
+### 3. 契约
+
+启动请求必须包含：
+
+```json
+{
+  "workspacePath": "D:/workspace/example",
+  "sessionId": "ses_123",
+  "pluginId": "example",
+  "requestKey": "client-generated-id",
+  "config": {}
+}
+```
+
+- 回测接口所有响应的 HTTP 状态固定为 `200`；响应体继续使用 `{ code, msg, data }`，业务成功为 `code: 200`，业务失败使用非 `200` code。
+- 启动接口完成校验和本地事务落库后立即返回 `pending`，不得等待 SmartX 返回远端任务结果。
+- 相同 `(workspacePath, sessionId, requestKey)` 返回原任务；幂等命中的活动任务只有在已有有效 `btId` 时才允许恢复查询，无 `btId` 表示远端提交结果不确定，必须只返回快照且不得再次调用 SmartX 启动。同一会话或同一插件已有其他 `pending/running` 任务时拒绝新任务。
+- Manager 使用服务级 context 启动和查询 SmartX；任务状态为 `pending -> running -> done|failed`，进度限制在 `0..100` 且不得回退。
+- 状态变更必须先持久化并递增 `revision`，再广播轻量 `backtest.updated`；终态完整结果通过详情接口读取。
+- 前端首次进入、切换会话和 `socket.open` 时读取 HTTP 快照；Socket 事件以及启动、列表、详情和 refresh 返回的所有 HTTP 快照都必须按 `workspacePath + sessionId + id + revision` 合并，较低 revision 不得覆盖较高 revision，同 revision 的详情可以补齐完整结果。
+- 普通进度更新不得改变用户选中的历史报告。流程图入口在任务活动期间只导航到回测面板，不得重新提交。
+- 旧数据库必须通过可重复增量迁移增加字段和作用域幂等索引，不能只修改 `create table if not exists`。
+
+### 4. 校验与错误矩阵
+
+| 条件 | HTTP | 业务 code | 行为 |
+| --- | --- | --- | --- |
+| 合法新任务 | `200` | `200` | 返回已落库的 `pending` 任务并启动后台 worker |
+| 相同 requestKey 重试 | `200` | `200` | 返回原任务且不重复启动 SmartX；有 `btId` 时可恢复 single-flight 查询，无 `btId` 时不得启动 worker |
+| JSON、路径、会话、requestKey 或配置无效 | `200` | `400` | 不创建任务 |
+| 同会话或同插件已有活动任务 | `200` | `409` | `data` 返回现有活动任务 |
+| 任务不存在 | `200` | `404` | 不泄露其他任务数据 |
+| SQLite、SmartX 初始化或内部状态错误 | `200` | `500` | 返回通用错误，不暴露内部异常 |
+| SmartX 查询瞬时失败 | 无 HTTP 响应 | 无 | Manager 退避重试，达到阈值后才落 `failed` |
+
+### 5. Good / Base / Bad Cases
+
+- Good：启动接口立即返回 `pending`；页面关闭后 Manager 继续查询，重新打开页面通过列表和 Socket 恢复进度，完成后加载完整报告。
+- Base：Socket 断线期间任务继续运行；重连触发列表对账，遗漏事件不影响最终状态。
+- Bad：浏览器每 3 秒调用 `/refresh` 才推进任务、运行中再次点击创建第二条任务、或轻量终态事件阻止同 revision 的完整详情写入 Redux。
+
+### 6. 必需测试
+
+- 后端：断言 pending 快返、幂等命中、幂等命中无 btId 不重复启动、会话/插件冲突、worker single-flight、空 btId、瞬时错误重试、进度单调、超时、终态停止和重启恢复。
+- 存储：断言旧表增量迁移可重复执行，空 requestKey 兼容旧记录，作用域内重复 requestKey 被拒绝。
+- 事件：断言每个 `backtest.updated.revision` 严格递增，并且读取数据库时对应 revision 已存在。
+- API：断言参数、冲突和不存在均返回 HTTP `200`，响应体 code 分别为 `400 / 409 / 404`。
+- 前端：断言跨会话响应被忽略、Socket 新状态不被迟到的启动响应或其他旧 revision 快照覆盖、进度更新不抢历史选择、同 revision 详情能补齐完整报告、`0%` 和 `failed` 正确显示。
+- 变更后从包目录运行 `go test ./...`、`go build ./...`、`go vet ./...`、相关 Bun 测试、`bun run typecheck` 和 `bun run build`。
+
+### 7. Wrong vs Correct
+
+错误：
+
+```ts
+window.setInterval(() => backtestApi.refresh(run.id), 3000)
+```
+
+正确：
+
+```ts
+socket.on("backtest.updated", merge)
+socket.on("socket.open", load)
+```
+
+错误：
+
+```go
+row, err := service.Run(c.Request.Context(), req) // 请求 context 驱动完整慢任务
+```
+
+正确：启动请求只负责事务创建 `pending` 记录；Manager 使用服务生命周期 context 执行 SmartX 启动、查询、持久化和通知，并在数据库关闭前停止所有 worker。
