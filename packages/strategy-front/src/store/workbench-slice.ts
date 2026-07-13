@@ -1,6 +1,6 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit"
 import { type Stage } from "@/components/workbench/data"
-import type { BacktestRun } from "@/types/backtest"
+import type { BacktestRun, BacktestUpdate } from "@/types/backtest"
 
 export type WorkbenchSession = {
   id: string
@@ -200,21 +200,57 @@ const slice = createSlice({
         action.payload.event,
       ].sort((a, b) => a.createdAt - b.createdAt))
     },
-    setBacktests(state, action: PayloadAction<{ workspacePath: string; sessionId: string; runs: BacktestRun[] }>) {
+    setBacktestScope(state, action: PayloadAction<{ workspacePath: string; sessionId: string }>) {
+      if (state.backtestPath === action.payload.workspacePath && state.backtestSession === action.payload.sessionId) return
       state.backtestPath = action.payload.workspacePath
       state.backtestSession = action.payload.sessionId
-      state.backtests = action.payload.runs
+      state.backtests = []
+      state.backtestActive = ""
+    },
+    setBacktests(state, action: PayloadAction<{ workspacePath: string; sessionId: string; runs: BacktestRun[] }>) {
+      if (state.backtestPath !== action.payload.workspacePath || state.backtestSession !== action.payload.sessionId) return
+      const runs = action.payload.runs.map((run) => {
+        const current = state.backtests.find((item) => item.id === run.id)
+        if (!current || current.revision <= run.revision) return run
+        return current
+      })
+      state.backtests = [
+        ...runs,
+        ...state.backtests.filter((run) => !runs.some((item) => item.id === run.id)),
+      ].sort((a, b) => b.updatedAt - a.updatedAt)
       if (state.backtests.some((item) => item.id === state.backtestActive)) return
       state.backtestActive = state.backtests[0]?.id ?? ""
     },
+    addBacktest(state, action: PayloadAction<{ workspacePath: string; run: BacktestRun }>) {
+      if (state.backtestPath !== action.payload.workspacePath || state.backtestSession !== action.payload.run.sessionId) return
+      const current = state.backtests.find((item) => item.id === action.payload.run.id)
+      state.backtests = [
+        current && current.revision > action.payload.run.revision ? current : action.payload.run,
+        ...state.backtests.filter((item) => item.id !== action.payload.run.id),
+      ].sort((a, b) => b.updatedAt - a.updatedAt)
+      state.backtestActive = action.payload.run.id
+    },
     upsertBacktest(state, action: PayloadAction<{ workspacePath: string; run: BacktestRun }>) {
-      state.backtestPath = action.payload.workspacePath
-      state.backtestSession = action.payload.run.sessionId
+      if (state.backtestPath !== action.payload.workspacePath || state.backtestSession !== action.payload.run.sessionId) return
+      const current = state.backtests.find((item) => item.id === action.payload.run.id)
+      if (current && current.revision > action.payload.run.revision) return
       state.backtests = [
         action.payload.run,
         ...state.backtests.filter((item) => item.id !== action.payload.run.id),
       ].sort((a, b) => b.updatedAt - a.updatedAt)
+      if (state.backtestActive) return
       state.backtestActive = action.payload.run.id
+    },
+    updateBacktest(state, action: PayloadAction<{ workspacePath: string; update: BacktestUpdate }>) {
+      if (
+        state.backtestPath !== action.payload.workspacePath ||
+        state.backtestSession !== action.payload.update.sessionId ||
+        action.payload.update.workspacePath !== action.payload.workspacePath
+      ) return
+      const idx = state.backtests.findIndex((item) => item.id === action.payload.update.id)
+      if (idx < 0 || state.backtests[idx].revision >= action.payload.update.revision) return
+      state.backtests[idx] = { ...state.backtests[idx], ...action.payload.update }
+      state.backtests.sort((a, b) => b.updatedAt - a.updatedAt)
     },
     setBacktestActive(state, action: PayloadAction<string>) {
       state.backtestActive = action.payload
@@ -258,11 +294,13 @@ const slice = createSlice({
 })
 
 export const {
+  addBacktest,
   deleteQuestion,
   deleteSession,
   setAnalysis,
   setActive,
   setBacktestActive,
+  setBacktestScope,
   setBacktests,
   setFlowchart,
   setQuestions,
@@ -273,6 +311,7 @@ export const {
   setStage,
   upsertProgress,
   upsertBacktest,
+  updateBacktest,
   upsertReview,
   upsertSession,
 } = slice.actions

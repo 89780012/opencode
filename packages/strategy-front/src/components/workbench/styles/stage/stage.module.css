@@ -308,6 +308,167 @@
   grid-column: 1 / -1;
 }
 
+.report {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 0.15rem;
+}
+
+.report > * + * {
+  margin-top: 0.75rem;
+}
+
+.runstate {
+  border: 1px solid #bfdbfe;
+  border-radius: 0.5rem;
+  background: #f8fbff;
+  padding: 0.85rem;
+}
+
+.runstate_compact {
+  border-color: #dbe3ec;
+  background: #f8fafc;
+}
+
+.runhead {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.runicon {
+  width: 1.8rem;
+  height: 1.8rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.45rem;
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.runhead div {
+  min-width: 0;
+}
+
+.runhead strong,
+.runhead span {
+  display: block;
+}
+
+.runhead strong {
+  color: #0f172a;
+  font-size: 0.82rem;
+}
+
+.runhead div span {
+  margin-top: 0.12rem;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 0.69rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runhead em {
+  color: #1d4ed8;
+  font-size: 0.82rem;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.runbar {
+  height: 0.42rem;
+  margin-top: 0.75rem;
+  overflow: hidden;
+  border-radius: 0.21rem;
+  background: #dbe7f5;
+}
+
+.runbar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #2563eb;
+  transition: width 0.25s ease;
+}
+
+.runbar > .runbar_pending {
+  width: 32% !important;
+  animation: pending 1.25s ease-in-out infinite alternate;
+}
+
+.runmeta {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-top: 0.58rem;
+  margin-left: -0.6rem;
+  color: #64748b;
+  font-size: 0.66rem;
+}
+
+.runmeta > span {
+  margin-left: 0.6rem;
+}
+
+.runmeta > span:first-child {
+  display: inline-flex;
+  align-items: center;
+}
+
+.runmeta > span:first-child > * + * {
+  margin-left: 0.25rem;
+}
+
+.runerror {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.65rem;
+  border: 1px solid #fecaca;
+  border-radius: 0.5rem;
+  background: #fff7f7;
+  color: #dc2626;
+  padding: 0.85rem;
+}
+
+.runerror div {
+  min-width: 0;
+}
+
+.runerror strong {
+  display: block;
+  color: #991b1b;
+  font-size: 0.82rem;
+}
+
+.runerror p {
+  margin: 0.22rem 0 0;
+  overflow-wrap: anywhere;
+  color: #b91c1c;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+@keyframes pending {
+  from {
+    transform: translateX(-80%);
+  }
+
+  to {
+    transform: translateX(290%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .runbar > .runbar_pending {
+    animation: none;
+    transform: translateX(100%);
+  }
+}
+
 @media (max-width: 920px) {
   .head {
     flex-wrap: wrap;

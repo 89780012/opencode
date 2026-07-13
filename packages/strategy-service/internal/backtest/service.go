@@ -5,23 +5,156 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log/slog"
+	"math"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
+	"strategy-service/internal/db"
 	"strategy-service/internal/smartx"
 )
 
-type Service struct {
-	doc *Store
-	sx  *smartx.Service
+type Client interface {
+	Backtest(context.Context, smartx.BacktestInput) (smartx.BacktestResult, error)
+	BacktestProgress(context.Context, smartx.ProgressInput) (smartx.ProgressResult, error)
 }
 
-func NewService(sx *smartx.Service) *Service {
+type repo interface {
+	Load(context.Context) (Config, error)
+	Save(context.Context, Config) (Config, error)
+	Create(context.Context, Run) (Run, bool, error)
+	Update(context.Context, Run) (Run, error)
+	Get(context.Context, string) (Run, error)
+	Find(context.Context, string, string, string) (Run, error)
+	Active(context.Context) ([]Run, error)
+	List(context.Context, ListReq) (List, error)
+}
+
+type Invalid struct {
+	Msg string
+}
+
+func (e *Invalid) Error() string {
+	return e.Msg
+}
+
+type Conflict struct {
+	Run Run
+}
+
+func (e *Conflict) Error() string {
+	return "an active backtest already exists"
+}
+
+type Service struct {
+	doc repo
+	sx  Client
+
+	ctx    context.Context
+	cancel context.CancelFunc
+	life   sync.RWMutex
+	mu     sync.Mutex
+	wg     sync.WaitGroup
+	jobs   map[string]struct{}
+	event  func(context.Context, string, json.RawMessage)
+	done   chan struct{}
+	start  bool
+	stop   bool
+	wait   bool
+
+	poll   time.Duration
+	stable time.Duration
+	retry  time.Duration
+	max    time.Duration
+	tries  int
+}
+
+func NewService(sx Client) *Service {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &Service{
-		doc: &Store{},
-		sx:  sx,
+		doc:    &Store{},
+		sx:     sx,
+		ctx:    ctx,
+		cancel: cancel,
+		jobs:   map[string]struct{}{},
+		done:   make(chan struct{}),
+		poll:   2 * time.Second,
+		stable: 5 * time.Second,
+		retry:  2 * time.Second,
+		max:    2 * time.Hour,
+		tries:  5,
+	}
+}
+
+func (s *Service) SetEvent(fn func(context.Context, string, json.RawMessage)) {
+	s.mu.Lock()
+	s.event = fn
+	s.mu.Unlock()
+}
+
+func (s *Service) Start() error {
+	s.mu.Lock()
+	if s.stop {
+		s.mu.Unlock()
+		return errors.New("backtest service is closed")
+	}
+	if s.start {
+		s.mu.Unlock()
+		return nil
+	}
+	s.start = true
+	s.mu.Unlock()
+
+	rows, err := s.doc.Active(s.ctx)
+	if err != nil {
+		s.mu.Lock()
+		s.start = false
+		s.mu.Unlock()
+		return err
+	}
+	ids := []string{}
+	for _, row := range rows {
+		if strings.TrimSpace(row.BtID) != "" {
+			ids = append(ids, row.ID)
+			continue
+		}
+		if _, err := s.fail(row, "backtest interrupted before the remote id was saved"); err != nil {
+			return err
+		}
+	}
+	for _, id := range ids {
+		s.launch(id)
+	}
+	return nil
+}
+
+func (s *Service) Close(ctx context.Context) error {
+	s.life.Lock()
+	s.mu.Lock()
+	if !s.stop {
+		s.stop = true
+		s.cancel()
+	}
+	if !s.wait {
+		s.wait = true
+		go func() {
+			s.wg.Wait()
+			close(s.done)
+		}()
+	}
+	done := s.done
+	s.mu.Unlock()
+	s.life.Unlock()
+
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }
 
@@ -74,7 +207,7 @@ func (s *Service) List(ctx context.Context, req ListReq) (List, error) {
 	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
 	req.SessionID = strings.TrimSpace(req.SessionID)
 	if req.WorkspacePath == "" {
-		return List{}, fmt.Errorf("workspacePath is required")
+		return List{}, invalid("workspacePath is required")
 	}
 	return s.doc.List(ctx, req)
 }
@@ -82,7 +215,7 @@ func (s *Service) List(ctx context.Context, req ListReq) (List, error) {
 func (s *Service) Get(ctx context.Context, req IDReq) (Run, error) {
 	req.ID = strings.TrimSpace(req.ID)
 	if req.ID == "" {
-		return Run{}, fmt.Errorf("id is required")
+		return Run{}, invalid("id is required")
 	}
 	return s.doc.Get(ctx, req.ID)
 }
@@ -91,34 +224,62 @@ func (s *Service) Run(ctx context.Context, req RunReq) (Run, error) {
 	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
 	req.SessionID = strings.TrimSpace(req.SessionID)
 	req.PluginID = strings.TrimSpace(req.PluginID)
+	req.RequestKey = strings.TrimSpace(req.RequestKey)
 	if req.WorkspacePath == "" {
-		return Run{}, fmt.Errorf("workspacePath is required")
+		return Run{}, invalid("workspacePath is required")
+	}
+	if req.SessionID == "" {
+		return Run{}, invalid("sessionId is required")
+	}
+	if req.RequestKey == "" {
+		return Run{}, invalid("requestKey is required")
 	}
 	if req.PluginID == "" {
 		req.PluginID = strings.TrimSuffix(filepath.Base(req.WorkspacePath), "-local")
 	}
+	req.PluginID = strings.TrimSuffix(req.PluginID, "-local")
 	if req.PluginID == "" || req.PluginID == "." {
-		return Run{}, fmt.Errorf("pluginId is required")
+		return Run{}, invalid("pluginId is required")
 	}
-	cfg, err := s.doc.Load(ctx)
-	if err != nil {
+	s.life.RLock()
+	defer s.life.RUnlock()
+	if err := s.alive(); err != nil {
 		return Run{}, err
 	}
-	if req.Config != nil {
+
+	row, err := s.doc.Find(ctx, req.WorkspacePath, req.SessionID, req.RequestKey)
+	if err == nil {
+		if active(row) && strings.TrimSpace(row.BtID) != "" {
+			s.launch(row.ID)
+		}
+		return row, nil
+	}
+	if !errors.Is(err, db.ErrNotFound) {
+		return Run{}, err
+	}
+
+	cfg := Default()
+	if req.Config == nil {
+		cfg, err = s.doc.Load(ctx)
+		if err != nil {
+			return Run{}, err
+		}
+	} else {
 		cfg = Clean(*req.Config)
 	}
 	if cfg.StartTime == "" {
-		return Run{}, fmt.Errorf("startTime is required")
+		return Run{}, invalid("startTime is required")
 	}
 	if cfg.EndTime == "" {
-		return Run{}, fmt.Errorf("endTime is required")
+		return Run{}, invalid("endTime is required")
 	}
 	now := time.Now().UnixMilli()
-	row := Run{
+	row = Run{
 		ID:            next(),
 		WorkspacePath: req.WorkspacePath,
 		SessionID:     req.SessionID,
 		PluginID:      req.PluginID,
+		RequestKey:    req.RequestKey,
 		Status:        "pending",
 		Config:        cfg,
 		Result:        json.RawMessage("{}"),
@@ -127,64 +288,225 @@ func (s *Service) Run(ctx context.Context, req RunReq) (Run, error) {
 		StartedAt:     now,
 		UpdatedAt:     now,
 	}
-	row, err = s.doc.Insert(ctx, row)
+	row, same, err := s.doc.Create(ctx, row)
 	if err != nil {
 		return Run{}, err
 	}
-	out, err := s.sx.Backtest(ctx, smartx.BacktestInput{PluginID: req.PluginID, Config: payload(cfg)})
-	if err != nil {
-		row.Status = "failed"
-		row.Error = err.Error()
-		row.UpdatedAt = time.Now().UnixMilli()
-		row.FinishedAt = row.UpdatedAt
-		_, _ = s.doc.Update(context.Background(), row)
-		return row, err
+	if !same {
+		s.emit(row)
 	}
-	row.BtID = out.BtID
-	row.PluginID = strings.TrimSuffix(out.PluginID, "-local")
-	row.LogPath = out.LogPath
-	row.Result = out.Raw
-	row.Status = "running"
-	row.Progress = 0
-	row.UpdatedAt = time.Now().UnixMilli()
-	return s.doc.Update(ctx, row)
+	if active(row) && (!same || strings.TrimSpace(row.BtID) != "") {
+		s.launch(row.ID)
+	}
+	return row, nil
 }
 
+// Refresh 保留旧接口兼容性，任务进度由后台 Manager 持续更新。
 func (s *Service) Refresh(ctx context.Context, req IDReq) (Run, error) {
-	row, err := s.Get(ctx, req)
+	return s.Get(ctx, req)
+}
+
+func (s *Service) alive() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.stop {
+		return errors.New("backtest service is closed")
+	}
+	return nil
+}
+
+func (s *Service) launch(id string) {
+	s.mu.Lock()
+	if s.stop {
+		s.mu.Unlock()
+		return
+	}
+	if _, ok := s.jobs[id]; ok {
+		s.mu.Unlock()
+		return
+	}
+	s.jobs[id] = struct{}{}
+	s.wg.Add(1)
+	s.mu.Unlock()
+
+	go func() {
+		defer func() {
+			s.mu.Lock()
+			delete(s.jobs, id)
+			s.mu.Unlock()
+			s.wg.Done()
+		}()
+		s.work(id)
+	}()
+}
+
+func (s *Service) work(id string) {
+	row, err := s.doc.Get(s.ctx, id)
+	if err != nil || !active(row) {
+		return
+	}
+	end := time.UnixMilli(row.StartedAt).Add(s.max)
+	if row.StartedAt == 0 {
+		end = time.Now().Add(s.max)
+	}
+	ctx, cancel := context.WithDeadline(s.ctx, end)
+	defer cancel()
+
+	if row.BtID == "" {
+		out, err := s.sx.Backtest(ctx, smartx.BacktestInput{PluginID: row.PluginID, Config: payload(row.Config)})
+		if err != nil {
+			s.failed(ctx, row, err.Error())
+			return
+		}
+		row.BtID = strings.TrimSpace(out.BtID)
+		if row.BtID == "" {
+			s.failed(ctx, row, "SmartX returned an empty backtest id")
+			return
+		}
+		if name := strings.TrimSuffix(strings.TrimSpace(out.PluginID), "-local"); name != "" {
+			row.PluginID = name
+		}
+		row.LogPath = out.LogPath
+		row.Result = safe(out.Raw)
+		row.Status = "running"
+		row.Error = ""
+		row, err = s.change(row)
+		if err != nil {
+			slog.Error("backtest start persistence failed", "id", row.ID, "error", err)
+			return
+		}
+	} else if row.Status != "running" {
+		row.Status = "running"
+		row.Error = ""
+		row, err = s.change(row)
+		if err != nil {
+			slog.Error("backtest recovery persistence failed", "id", row.ID, "error", err)
+			return
+		}
+	}
+	s.polling(ctx, row)
+}
+
+func (s *Service) polling(ctx context.Context, row Run) {
+	delay := s.poll
+	errs := 0
+	count := 0
+	for {
+		if !sleep(ctx, delay) {
+			s.failed(ctx, row, "backtest timed out")
+			return
+		}
+		out, err := s.sx.BacktestProgress(ctx, smartx.ProgressInput{PluginID: row.PluginID, BtID: row.BtID})
+		if err != nil {
+			if ctx.Err() != nil {
+				s.failed(ctx, row, "backtest timed out")
+				return
+			}
+			errs++
+			count = 0
+			if errs >= s.tries {
+				s.failed(ctx, row, err.Error())
+				return
+			}
+			row.Error = err.Error()
+			var save error
+			row, save = s.change(row)
+			if save != nil {
+				slog.Error("backtest retry persistence failed", "id", row.ID, "error", save)
+				return
+			}
+			delay = s.retry * time.Duration(1<<(errs-1))
+			continue
+		}
+
+		errs = 0
+		count++
+		row.StatusCode = out.Status
+		row.Progress = math.Max(row.Progress, clamp(out.Progress))
+		row.Result = safe(out.Raw)
+		row.Summary = safe(out.Summary)
+		row.DataFiles = safe(out.DataFiles)
+		row.Error = ""
+		if out.Finished {
+			row.Status = "done"
+			row.Progress = 100
+			row.FinishedAt = time.Now().UnixMilli()
+		} else if out.Running {
+			row.Status = "running"
+		} else {
+			row.Status = "failed"
+			row.Error = fmt.Sprintf("backtest failed: status %.2f", out.Status)
+			row.FinishedAt = time.Now().UnixMilli()
+		}
+		var save error
+		row, save = s.change(row)
+		if save != nil {
+			slog.Error("backtest progress persistence failed", "id", row.ID, "error", save)
+			return
+		}
+		if !active(row) {
+			return
+		}
+		delay = s.poll
+		if count >= 3 {
+			delay = s.stable
+		}
+	}
+}
+
+func (s *Service) failed(ctx context.Context, row Run, msg string) {
+	if s.ctx.Err() != nil {
+		return
+	}
+	if ctx.Err() != nil && !errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return
+	}
+	if _, err := s.fail(row, msg); err != nil {
+		slog.Error("backtest failure persistence failed", "id", row.ID, "error", err)
+	}
+}
+
+func (s *Service) fail(row Run, msg string) (Run, error) {
+	row.Status = "failed"
+	row.Error = strings.TrimSpace(msg)
+	row.FinishedAt = time.Now().UnixMilli()
+	return s.change(row)
+}
+
+func (s *Service) change(row Run) (Run, error) {
+	row.Progress = clamp(row.Progress)
+	row.Revision++
+	row.UpdatedAt = time.Now().UnixMilli()
+	out, err := s.doc.Update(s.ctx, row)
 	if err != nil {
 		return Run{}, err
 	}
-	if row.Status == "done" || row.Status == "failed" {
-		return row, nil
+	s.emit(out)
+	return out, nil
+}
+
+func (s *Service) emit(row Run) {
+	s.mu.Lock()
+	fn := s.event
+	s.mu.Unlock()
+	if fn == nil {
+		return
 	}
-	out, err := s.sx.BacktestProgress(ctx, smartx.ProgressInput{PluginID: row.PluginID, BtID: row.BtID})
-	if err != nil {
-		row.Status = "failed"
-		row.Error = err.Error()
-		row.FinishedAt = time.Now().UnixMilli()
-		row.UpdatedAt = row.FinishedAt
-		_, _ = s.doc.Update(context.Background(), row)
-		return row, err
+	body, err := json.Marshal(Update{
+		ID:            row.ID,
+		WorkspacePath: row.WorkspacePath,
+		SessionID:     row.SessionID,
+		Status:        row.Status,
+		StatusCode:    row.StatusCode,
+		Progress:      row.Progress,
+		Error:         row.Error,
+		Revision:      row.Revision,
+		UpdatedAt:     row.UpdatedAt,
+		HasResult:     row.Status == "done",
+	})
+	if err == nil {
+		fn(context.Background(), "backtest.updated", body)
 	}
-	row.StatusCode = out.Status
-	row.Progress = out.Progress
-	row.Result = out.Raw
-	row.Summary = out.Summary
-	row.DataFiles = out.DataFiles
-	row.Error = ""
-	row.UpdatedAt = time.Now().UnixMilli()
-	if out.Finished {
-		row.Status = "done"
-		row.FinishedAt = row.UpdatedAt
-	} else if out.Running {
-		row.Status = "running"
-	} else {
-		row.Status = "failed"
-		row.Error = fmt.Sprintf("backtest failed: status %.2f", out.Status)
-		row.FinishedAt = row.UpdatedAt
-	}
-	return s.doc.Update(ctx, row)
 }
 
 func payload(cfg Config) map[string]any {
@@ -205,6 +527,38 @@ func payload(cfg Config) map[string]any {
 		"isTickMode":   cfg.IsTickMode,
 		"useNewPrice":  cfg.UseNewPrice,
 		"interval":     cfg.Interval,
+	}
+}
+
+func invalid(msg string) error {
+	return &Invalid{Msg: msg}
+}
+
+func active(row Run) bool {
+	return row.Status == "pending" || row.Status == "running"
+}
+
+func clamp(value float64) float64 {
+	if math.IsNaN(value) {
+		return 0
+	}
+	if value < 0 {
+		return 0
+	}
+	if value > 100 || math.IsInf(value, 1) {
+		return 100
+	}
+	return value
+}
+
+func sleep(ctx context.Context, delay time.Duration) bool {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
 	}
 }
 

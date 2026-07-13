@@ -47,6 +47,7 @@ export function StageView() {
           cur={stage.cur}
           flow={stage.flowchart}
           id={stage.active}
+          busy={stage.testing}
           onRun={() => void stage.backtest()}
           onSave={stage.saveFlowchart}
         />
@@ -61,7 +62,9 @@ export function StageView() {
           onTab={stage.setTab}
         />
       ) : null}
-      {stage.stage === "backtest" ? <Backtest cur={stage.cur} onRun={() => void stage.backtest()} /> : null}
+      {stage.stage === "backtest" ? (
+        <Backtest cur={stage.cur} busy={stage.testing} onRun={() => void stage.backtest()} />
+      ) : null}
       {stage.stage === "timeline" ? <TimelineStage cur={stage.cur} active={stage.active} /> : null}
       <Composer
         busy={chat.busy}

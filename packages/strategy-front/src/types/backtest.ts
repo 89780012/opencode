@@ -33,6 +33,8 @@ export type BacktestRun = {
   dataFiles: Record<string, unknown>
   logPath: string
   error: string
+  requestKey: string
+  revision: number
   startedAt: number
   finishedAt: number
   updatedAt: number
@@ -48,5 +50,19 @@ export type BacktestRunInput = {
   workspacePath: string
   sessionId: string
   pluginId: string
+  requestKey: string
   config?: BacktestConfig
+}
+
+export type BacktestUpdate = {
+  id: string
+  workspacePath: string
+  sessionId: string
+  status: BacktestRun["status"]
+  statusCode: number
+  progress: number
+  error: string
+  revision: number
+  updatedAt: number
+  hasResult: boolean
 }

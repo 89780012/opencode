@@ -55,3 +55,55 @@ func TestWorkspaceReviewsKeepHistory(t *testing.T) {
 		t.Fatalf("count = %d, want 2", count)
 	}
 }
+
+func TestBacktestMigrationAddsIdempotencyColumnsAndIndex(t *testing.T) {
+	doc, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer doc.Close()
+	ctx := context.Background()
+	_, err = doc.ExecContext(ctx, `create table backtest_runs (
+		id text primary key,
+		workspace_path text not null,
+		session_id text not null,
+		plugin_id text not null,
+		status text not null
+	)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := migrate(ctx, doc); err != nil {
+		t.Fatal(err)
+	}
+	if err := migrate(ctx, doc); err != nil {
+		t.Fatalf("second migration failed: %v", err)
+	}
+	for _, name := range []string{"request_key", "revision"} {
+		var count int
+		if err := doc.QueryRowContext(ctx, `select count(*) from pragma_table_info('backtest_runs') where name = ?`, name).Scan(&count); err != nil {
+			t.Fatal(err)
+		}
+		if count != 1 {
+			t.Fatalf("column %s count = %d", name, count)
+		}
+	}
+	_, err = doc.ExecContext(ctx, `insert into backtest_runs(id, workspace_path, session_id, plugin_id, status, request_key) values
+		('one', 'workspace', 'session', 'plugin', 'done', ''),
+		('two', 'workspace', 'session', 'plugin', 'done', '')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = doc.ExecContext(ctx, `insert into backtest_runs(id, workspace_path, session_id, plugin_id, status, request_key) values ('three', 'workspace', 'session', 'plugin', 'done', 'key')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = doc.ExecContext(ctx, `insert into backtest_runs(id, workspace_path, session_id, plugin_id, status, request_key) values ('four', 'workspace', 'session', 'plugin', 'done', 'key')`)
+	if err == nil {
+		t.Fatal("duplicate scoped request key was accepted")
+	}
+	_, err = doc.ExecContext(ctx, `insert into backtest_runs(id, workspace_path, session_id, plugin_id, status, request_key) values ('five', 'workspace', 'other', 'plugin', 'done', 'key')`)
+	if err != nil {
+		t.Fatalf("request key in another session failed: %v", err)
+	}
+}

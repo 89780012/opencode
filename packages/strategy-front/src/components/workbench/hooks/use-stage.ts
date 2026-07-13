@@ -48,6 +48,7 @@ export function useStage() {
     active: app.active,
     cur: app.cur,
     flowchart: app.flow,
+    testing: app.testing,
     file,
     tab,
     setTab,

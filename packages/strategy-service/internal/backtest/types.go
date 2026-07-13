@@ -26,6 +26,7 @@ type RunReq struct {
 	WorkspacePath string  `json:"workspacePath"`
 	SessionID     string  `json:"sessionId"`
 	PluginID      string  `json:"pluginId"`
+	RequestKey    string  `json:"requestKey"`
 	Config        *Config `json:"config,omitempty"`
 }
 
@@ -44,10 +45,12 @@ type Run struct {
 	WorkspacePath string          `json:"workspacePath"`
 	SessionID     string          `json:"sessionId"`
 	PluginID      string          `json:"pluginId"`
+	RequestKey    string          `json:"requestKey"`
 	BtID          string          `json:"btId"`
 	Status        string          `json:"status"`
 	StatusCode    float64         `json:"statusCode"`
 	Progress      float64         `json:"progress"`
+	Revision      int64           `json:"revision"`
 	Config        Config          `json:"config"`
 	Result        json.RawMessage `json:"result"`
 	Summary       json.RawMessage `json:"summary"`
@@ -57,6 +60,19 @@ type Run struct {
 	StartedAt     int64           `json:"startedAt"`
 	FinishedAt    int64           `json:"finishedAt"`
 	UpdatedAt     int64           `json:"updatedAt"`
+}
+
+type Update struct {
+	ID            string  `json:"id"`
+	WorkspacePath string  `json:"workspacePath"`
+	SessionID     string  `json:"sessionId"`
+	Status        string  `json:"status"`
+	StatusCode    float64 `json:"statusCode"`
+	Progress      float64 `json:"progress"`
+	Error         string  `json:"error"`
+	Revision      int64   `json:"revision"`
+	UpdatedAt     int64   `json:"updatedAt"`
+	HasResult     bool    `json:"hasResult"`
 }
 
 type List struct {

@@ -10,10 +10,21 @@ import (
 	"strategy-service/internal/db"
 )
 
-type Store struct{}
+const columns = `id, workspace_path, session_id, plugin_id, request_key, bt_id, status, status_code, progress, revision, config_json, result_json, summary_json, data_files_json, log_path, error, started_at, finished_at, updated_at`
+
+type Store struct {
+	open func() (*sql.DB, error)
+}
+
+func (s *Store) db() (*sql.DB, error) {
+	if s.open != nil {
+		return s.open()
+	}
+	return db.Open()
+}
 
 func (s *Store) Load(ctx context.Context) (Config, error) {
-	doc, err := db.Open()
+	doc, err := s.db()
 	if err != nil {
 		return Default(), err
 	}
@@ -36,7 +47,7 @@ func (s *Store) Load(ctx context.Context) (Config, error) {
 }
 
 func (s *Store) Save(ctx context.Context, cfg Config) (Config, error) {
-	doc, err := db.Open()
+	doc, err := s.db()
 	if err != nil {
 		return Default(), err
 	}
@@ -50,25 +61,50 @@ on conflict(id) do update set start_time = excluded.start_time, end_time = exclu
 	return cfg, nil
 }
 
-func (s *Store) Insert(ctx context.Context, row Run) (Run, error) {
-	doc, err := db.Open()
+func (s *Store) Create(ctx context.Context, row Run) (Run, bool, error) {
+	doc, err := s.db()
 	if err != nil {
-		return Run{}, err
+		return Run{}, false, err
 	}
+	tx, err := doc.BeginTx(ctx, nil)
+	if err != nil {
+		return Run{}, false, err
+	}
+	defer tx.Rollback()
+
+	old, err := scan(tx.QueryRowContext(ctx, `select `+columns+` from backtest_runs where workspace_path = ? and session_id = ? and request_key = ?`, row.WorkspacePath, row.SessionID, row.RequestKey))
+	if err == nil {
+		return old, true, nil
+	}
+	if !errors.Is(err, db.ErrNotFound) {
+		return Run{}, false, err
+	}
+
+	old, err = scan(tx.QueryRowContext(ctx, `select `+columns+` from backtest_runs where status in ('pending', 'running') and ((workspace_path = ? and session_id = ?) or plugin_id = ?) order by updated_at desc limit 1`, row.WorkspacePath, row.SessionID, row.PluginID))
+	if err == nil {
+		return Run{}, false, &Conflict{Run: old}
+	}
+	if !errors.Is(err, db.ErrNotFound) {
+		return Run{}, false, err
+	}
+
 	cfg, err := json.Marshal(row.Config)
 	if err != nil {
-		return Run{}, err
+		return Run{}, false, err
 	}
-	result := safe(row.Result)
-	summary := safe(row.Summary)
-	files := safe(row.DataFiles)
-	_, err = doc.ExecContext(ctx, `insert into backtest_runs(id, workspace_path, session_id, plugin_id, bt_id, status, status_code, progress, config_json, result_json, summary_json, data_files_json, log_path, error, started_at, finished_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		row.ID, row.WorkspacePath, row.SessionID, row.PluginID, row.BtID, row.Status, row.StatusCode, row.Progress, string(cfg), string(result), string(summary), string(files), row.LogPath, row.Error, row.StartedAt, row.FinishedAt, row.UpdatedAt)
-	return row, err
+	_, err = tx.ExecContext(ctx, `insert into backtest_runs(id, workspace_path, session_id, plugin_id, request_key, bt_id, status, status_code, progress, revision, config_json, result_json, summary_json, data_files_json, log_path, error, started_at, finished_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		row.ID, row.WorkspacePath, row.SessionID, row.PluginID, row.RequestKey, row.BtID, row.Status, row.StatusCode, row.Progress, row.Revision, string(cfg), string(safe(row.Result)), string(safe(row.Summary)), string(safe(row.DataFiles)), row.LogPath, row.Error, row.StartedAt, row.FinishedAt, row.UpdatedAt)
+	if err != nil {
+		return Run{}, false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return Run{}, false, err
+	}
+	return row, false, nil
 }
 
 func (s *Store) Update(ctx context.Context, row Run) (Run, error) {
-	doc, err := db.Open()
+	doc, err := s.db()
 	if err != nil {
 		return Run{}, err
 	}
@@ -76,8 +112,8 @@ func (s *Store) Update(ctx context.Context, row Run) (Run, error) {
 	if err != nil {
 		return Run{}, err
 	}
-	res, err := doc.ExecContext(ctx, `update backtest_runs set plugin_id = ?, bt_id = ?, status = ?, status_code = ?, progress = ?, config_json = ?, result_json = ?, summary_json = ?, data_files_json = ?, log_path = ?, error = ?, finished_at = ?, updated_at = ? where id = ?`,
-		row.PluginID, row.BtID, row.Status, row.StatusCode, row.Progress, string(cfg), string(safe(row.Result)), string(safe(row.Summary)), string(safe(row.DataFiles)), row.LogPath, row.Error, row.FinishedAt, row.UpdatedAt, row.ID)
+	res, err := doc.ExecContext(ctx, `update backtest_runs set plugin_id = ?, bt_id = ?, status = ?, status_code = ?, progress = ?, revision = ?, config_json = ?, result_json = ?, summary_json = ?, data_files_json = ?, log_path = ?, error = ?, finished_at = ?, updated_at = ? where id = ?`,
+		row.PluginID, row.BtID, row.Status, row.StatusCode, row.Progress, row.Revision, string(cfg), string(safe(row.Result)), string(safe(row.Summary)), string(safe(row.DataFiles)), row.LogPath, row.Error, row.FinishedAt, row.UpdatedAt, row.ID)
 	if err != nil {
 		return Run{}, err
 	}
@@ -92,15 +128,44 @@ func (s *Store) Update(ctx context.Context, row Run) (Run, error) {
 }
 
 func (s *Store) Get(ctx context.Context, id string) (Run, error) {
-	doc, err := db.Open()
+	doc, err := s.db()
 	if err != nil {
 		return Run{}, err
 	}
-	return scan(doc.QueryRowContext(ctx, `select id, workspace_path, session_id, plugin_id, bt_id, status, status_code, progress, config_json, result_json, summary_json, data_files_json, log_path, error, started_at, finished_at, updated_at from backtest_runs where id = ?`, id))
+	return scan(doc.QueryRowContext(ctx, `select `+columns+` from backtest_runs where id = ?`, id))
+}
+
+func (s *Store) Find(ctx context.Context, workspace string, session string, key string) (Run, error) {
+	doc, err := s.db()
+	if err != nil {
+		return Run{}, err
+	}
+	return scan(doc.QueryRowContext(ctx, `select `+columns+` from backtest_runs where workspace_path = ? and session_id = ? and request_key = ?`, workspace, session, key))
+}
+
+func (s *Store) Active(ctx context.Context) ([]Run, error) {
+	doc, err := s.db()
+	if err != nil {
+		return nil, err
+	}
+	rows, err := doc.QueryContext(ctx, `select `+columns+` from backtest_runs where status in ('pending', 'running') order by updated_at`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Run{}
+	for rows.Next() {
+		row, err := scan(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, row)
+	}
+	return out, rows.Err()
 }
 
 func (s *Store) List(ctx context.Context, req ListReq) (List, error) {
-	doc, err := db.Open()
+	doc, err := s.db()
 	if err != nil {
 		return List{}, err
 	}
@@ -113,9 +178,9 @@ func (s *Store) List(ctx context.Context, req ListReq) (List, error) {
 	}
 	var rows *sql.Rows
 	if req.SessionID == "" {
-		rows, err = doc.QueryContext(ctx, `select id, workspace_path, session_id, plugin_id, bt_id, status, status_code, progress, config_json, result_json, summary_json, data_files_json, log_path, error, started_at, finished_at, updated_at from backtest_runs where workspace_path = ? order by updated_at desc limit ?`, req.WorkspacePath, limit)
+		rows, err = doc.QueryContext(ctx, `select `+columns+` from backtest_runs where workspace_path = ? order by updated_at desc limit ?`, req.WorkspacePath, limit)
 	} else {
-		rows, err = doc.QueryContext(ctx, `select id, workspace_path, session_id, plugin_id, bt_id, status, status_code, progress, config_json, result_json, summary_json, data_files_json, log_path, error, started_at, finished_at, updated_at from backtest_runs where workspace_path = ? and session_id = ? order by updated_at desc limit ?`, req.WorkspacePath, req.SessionID, limit)
+		rows, err = doc.QueryContext(ctx, `select `+columns+` from backtest_runs where workspace_path = ? and session_id = ? order by updated_at desc limit ?`, req.WorkspacePath, req.SessionID, limit)
 	}
 	if err != nil {
 		return List{}, err
@@ -140,7 +205,7 @@ func scan(row interface {
 	var result string
 	var summary string
 	var files string
-	err := row.Scan(&out.ID, &out.WorkspacePath, &out.SessionID, &out.PluginID, &out.BtID, &out.Status, &out.StatusCode, &out.Progress, &cfg, &result, &summary, &files, &out.LogPath, &out.Error, &out.StartedAt, &out.FinishedAt, &out.UpdatedAt)
+	err := row.Scan(&out.ID, &out.WorkspacePath, &out.SessionID, &out.PluginID, &out.RequestKey, &out.BtID, &out.Status, &out.StatusCode, &out.Progress, &out.Revision, &cfg, &result, &summary, &files, &out.LogPath, &out.Error, &out.StartedAt, &out.FinishedAt, &out.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Run{}, db.ErrNotFound
 	}

@@ -5,7 +5,7 @@ export type Stage = "session" | "flowchart" | "code" | "backtest" | "timeline"
 export type SidebarTab = "requirements" | "sessions"
 export type ReviewStatus = "idle" | "running" | "passed" | "failed"
 export type FlowStatus = "idle" | "generating" | "done"
-export type BacktestStatus = "idle" | "running" | "done"
+export type BacktestStatus = "idle" | BacktestRun["status"]
 export type StepStatus = "pending" | "running" | "done" | "error"
 export type EventType = "requirement" | "code" | "git" | "review" | "flowchart" | "backtest"
 
@@ -55,6 +55,7 @@ export interface SessionItem {
   flowchartStatus: FlowStatus
   flowchartCode: string
   backtestStatus: BacktestStatus
+  backtestRun: BacktestRun | null
   backtestResults: BacktestRun | null
   backtestHistory: BacktestRun[]
   timelineEvents: TimelineEvent[]

@@ -74,7 +74,44 @@ func initdb(db *sql.DB) error {
 			return err
 		}
 	}
-	return nil
+	return migrate(ctx, db)
+}
+
+func migrate(ctx context.Context, db *sql.DB) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	for _, col := range []struct {
+		name string
+		sql  string
+	}{
+		{name: "request_key", sql: "alter table backtest_runs add column request_key text not null default ''"},
+		{name: "revision", sql: "alter table backtest_runs add column revision integer not null default 0"},
+	} {
+		var count int
+		if err := tx.QueryRowContext(ctx, `select count(*) from pragma_table_info('backtest_runs') where name = ?`, col.name).Scan(&count); err != nil {
+			return err
+		}
+		if count == 0 {
+			if _, err := tx.ExecContext(ctx, col.sql); err != nil {
+				return err
+			}
+		}
+	}
+
+	for _, stmt := range []string{
+		`create unique index if not exists idx_backtest_runs_session_request_key on backtest_runs(workspace_path, session_id, request_key) where request_key <> ''`,
+		`create index if not exists idx_backtest_runs_active_session on backtest_runs(workspace_path, session_id) where status in ('pending', 'running')`,
+		`create index if not exists idx_backtest_runs_active_plugin on backtest_runs(plugin_id) where status in ('pending', 'running')`,
+	} {
+		if _, err := tx.ExecContext(ctx, stmt); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func root() (string, error) {
@@ -224,10 +261,12 @@ var schema = []string{
 	workspace_path text not null,
 	session_id text not null default '',
 	plugin_id text not null,
+	request_key text not null default '',
 	bt_id text not null default '',
 	status text not null,
 	status_code real not null default 0,
 	progress real not null default 0,
+	revision integer not null default 0,
 	config_json text not null,
 	result_json text not null default '{}',
 	summary_json text not null default '{}',

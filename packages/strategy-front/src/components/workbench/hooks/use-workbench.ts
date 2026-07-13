@@ -1,8 +1,10 @@
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { backtestApi, modelChainApi } from "@/api/modules"
+import { ApiError } from "@/api/errors"
+import { activeBacktest, backtestKey, isBacktestRun } from "@/lib/backtest"
 import { toast } from "sonner"
 import { selectWorkbench, selectWorkbenchBacktests, selectWorkbenchProgress, useAppDispatch, useAppSelector } from "@/store"
-import { setActive, setBacktestActive, setStage, upsertBacktest } from "@/store/workbench-slice"
+import { addBacktest, setActive, setBacktestActive, setStage } from "@/store/workbench-slice"
 import { code, createTimeline, type FlowStatus, type ReviewStatus, type SessionItem, type StepStatus, type TimelineEvent } from "../data"
 import { useWorkbenchProgressSync } from "./use-workbench-progress"
 import type { BacktestConfig } from "@/types/backtest"
@@ -46,6 +48,7 @@ function empty(): SessionItem {
     flowchartStatus: "idle",
     flowchartCode: "",
     backtestStatus: "idle",
+    backtestRun: null,
     backtestResults: null,
     backtestHistory: [],
     timelineEvents: [],
@@ -87,6 +90,7 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
   const [view, setView] = useState<"current" | "history">("current")
   const [reviewing, setReviewing] = useState(false)
   const [testing, setTesting] = useState(false)
+  const gate = useRef(false)
   const flow = state.flowchart?.workspacePath === state.sessionPath ? state.flowchart : null
   const rows = useMemo(
     () => (state.reviewPath === state.sessionPath ? state.reviews : []).slice().sort((a, b) => b.updatedAt - a.updatedAt),
@@ -122,6 +126,7 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
         suggestions: [item.summary, ...item.suggestions].filter((tip) => tip),
       }))
     const back = runs.find((item) => item.id === state.backtestActive) ?? runs[0] ?? null
+    const active = activeBacktest(runs)
     return {
       ...empty(),
       id: session.id,
@@ -137,7 +142,8 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
       flowchartStatus:
         flow?.state === "generating" ? "generating" : flow?.state === "done" && flow.code ? "done" : ("idle" as FlowStatus),
       flowchartCode: flow?.state === "done" ? flow.code : "",
-      backtestStatus: back?.status === "pending" || back?.status === "running" ? "running" : back ? "done" : "idle",
+      backtestStatus: back?.status ?? "idle",
+      backtestRun: active,
       backtestResults: back,
       backtestHistory: runs,
       timelineEvents: prog.length > 0 ? prog.map(map) : createTimeline(session.title),
@@ -180,24 +186,33 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
 
   const backtest = async (cfg?: BacktestConfig) => {
     dispatch(setStage("backtest"))
-    if (testing) return
+    if (cur.backtestRun || gate.current) return
     if (!state.sessionPath || !state.active) {
       toast.error("请先创建或选择一个会话")
       return
     }
+    gate.current = true
     setTesting(true)
     try {
       const run = await backtestApi.run({
         workspacePath: state.sessionPath,
         sessionId: state.active,
         pluginId: plugin(state.sessionPath),
+        requestKey: backtestKey(),
         config: cfg,
       })
-      dispatch(upsertBacktest({ workspacePath: state.sessionPath, run }))
+      dispatch(addBacktest({ workspacePath: state.sessionPath, run }))
       toast.success("回测已开始")
     } catch (err) {
+      const run = err instanceof ApiError && err.code === 409 ? err.payload?.data : undefined
+      if (isBacktestRun(run) && run.workspacePath === state.sessionPath && run.sessionId === state.active) {
+        dispatch(addBacktest({ workspacePath: state.sessionPath, run }))
+        toast.info("已有回测正在运行")
+        return
+      }
       toast.error(err instanceof Error ? err.message : "启动回测失败")
     } finally {
+      gate.current = false
       setTesting(false)
     }
   }

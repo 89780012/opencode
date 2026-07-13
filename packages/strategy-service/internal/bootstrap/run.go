@@ -59,5 +59,8 @@ func Run() int {
 	}
 
 	slog.Error("strategy-service exited with error", "error", err)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	_ = srv.Shutdown(ctx)
 	return 1
 }

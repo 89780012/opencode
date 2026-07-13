@@ -1,4 +1,4 @@
-import { Code2, Maximize2, Minus, Play, Plus, Save, Workflow } from "lucide-react"
+import { Code2, LoaderCircle, Maximize2, Minus, Play, Plus, Save, Workflow } from "lucide-react"
 import { useEffect, useRef, useState, type PointerEvent, type WheelEvent } from "react"
 import type { WorkbenchFlowchart } from "@/store/workbench-slice"
 import type { SessionItem } from "../../data"
@@ -14,6 +14,7 @@ export function Flow(props: {
   cur: SessionItem
   flow: WorkbenchFlowchart | null
   id: string
+  busy: boolean
   onRun: () => void
   onSave: (code: string) => Promise<void>
 }) {
@@ -28,6 +29,7 @@ export function Flow(props: {
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState("")
   const dirty = draft !== props.cur.flowchartCode
+  const run = props.cur.backtestRun
 
   useEffect(() => {
     setDraft(props.cur.flowchartCode)
@@ -157,9 +159,15 @@ export function Flow(props: {
               <span>{saving ? "保存中" : dirty ? "保存" : "已保存"}</span>
             </button>
           )}
-          <button type="button" className={`${ui.blockbtn} ${css.actionbtn}`} onClick={props.onRun}>
-            <Play size={14} />
-            <span>运行回测</span>
+          <button type="button" className={`${ui.blockbtn} ${css.actionbtn}`} disabled={props.busy} onClick={props.onRun}>
+            {run || props.busy ? <LoaderCircle size={14} className={ui.spin} /> : <Play size={14} />}
+            <span>
+              {props.busy || run?.status === "pending"
+                ? "查看回测 · 启动中"
+                : run
+                  ? `查看回测 ${Math.round(run.progress)}%`
+                  : "运行回测"}
+            </span>
           </button>
         </div>
       </div>

@@ -62,6 +62,14 @@ func bad(c *gin.Context, err error) {
 	fail(c, http.StatusBadRequest, err.Error(), nil)
 }
 
+func backFail(c *gin.Context, code int, msg string, data any) {
+	c.JSON(http.StatusOK, envelope{
+		Code: code,
+		Msg:  msg,
+		Data: data,
+	})
+}
+
 // NewAPI 组装 API 所需的各类底层服务。
 func NewAPI(run *rt.Service, op *oc.Service, cfg *cfg.Store, sx *smartx.Service, question *question.Service, summary *summary.Service, chain *modelchain.Service, smartURL string) *API {
 	if chain == nil {
@@ -84,6 +92,10 @@ func NewAPI(run *rt.Service, op *oc.Service, cfg *cfg.Store, sx *smartx.Service,
 		_ = ctx
 		api.event.emitBroadcast(kind, payload)
 	})
+	api.back.SetEvent(func(ctx context.Context, kind string, payload json.RawMessage) {
+		_ = ctx
+		api.event.emitBroadcast(kind, payload)
+	})
 	api.socketHandlers = map[string]socketHandlerFunc{
 		"analysis.get":    api.handleAnalysisGet,
 		"flowchart.get":   api.handleFlowchartGet,
@@ -101,6 +113,14 @@ func NewAPI(run *rt.Service, op *oc.Service, cfg *cfg.Store, sx *smartx.Service,
 	}
 	api.event.handle = api.socket
 	return api
+}
+
+func (a *API) Start() error {
+	return a.back.Start()
+}
+
+func (a *API) Close(ctx context.Context) error {
+	return a.back.Close(ctx)
 }
 
 // Register 将所有 HTTP 路由挂载到 gin 引擎上。

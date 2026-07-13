@@ -9,7 +9,7 @@ export const backtestApi = {
     return request.put<BacktestConfig, BacktestConfig>("/backtest/config", cfg)
   },
   run(input: BacktestRunInput) {
-    return request.post<BacktestRun, BacktestRunInput>("/backtest/run", input, { timeout: 45000 })
+    return request.post<BacktestRun, BacktestRunInput>("/backtest/run", input)
   },
   runs(workspacePath: string, sessionId?: string, limit = 20) {
     const query = new URLSearchParams({ workspacePath, limit: `${limit}` })

@@ -28,6 +28,7 @@ type Service struct {
 	cfg Config
 	srv *http.Server
 	op  *oc.Service
+	api *web.API
 }
 
 // New 根据配置创建完整的 HTTP 服务。
@@ -81,6 +82,11 @@ func New(cfg Config) (*Service, error) {
 		WindowId: cfg.WindowId,
 		LogDir:   cfg.LogDir,
 	}), question.NewService(), summary.NewService(op, chain), chain, cfg.SmartURL)
+	if err := api.Start(); err != nil {
+		_ = api.Close(context.Background())
+		_ = db.Close()
+		return nil, err
+	}
 
 	gin.SetMode(gin.ReleaseMode)
 	mux := gin.New()
@@ -102,6 +108,7 @@ func New(cfg Config) (*Service, error) {
 		cfg: cfg,
 		srv: srv,
 		op:  op,
+		api: api,
 	}, nil
 }
 
@@ -166,13 +173,22 @@ func (s *Service) ListenAndServe() error {
 // Shutdown 优雅关闭 HTTP 服务和托管的 opencode 进程。
 func (s *Service) Shutdown(ctx context.Context) error {
 	slog.Info("shutting down service")
+	halt := s.api.Close(ctx)
+	if halt != nil {
+		slog.Error("backtest service shutdown error", "error", halt)
+	}
 	err := s.srv.Shutdown(ctx)
 	if err != nil {
 		slog.Error("http server shutdown error", "error", err)
 	}
+	if err == nil {
+		err = halt
+	}
 	_, _ = s.op.Stop(context.Background())
-	if closeErr := db.Close(); closeErr != nil && err == nil {
-		err = closeErr
+	if halt == nil && err == nil {
+		if next := db.Close(); next != nil && err == nil {
+			err = next
+		}
 	}
 	slog.Info("service shutdown complete")
 	return err
