@@ -38,3 +38,36 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 2: 回测实时进度与需求变更重审
+
+**Date**: 2026-07-13
+**Task**: 回测实时进度与需求变更重审
+**Branch**: `2026070703`
+
+### Summary
+
+完成服务端回测任务管理、WebSocket 实时进度、幂等与时序修复；优化回测空态和进度面板；增加需求保存后的会话级重审提示及版本化竞态保护。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `32aeb3688` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
