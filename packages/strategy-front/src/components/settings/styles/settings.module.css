@@ -846,6 +846,12 @@
   box-shadow: 0 0 0 3px rgba(191, 219, 254, 0.56);
 }
 
+.btfield select:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
 .btchecks {
   margin-top: 0.72rem;
   margin-left: -1rem;
@@ -868,6 +874,11 @@
   height: 0.9rem;
   margin: 0 0.35rem 0 0;
   vertical-align: -0.12rem;
+}
+
+.btchecks input:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
 }
 
 @media (max-width: 920px) {

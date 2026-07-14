@@ -103,8 +103,14 @@ function Detail(props: { run: BacktestRun }) {
         <strong>{props.run.config.cash}</strong>
       </div>
       <div>
-        <span>K线周期</span>
-        <strong>{props.run.config.interval === "1m" ? "分钟线" : "日线"}</strong>
+        <span>行情模式</span>
+        <strong>
+          {props.run.config.isTickMode ? "快照行情" : props.run.config.interval === "1m" ? "分钟线" : "日线"}
+        </strong>
+      </div>
+      <div>
+        <span>现价成交</span>
+        <strong>{props.run.config.isTickMode ? (props.run.config.useNewPrice ? "是" : "否") : "--"}</strong>
       </div>
       <div className={css.wide}>
         <span>日志路径</span>

@@ -28,7 +28,7 @@ func (a *API) backtestConfigPut(c *gin.Context) {
 	}
 	cfg, err := a.back.Save(c.Request.Context(), body)
 	if err != nil {
-		backFail(c, http.StatusInternalServerError, "failed to save backtest config", nil)
+		backError(c, err)
 		return
 	}
 	ok(c, cfg)

@@ -20,6 +20,8 @@ import (
 	"strategy-service/internal/smartx"
 )
 
+const layout = "2006-01-02 15:04"
+
 type Client interface {
 	Backtest(context.Context, smartx.BacktestInput) (smartx.BacktestResult, error)
 	BacktestProgress(context.Context, smartx.ProgressInput) (smartx.ProgressResult, error)
@@ -164,7 +166,10 @@ func (s *Service) Close(ctx context.Context) error {
 }
 
 func Default() Config {
+	now := time.Now()
 	return Config{
+		StartTime:    now.AddDate(-1, 0, 0).Format(layout),
+		EndTime:      now.Format(layout),
 		Cash:         10000000,
 		ShStockSx:    1.5,
 		ShStockMinSx: 5,
@@ -192,10 +197,18 @@ func Clean(cfg Config) Config {
 	out.Rf = zero(cfg.Rf)
 	out.Slippage = zero(cfg.Slippage)
 	out.IsTickMode = cfg.IsTickMode
-	out.UseNewPrice = cfg.UseNewPrice
+	out.UseNewPrice = cfg.IsTickMode && cfg.UseNewPrice
 	out.CloseLog = cfg.CloseLog
-	if cfg.Interval == "1m" {
-		out.Interval = "1m"
+	bar := strings.TrimSpace(cfg.Interval)
+	if cfg.IsTickMode {
+		out.Interval = ""
+		if bar != "" && bar != "1d" && bar != "1m" {
+			out.Interval = bar
+		}
+		return out
+	}
+	if bar != "" && bar != "1d" {
+		out.Interval = bar
 	}
 	return out
 }
@@ -242,17 +255,42 @@ func Merge(cfg Config, patch ConfigPatch) Config {
 	}
 	if patch.IsTickMode != nil {
 		cfg.IsTickMode = *patch.IsTickMode
+		if cfg.IsTickMode {
+			cfg.Interval = ""
+		} else {
+			cfg.UseNewPrice = false
+			if strings.TrimSpace(cfg.Interval) == "" {
+				cfg.Interval = "1d"
+			}
+		}
 	}
 	if patch.UseNewPrice != nil {
 		cfg.UseNewPrice = *patch.UseNewPrice
 	}
 	if patch.Interval != nil {
-		cfg.Interval = *patch.Interval
+		cfg.Interval = strings.TrimSpace(*patch.Interval)
+		if cfg.Interval != "" {
+			cfg.IsTickMode = false
+			cfg.UseNewPrice = false
+		}
 	}
 	if patch.CloseLog != nil {
 		cfg.CloseLog = *patch.CloseLog
 	}
 	return cfg
+}
+
+func compatible(patch ConfigPatch) error {
+	tick := patch.IsTickMode != nil && *patch.IsTickMode
+	bar := patch.Interval != nil && strings.TrimSpace(*patch.Interval) != ""
+	price := patch.UseNewPrice != nil && *patch.UseNewPrice
+	if tick && bar {
+		return issue("invalid_config", "isTickMode and interval cannot be selected together")
+	}
+	if price && (bar || patch.IsTickMode != nil && !*patch.IsTickMode) {
+		return issue("invalid_config", "useNewPrice requires tick mode")
+	}
+	return nil
 }
 
 func (s *Service) Config(ctx context.Context) (Config, error) {
@@ -275,6 +313,10 @@ func (s *Service) ConfigFor(ctx context.Context, workspace string, session strin
 }
 
 func (s *Service) Save(ctx context.Context, cfg Config) (Config, error) {
+	cfg = Clean(cfg)
+	if err := check(cfg); err != nil {
+		return Config{}, err
+	}
 	return s.doc.Save(ctx, cfg)
 }
 
@@ -419,15 +461,14 @@ func (s *Service) run(ctx context.Context, req RunReq, patch *ConfigPatch) (Run,
 
 	cfg := Default()
 	if patch != nil {
+		if err := compatible(*patch); err != nil {
+			return Run{}, "", err
+		}
 		cfg, err = s.doc.Load(ctx)
 		if err != nil {
 			return Run{}, "", err
 		}
 		cfg = Merge(cfg, *patch)
-		if err := check(cfg); err != nil {
-			return Run{}, "", err
-		}
-		cfg = Clean(cfg)
 	} else if req.Config == nil {
 		cfg, err = s.doc.Load(ctx)
 		if err != nil {
@@ -436,12 +477,10 @@ func (s *Service) run(ctx context.Context, req RunReq, patch *ConfigPatch) (Run,
 	} else {
 		cfg = Clean(*req.Config)
 	}
-	if cfg.StartTime == "" {
-		return Run{}, "", invalid("startTime is required")
+	if err := check(cfg); err != nil {
+		return Run{}, "", err
 	}
-	if cfg.EndTime == "" {
-		return Run{}, "", invalid("endTime is required")
-	}
+	cfg = Clean(cfg)
 	now := time.Now().UnixMilli()
 	row = Run{
 		ID:            next(),
@@ -682,6 +721,11 @@ func (s *Service) emit(row Run) {
 }
 
 func payload(cfg Config) map[string]any {
+	bar := cfg.Interval
+	// 保持 SmartX 旧版入参结构，由 isTickMode 决定是否使用快照行情。
+	if bar == "" {
+		bar = "1d"
+	}
 	return map[string]any{
 		"startTime":    cfg.StartTime,
 		"endTime":      cfg.EndTime,
@@ -698,7 +742,7 @@ func payload(cfg Config) map[string]any {
 		"slippage":     cfg.Slippage,
 		"isTickMode":   cfg.IsTickMode,
 		"useNewPrice":  cfg.UseNewPrice,
-		"interval":     cfg.Interval,
+		"interval":     bar,
 		"closeLog":     cfg.CloseLog,
 	}
 }
@@ -813,6 +857,15 @@ func check(cfg Config) error {
 		if math.IsNaN(item.value) || math.IsInf(item.value, 0) || item.value < 0 {
 			return issue("invalid_config", item.name+" must be zero or greater")
 		}
+	}
+	if cfg.IsTickMode {
+		if strings.TrimSpace(cfg.Interval) != "" {
+			return issue("invalid_config", "interval must be empty in tick mode")
+		}
+		return nil
+	}
+	if cfg.UseNewPrice {
+		return issue("invalid_config", "useNewPrice requires tick mode")
 	}
 	if cfg.Interval != "1d" && cfg.Interval != "1m" {
 		return issue("invalid_config", "interval must be 1d or 1m")

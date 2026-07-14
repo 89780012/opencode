@@ -39,6 +39,77 @@ type broken struct {
 	id string
 }
 
+func TestDefaultUsesPreviousYear(t *testing.T) {
+	cfg := Default()
+	start, ok := stamp(cfg.StartTime)
+	if !ok {
+		t.Fatalf("startTime = %q", cfg.StartTime)
+	}
+	end, ok := stamp(cfg.EndTime)
+	if !ok {
+		t.Fatalf("endTime = %q", cfg.EndTime)
+	}
+	if !start.Equal(end.AddDate(-1, 0, 0)) {
+		t.Fatalf("window = %q to %q", cfg.StartTime, cfg.EndTime)
+	}
+}
+
+func TestConfigModesAreExclusive(t *testing.T) {
+	legacy := Default()
+	legacy.IsTickMode = true
+	legacy.UseNewPrice = true
+	legacy.Interval = "1d"
+	legacy = Clean(legacy)
+	if legacy.Interval != "" || !legacy.UseNewPrice {
+		t.Fatalf("legacy tick config = %#v", legacy)
+	}
+
+	yes := true
+	tick := Merge(Default(), ConfigPatch{IsTickMode: &yes, UseNewPrice: &yes})
+	if tick.Interval != "" || !tick.IsTickMode || !tick.UseNewPrice {
+		t.Fatalf("tick config = %#v", tick)
+	}
+	if payload(tick)["interval"] != "1d" {
+		t.Fatalf("tick payload = %#v", payload(tick))
+	}
+
+	bar := "1m"
+	next := Merge(tick, ConfigPatch{Interval: &bar})
+	if next.Interval != "1m" || next.IsTickMode || next.UseNewPrice {
+		t.Fatalf("bar config = %#v", next)
+	}
+
+	next = Default()
+	next.UseNewPrice = true
+	if err := check(next); err == nil {
+		t.Fatal("latest price without tick mode was accepted")
+	}
+
+	day := "1d"
+	if err := compatible(ConfigPatch{IsTickMode: &yes, Interval: &day}); err == nil {
+		t.Fatal("conflicting mode patch was accepted")
+	}
+}
+
+func TestStoreLoadRepairsIncompleteWindow(t *testing.T) {
+	_, store := memory(t)
+	cfg := Default()
+	cfg.StartTime = ""
+	cfg.EndTime = "2020-01-01"
+	if _, err := store.Save(context.Background(), cfg); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := store.Load(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	start, _ := stamp(cfg.StartTime)
+	end, _ := stamp(cfg.EndTime)
+	if !start.Equal(end.AddDate(-1, 0, 0)) {
+		t.Fatalf("repaired window = %q to %q", cfg.StartTime, cfg.EndTime)
+	}
+}
+
 func (b *broken) Update(ctx context.Context, row Run) (Run, error) {
 	if row.ID == b.id {
 		return Run{}, errors.New("update failed")

@@ -74,11 +74,11 @@ func backtestProps() map[string]any {
 		"rf":           prop("number", "Risk-free rate."),
 		"slippage":     prop("number", "Slippage percentage."),
 		"isTickMode":   prop("boolean", "Whether to use tick snapshots."),
-		"useNewPrice":  prop("boolean", "Whether to trade at the latest price."),
+		"useNewPrice":  prop("boolean", "Whether to trade at the latest price. Available only in tick snapshot mode."),
 		"interval": map[string]any{
 			"type":        "string",
-			"description": "Bar interval.",
-			"enum":        []string{"1d", "1m"},
+			"description": "Bar interval. Empty when tick snapshots are selected.",
+			"enum":        []string{"", "1d", "1m"},
 		},
 		"closeLog": prop("boolean", "Whether SmartX backtest logging is disabled."),
 	}

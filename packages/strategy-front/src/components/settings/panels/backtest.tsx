@@ -3,24 +3,49 @@ import { backtestApi } from "@/api/modules"
 import type { BacktestConfig } from "@/types/backtest"
 import css from "../styles/settings.module.css"
 
-const init: BacktestConfig = {
-  startTime: "",
-  endTime: "",
-  cash: 10000000,
-  shStockSx: 1.5,
-  shStockMinSx: 5,
-  szStockSx: 1.5,
-  szStockMinSx: 5,
-  shStockGh: 0,
-  szStockGh: 0,
-  buyYh: 0,
-  sellYh: 5,
-  rf: 0.025,
-  slippage: 0,
-  isTickMode: false,
-  useNewPrice: false,
-  interval: "1d",
-  closeLog: false,
+function pad(value: number) {
+  return `${value}`.padStart(2, "0")
+}
+
+function format(value: Date) {
+  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())} ${pad(value.getHours())}:${pad(value.getMinutes())}`
+}
+
+function defaults(): BacktestConfig {
+  const end = new Date()
+  const start = new Date(end)
+  start.setFullYear(start.getFullYear() - 1)
+  return {
+    startTime: format(start),
+    endTime: format(end),
+    cash: 10000000,
+    shStockSx: 1.5,
+    shStockMinSx: 5,
+    szStockSx: 1.5,
+    szStockMinSx: 5,
+    shStockGh: 0,
+    szStockGh: 0,
+    buyYh: 0,
+    sellYh: 5,
+    rf: 0.025,
+    slippage: 0,
+    isTickMode: false,
+    useNewPrice: false,
+    interval: "1d",
+    closeLog: false,
+  }
+}
+
+function clean(cfg: BacktestConfig): BacktestConfig {
+  const base = defaults()
+  const empty = !cfg.startTime || !cfg.endTime
+  return {
+    ...cfg,
+    startTime: empty ? base.startTime : cfg.startTime,
+    endTime: empty ? base.endTime : cfg.endTime,
+    interval: cfg.isTickMode ? "" : cfg.interval || "1d",
+    useNewPrice: cfg.isTickMode && cfg.useNewPrice,
+  }
 }
 
 const nums = [
@@ -40,7 +65,14 @@ const nums = [
 type Num = (typeof nums)[number][0]
 
 function time(value: string) {
-  return value.replace(" ", "T")
+  const raw = value.trim()
+  if (/([zZ]|[+-]\d{2}:\d{2})$/.test(raw)) {
+    const date = new Date(raw)
+    if (!Number.isNaN(date.getTime())) return format(date).replace(" ", "T")
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return `${raw}T00:00`
+  const match = raw.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/)
+  return match ? `${match[1]}T${match[2]}` : ""
 }
 
 function stamp(value: string) {
@@ -48,7 +80,7 @@ function stamp(value: string) {
 }
 
 export function BacktestPanel() {
-  const [cfg, setCfg] = useState(init)
+  const [cfg, setCfg] = useState(defaults)
   const [load, setLoad] = useState(true)
   const [busy, setBusy] = useState(false)
   const [tip, setTip] = useState({ kind: "", text: "" })
@@ -56,7 +88,7 @@ export function BacktestPanel() {
   useEffect(() => {
     let live = true
     void backtestApi.config().then((data) => {
-      if (live) setCfg(data)
+      if (live) setCfg(clean(data))
     }).catch((err) => {
       if (live) setTip({ kind: "error", text: err instanceof Error ? err.message : "读取回测配置失败" })
     }).finally(() => {
@@ -82,7 +114,7 @@ export function BacktestPanel() {
     setTip({ kind: "info", text: "正在保存配置..." })
     try {
       const next = await backtestApi.saveConfig(cfg)
-      setCfg(next)
+      setCfg(clean(next))
       setTip({ kind: "success", text: "回测配置已保存" })
     } catch (err) {
       setTip({ kind: "error", text: err instanceof Error ? err.message : "保存回测配置失败" })
@@ -99,7 +131,12 @@ export function BacktestPanel() {
           <p>配置 Smart CLI 回测默认入参。工作台侧栏回测配置入口会打开此页面。</p>
         </div>
         <div className={css.actions}>
-          <button type="button" className={css.primary} onClick={() => void save()} disabled={load || busy}>
+          <button
+            type="button"
+            className={css.primary}
+            onClick={() => void save()}
+            disabled={load || busy}
+          >
             {busy ? "保存中..." : "保存配置"}
           </button>
         </div>
@@ -146,8 +183,19 @@ export function BacktestPanel() {
             <select
               id="settings-backtest-interval"
               value={cfg.interval}
-              onChange={(event) => setCfg((item) => ({ ...item, interval: event.target.value === "1m" ? "1m" : "1d" }))}
+              disabled={cfg.isTickMode}
+              onChange={(event) =>
+                setCfg((item) => ({
+                  ...item,
+                  interval: event.target.value === "1m" ? "1m" : event.target.value === "1d" ? "1d" : "",
+                  isTickMode: false,
+                  useNewPrice: false,
+                }))
+              }
             >
+              <option value="" disabled>
+                不适用
+              </option>
               <option value="1d">日线</option>
               <option value="1m">分钟线</option>
             </select>
@@ -156,16 +204,34 @@ export function BacktestPanel() {
         <div className={css.btchecks}>
           <label>
             <input
-              type="checkbox"
-              checked={cfg.isTickMode}
-              onChange={(event) => setCfg((item) => ({ ...item, isTickMode: event.target.checked }))}
+              type="radio"
+              name="settings-backtest-mode"
+              checked={!cfg.isTickMode}
+              onChange={() =>
+                setCfg((item) => ({
+                  ...item,
+                  isTickMode: false,
+                  interval: item.interval || "1d",
+                  useNewPrice: false,
+                }))
+              }
             />
-            使用快照行情
+            K线行情
+          </label>
+          <label>
+            <input
+              type="radio"
+              name="settings-backtest-mode"
+              checked={cfg.isTickMode}
+              onChange={() => setCfg((item) => ({ ...item, isTickMode: true, interval: "" }))}
+            />
+            快照行情
           </label>
           <label>
             <input
               type="checkbox"
-              checked={cfg.useNewPrice}
+              checked={cfg.isTickMode && cfg.useNewPrice}
+              disabled={!cfg.isTickMode}
               onChange={(event) => setCfg((item) => ({ ...item, useNewPrice: event.target.checked }))}
             />
             现价成交

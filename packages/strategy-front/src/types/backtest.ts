@@ -12,9 +12,9 @@ export type BacktestConfig = {
   sellYh: number //卖出印花费
   rf: number //无风险利率
   slippage: number //滑点
-  isTickMode: boolean //快照行情多选框
-  useNewPrice: boolean //现价成交多选框
-  interval: "1d" | "1m" //K线周期
+  isTickMode: boolean //是否使用快照行情
+  useNewPrice: boolean //是否使用现价成交
+  interval: "" | "1d" | "1m" //K线周期，快照模式下为空
   closeLog: boolean //是否关闭日志
 }
 

@@ -43,7 +43,13 @@ func (s *Store) Load(ctx context.Context) (Config, error) {
 	cfg.IsTickMode = tick != 0
 	cfg.UseNewPrice = price != 0
 	cfg.CloseLog = log != 0
-	return Clean(cfg), nil
+	cfg = Clean(cfg)
+	base := Default()
+	if cfg.StartTime == "" || cfg.EndTime == "" {
+		cfg.StartTime = base.StartTime
+		cfg.EndTime = base.EndTime
+	}
+	return cfg, nil
 }
 
 func (s *Store) Save(ctx context.Context, cfg Config) (Config, error) {
