@@ -1,0 +1,6 @@
+{"file":".trellis/spec/monorepo.md","reason":"约束跨包边界、包级命令和生成产物"}
+{"file":".trellis/spec/strategy-workbench.md","reason":"约束回测异步生命周期、HTTP/Socket/revision 和会话隔离"}
+{"file":".trellis/spec/testing-quality.md","reason":"约束三个包的测试、typecheck 和构建门禁"}
+{"file":".trellis/tasks/07-13-ai-backtest/prd.md","reason":"提供已确认需求和验收标准"}
+{"file":".trellis/tasks/07-13-ai-backtest/design.md","reason":"提供 MCP、workflow 和前端集成设计"}
+{"file":".trellis/tasks/07-13-ai-backtest/implement.md","reason":"提供实施顺序、验证命令和回滚点"}

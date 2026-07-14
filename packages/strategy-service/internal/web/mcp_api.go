@@ -59,7 +59,7 @@ func (a *API) mcpPost(c *gin.Context) {
 				"name":    "strategy-service",
 				"version": "dev",
 			},
-			"instructions": "Use start/logs for SmartX runtime work, use init_project_state/resume_project_state/save_project_state to maintain workspace memory, get_requirements for workspace requirements, refresh_workspace to request fresh workspace analysis plus flowchart, and save_analysis/save_flowchart/save_review to persist workspace analysis results. Progress events are recorded automatically for these operations.",
+			"instructions": "Use start/logs for SmartX runtime work, use init_project_state/resume_project_state/save_project_state to maintain workspace memory, get_requirements for workspace requirements, refresh_workspace to request fresh workspace analysis plus flowchart, and save_analysis/save_flowchart/save_review to persist workspace analysis results. Use run_backtest only when the user explicitly requests execution; it returns immediately, while list_backtests/get_backtest read persisted status and results. Progress events are recorded automatically for these operations.",
 		})
 	case "notifications/initialized":
 		c.Status(202)
@@ -67,7 +67,7 @@ func (a *API) mcpPost(c *gin.Context) {
 		mcpResult(c, req.ID, map[string]any{})
 	case "tools/list":
 		mcpResult(c, req.ID, map[string]any{
-			"tools": []map[string]any{
+			"tools": append([]map[string]any{
 				{
 					"name":        "start",
 					"description": "Start a SmartX strategy extension through strategy-service.",
@@ -288,7 +288,7 @@ func (a *API) mcpPost(c *gin.Context) {
 						"worktreePath":  prop("string", "Worktree path. Defaults to workspacePath."),
 					}, []string{"workspacePath"}),
 				},
-			},
+			}, backtestTools()...),
 		})
 	case "tools/call":
 		call := req.Params
@@ -334,6 +334,8 @@ func (a *API) mcpPost(c *gin.Context) {
 				"logs":    out.Logs,
 			}
 			mcpToolResult(c, req.ID, jsonText(body), body, false)
+		case "run_backtest", "list_backtests", "get_backtest", "get_backtest_config":
+			a.mcpBacktest(c, req.ID, name, args)
 		case "init_project_state":
 			mcpWorkbench(c.Request.Context(), req.ID, c, func(ctx context.Context) (any, error) {
 				return a.bench.InitProjectState(ctx, workbench.ProjectStateInitReq{

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { action, activeBacktest, backtestKey } from "../src/lib/backtest"
+import { backtestTool, isBacktestToolResult, parseBacktestToolResult, partition, results } from "../src/lib/backtest-tool"
 import {
   addBacktest,
   setBacktestActive,
@@ -10,6 +11,7 @@ import {
   workbenchReducer,
 } from "../src/store/workbench-slice"
 import type { BacktestRun } from "../src/types/backtest"
+import type { ChatToolPart } from "../src/types/chat"
 
 function run(value: Partial<BacktestRun> = {}): BacktestRun {
   return {
@@ -59,6 +61,41 @@ function scope() {
     workbenchReducer(undefined, { type: "test.init" }),
     setBacktestScope({ workspacePath: "workspace-a", sessionId: "session-a" }),
   )
+}
+
+function result() {
+  return {
+    version: 1,
+    accepted: true,
+    reason: "created",
+    run: {
+      id: "run-1",
+      workspacePath: "workspace-a",
+      sessionId: "session-a",
+      status: "pending",
+      progress: 0,
+      revision: 0,
+    },
+  } as const
+}
+
+function tool(output: string, metadata: Record<string, unknown> = {}, name = "smartx_run_backtest"): ChatToolPart {
+  return {
+    id: "part-1",
+    sessionID: "session-a",
+    messageID: "message-1",
+    type: "tool",
+    callID: "call-1",
+    tool: name,
+    state: {
+      status: "completed",
+      input: {},
+      output,
+      title: "",
+      metadata,
+      time: { start: 1000, end: 1001 },
+    },
+  }
 }
 
 describe("workbench backtests", () => {
@@ -158,6 +195,25 @@ describe("workbench backtests", () => {
     expect(next.backtests[0].summary).toEqual({ total_return: "12.4%" })
   })
 
+  test("does not replace a selected history report when AI detail is reconciled", () => {
+    const history = run({ id: "history", status: "done", progress: 100, revision: 2 })
+    const loaded = workbenchReducer(
+      scope(),
+      setBacktests({ workspacePath: "workspace-a", sessionId: "session-a", runs: [run(), history] }),
+    )
+    const selected = workbenchReducer(loaded, setBacktestActive("history"))
+    const next = workbenchReducer(
+      selected,
+      upsertBacktest({
+        workspacePath: "workspace-a",
+        run: run({ status: "done", progress: 100, revision: 3 }),
+      }),
+    )
+
+    expect(next.backtestActive).toBe("history")
+    expect(next.backtests.find((item) => item.id === "run-1")?.status).toBe("done")
+  })
+
   test("keeps newer socket state when the launch response arrives late", () => {
     (["running", "failed"] as const).forEach((status) => {
       const current = run({ status, error: status === "failed" ? "SmartX unavailable" : "", revision: 1 })
@@ -197,5 +253,74 @@ describe("workbench backtests", () => {
       "回测 42%",
     )
     expect(action(null, null, true)).toBe("提交中")
+  })
+})
+
+describe("AI backtest tool result", () => {
+  test("parses the strict v1 text and structured content forms", () => {
+    const data = result()
+
+    expect(parseBacktestToolResult(JSON.stringify(data))).toEqual(data)
+    expect(parseBacktestToolResult({ structuredContent: data })).toEqual(data)
+    expect(parseBacktestToolResult({ content: [{ type: "text", text: JSON.stringify(data) }] })).toEqual(data)
+    expect(isBacktestToolResult({ structuredContent: data })).toBeFalse()
+    expect(backtestTool(tool(JSON.stringify(data)))).toEqual(data)
+    expect(backtestTool(tool("", { structuredContent: data }))).toEqual(data)
+  })
+
+  test("recognizes only the prefixed completed run tool", () => {
+    const data = JSON.stringify(result())
+    const running: ChatToolPart = {
+      id: "part-2",
+      sessionID: "session-a",
+      messageID: "message-1",
+      type: "tool",
+      callID: "call-2",
+      tool: "smartx_run_backtest",
+      state: { status: "running", input: {}, metadata: { output: data }, time: { start: 1000 } },
+    }
+
+    expect(backtestTool(tool(data, {}, "run_backtest"))).toBeNull()
+    expect(backtestTool(running)).toBeNull()
+  })
+
+  test("keeps completed backtest cards outside the folded execution process", () => {
+    const card = tool(JSON.stringify(result()))
+    const other = tool("{}", {}, "smartx_get_backtest")
+    const parts = partition([card, other])
+
+    expect(parts.cards.map((part) => part.id)).toEqual([card.id])
+    expect(parts.rest.map((part) => part.id)).toEqual([other.id])
+  })
+
+  test("deduplicates repeated tool calls by scoped run", () => {
+    const first = tool(JSON.stringify(result()))
+    const second = { ...first, id: "part-2", callID: "call-2" }
+
+    expect(results([first, second])).toHaveLength(1)
+  })
+
+  test("rejects malformed and unsupported v1 payloads", () => {
+    const data = result()
+    const bad = [
+      { ...data, version: 2 },
+      { ...data, accepted: "true" },
+      { ...data, reason: "created-again" },
+      { ...data, run: { ...data.run, id: "" } },
+      { ...data, run: { ...data.run, workspacePath: "" } },
+      { ...data, run: { ...data.run, sessionId: "" } },
+      { ...data, run: { ...data.run, status: "queued" } },
+      { ...data, run: { ...data.run, progress: 101 } },
+      { ...data, run: { ...data.run, revision: 0.5 } },
+    ]
+
+    bad.forEach((value) => expect(isBacktestToolResult(value)).toBeFalse())
+    expect(parseBacktestToolResult("not-json")).toBeNull()
+    expect(parseBacktestToolResult({ version: 1, accepted: false, reason: "busy" })).toEqual({
+      version: 1,
+      accepted: false,
+      reason: "busy",
+    })
+    expect(backtestTool(tool('{"version":1,"accepted":false,"reason":"busy"}'))).toBeNull()
   })
 })

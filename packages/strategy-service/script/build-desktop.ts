@@ -22,6 +22,7 @@ import fs from "fs/promises"
 import path from "path"
 import { fileURLToPath } from "url"
 import { front } from "./front"
+import { workflow } from "./workflow"
 
 const self = fileURLToPath(import.meta.url)
 const dir = path.dirname(self)
@@ -38,6 +39,7 @@ const pass = args.filter((x) => x !== "--skip-front" && x !== "--clean")
 const mod = "github.com/wailsapp/wails/v2"
 
 // 步骤 1: 构建前端资源
+await workflow(root)
 await front(root, skip)
 
 console.log("building strategy-service desktop")

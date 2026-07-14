@@ -20,6 +20,16 @@ export function gate(state: View, toolKind: Kind) {
       ? "SmartX workflow requires restoring project memory through resume_project_state before sustained work."
       : "SmartX workflow requires initializing project memory through init_project_state before sustained work."
   }
+  if (toolKind === "backtest") {
+    if (state.life === "ready" || state.life === "dirty") return ""
+    if (state.life === "refreshing") {
+      return "SmartX workflow requires completing the workspace baseline refresh before running a backtest."
+    }
+    if (state.life === "finalizing") {
+      return "SmartX workflow cannot run a backtest while generating the final workspace snapshot."
+    }
+    return "SmartX workflow requires completing the initial workspace baseline before running a backtest."
+  }
   if (state.pendingSave?.kind === "review") return state.life === "ready" || state.life === "dirty" ? "" : ""
   // idle 状态：等待基线初始化
   if (state.life === "idle") {

@@ -16,6 +16,7 @@ type Dep = {
   reviewRequests?: Set<string>
   finalRequests?: Set<string>
   childSessions?: Set<string>
+  parent?: (id: string) => Promise<boolean>
   service?: string
   load?: (workspace: string, worktree: string) => Promise<Analysis | undefined>
   loadChart?: (workspace: string, worktree: string) => Promise<Chart | undefined>
@@ -65,6 +66,13 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
     reviewRequests,
     finalRequests,
     childSessions,
+    parent:
+      dep.parent ??
+      (async (id) => {
+        const result = await ctx.client.session.get({ path: { id } })
+        if (!result.data) throw new Error("session not found")
+        return !!result.data.parentID
+      }),
     workspace,
     worktree,
     id,

@@ -1,6 +1,7 @@
 ﻿import { describe, expect, test } from "bun:test"
 import { build } from "../src/hooks.js"
 import { loadRemote } from "../src/remote.js"
+import { backtest, kind } from "../src/tool.js"
 import {
   analyze,
   doneAnalysis,
@@ -29,6 +30,9 @@ function stub(rows: Row[]) {
         rows.push(input.body)
         return true
       },
+    },
+    session: {
+      get: async () => ({ data: { parentID: undefined } }),
     },
   } as never
 }
@@ -78,6 +82,23 @@ describe("smartx workspace analysis", () => {
     expect(wantsReview("review conclusion: passed")).toBe(false)
     expect(wantsReview("review result: failed")).toBe(false)
     expect(wantsReview("please write code")).toBe(false)
+  })
+
+  test("classifies prefixed backtest tools", () => {
+    expect(backtest({ tool: "smartx_run_backtest" })).toBe(true)
+    expect(backtest({ tool: "strategy_list_backtests" })).toBe(true)
+    expect(backtest({ tool: "smartx_get_backtest" })).toBe(true)
+    expect(backtest({ tool: "smartx_get_backtest_config" })).toBe(true)
+    expect(backtest({ tool: "smartx_get_requirements" })).toBe(false)
+    expect(kind({ tool: "smartx_run_backtest" })).toBe("backtest")
+    expect(kind({ tool: "smartx_list_backtests" })).toBe("read")
+    expect(kind({ tool: "smartx_get_backtest" })).toBe("read")
+    expect(kind({ tool: "smartx_get_backtest_config" })).toBe("read")
+    expect(backtest({ tool: "run_backtest" })).toBe(true)
+    expect(kind({ tool: "run_backtest" })).toBe("backtest")
+    expect(kind({ tool: "list_backtests" })).toBe("read")
+    expect(kind({ tool: "get_backtest" })).toBe("read")
+    expect(kind({ tool: "get_backtest_config" })).toBe("read")
   })
 
   test("tracks workspace analysis states", () => {
@@ -398,6 +419,113 @@ describe("smartx workspace analysis", () => {
         { args: { filePath: "f:/repo/a.ts" } },
       ),
     ).resolves.toBeUndefined()
+  })
+
+  test("binds trusted context to backtest tools without dirtying the workspace", async () => {
+    const id = workspace()
+    const memory = restored()
+    const dirty = new Map()
+    const workspaces = new Map<string, Analysis>([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]])
+    const charts = new Map<string, Chart>([
+      [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() }],
+    ])
+    const hooks = build(ctx("f:/repo"), {
+      memory,
+      projects: projects(),
+      dirtyStates: dirty,
+      workspaces,
+      charts,
+    })
+    const output = {
+      args: {
+        workspacePath: "f:/forged",
+        sessionId: "forged",
+        requestKey: "forged",
+        pluginId: "forged",
+        config: { cash: 100000 },
+      },
+    }
+
+    await hooks["tool.execute.before"]?.(
+      { sessionID: "s1", tool: "smartx_run_backtest", callID: "call-1" },
+      output,
+    )
+
+    expect(output.args).toEqual({
+      workspacePath: "f:/repo",
+      sessionId: "s1",
+      requestKey: "ai:call-1",
+      config: { cash: 100000 },
+    })
+
+    await hooks["tool.execute.after"]?.(
+      { sessionID: "s1", tool: "smartx_run_backtest", callID: "call-1", args: output.args },
+      { title: "", output: "{}", metadata: {} },
+    )
+
+    expect(dirty.has(id)).toBe(false)
+    expect(memory.get(id)?.needsSave).toBe(false)
+  })
+
+  test("binds read-only backtest tools and removes forged execution fields", async () => {
+    const hooks = setup(ctx("f:/repo"))
+
+    await Promise.all(
+      [
+        { tool: "smartx_list_backtests", args: { limit: 3 } },
+        { tool: "smartx_get_backtest", args: { id: "bt_1" } },
+        { tool: "smartx_get_backtest_config", args: {} },
+      ].map(async (item) => {
+        const output = {
+          args: {
+            workspacePath: "f:/forged",
+            sessionId: "forged",
+            requestKey: "forged",
+            pluginId: "forged",
+            ...item.args,
+          },
+        }
+        await hooks["tool.execute.before"]?.(
+          { sessionID: "s1", tool: item.tool, callID: "call-read" },
+          output,
+        )
+        expect(output.args).toEqual({ workspacePath: "f:/repo", sessionId: "s1", ...item.args })
+      }),
+    )
+  })
+
+  test("rejects backtest tools from child sessions", async () => {
+    const hooks = setup(ctx("f:/repo"))
+
+    await hooks.event?.({
+      event: {
+        type: "session.created",
+        properties: { info: { id: "s2", parentID: "s1" } },
+      } as never,
+    })
+
+    await Promise.all(
+      ["smartx_run_backtest", "smartx_list_backtests", "smartx_get_backtest", "smartx_get_backtest_config"].map(
+        (tool) =>
+          expect(
+            hooks["tool.execute.before"]?.(
+              { sessionID: "s2", tool, callID: "call-child" },
+              { args: { workspacePath: "f:/repo", sessionId: "s2" } },
+            ),
+          ).rejects.toThrow("main session"),
+      ),
+    )
+  })
+
+  test("rejects a restored child session without a created event", async () => {
+    const hooks = setup(ctx("f:/repo"), { parent: async (id) => id === "s2" })
+
+    await expect(
+      hooks["tool.execute.before"]?.(
+        { sessionID: "s2", tool: "smartx_run_backtest", callID: "call-restored-child" },
+        { args: {} },
+      ),
+    ).rejects.toThrow("main session")
   })
 
   test("refresh tool allows reads and blocks writes until refreshed baseline is rebuilt", async () => {

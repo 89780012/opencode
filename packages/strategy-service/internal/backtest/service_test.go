@@ -5,11 +5,14 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"strategy-service/internal/db"
 	"strategy-service/internal/smartx"
 
 	_ "modernc.org/sqlite"
@@ -28,6 +31,7 @@ type client struct {
 	starts int
 	polls  int
 	block  bool
+	input  smartx.BacktestInput
 }
 
 type broken struct {
@@ -42,9 +46,10 @@ func (b *broken) Update(ctx context.Context, row Run) (Run, error) {
 	return b.Store.Update(ctx, row)
 }
 
-func (c *client) Backtest(ctx context.Context, _ smartx.BacktestInput) (smartx.BacktestResult, error) {
+func (c *client) Backtest(ctx context.Context, input smartx.BacktestInput) (smartx.BacktestResult, error) {
 	c.mu.Lock()
 	c.starts++
+	c.input = input
 	block := c.block
 	row := c.start
 	err := c.err
@@ -54,6 +59,38 @@ func (c *client) Backtest(ctx context.Context, _ smartx.BacktestInput) (smartx.B
 		return smartx.BacktestResult{}, ctx.Err()
 	}
 	return row, err
+}
+
+func TestRunKeepsManualPluginAndForwardsCompleteConfig(t *testing.T) {
+	_, store := memory(t)
+	sx := &client{block: true}
+	svc := service(store, sx)
+	t.Cleanup(func() { shutdown(t, svc) })
+
+	req := request("manual-plugin")
+	req.PluginID = "custom-local"
+	req.Config.CloseLog = true
+	row, err := svc.Run(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if row.PluginID != "custom" {
+		t.Fatalf("pluginId = %q", row.PluginID)
+	}
+	end := time.Now().Add(time.Second)
+	for time.Now().Before(end) {
+		sx.mu.Lock()
+		input := sx.input
+		sx.mu.Unlock()
+		if input.PluginID != "" {
+			if input.PluginID != "custom" || input.Config["closeLog"] != true {
+				t.Fatalf("input = %#v", input)
+			}
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatal("backtest input was not captured")
 }
 
 func (c *client) BacktestProgress(ctx context.Context, _ smartx.ProgressInput) (smartx.ProgressResult, error) {
@@ -169,6 +206,164 @@ func TestRunDoesNotRestartIdempotentPendingWithoutRemoteID(t *testing.T) {
 	sx.mu.Unlock()
 	if starts != 0 {
 		t.Fatalf("starts = %d, want 0", starts)
+	}
+}
+
+func TestRunPatchMergesSavedConfigWithoutPersisting(t *testing.T) {
+	_, store := memory(t)
+	base := Default()
+	base.StartTime = "2026-01-01 09:30"
+	base.EndTime = "2026-02-01 15:00"
+	base.ShStockSx = 3
+	if _, err := store.Save(context.Background(), base); err != nil {
+		t.Fatal(err)
+	}
+	svc := service(store, &client{block: true})
+	t.Cleanup(func() { shutdown(t, svc) })
+
+	zero := float64(0)
+	yes := true
+	row, reason, err := svc.RunPatch(context.Background(), PatchReq{
+		WorkspacePath: "workspace",
+		SessionID:     "session",
+		RequestKey:    "ai:patch",
+		Config:        &ConfigPatch{ShStockSx: &zero, CloseLog: &yes},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reason != "created" || row.Status != "pending" {
+		t.Fatalf("run = %#v, reason = %q", row, reason)
+	}
+	if row.Config.ShStockSx != 0 || !row.Config.CloseLog || row.Config.Cash != base.Cash {
+		t.Fatalf("merged config = %#v", row.Config)
+	}
+	saved, err := store.Load(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.ShStockSx != base.ShStockSx || saved.CloseLog {
+		t.Fatalf("saved config changed = %#v", saved)
+	}
+	second, reason, err := svc.RunPatch(context.Background(), PatchReq{
+		WorkspacePath: "workspace",
+		SessionID:     "session",
+		RequestKey:    "ai:patch",
+	})
+	if err != nil || reason != "idempotent" || second.ID != row.ID {
+		t.Fatalf("idempotent run = %#v, reason = %q, err = %v", second, reason, err)
+	}
+}
+
+func TestRunRejectsMissingOrMismatchedSession(t *testing.T) {
+	_, store := memory(t)
+	svc := service(store, &client{})
+	t.Cleanup(func() { shutdown(t, svc) })
+
+	for _, req := range []RunReq{
+		{WorkspacePath: "workspace", SessionID: "missing", RequestKey: "missing", Config: request("x").Config},
+		{WorkspacePath: "other", SessionID: "session", RequestKey: "mismatch", Config: request("x").Config},
+	} {
+		if _, err := svc.Run(context.Background(), req); !errors.Is(err, db.ErrNotFound) {
+			t.Fatalf("Run(%#v) error = %v", req, err)
+		}
+	}
+}
+
+func TestDetailIsScopedAndOmitsLargeInternalFields(t *testing.T) {
+	_, store := memory(t)
+	now := time.Now().UnixMilli()
+	row := run("detail", "workspace", "session", "workspace", "detail", now)
+	row.Status = "done"
+	row.Progress = 100
+	row.Config = *request("x").Config
+	row.Result = json.RawMessage(`{"large":"result"}`)
+	row.Summary = json.RawMessage(`{"total_return":12}`)
+	row.DataFiles = json.RawMessage(`{"secret":"file"}`)
+	row.LogPath = `C:\\private\\backtest.log`
+	if _, _, err := store.Create(context.Background(), row); err != nil {
+		t.Fatal(err)
+	}
+	svc := service(store, &client{})
+	t.Cleanup(func() { shutdown(t, svc) })
+
+	detail, err := svc.Detail(context.Background(), ScopedReq{ID: row.ID, WorkspacePath: row.WorkspacePath, SessionID: row.SessionID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !detail.HasResult || string(detail.Summary) != string(row.Summary) {
+		t.Fatalf("detail = %#v", detail)
+	}
+	body, err := json.Marshal(detail)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, value := range []string{"large", "secret", "private", "requestKey", "pluginId", "btId"} {
+		if strings.Contains(string(body), value) {
+			t.Fatalf("detail leaked %q: %s", value, body)
+		}
+	}
+	if _, err := svc.Detail(context.Background(), ScopedReq{ID: row.ID, WorkspacePath: "other", SessionID: row.SessionID}); !errors.Is(err, db.ErrNotFound) {
+		t.Fatalf("cross-scope detail error = %v", err)
+	}
+}
+
+func TestDetailBoundsLargeSummaryAndConfigScope(t *testing.T) {
+	_, store := memory(t)
+	now := time.Now().UnixMilli()
+	row := run("large-summary", "workspace", "session", "workspace", "large-summary", now)
+	row.Status = "done"
+	row.Summary = json.RawMessage(`{"total_return":"12%","curve":"` + strings.Repeat("x", 32<<10) + `"}`)
+	if _, _, err := store.Create(context.Background(), row); err != nil {
+		t.Fatal(err)
+	}
+	svc := service(store, &client{})
+	t.Cleanup(func() { shutdown(t, svc) })
+
+	detail, err := svc.Detail(context.Background(), ScopedReq{ID: row.ID, WorkspacePath: row.WorkspacePath, SessionID: row.SessionID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(detail.Summary) > 16<<10 || !strings.Contains(string(detail.Summary), `"total_return":"12%"`) || !strings.Contains(string(detail.Summary), `"truncated":true`) {
+		t.Fatalf("bounded summary = %s", detail.Summary)
+	}
+	if _, err := svc.ConfigFor(context.Background(), "workspace", "session"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.ConfigFor(context.Background(), "other", "session"); !errors.Is(err, db.ErrNotFound) {
+		t.Fatalf("cross-scope config error = %v", err)
+	}
+}
+
+func TestBriefsCapsListAndOmitsHeavyFields(t *testing.T) {
+	_, store := memory(t)
+	now := time.Now().UnixMilli()
+	for idx := 0; idx < 25; idx++ {
+		row := run(fmt.Sprintf("brief-%02d", idx), "workspace", "session", "workspace", fmt.Sprintf("brief-%02d", idx), now+int64(idx))
+		row.Status = "done"
+		row.Result = json.RawMessage(`{"private":"result"}`)
+		row.DataFiles = json.RawMessage(`{"private":"file"}`)
+		row.LogPath = `C:\\private\\backtest.log`
+		if _, _, err := store.Create(context.Background(), row); err != nil {
+			t.Fatal(err)
+		}
+	}
+	svc := service(store, &client{})
+	t.Cleanup(func() { shutdown(t, svc) })
+
+	list, err := svc.Briefs(context.Background(), ListReq{WorkspacePath: "workspace", SessionID: "session", Limit: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list.Runs) != 20 {
+		t.Fatalf("brief count = %d", len(list.Runs))
+	}
+	body, err := json.Marshal(list)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(body), "private") {
+		t.Fatalf("brief list leaked heavy fields: %s", body)
 	}
 }
 
@@ -366,6 +561,41 @@ func service(store *Store, sx Client) *Service {
 func memory(t *testing.T) (*sql.DB, *Store) {
 	t.Helper()
 	doc, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = doc.Exec(`create table sessions (
+		id text primary key,
+		workspace_path text not null
+	)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = doc.Exec(`insert into sessions(id, workspace_path) values ('session', 'workspace')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = doc.Exec(`create table backtest_config (
+		id integer primary key,
+		start_time text not null,
+		end_time text not null,
+		cash real not null,
+		sh_stock_sx real not null,
+		sh_stock_min_sx real not null,
+		sz_stock_sx real not null,
+		sz_stock_min_sx real not null,
+		sh_stock_gh real not null,
+		sz_stock_gh real not null,
+		buy_yh real not null,
+		sell_yh real not null,
+		rf real not null,
+		slippage real not null,
+		is_tick_mode integer not null,
+		use_new_price integer not null,
+		interval text not null,
+		close_log integer not null,
+		updated_at integer not null
+	)`)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -122,3 +122,18 @@ bun run build
 ```text
 packages/smartx-workflow/dist/smartx-workflow.js
 ```
+
+strategy-service 的 CLI 与 desktop 发布脚本会先执行上述构建。`dist` 不提交到 Git，SmartX 发布器必须分发新产物，并同步本次版本中的 `smartx-helper` agent；服务内的 `EnsureBuiltins` 与自动启动 MCP 注入仍由 SmartX 管理。显式 `/system/opencode/start` 和 `/system/opencode/restart` 会在启动 OpenCode 前刷新 strategy-service MCP 配置。
+
+## AI 回测约束
+
+工作台主会话可以直接调用 strategy-service MCP 提供的以下回测工具，不增加额外审批：
+
+- `run_backtest`
+- `list_backtests`
+- `get_backtest`
+- `get_backtest_config`
+
+工具注册名可以带 MCP 前缀。workflow 会在执行前强制使用当前 workspace 和主会话 ID，忽略模型提供的作用域；`run_backtest` 的 `requestKey` 固定为 `ai:<tool-call-id>`，`pluginId` 交由服务端从 workspace 推导。子 agent 不允许调用这些工具。
+
+`run_backtest` 只在 project memory 已恢复且 baseline 处于 `ready` 或 `dirty` 时放行；初始化、刷新和最终快照阶段均会阻止启动。查询工具保持只读，不受 baseline 阶段限制。回测调用不会把 workspace 或 project memory 标记为 dirty。

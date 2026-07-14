@@ -16,8 +16,9 @@ export const backtestApi = {
     if (sessionId) query.set("sessionId", sessionId)
     return request.get<BacktestList>(`/backtest/runs?${query.toString()}`)
   },
-  detail(id: string) {
-    return request.get<BacktestRun>(`/backtest/runs/${encodeURIComponent(id)}`)
+  detail(id: string, workspacePath: string, sessionId: string) {
+    const query = new URLSearchParams({ workspacePath, sessionId })
+    return request.get<BacktestRun>(`/backtest/runs/${encodeURIComponent(id)}?${query.toString()}`)
   },
   refresh(id: string) {
     return request.post<BacktestRun>(`/backtest/runs/${encodeURIComponent(id)}/refresh`)

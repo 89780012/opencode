@@ -810,11 +810,153 @@
   line-height: 1.4;
 }
 
+.backtestTool {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border-left: 3px solid #9ca3af;
+  background: #f3f4f6;
+  padding: 0.62rem 0.7rem;
+}
+
+.backtestHead {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 1.75rem minmax(0, 1fr) auto;
+  align-items: center;
+  grid-column-gap: 0.48rem;
+  column-gap: 0.48rem;
+}
+
+.backtestIcon {
+  width: 1.75rem;
+  height: 1.75rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #4b5563;
+}
+
+.backtestCopy {
+  min-width: 0;
+  display: block;
+  line-height: 1.35;
+}
+
+.backtestCopy strong,
+.backtestCopy span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.backtestCopy strong {
+  color: #111827;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.backtestCopy span {
+  margin-top: 0.08rem;
+  color: #6b7280;
+  font-size: 0.68rem;
+}
+
+.backtestProgress {
+  color: #374151;
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+}
+
+.backtestBar {
+  height: 0.28rem;
+  overflow: hidden;
+  border-radius: 0.2rem;
+  margin: 0.58rem 0 0 2.23rem;
+  background: #d1d5db;
+}
+
+.backtestBar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #2563eb;
+  transition: width 0.2s ease;
+}
+
+.backtestError {
+  margin: 0.48rem 0 0 2.23rem;
+  color: #b91c1c;
+  font-size: 0.73rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.backtestAction {
+  min-height: 1.8rem;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #d1d5db;
+  border-radius: 0.38rem;
+  margin: 0.58rem 0 0 2.23rem;
+  background: #ffffff;
+  color: #1f2937;
+  padding: 0.28rem 0.52rem;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.backtestAction svg {
+  flex: none;
+  margin-right: 0.32rem;
+}
+
+.backtestAction:hover {
+  border-color: #9ca3af;
+  background: #f9fafb;
+}
+
+.backtest_pending,
+.backtest_running {
+  border-left-color: #2563eb;
+}
+
+.backtest_pending .backtestIcon,
+.backtest_running .backtestIcon {
+  color: #2563eb;
+}
+
+.backtest_done {
+  border-left-color: #059669;
+}
+
+.backtest_done .backtestIcon {
+  color: #059669;
+}
+
+.backtest_failed {
+  border-left-color: #dc2626;
+}
+
+.backtest_failed .backtestIcon {
+  color: #dc2626;
+}
+
 .process {
   display: grid;
   gap: 0.18rem;
   padding-bottom: 0.2rem;
   border-bottom: 1px dashed #e5e7eb;
+}
+
+.processBody {
+  display: grid;
+  gap: 0.18rem;
 }
 
 .process .fold {

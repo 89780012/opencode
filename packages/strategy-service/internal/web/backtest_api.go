@@ -3,6 +3,7 @@ package web
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"strategy-service/internal/backtest"
 	"strategy-service/internal/db"
@@ -41,10 +42,21 @@ func (a *API) backtestRun(c *gin.Context) {
 	}
 	row, err := a.back.Run(c.Request.Context(), body)
 	if err != nil {
-		backError(c, err)
+		backRunError(c, err, body)
 		return
 	}
 	ok(c, row)
+}
+
+func backRunError(c *gin.Context, err error, req backtest.RunReq) {
+	var conflict *backtest.Conflict
+	if errors.As(err, &conflict) &&
+		(conflict.Run.WorkspacePath != strings.TrimSpace(req.WorkspacePath) ||
+			conflict.Run.SessionID != strings.TrimSpace(req.SessionID)) {
+		backFail(c, http.StatusConflict, conflict.Error(), nil)
+		return
+	}
+	backError(c, err)
 }
 
 func (a *API) backtestRuns(c *gin.Context) {
@@ -62,7 +74,23 @@ func (a *API) backtestRuns(c *gin.Context) {
 }
 
 func (a *API) backtestRunGet(c *gin.Context) {
-	row, err := a.back.Get(c.Request.Context(), backtest.IDReq{ID: c.Param("id")})
+	workspace := c.Query("workspacePath")
+	session := c.Query("sessionId")
+	if (workspace == "") != (session == "") {
+		backFail(c, http.StatusBadRequest, "workspacePath and sessionId are required together", nil)
+		return
+	}
+	var row backtest.Run
+	var err error
+	if workspace != "" {
+		row, err = a.back.GetScoped(c.Request.Context(), backtest.ScopedReq{
+			ID:            c.Param("id"),
+			WorkspacePath: workspace,
+			SessionID:     session,
+		})
+	} else {
+		row, err = a.back.Get(c.Request.Context(), backtest.IDReq{ID: c.Param("id")})
+	}
 	if errors.Is(err, db.ErrNotFound) {
 		backFail(c, http.StatusNotFound, "backtest run not found", nil)
 		return
@@ -96,6 +124,10 @@ func backError(c *gin.Context, err error) {
 	var conflict *backtest.Conflict
 	if errors.As(err, &conflict) {
 		backFail(c, http.StatusConflict, conflict.Error(), conflict.Run)
+		return
+	}
+	if errors.Is(err, db.ErrNotFound) {
+		backFail(c, http.StatusNotFound, "backtest resource not found", nil)
 		return
 	}
 	backFail(c, http.StatusInternalServerError, "backtest request failed", nil)

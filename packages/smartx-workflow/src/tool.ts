@@ -3,6 +3,7 @@
 const analyzer = "workspace-analyzer"
 const chart = "strategy-flowchart-generator"
 const reviewer = "strategy-reviewer"
+const backtests = ["run_backtest", "list_backtests", "get_backtest", "get_backtest_config"]
 
 /** 统一把字符串调用包装成标准调用对象，减少后续分支判断。 */
 function item(input: Call | string): Call {
@@ -13,6 +14,11 @@ function item(input: Call | string): Call {
 /** 判断当前工具名是否命中了某个 MCP 工具，兼容带前缀的注册名。 */
 export function mcp(input: { tool: string }, name: string) {
   return input.tool === name || input.tool.endsWith("_" + name)
+}
+
+/** 判断当前调用是否属于策略回测 MCP 工具。 */
+export function backtest(input: { tool: string }) {
+  return backtests.some((name) => mcp(input, name))
 }
 /** 从 skill 调用里提取 skill 名称；非 skill 调用返回空字符串。 */
 export function skill(input: { tool: string; args?: unknown }) {
@@ -56,10 +62,14 @@ export type Kind =
   | "project_get"
   | "project_save"
   | "project_validate"
+  | "backtest"
   | "other"
 
 /** 把底层工具调用归类成工作流可理解的动作类型。 */
 export function kind(input: { tool: string; args?: unknown }) {
+  if (mcp(input, "run_backtest")) return "backtest" as const
+  if (mcp(input, "list_backtests") || mcp(input, "get_backtest") || mcp(input, "get_backtest_config"))
+    return "read" as const
   if (mcp(input, "init_project_state")) return "project_init" as const
   if (mcp(input, "resume_project_state")) return "project_resume" as const
   if (mcp(input, "get_project_state")) return "project_get" as const

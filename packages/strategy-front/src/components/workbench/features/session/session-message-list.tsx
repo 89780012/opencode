@@ -12,10 +12,12 @@ import {
 import { memo, useEffect, useMemo, useState, type ReactNode } from "react"
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation"
 import { Response } from "@/components/ai-elements/response"
+import { backtestTool, partition } from "@/lib/backtest-tool"
 import { selectSessionParts, useAppSelector } from "@/store"
 import type { ChatAssistantMessage, ChatMessageInfo, ChatPart, ChatStatus, ChatToolPart } from "@/types/chat"
 import common from "../../styles/session/session-common.module.css"
 import css from "../../styles/session/session-chat.module.css"
+import { SessionBacktestTool } from "./session-backtest-tool"
 
 const empty: ChatPart[] = []
 const ansi = /\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g
@@ -213,7 +215,7 @@ function Panel(props: { title: string; children: ReactNode }) {
   )
 }
 
-function Tool(props: { part: ChatToolPart }) {
+function DefaultTool(props: { part: ChatToolPart }) {
   const out = output(props.part)
   const body = payload(props.part)
   const title =
@@ -274,6 +276,13 @@ function Tool(props: { part: ChatToolPart }) {
       </div>
     </Fold>
   )
+}
+
+function Tool(props: { part: ChatToolPart }) {
+  const data = backtestTool(props.part)
+  const fallback = <DefaultTool part={props.part} />
+  if (!data) return fallback
+  return <SessionBacktestTool data={data} fallback={fallback} />
 }
 
 function CodeBlock(props: { lang: string; value: string }) {
@@ -385,15 +394,23 @@ function meta(parts: ChatPart[]) {
 function Process(props: { parts: ChatPart[]; onOpenDiff?: (file: string) => void }) {
   const parts = props.parts.filter(shown)
   if (parts.length === 0) return null
+  const { cards, rest } = partition(parts)
 
   return (
-    <Fold title="执行过程" meta={meta(props.parts)} state={proc(props.parts)}>
-      <div className={css.process}>
-        {parts.map((part) => (
-          <Part key={part.id} part={part} role="assistant" onOpenDiff={props.onOpenDiff} />
-        ))}
-      </div>
-    </Fold>
+    <div className={css.process}>
+      {cards.map((part) => (
+        <Tool key={part.id} part={part} />
+      ))}
+      {rest.length ? (
+        <Fold title="执行过程" meta={meta(rest)} state={proc(rest)}>
+          <div className={css.processBody}>
+            {rest.map((part) => (
+              <Part key={part.id} part={part} role="assistant" onOpenDiff={props.onOpenDiff} />
+            ))}
+          </div>
+        </Fold>
+      ) : null}
+    </div>
   )
 }
 

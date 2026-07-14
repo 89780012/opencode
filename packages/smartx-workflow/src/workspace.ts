@@ -26,7 +26,7 @@ import {
   limit,
 } from "./note.js"
 import { items, mermaid, reviewState, reviewText, serial } from "./parse.js"
-import { analyze, flowchart, kind, mcp, review } from "./tool.js"
+import { analyze, backtest, flowchart, kind, mcp, review } from "./tool.js"
 import type { Analysis, Chart, Dirt, Fix, Memory, Mode, Pending, Project, SaveReview } from "./types.js"
 import { flow, step } from "./workflow.js"
 
@@ -49,6 +49,7 @@ type Opt = {
   reviewRequests: Set<string>
   finalRequests: Set<string>
   childSessions: Set<string>
+  parent: (id: string) => Promise<boolean>
   workspace: string
   worktree: string
   id: string
@@ -433,6 +434,38 @@ export function createWorkspace(opt: Opt) {
     /** 工具执行前做硬门禁，并记录 analysis / review / chart 的启动状态。*/
     before: async (input: Parameters<Before>[0], output: Parameters<Before>[1]) => {
       if (!opt.workspace || !opt.id) return false
+      if (backtest(input)) {
+        const child =
+          opt.childSessions.has(input.sessionID) ||
+          (await opt.parent(input.sessionID).catch(async (err) => {
+            await opt.write("backtest session verification failed", {
+              sessionID: input.sessionID,
+              tool: input.tool,
+              error: String(err),
+            })
+            throw new Error("SmartX workflow could not verify the main session.")
+          }))
+        if (child) {
+          opt.childSessions.add(input.sessionID)
+          await opt.write("child session backtest blocked", {
+            sessionID: input.sessionID,
+            workspace: opt.workspace,
+            worktree: opt.worktree,
+            tool: input.tool,
+          })
+          throw new Error("SmartX backtest tools are only available in the main session.")
+        }
+        const args =
+          output.args && typeof output.args === "object" && !Array.isArray(output.args)
+            ? (output.args as Record<string, unknown>)
+            : {}
+        output.args = args
+        args.workspacePath = opt.workspace
+        args.sessionId = input.sessionID
+        delete args.pluginId
+        delete args.requestKey
+        if (mcp(input, "run_backtest")) args.requestKey = "ai:" + input.callID
+      }
       if (!opt.childSessions.has(input.sessionID)) {
         // 1. 先读取当前工作区快照，拿到 analysis / chart / project 的最新状态。
         const snap = await snapshot(opt)

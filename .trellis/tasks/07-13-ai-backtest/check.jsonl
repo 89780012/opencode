@@ -1,0 +1,4 @@
+{"file":".trellis/spec/strategy-workbench.md","reason":"复核会话隔离、幂等、revision 和异步回测契约"}
+{"file":".trellis/spec/testing-quality.md","reason":"执行跨包质量门禁"}
+{"file":".trellis/tasks/07-13-ai-backtest/prd.md","reason":"逐项核对验收标准"}
+{"file":".trellis/tasks/07-13-ai-backtest/design.md","reason":"复核身份绑定、MCP 输出和回滚边界"}

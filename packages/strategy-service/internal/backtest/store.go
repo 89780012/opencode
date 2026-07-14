@@ -135,6 +135,27 @@ func (s *Store) Get(ctx context.Context, id string) (Run, error) {
 	return scan(doc.QueryRowContext(ctx, `select `+columns+` from backtest_runs where id = ?`, id))
 }
 
+func (s *Store) GetScoped(ctx context.Context, req ScopedReq) (Run, error) {
+	doc, err := s.db()
+	if err != nil {
+		return Run{}, err
+	}
+	return scan(doc.QueryRowContext(ctx, `select `+columns+` from backtest_runs where id = ? and workspace_path = ? and session_id = ?`, req.ID, req.WorkspacePath, req.SessionID))
+}
+
+func (s *Store) Owns(ctx context.Context, workspace string, session string) error {
+	doc, err := s.db()
+	if err != nil {
+		return err
+	}
+	var id string
+	err = doc.QueryRowContext(ctx, `select id from sessions where id = ? and workspace_path = ?`, session, workspace).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return db.ErrNotFound
+	}
+	return err
+}
+
 func (s *Store) Find(ctx context.Context, workspace string, session string, key string) (Run, error) {
 	doc, err := s.db()
 	if err != nil {

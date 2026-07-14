@@ -1,6 +1,7 @@
 package backtest
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -10,6 +11,7 @@ import (
 	"log/slog"
 	"math"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -29,13 +31,16 @@ type repo interface {
 	Create(context.Context, Run) (Run, bool, error)
 	Update(context.Context, Run) (Run, error)
 	Get(context.Context, string) (Run, error)
+	GetScoped(context.Context, ScopedReq) (Run, error)
+	Owns(context.Context, string, string) error
 	Find(context.Context, string, string, string) (Run, error)
 	Active(context.Context) ([]Run, error)
 	List(context.Context, ListReq) (List, error)
 }
 
 type Invalid struct {
-	Msg string
+	Code string
+	Msg  string
 }
 
 func (e *Invalid) Error() string {
@@ -195,7 +200,77 @@ func Clean(cfg Config) Config {
 	return out
 }
 
+func Merge(cfg Config, patch ConfigPatch) Config {
+	if patch.StartTime != nil {
+		cfg.StartTime = *patch.StartTime
+	}
+	if patch.EndTime != nil {
+		cfg.EndTime = *patch.EndTime
+	}
+	if patch.Cash != nil {
+		cfg.Cash = *patch.Cash
+	}
+	if patch.ShStockSx != nil {
+		cfg.ShStockSx = *patch.ShStockSx
+	}
+	if patch.ShStockMinSx != nil {
+		cfg.ShStockMinSx = *patch.ShStockMinSx
+	}
+	if patch.SzStockSx != nil {
+		cfg.SzStockSx = *patch.SzStockSx
+	}
+	if patch.SzStockMinSx != nil {
+		cfg.SzStockMinSx = *patch.SzStockMinSx
+	}
+	if patch.ShStockGh != nil {
+		cfg.ShStockGh = *patch.ShStockGh
+	}
+	if patch.SzStockGh != nil {
+		cfg.SzStockGh = *patch.SzStockGh
+	}
+	if patch.BuyYh != nil {
+		cfg.BuyYh = *patch.BuyYh
+	}
+	if patch.SellYh != nil {
+		cfg.SellYh = *patch.SellYh
+	}
+	if patch.Rf != nil {
+		cfg.Rf = *patch.Rf
+	}
+	if patch.Slippage != nil {
+		cfg.Slippage = *patch.Slippage
+	}
+	if patch.IsTickMode != nil {
+		cfg.IsTickMode = *patch.IsTickMode
+	}
+	if patch.UseNewPrice != nil {
+		cfg.UseNewPrice = *patch.UseNewPrice
+	}
+	if patch.Interval != nil {
+		cfg.Interval = *patch.Interval
+	}
+	if patch.CloseLog != nil {
+		cfg.CloseLog = *patch.CloseLog
+	}
+	return cfg
+}
+
 func (s *Service) Config(ctx context.Context) (Config, error) {
+	return s.doc.Load(ctx)
+}
+
+func (s *Service) ConfigFor(ctx context.Context, workspace string, session string) (Config, error) {
+	workspace = strings.TrimSpace(workspace)
+	session = strings.TrimSpace(session)
+	if workspace == "" {
+		return Config{}, invalid("workspacePath is required")
+	}
+	if session == "" {
+		return Config{}, invalid("sessionId is required")
+	}
+	if err := s.doc.Owns(ctx, workspace, session); err != nil {
+		return Config{}, err
+	}
 	return s.doc.Load(ctx)
 }
 
@@ -212,6 +287,35 @@ func (s *Service) List(ctx context.Context, req ListReq) (List, error) {
 	return s.doc.List(ctx, req)
 }
 
+func (s *Service) Briefs(ctx context.Context, req ListReq) (BriefList, error) {
+	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
+	req.SessionID = strings.TrimSpace(req.SessionID)
+	if req.WorkspacePath == "" {
+		return BriefList{}, invalid("workspacePath is required")
+	}
+	if req.SessionID == "" {
+		return BriefList{}, invalid("sessionId is required")
+	}
+	if err := s.doc.Owns(ctx, req.WorkspacePath, req.SessionID); err != nil {
+		return BriefList{}, err
+	}
+	if req.Limit <= 0 {
+		req.Limit = 5
+	}
+	if req.Limit > 20 {
+		req.Limit = 20
+	}
+	rows, err := s.doc.List(ctx, req)
+	if err != nil {
+		return BriefList{}, err
+	}
+	out := BriefList{WorkspacePath: req.WorkspacePath, SessionID: req.SessionID, Runs: make([]Brief, 0, len(rows.Runs))}
+	for _, row := range rows.Runs {
+		out.Runs = append(out.Runs, row.Brief())
+	}
+	return out, nil
+}
+
 func (s *Service) Get(ctx context.Context, req IDReq) (Run, error) {
 	req.ID = strings.TrimSpace(req.ID)
 	if req.ID == "" {
@@ -220,31 +324,86 @@ func (s *Service) Get(ctx context.Context, req IDReq) (Run, error) {
 	return s.doc.Get(ctx, req.ID)
 }
 
-func (s *Service) Run(ctx context.Context, req RunReq) (Run, error) {
+func (s *Service) Detail(ctx context.Context, req ScopedReq) (Detail, error) {
+	row, err := s.GetScoped(ctx, req)
+	if err != nil {
+		return Detail{}, err
+	}
+	return row.Detail(), nil
+}
+
+func (s *Service) GetScoped(ctx context.Context, req ScopedReq) (Run, error) {
+	req.ID = strings.TrimSpace(req.ID)
 	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
 	req.SessionID = strings.TrimSpace(req.SessionID)
-	req.PluginID = strings.TrimSpace(req.PluginID)
-	req.RequestKey = strings.TrimSpace(req.RequestKey)
+	if req.ID == "" {
+		return Run{}, invalid("id is required")
+	}
 	if req.WorkspacePath == "" {
 		return Run{}, invalid("workspacePath is required")
 	}
 	if req.SessionID == "" {
 		return Run{}, invalid("sessionId is required")
 	}
+	if err := s.doc.Owns(ctx, req.WorkspacePath, req.SessionID); err != nil {
+		return Run{}, err
+	}
+	row, err := s.doc.GetScoped(ctx, req)
+	if err != nil {
+		return Run{}, err
+	}
+	return row, nil
+}
+
+func (s *Service) Run(ctx context.Context, req RunReq) (Run, error) {
+	row, _, err := s.run(ctx, req, nil)
+	return row, err
+}
+
+func (s *Service) RunPatch(ctx context.Context, req PatchReq) (Run, string, error) {
+	patch := req.Config
+	if patch == nil {
+		patch = &ConfigPatch{}
+	}
+	return s.run(ctx, RunReq{
+		WorkspacePath: req.WorkspacePath,
+		SessionID:     req.SessionID,
+		RequestKey:    req.RequestKey,
+	}, patch)
+}
+
+func (s *Service) run(ctx context.Context, req RunReq, patch *ConfigPatch) (Run, string, error) {
+	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
+	req.SessionID = strings.TrimSpace(req.SessionID)
+	req.PluginID = strings.TrimSpace(req.PluginID)
+	req.RequestKey = strings.TrimSpace(req.RequestKey)
+	if req.WorkspacePath == "" {
+		return Run{}, "", invalid("workspacePath is required")
+	}
+	if req.SessionID == "" {
+		return Run{}, "", invalid("sessionId is required")
+	}
 	if req.RequestKey == "" {
-		return Run{}, invalid("requestKey is required")
+		return Run{}, "", invalid("requestKey is required")
 	}
-	if req.PluginID == "" {
-		req.PluginID = strings.TrimSuffix(filepath.Base(req.WorkspacePath), "-local")
+	if err := s.doc.Owns(ctx, req.WorkspacePath, req.SessionID); err != nil {
+		return Run{}, "", err
 	}
-	req.PluginID = strings.TrimSuffix(req.PluginID, "-local")
+	if patch != nil {
+		req.PluginID = plugin(req.WorkspacePath)
+	} else {
+		if req.PluginID == "" {
+			req.PluginID = plugin(req.WorkspacePath)
+		}
+		req.PluginID = strings.TrimSuffix(req.PluginID, "-local")
+	}
 	if req.PluginID == "" || req.PluginID == "." {
-		return Run{}, invalid("pluginId is required")
+		return Run{}, "", invalid("pluginId is required")
 	}
 	s.life.RLock()
 	defer s.life.RUnlock()
 	if err := s.alive(); err != nil {
-		return Run{}, err
+		return Run{}, "", err
 	}
 
 	row, err := s.doc.Find(ctx, req.WorkspacePath, req.SessionID, req.RequestKey)
@@ -252,26 +411,36 @@ func (s *Service) Run(ctx context.Context, req RunReq) (Run, error) {
 		if active(row) && strings.TrimSpace(row.BtID) != "" {
 			s.launch(row.ID)
 		}
-		return row, nil
+		return row, "idempotent", nil
 	}
 	if !errors.Is(err, db.ErrNotFound) {
-		return Run{}, err
+		return Run{}, "", err
 	}
 
 	cfg := Default()
-	if req.Config == nil {
+	if patch != nil {
 		cfg, err = s.doc.Load(ctx)
 		if err != nil {
-			return Run{}, err
+			return Run{}, "", err
+		}
+		cfg = Merge(cfg, *patch)
+		if err := check(cfg); err != nil {
+			return Run{}, "", err
+		}
+		cfg = Clean(cfg)
+	} else if req.Config == nil {
+		cfg, err = s.doc.Load(ctx)
+		if err != nil {
+			return Run{}, "", err
 		}
 	} else {
 		cfg = Clean(*req.Config)
 	}
 	if cfg.StartTime == "" {
-		return Run{}, invalid("startTime is required")
+		return Run{}, "", invalid("startTime is required")
 	}
 	if cfg.EndTime == "" {
-		return Run{}, invalid("endTime is required")
+		return Run{}, "", invalid("endTime is required")
 	}
 	now := time.Now().UnixMilli()
 	row = Run{
@@ -290,7 +459,7 @@ func (s *Service) Run(ctx context.Context, req RunReq) (Run, error) {
 	}
 	row, same, err := s.doc.Create(ctx, row)
 	if err != nil {
-		return Run{}, err
+		return Run{}, "", err
 	}
 	if !same {
 		s.emit(row)
@@ -298,7 +467,10 @@ func (s *Service) Run(ctx context.Context, req RunReq) (Run, error) {
 	if active(row) && (!same || strings.TrimSpace(row.BtID) != "") {
 		s.launch(row.ID)
 	}
-	return row, nil
+	if same {
+		return row, "idempotent", nil
+	}
+	return row, "created", nil
 }
 
 // Refresh 保留旧接口兼容性，任务进度由后台 Manager 持续更新。
@@ -527,11 +699,155 @@ func payload(cfg Config) map[string]any {
 		"isTickMode":   cfg.IsTickMode,
 		"useNewPrice":  cfg.UseNewPrice,
 		"interval":     cfg.Interval,
+		"closeLog":     cfg.CloseLog,
 	}
 }
 
+func (r Run) Brief() Brief {
+	err := ""
+	if r.Status == "failed" {
+		err = "backtest failed"
+	}
+	return Brief{
+		ID:            r.ID,
+		WorkspacePath: r.WorkspacePath,
+		SessionID:     r.SessionID,
+		Status:        r.Status,
+		StatusCode:    r.StatusCode,
+		Progress:      r.Progress,
+		Revision:      r.Revision,
+		Error:         err,
+		StartedAt:     r.StartedAt,
+		FinishedAt:    r.FinishedAt,
+		UpdatedAt:     r.UpdatedAt,
+	}
+}
+
+func (r Run) Detail() Detail {
+	summary := json.RawMessage("{}")
+	if r.Status == "done" {
+		summary = clip(r.Summary)
+	}
+	return Detail{
+		Brief:     r.Brief(),
+		Config:    r.Config,
+		Summary:   summary,
+		HasResult: r.Status == "done",
+	}
+}
+
+func clip(body json.RawMessage) json.RawMessage {
+	body = safe(body)
+	const limit = 16 << 10
+	if len(body) <= limit {
+		return body
+	}
+	data := map[string]json.RawMessage{}
+	if err := json.Unmarshal(body, &data); err != nil {
+		return json.RawMessage(`{"truncated":true}`)
+	}
+	keys := make([]string, 0, len(data))
+	for key := range data {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	out := map[string]json.RawMessage{"truncated": json.RawMessage("true")}
+	for _, key := range keys {
+		value := bytes.TrimSpace(data[key])
+		if len(value) == 0 || len(value) > 1024 || value[0] == '{' || value[0] == '[' {
+			continue
+		}
+		out[key] = value
+		next, err := json.Marshal(out)
+		if err != nil || len(next) > limit {
+			delete(out, key)
+			break
+		}
+	}
+	next, err := json.Marshal(out)
+	if err != nil {
+		return json.RawMessage(`{"truncated":true}`)
+	}
+	return next
+}
+
+func check(cfg Config) error {
+	start := strings.TrimSpace(cfg.StartTime)
+	end := strings.TrimSpace(cfg.EndTime)
+	if start == "" {
+		return issue("needs_config", "startTime is required")
+	}
+	if end == "" {
+		return issue("needs_config", "endTime is required")
+	}
+	from, ok := stamp(start)
+	if !ok {
+		return issue("invalid_config", "startTime is invalid")
+	}
+	to, ok := stamp(end)
+	if !ok {
+		return issue("invalid_config", "endTime is invalid")
+	}
+	if !from.Before(to) {
+		return issue("invalid_config", "endTime must be later than startTime")
+	}
+	if math.IsNaN(cfg.Cash) || math.IsInf(cfg.Cash, 0) || cfg.Cash <= 0 {
+		return issue("invalid_config", "cash must be greater than zero")
+	}
+	values := []struct {
+		name  string
+		value float64
+	}{
+		{"shStockSx", cfg.ShStockSx},
+		{"shStockMinSx", cfg.ShStockMinSx},
+		{"szStockSx", cfg.SzStockSx},
+		{"szStockMinSx", cfg.SzStockMinSx},
+		{"shStockGh", cfg.ShStockGh},
+		{"szStockGh", cfg.SzStockGh},
+		{"buyYh", cfg.BuyYh},
+		{"sellYh", cfg.SellYh},
+		{"rf", cfg.Rf},
+		{"slippage", cfg.Slippage},
+	}
+	for _, item := range values {
+		if math.IsNaN(item.value) || math.IsInf(item.value, 0) || item.value < 0 {
+			return issue("invalid_config", item.name+" must be zero or greater")
+		}
+	}
+	if cfg.Interval != "1d" && cfg.Interval != "1m" {
+		return issue("invalid_config", "interval must be 1d or 1m")
+	}
+	return nil
+}
+
+func stamp(value string) (time.Time, bool) {
+	for _, layout := range []string{
+		time.DateOnly,
+		"2006-01-02 15:04",
+		"2006-01-02 15:04:05",
+		"2006-01-02T15:04",
+		"2006-01-02T15:04:05",
+		time.RFC3339,
+	} {
+		out, err := time.Parse(layout, value)
+		if err == nil {
+			return out, true
+		}
+	}
+	return time.Time{}, false
+}
+
+func plugin(workspace string) string {
+	path := strings.TrimRight(strings.ReplaceAll(strings.TrimSpace(workspace), "\\", "/"), "/")
+	return strings.TrimSuffix(filepath.Base(path), "-local")
+}
+
 func invalid(msg string) error {
-	return &Invalid{Msg: msg}
+	return issue("invalid_input", msg)
+}
+
+func issue(code string, msg string) error {
+	return &Invalid{Code: code, Msg: msg}
 }
 
 func active(row Run) bool {

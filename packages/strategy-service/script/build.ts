@@ -6,6 +6,7 @@ import fs from "fs/promises"
 import path from "path"
 import { fileURLToPath } from "url"
 import { front } from "./front"
+import { workflow } from "./workflow"
 
 const self = fileURLToPath(import.meta.url)
 const dir = path.dirname(self)
@@ -39,6 +40,7 @@ if (!jobs.length) {
 
 console.log(`targets: ${jobs.map((item) => item.id).join(", ")}`)
 
+await workflow(root)
 await front(root, skip)
 
 console.log("building strategy-service")

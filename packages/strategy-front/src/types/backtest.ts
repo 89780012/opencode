@@ -66,3 +66,21 @@ export type BacktestUpdate = {
   updatedAt: number
   hasResult: boolean
 }
+
+export type BacktestBrief = Pick<
+  BacktestRun,
+  "id" | "workspacePath" | "sessionId" | "status" | "progress" | "revision"
+>
+
+export type BacktestToolResult =
+  | {
+      version: 1
+      accepted: true
+      reason: "created" | "idempotent" | "active"
+      run: BacktestBrief
+    }
+  | {
+      version: 1
+      accepted: false
+      reason: "busy"
+    }

@@ -71,10 +71,11 @@ Output is copied to:
 packages/strategy-service/dist/desktop/
 ```
 
-Build everything in one command:
+Build the CLI binaries and desktop bundle from the repository root:
 
 ```bash
-bun run package:strategy-service
+bun run build:strategy-service
+bun run build:strategy-desktop
 ```
 
 This packages:
@@ -82,7 +83,9 @@ This packages:
 - all cross-platform `strategy-service` CLI binaries under `packages/strategy-service/dist/`
 - the current host desktop bundle under `packages/strategy-service/dist/desktop/`
 
-Use `bun run package:strategy-service -- --clean` to clear old output first.
+Pass `-- --clean` to either command to clear that command's old output first.
+
+Both release scripts rebuild `packages/smartx-workflow/dist/smartx-workflow.js` before building strategy-service. The workflow `dist` directory is not committed, so the SmartX release manager must distribute that artifact together with the matching `smartx-helper` agent. SmartX continues to own automatic builtin and MCP provisioning; explicit `/system/opencode/start` and `/system/opencode/restart` requests refresh the strategy-service MCP configuration before OpenCode starts.
 
 The classic CLI flow still works:
 
