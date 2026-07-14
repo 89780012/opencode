@@ -85,7 +85,11 @@ This packages:
 
 Pass `-- --clean` to either command to clear that command's old output first.
 
-Both release scripts rebuild `packages/smartx-workflow/dist/smartx-workflow.js` before building strategy-service. The workflow `dist` directory is not committed, so the SmartX release manager must distribute that artifact together with the matching `smartx-helper` agent. SmartX continues to own automatic builtin and MCP provisioning; explicit `/system/opencode/start` and `/system/opencode/restart` requests refresh the strategy-service MCP configuration before OpenCode starts.
+Both release scripts rebuild `packages/smartx-workflow/dist/smartx-workflow.js` before building strategy-service. The workflow `dist` directory is not committed, so the SmartX release manager must distribute that artifact together with the matching `smartx-helper` agent and the complete `smartx-market-data` skill directory. Treat the workflow artifact, helper, and skill as one compatible release; do not publish only part of the set.
+
+SmartX continues to own automatic builtin, skill, and MCP provisioning. The host must inject the original, unescaped `SMART_HOME` into the strategy-service environment before starting the managed OpenCode process. After changing `SMART_HOME` or `SMARTX_PYTHON_LAYOUT`, restart strategy-service so it reloads the host environment. When only the embedded CPython or packages at the same path change, restarting OpenCode is sufficient. Explicit `/system/opencode/start` and `/system/opencode/restart` requests refresh the strategy-service MCP configuration before OpenCode starts; hot-reloading a skill does not refresh process environment variables.
+
+Managed OpenCode receives an explicit `SMARTX_PYTHON_LAYOUT`. The service default is `production`, which prefers `<SMART_HOME>/bin/cpython`; set it to `development` to prefer `<SMART_HOME>/bin/<platform>/cpython`. Any other value stops service initialization with a configuration error. `Taskfile.yml` defaults local tasks to `development`. The service passes the original `SMART_HOME` value through unchanged, including spaces, parentheses, and non-ASCII characters.
 
 The classic CLI flow still works:
 
@@ -158,6 +162,8 @@ Pass `--clean` to remove the full `dist` directory before building.
 - `HOST` default: `127.0.0.1`
 - `PORT` default: `5000`
 - `STRATEGY_FRONT_DIST` default: `../strategy-front/dist`
+- `SMART_HOME` has no default and must contain the original, unescaped SmartX installation path
+- `SMARTX_PYTHON_LAYOUT` default: `production`; supported values: `production`, `development`
 
 ## Install strategy
 

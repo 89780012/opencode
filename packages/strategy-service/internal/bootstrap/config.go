@@ -25,6 +25,7 @@ type OpencodeConfig struct {
 	Enabled      bool          // 是否启用 opencode
 	Bin          string        // opencode 二进制文件
 	GitBin       string        // git 二进制文件
+	PythonLayout string        // SMART_HOME 内的 Python 布局
 	Host         string        // opencode 服务监听地址
 	Port         int           // opencode 服务监听端口
 	Cwd          string        // opencode 工作目录
@@ -51,6 +52,7 @@ func LoadConfig() Config {
 		LogDir:   logDir,
 		Opencode: OpencodeConfig{
 			Enabled:      truth("STRATEGY_OPENCODE_ENABLED", true),
+			PythonLayout: pythonLayout(),
 			Host:         text("STRATEGY_OPENCODE_HOST", "127.0.0.1"),
 			Port:         number("STRATEGY_OPENCODE_PORT", 4096),
 			Cwd:          text("STRATEGY_OPENCODE_CWD", ""),
@@ -59,6 +61,15 @@ func LoadConfig() Config {
 		Account:  account,
 		WindowId: windowId,
 	}
+}
+
+// pythonLayout 返回托管 OpenCode 使用的 SmartX Python 布局。
+func pythonLayout() string {
+	value := strings.ToLower(strings.TrimSpace(os.Getenv("SMARTX_PYTHON_LAYOUT")))
+	if value == "" {
+		return "production"
+	}
+	return value
 }
 
 // Addr 返回 HTTP 服务监听地址。

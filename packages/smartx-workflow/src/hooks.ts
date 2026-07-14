@@ -3,6 +3,7 @@ import { key, wantsFinal, wantsReview, type Analysis, type Chart, type Dirt, typ
 import { loadChartRemote, loadProjectRemote, loadRemote, saveReviewRemote } from "./remote.js"
 import type { Fix, Memory, Pending, Project, SaveReview } from "./types.js"
 import { createWorkspace } from "./workspace.js"
+import { python } from "./python.js"
 
 type Dep = {
   workspaces?: Map<string, Analysis>
@@ -22,6 +23,7 @@ type Dep = {
   loadChart?: (workspace: string, worktree: string) => Promise<Chart | undefined>
   loadProject?: (workspace: string, worktree: string) => Promise<Project | undefined>
   saveReview?: (input: SaveReview) => Promise<void>
+  runtime?: NonNullable<Parameters<typeof python>[0]>
 }
 
 /** 组装插件 hook，把 session 配对与 workspace 工作流接到同一个入口上。 */
@@ -89,6 +91,12 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
   })
 
   return {
+    tool: {
+      smartx_python: python({
+        ...dep.runtime,
+        start: (session) => workspaceFlow.taint(session, "smartx_python"),
+      }),
+    },
     event: async (input) => {
       /** 记录子 session，避免把主工作区门禁错误地下放给子 agent。 */
       if (input.event.type === "session.created") {

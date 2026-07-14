@@ -1,7 +1,8 @@
 ﻿import { describe, expect, test } from "bun:test"
+import type { ToolContext } from "@opencode-ai/plugin"
 import { build } from "../src/hooks.js"
 import { loadRemote } from "../src/remote.js"
-import { backtest, kind } from "../src/tool.js"
+import { backtest, kind, python } from "../src/tool.js"
 import {
   analyze,
   doneAnalysis,
@@ -99,6 +100,14 @@ describe("smartx workspace analysis", () => {
     expect(kind({ tool: "list_backtests" })).toBe("read")
     expect(kind({ tool: "get_backtest" })).toBe("read")
     expect(kind({ tool: "get_backtest_config" })).toBe("read")
+  })
+
+  test("registers and classifies the SmartX Python tool", () => {
+    const hooks = setup(ctx("f:/repo"))
+    expect(hooks.tool?.smartx_python).toBeDefined()
+    expect(python({ tool: "smartx_python" })).toBe(true)
+    expect(python({ tool: "python" })).toBe(false)
+    expect(kind({ tool: "smartx_python" })).toBe("exec")
   })
 
   test("tracks workspace analysis states", () => {
@@ -526,6 +535,88 @@ describe("smartx workspace analysis", () => {
         { args: {} },
       ),
     ).rejects.toThrow("main session")
+  })
+
+  test("rejects SmartX Python in child sessions before execution", async () => {
+    const hooks = setup(ctx("f:/repo"), { parent: async (id) => id === "s2" })
+
+    await expect(
+      hooks["tool.execute.before"]?.(
+        { sessionID: "s2", tool: "smartx_python", callID: "call-python-child" },
+        { args: { description: "child", code: "print(1)" } },
+      ),
+    ).rejects.toThrow("SmartX Python is only available in the main session")
+  })
+
+  test("applies baseline gates and preserves dirt after a failed Python execution", async () => {
+    const blocked = setup(ctx("f:/repo"), { parent: async () => false })
+    await expect(
+      blocked["tool.execute.before"]?.(
+        { sessionID: "s1", tool: "smartx_python", callID: "call-python-blocked" },
+        { args: { description: "blocked", code: "print(1)" } },
+      ),
+    ).rejects.toThrow("initial workspace")
+
+    const id = workspace()
+    const memory = restored()
+    const dirty = new Map()
+    const workspaces = new Map<string, Analysis>([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]])
+    const charts = new Map<string, Chart>([
+      [
+        id,
+        {
+          workspace: "f:/repo",
+          worktree: "f:/repo",
+          state: "done",
+          mermaidCode: "flowchart TD",
+          errorText: "",
+          updated: Date.now(),
+        },
+      ],
+    ])
+    const hooks = build(ctx("f:/repo"), {
+      memory,
+      projects: projects(),
+      dirtyStates: dirty,
+      workspaces,
+      charts,
+      parent: async () => false,
+      runtime: {
+        find: async () => process.execPath,
+        cmd: (bin) => [bin, "-e", "await Bun.stdin.text(); process.exit(7)"],
+      },
+    })
+    const args = { description: "query", code: "print(1)" }
+
+    await expect(
+      hooks["tool.execute.before"]?.(
+        { sessionID: "s1", tool: "smartx_python", callID: "call-python" },
+        { args },
+      ),
+    ).resolves.toBeUndefined()
+
+    expect(dirty.has(id)).toBe(false)
+    expect(memory.get(id)?.needsSave).toBe(false)
+
+    const run = hooks.tool?.smartx_python
+    if (!run) throw new Error("smartx_python was not registered")
+    const ctrl = new AbortController()
+    await expect(
+      run.execute(args, {
+        sessionID: "s1",
+        messageID: "m1",
+        agent: "smartx-helper",
+        directory: process.cwd(),
+        worktree: process.cwd(),
+        abort: ctrl.signal,
+        metadata() {},
+        async ask() {},
+      } satisfies ToolContext),
+    ).rejects.toThrow("exited with code 7")
+
+    // execute 抛错后 core 不会触发 after hook，启动回调仍已保留副作用状态。
+    expect(dirty.get(id)?.state).toBe("dirty")
+    expect(memory.get(id)?.needsSave).toBe(true)
   })
 
   test("refresh tool allows reads and blocks writes until refreshed baseline is rebuilt", async () => {

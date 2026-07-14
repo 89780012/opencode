@@ -480,6 +480,7 @@ func env(cfg Config) []string {
 	out = set(out, "OPENCODE_CLIENT", "strategy-service")
 	out = set(out, "OPENCODE_SERVER_PASSWORD", "")
 	out = set(out, "OPENCODE_SERVER_USERNAME", "")
+	out = set(out, "SMARTX_PYTHON_LAYOUT", cfg.PythonLayout)
 	if cfg.ServiceURL != "" {
 		out = set(out, "STRATEGY_SERVICE_URL", cfg.ServiceURL)
 	}

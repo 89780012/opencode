@@ -6,6 +6,7 @@ type Config struct {
 	Enabled      bool
 	Bin          string
 	GitBin       string
+	PythonLayout string
 	Host         string
 	Port         int
 	Cwd          string

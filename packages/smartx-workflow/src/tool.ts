@@ -20,6 +20,11 @@ export function mcp(input: { tool: string }, name: string) {
 export function backtest(input: { tool: string }) {
   return backtests.some((name) => mcp(input, name))
 }
+
+/** 判断当前调用是否为 SmartX 内置 Python 工具。 */
+export function python(input: { tool: string }) {
+  return input.tool === "smartx_python"
+}
 /** 从 skill 调用里提取 skill 名称；非 skill 调用返回空字符串。 */
 export function skill(input: { tool: string; args?: unknown }) {
   if (input.tool !== "skill") return ""
@@ -67,6 +72,7 @@ export type Kind =
 
 /** 把底层工具调用归类成工作流可理解的动作类型。 */
 export function kind(input: { tool: string; args?: unknown }) {
+  if (python(input)) return "exec" as const
   if (mcp(input, "run_backtest")) return "backtest" as const
   if (mcp(input, "list_backtests") || mcp(input, "get_backtest") || mcp(input, "get_backtest_config"))
     return "read" as const

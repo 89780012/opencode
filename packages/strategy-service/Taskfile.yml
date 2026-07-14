@@ -17,6 +17,7 @@ env:
   STRATEGY_OPENCODE_PORT: '{{default "9999" .STRATEGY_OPENCODE_PORT}}'
   STRATEGY_OPENCODE_CWD: '{{default "" .STRATEGY_OPENCODE_CWD}}'
   STRATEGY_OPENCODE_START_TIMEOUT: '{{default "30s" .STRATEGY_OPENCODE_START_TIMEOUT}}'
+  SMARTX_PYTHON_LAYOUT: '{{default "development" .SMARTX_PYTHON_LAYOUT}}'
 
 tasks:
   default:
@@ -39,6 +40,7 @@ tasks:
       - echo STRATEGY_OPENCODE_PORT={{.STRATEGY_OPENCODE_PORT}}
       - echo STRATEGY_OPENCODE_CWD={{.STRATEGY_OPENCODE_CWD}}
       - echo STRATEGY_OPENCODE_START_TIMEOUT={{.STRATEGY_OPENCODE_START_TIMEOUT}}
+      - echo SMARTX_PYTHON_LAYOUT={{.SMARTX_PYTHON_LAYOUT}}
 
   run:
     desc: Run strategy-service through the legacy root entrypoint with env vars

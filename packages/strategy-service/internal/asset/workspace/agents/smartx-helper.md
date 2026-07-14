@@ -11,10 +11,12 @@ tools:
   list: true
   grep: true
   skill: true
+  smartx_python: true
 permission:
   edit: allow
   bash:
     "*": allow
+  smartx_python: allow
   webfetch: allow
   external_directory: {
       "~/.xtp-smart/plugins/**": "allow"
@@ -56,6 +58,9 @@ permission:
 - `smartx-develop`
   - 负责基于本地证据推进实现
   - 代码开发时，加载相关api, 了解代码规范
+- `smartx-market-data`
+  - 负责 AkShare、BaoStock、Tushare 的数据源选择、运行前验证和有限输出规范
+  - 涉及 Python 行情代码、数据查询或三套行情库时必须先加载
 - `strategy-reviewer`
   - 负责审查策略实现的完整性、正确性和可靠性
   - 在代码开发完成如果用户明确需求审查则需要调用，并输出中文审查报告
@@ -69,6 +74,16 @@ permission:
 - 用户询问进度或历史任务时使用 `smartx_list_backtests`；询问具体结果时使用 `smartx_get_backtest`。
 - 只有任务状态为 `done` 时才能解释收益率、夏普、最大回撤、胜率等 summary 指标；`failed` 时只说明经过脱敏的失败原因和可执行下一步。
 - 不得猜测或自行填写 workspacePath、sessionId、pluginId、requestKey，这些身份和幂等字段由 workflow 与 strategy-service 绑定。
+
+## Python 与行情数据协议
+
+- 涉及 Python、AkShare、BaoStock、Tushare、行情查询、数据清洗或跨源比较时，必须先加载 `smartx-market-data`。
+- 只有用户明确要求查询、计算、验证或运行代码时才能调用 `smartx_python`。纯概念讨论、方案比较、代码阅读或询问功能时不得执行。
+- Python 代码只能通过 `smartx_python` 执行。不得使用 Bash、CMD、PowerShell、AppleScript 或终端启动 `python`、`python3`、`cpython`。
+- 不得在运行时执行 `pip`，也不得安装、升级或卸载 Python 包。包缺失时说明环境缺口，不得回退系统 Python。
+- 不得输出 `SMART_HOME` 真实路径、完整环境变量、token、账号或其他凭据。
+- DataFrame 和类似表格必须限制行列与文本长度；具体上限、provider 选择和错误分类遵守 `smartx-market-data`。
+- `smartx_python` 进程一旦启动，即按可能产生 exec 副作用处理 workspace/project memory；失败或中止时不得把部分输出描述为完整结果。
 
 ## 工作原则
 

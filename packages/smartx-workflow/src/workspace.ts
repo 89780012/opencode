@@ -26,7 +26,7 @@ import {
   limit,
 } from "./note.js"
 import { items, mermaid, reviewState, reviewText, serial } from "./parse.js"
-import { analyze, backtest, flowchart, kind, mcp, review } from "./tool.js"
+import { analyze, backtest, flowchart, kind, mcp, python, review } from "./tool.js"
 import type { Analysis, Chart, Dirt, Fix, Memory, Mode, Pending, Project, SaveReview } from "./types.js"
 import { flow, step } from "./workflow.js"
 
@@ -129,6 +129,30 @@ function requestKey(id: string, session: string) {
   return id + "\x00" + session
 }
 
+/** 对只能在主会话运行的本地能力做恢复会话兼容校验。 */
+async function main(opt: Opt, input: Parameters<Before>[0], name: "backtest" | "python") {
+  const child =
+    opt.childSessions.has(input.sessionID) ||
+    (await opt.parent(input.sessionID).catch(async (err) => {
+      await opt.write(`${name} session verification failed`, {
+        sessionID: input.sessionID,
+        tool: input.tool,
+        error: String(err),
+      })
+      throw new Error("SmartX workflow could not verify the main session.")
+    }))
+  if (!child) return
+  opt.childSessions.add(input.sessionID)
+  await opt.write(`child session ${name} blocked`, {
+    sessionID: input.sessionID,
+    workspace: opt.workspace,
+    worktree: opt.worktree,
+    tool: input.tool,
+  })
+  if (name === "python") throw new Error("SmartX Python is only available in the main session.")
+  throw new Error("SmartX backtest tools are only available in the main session.")
+}
+
 /** 从本地缓存或远端服务同步 analysis / chart / project 三类快照。*/
 async function snapshot(opt: Opt) {
   const cached = opt.workspaces.get(opt.id)
@@ -159,6 +183,23 @@ function mark(opt: Opt, reason: string) {
   })
 }
 
+/** 记录已经开始且可能产生副作用的执行，确保失败路径也会刷新基线和项目记忆。 */
+async function dirty(opt: Opt, session: string, tool: string) {
+  mark(opt, tool)
+  const memory = opt.memory.get(opt.id) ?? cleanMemory(opt.projects.get(opt.id))
+  opt.memory.set(opt.id, {
+    hasProjectState: memory.hasProjectState,
+    hasRestoredState: memory.hasRestoredState,
+    needsSave: memory.hasRestoredState,
+  })
+  await opt.write("workspace dirtied", {
+    sessionID: session,
+    workspace: opt.workspace,
+    worktree: opt.worktree,
+    tool,
+  })
+}
+
 /** 将 workspace 重新推回 analysis -> flowchart 的基线起点。*/
 function reset(opt: Opt, mode?: Mode) {
   opt.workspaces.set(opt.id, requestAnalysis(opt.workspace, opt.worktree))
@@ -171,6 +212,8 @@ function reset(opt: Opt, mode?: Mode) {
 /** workspace 级编排器，负责 system 注入、before 门禁和 after 状态推进。*/
 export function createWorkspace(opt: Opt) {
   return {
+    /** Python 进程启动后立即保守标脏，不依赖可能缺席的 after hook。 */
+    taint: (session: string, tool: string) => void dirty(opt, session, tool).catch(() => {}),
     /** 外部显式要求刷新时，重建基线并记录日志。*/
     reset: async (reason: Reason, detail = "") => {
       if (!opt.workspace || !opt.id) return false
@@ -434,27 +477,9 @@ export function createWorkspace(opt: Opt) {
     /** 工具执行前做硬门禁，并记录 analysis / review / chart 的启动状态。*/
     before: async (input: Parameters<Before>[0], output: Parameters<Before>[1]) => {
       if (!opt.workspace || !opt.id) return false
+      if (python(input)) await main(opt, input, "python")
       if (backtest(input)) {
-        const child =
-          opt.childSessions.has(input.sessionID) ||
-          (await opt.parent(input.sessionID).catch(async (err) => {
-            await opt.write("backtest session verification failed", {
-              sessionID: input.sessionID,
-              tool: input.tool,
-              error: String(err),
-            })
-            throw new Error("SmartX workflow could not verify the main session.")
-          }))
-        if (child) {
-          opt.childSessions.add(input.sessionID)
-          await opt.write("child session backtest blocked", {
-            sessionID: input.sessionID,
-            workspace: opt.workspace,
-            worktree: opt.worktree,
-            tool: input.tool,
-          })
-          throw new Error("SmartX backtest tools are only available in the main session.")
-        }
+        await main(opt, input, "backtest")
         const args =
           output.args && typeof output.args === "object" && !Array.isArray(output.args)
             ? (output.args as Record<string, unknown>)
@@ -500,7 +525,6 @@ export function createWorkspace(opt: Opt) {
           throw new Error(blockText)
         }
       }
-
       return flow([
         /** flowchart 子 agent 即将启动时，把 chart 标成 generating。*/
         step("chart", async () => {
@@ -654,19 +678,9 @@ export function createWorkspace(opt: Opt) {
           if (opt.childSessions.has(input.sessionID) || !ok(output)) return false
           const value = kind({ tool: input.tool, args: input.args })
           if (value !== "write" && value !== "exec") return false
-          mark(opt, input.tool)
-          const projectMemory = opt.memory.get(opt.id) ?? cleanMemory(opt.projects.get(opt.id))
-          opt.memory.set(opt.id, {
-            hasProjectState: projectMemory.hasProjectState,
-            hasRestoredState: projectMemory.hasRestoredState,
-            needsSave: projectMemory.hasRestoredState,
-          })
-          await opt.write("workspace dirtied", {
-            sessionID: input.sessionID,
-            workspace: opt.workspace,
-            worktree: opt.worktree,
-            tool: input.tool,
-          })
+          // Python 已在进程启动回调中保守标记，避免成功后重复写日志和更新时间。
+          if (python(input)) return false
+          await dirty(opt, input.sessionID, input.tool)
           return false
         }),
         step("refresh", async () => {

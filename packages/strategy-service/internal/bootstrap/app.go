@@ -33,6 +33,12 @@ type Service struct {
 
 // New 根据配置创建完整的 HTTP 服务。
 func New(cfg Config) (*Service, error) {
+	if cfg.Opencode.PythonLayout != "production" && cfg.Opencode.PythonLayout != "development" {
+		return nil, fmt.Errorf(
+			"invalid SMARTX_PYTHON_LAYOUT %q: expected production or development",
+			cfg.Opencode.PythonLayout,
+		)
+	}
 	slog.Info("initializing service", "addr", cfg.Addr(), "opencode_enabled", cfg.Opencode.Enabled)
 
 	// 同步内置的 agent 和 skill 资源。
@@ -68,6 +74,7 @@ func New(cfg Config) (*Service, error) {
 		Enabled:      cfg.Opencode.Enabled,
 		Bin:          cfg.Opencode.Bin,
 		GitBin:       cfg.Opencode.GitBin,
+		PythonLayout: cfg.Opencode.PythonLayout,
 		Host:         cfg.Opencode.Host,
 		Port:         cfg.Opencode.Port,
 		Cwd:          cfg.Opencode.Cwd,

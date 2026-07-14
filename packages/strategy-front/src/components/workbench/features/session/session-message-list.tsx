@@ -13,6 +13,7 @@ import { memo, useEffect, useMemo, useState, type ReactNode } from "react"
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation"
 import { Response } from "@/components/ai-elements/response"
 import { backtestTool, partition } from "@/lib/backtest-tool"
+import { ext, output, payload } from "@/lib/session-tool"
 import { selectSessionParts, useAppSelector } from "@/store"
 import type { ChatAssistantMessage, ChatMessageInfo, ChatPart, ChatStatus, ChatToolPart } from "@/types/chat"
 import common from "../../styles/session/session-common.module.css"
@@ -20,7 +21,7 @@ import css from "../../styles/session/session-chat.module.css"
 import { SessionBacktestTool } from "./session-backtest-tool"
 
 const empty: ChatPart[] = []
-const ansi = /\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g
+const ansi = new RegExp(String.fromCharCode(27) + "(?:[@-Z\\\\-_]|\\[[0-?]*[ -/]*[@-~])", "g")
 type Retry = Extract<ChatStatus, { type: "retry" }>
 type Entry =
   | {
@@ -168,44 +169,6 @@ function Fold(props: {
   )
 }
 
-function output(part: ChatToolPart) {
-  if (part.state.status === "running") return text(part.state.metadata?.output)
-  if ("output" in part.state) return text(part.state.output)
-  if ("error" in part.state) return text(part.state.error)
-  return ""
-}
-
-function json(value: unknown) {
-  if (value === undefined) return ""
-  return JSON.stringify(value, null, 2) ?? ""
-}
-
-function payload(part: ChatToolPart) {
-  const cmd = text(part.state.input.command)
-  if (cmd && Object.keys(part.state.input).length === 1) {
-    return {
-      lang: "shell",
-      value: `$ ${cmd}`,
-    }
-  }
-  return {
-    lang: "json",
-    value: json(part.state.input),
-  }
-}
-
-function ext(lang: string) {
-  const key = lang.toLowerCase()
-  if (key === "shell" || key === "bash" || key === "sh") return "sh"
-  if (key === "javascript" || key === "js") return "js"
-  if (key === "typescript" || key === "ts") return "ts"
-  if (key === "json") return "json"
-  if (key === "markdown" || key === "md") return "md"
-  if (key === "html") return "html"
-  if (key === "css") return "css"
-  return "txt"
-}
-
 function Panel(props: { title: string; children: ReactNode }) {
   return (
     <section className={css.toolpanel}>
@@ -269,6 +232,7 @@ function DefaultTool(props: { part: ChatToolPart }) {
         </div>
         <Panel title="输入">
           {body.value ? <CodeBlock lang={body.lang} value={body.value} /> : <div className={css.muted}>暂无输入</div>}
+          {body.meta ? <CodeBlock lang="json" value={body.meta} /> : null}
         </Panel>
         <Panel title={props.part.state.status === "error" ? "错误" : "输出"}>
           {out ? <CodeBlock lang="text" value={out} /> : <div className={css.muted}>暂无输出</div>}
