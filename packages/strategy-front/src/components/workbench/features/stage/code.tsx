@@ -351,6 +351,7 @@ export function CodePanel(props: {
   const [side, setSide] = useState(264)
   const [drag, setDrag] = useState(false)
   const size = useRef({ x: 0, w: 264 })
+  const last = useRef<string | null>(null)
   const editor = useWorkspaceEditor({ workspace: props.workspace, path: props.path })
   const review = useChatReview(props.workspace?.path, props.sessionId, props.tab === "review" || filter === "changed")
   const focus = useMemo(() => relative(props.workspace?.path, props.path), [props.path, props.workspace?.path])
@@ -367,8 +368,16 @@ export function CodePanel(props: {
   }
 
   useEffect(() => {
-    if (!focus) return
+    if (!focus) {
+      last.current = null
+      return
+    }
+
+    if (last.current === focus) return
     if (editor.active !== focus) editor.show(focus)
+
+    if (!review.diffs.some((item) => item.file === focus)) return
+    last.current = focus
     if (review.file !== focus) review.open(focus)
   }, [editor, focus, review])
 
