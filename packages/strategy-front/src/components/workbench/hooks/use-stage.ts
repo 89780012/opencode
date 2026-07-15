@@ -46,9 +46,11 @@ export function useStage() {
 
   return {
     active: app.active,
+    path: app.path,
     cur: app.cur,
     flowchart: app.flow,
     testing: app.testing,
+    reviewing: app.reviewing,
     file,
     tab,
     setTab,
@@ -56,5 +58,6 @@ export function useStage() {
     diff,
     saveFlowchart: save,
     backtest: app.backtest,
+    review: app.review,
   }
 }

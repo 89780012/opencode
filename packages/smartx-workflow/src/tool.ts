@@ -82,7 +82,7 @@ export function kind(input: { tool: string; args?: unknown }) {
   if (mcp(input, "save_project_state")) return "project_save" as const
   if (mcp(input, "validate_project_state")) return "project_validate" as const
   if (mcp(input, "refresh_workspace")) return "refresh" as const
-  if (mcp(input, "save_analysis") || mcp(input, "save_flowchart")) return "save" as const
+  if (mcp(input, "save_analysis") || mcp(input, "save_flowchart") || mcp(input, "save_review")) return "save" as const
   if (skill(input) === "smartx-develop") return "write" as const
   if (input.tool === "task") {
     const args = input.args

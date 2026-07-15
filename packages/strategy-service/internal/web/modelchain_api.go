@@ -1,13 +1,16 @@
 package web
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
 
+	"strategy-service/internal/db"
 	"strategy-service/internal/modelchain"
 	"strategy-service/internal/question"
 	"strategy-service/internal/utils"
+	"strategy-service/internal/workbench"
 
 	"github.com/gin-gonic/gin"
 )
@@ -53,6 +56,35 @@ func (a *API) modelChainPrompt(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		bad(c, err)
+		return
+	}
+	id := strings.TrimSpace(c.Param("sessionId"))
+	if id == "" {
+		bad(c, fmt.Errorf("sessionId is required"))
+		return
+	}
+	req.SessionID = strings.TrimSpace(req.SessionID)
+	if req.SessionID != "" && req.SessionID != id {
+		bad(c, fmt.Errorf("sessionId does not match request path"))
+		return
+	}
+	req.SessionID = id
+	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
+	if req.WorkspacePath == "" {
+		bad(c, fmt.Errorf("workspacePath is required"))
+		return
+	}
+	if a.bench == nil {
+		fail(c, 500, "workbench service is unavailable", nil)
+		return
+	}
+	row, err := a.bench.DetailSession(c.Request.Context(), workbench.SessionDetail{ID: req.SessionID})
+	if errors.Is(err, db.ErrNotFound) || (err == nil && row.WorkspacePath != req.WorkspacePath) {
+		fail(c, 404, "session not found", nil)
+		return
+	}
+	if err != nil {
+		fail(c, 500, "failed to validate session", nil)
 		return
 	}
 	if err := a.chain.Prompt(c.Request.Context(), req); err != nil {

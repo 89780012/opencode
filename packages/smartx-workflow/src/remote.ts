@@ -40,7 +40,7 @@ export async function saveChartRemote(service: string, input: SaveChart) {
 
 /** 把 review 结果保存到 strategy-service。 */
 export async function saveReviewRemote(service: string, input: SaveReview) {
-  if (!service) return
+  if (!service) throw new Error("strategy service URL is required")
   const resp = await fetch(new URL("/api/workbench/review", service), {
     method: "POST",
     headers: { "Content-Type": "application/json" },

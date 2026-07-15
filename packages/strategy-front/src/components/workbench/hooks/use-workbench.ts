@@ -1,13 +1,30 @@
 import { useMemo, useRef, useState } from "react"
+import { useSearchParams } from "react-router-dom"
 import { backtestApi, modelChainApi } from "@/api/modules"
 import { ApiError } from "@/api/errors"
 import { activeBacktest, backtestKey, isBacktestRun } from "@/lib/backtest"
 import { toast } from "sonner"
-import { selectWorkbench, selectWorkbenchBacktests, selectWorkbenchProgress, useAppDispatch, useAppSelector } from "@/store"
-import { addBacktest, setActive, setBacktestActive, setStage } from "@/store/workbench-slice"
+import {
+  selectWorkbench,
+  selectWorkbenchBacktests,
+  selectWorkbenchProgress,
+  store,
+  useAppDispatch,
+  useAppSelector,
+} from "@/store"
+import {
+  addBacktest,
+  rollbackReview,
+  setActive,
+  setBacktestActive,
+  setStage,
+  startReview,
+} from "@/store/workbench-slice"
 import { code, createTimeline, type FlowStatus, type ReviewStatus, type SessionItem, type StepStatus, type TimelineEvent } from "../data"
 import { useWorkbenchProgressSync } from "./use-workbench-progress"
 import type { BacktestConfig } from "@/types/backtest"
+
+const locks = new Set<string>()
 
 function status(state?: string): ReviewStatus {
   if (state === "running") return "running"
@@ -30,6 +47,12 @@ function stamp(value?: number) {
 
 function plugin(path: string) {
   return path.split(/[\\/]/).filter(Boolean).at(-1)?.replace(/-local$/, "") ?? ""
+}
+
+function message(text?: string) {
+  const value = text?.trim() ?? ""
+  if (!value) return "审查"
+  return `${value}\n\n请根据以上内容审查当前策略代码，并给出明确的审查结论。`
 }
 
 function empty(): SessionItem {
@@ -84,11 +107,12 @@ function map(event: ReturnType<typeof selectWorkbenchProgress>[number]): Timelin
 export function useWorkbench(setRight?: (open: boolean) => void) {
   const dispatch = useAppDispatch()
   const state = useAppSelector(selectWorkbench)
+  const [search] = useSearchParams()
+  const path = search.get("path")?.trim() ?? ""
   useWorkbenchProgressSync(state.sessionPath, state.active)
   const prog = useAppSelector((item) => selectWorkbenchProgress(item, state.sessionPath, state.active))
   const runs = useAppSelector((item) => selectWorkbenchBacktests(item, state.sessionPath, state.active))
   const [view, setView] = useState<"current" | "history">("current")
-  const [reviewing, setReviewing] = useState(false)
   const [testing, setTesting] = useState(false)
   const gate = useRef(false)
   const flow = state.flowchart?.workspacePath === state.sessionPath ? state.flowchart : null
@@ -96,7 +120,8 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
     () => (state.reviewPath === state.sessionPath ? state.reviews : []).slice().sort((a, b) => b.updatedAt - a.updatedAt),
     [state.reviewPath, state.reviews, state.sessionPath],
   )
-  const row = rows[0] ?? null
+  const row = rows.find((item) => item.sessionId === state.active) ?? rows.find((item) => !item.sessionId) ?? null
+  const reviewing = row?.state === "running"
   const cur = useMemo<SessionItem>(() => {
     const session = state.sessions.find((item) => item.id === state.active) ?? state.sessions[0]
     if (!session) return empty()
@@ -149,7 +174,7 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
       timelineEvents: prog.length > 0 ? prog.map(map) : createTimeline(session.title),
     }
   }, [flow, prog, row, rows, runs, state.active, state.backtestActive, state.sessions, view])
-  const last = cur.reviewHistory.at(-1) ?? null
+  const last = row ? (cur.reviewHistory.find((item) => item.id === row.id) ?? null) : null
   const risk = useMemo(() => {
     if (cur.reviewStatus === "passed") return "审查已通过"
     if (cur.reviewStatus === "failed") return "审查未通过，需要修复"
@@ -163,24 +188,40 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
     return list.join(" / ")
   }, [cur.backtestResults, cur.backtestStatus, cur.flowchartStatus, risk])
 
-  const review = async () => {
+  const review = async (text?: string) => {
     setRight?.(true)
-    if (reviewing) return
-    if (!state.sessionPath || !state.active) {
+    const fresh = selectWorkbench(store.getState())
+    const session = fresh.sessions.find((item) => item.id === fresh.active)
+    if (
+      !path ||
+      fresh.sessionPath !== path ||
+      fresh.reviewPath !== path ||
+      !session ||
+      session.workspacePath !== path
+    ) {
       toast.error("请先创建或选择一个会话")
-      return
+      return false
     }
-    setReviewing(true)
+    const key = `${path}\u0000${session.id}`
+    const wait = fresh.reviews.some((item) => item.id.startsWith("pending_") && item.sessionId === session.id)
+    const current = fresh.reviews.find((item) => !item.id.startsWith("pending_") && item.sessionId === session.id)
+    if (wait || current?.state === "running" || locks.has(key)) return false
+    const id = `pending_${backtestKey()}`
+    locks.add(key)
+    dispatch(startReview({ workspacePath: path, sessionId: session.id, id, updatedAt: Date.now() }))
     try {
       await modelChainApi.sendPrompt({
-        workspacePath: state.sessionPath,
-        sessionId: state.active,
-        parts: [{ type: "text", text: "审查" }],
+        workspacePath: path,
+        sessionId: session.id,
+        parts: [{ type: "text", text: message(text) }],
       })
+      return true
     } catch {
+      dispatch(rollbackReview({ workspacePath: path, id }))
       toast.error("提交审查失败")
+      return false
     } finally {
-      setReviewing(false)
+      locks.delete(key)
     }
   }
 
@@ -219,6 +260,7 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
 
   return {
     active: state.active,
+    path,
     stage: state.stage,
     flow,
     cur,

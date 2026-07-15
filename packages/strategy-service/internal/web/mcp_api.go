@@ -254,6 +254,8 @@ func (a *API) mcpPost(c *gin.Context) {
 					"inputSchema": schema(map[string]any{
 						"workspacePath": prop("string", "Workspace path."),
 						"worktreePath":  prop("string", "Worktree path. Defaults to workspacePath."),
+						"reviewId":      prop("string", "Stable review request id."),
+						"sessionId":     prop("string", "Workbench session id."),
 						"state":         prop("string", "Review state: running, passed, failed, or error."),
 						"summary":       prop("string", "Required Chinese review summary."),
 						"items": map[string]any{
@@ -278,7 +280,7 @@ func (a *API) mcpPost(c *gin.Context) {
 								"type": "string",
 							},
 						},
-					}, []string{"workspacePath", "summary", "items", "suggestions"}),
+					}, []string{"workspacePath", "reviewId", "sessionId", "summary", "items", "suggestions"}),
 				},
 				{
 					"name":        "get_review",
@@ -460,6 +462,8 @@ func (a *API) mcpPost(c *gin.Context) {
 				data, err := a.bench.SaveReview(ctx, workbench.ReviewReq{
 					WorkspacePath: text(args["workspacePath"]),
 					WorktreePath:  text(args["worktreePath"]),
+					ReviewID:      text(args["reviewId"]),
+					SessionID:     text(args["sessionId"]),
 					State:         text(args["state"]),
 					Summary:       text(args["summary"]),
 					Items:         reviewItems(args["items"]),

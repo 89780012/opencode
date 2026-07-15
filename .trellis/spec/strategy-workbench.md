@@ -224,3 +224,104 @@ row, err := service.Run(c.Request.Context(), req) // 请求 context 驱动完整
 ```
 
 正确：启动请求只负责事务创建 `pending` 记录；Manager 使用服务生命周期 context 执行 SmartX 启动、查询、持久化和通知，并在数据库关闭前停止所有 worker。
+
+## 场景：策略审查闭环与实时状态
+
+### 1. 范围与触发条件
+
+- 修改 `packages/strategy-front` 的审查入口、审查面板或 Redux 同步，修改 `packages/smartx-workflow` 的 reviewer 编排，或修改 `packages/strategy-service` 的审查持久化、MCP 与 WebSocket 时，必须遵守本契约。
+- 审查历史按 `workspacePath + worktreePath` 展示；每轮运行态、终态和进度必须额外绑定稳定 `reviewId` 与可信 `sessionId`，避免并发会话串轮次。
+
+### 2. 签名
+
+- 提交意图：`POST /api/model-chain/session/:sessionId/prompt`
+- HTTP 保存：`POST /api/workbench/review`
+- MCP 保存：`save_review`
+- WebSocket 查询：`review.get -> review.got`
+- WebSocket 增量：`review.updated`、`progress.updated`
+- 服务：`SaveReview(context.Context, ReviewReq) (ReviewRow, error)`
+- 存储：`workspace_reviews.review_id`、`workspace_reviews.session_id`；唯一索引作用域为 `(workspace_path, worktree_path, review_id)` 且忽略空 `review_id`。
+
+### 3. 契约
+
+running 与 terminal 保存使用同一结构：
+
+```json
+{
+  "reviewId": "reviewer-tool-call-id",
+  "sessionId": "ses_123",
+  "workspacePath": "D:/workspace/example",
+  "worktreePath": "D:/workspace/example",
+  "state": "failed",
+  "summary": "风险控制仍需完善",
+  "items": [
+    {
+      "name": "风险控制",
+      "status": "warning",
+      "detail": "缺少止损约束",
+      "suggestion": "增加最大回撤保护"
+    }
+  ],
+  "suggestions": ["增加最大回撤保护"]
+}
+```
+
+- workflow 使用 reviewer 的 tool call ID 生成 `reviewId`，使用 hook 上下文注入 `sessionId/workspacePath/worktreePath`；不得信任模型填写的身份字段。
+- reviewer 真正启动前先持久化 `running`；远程保存成功后才消费 review request。并发启动必须先占用 session 级运行锁，保存失败时释放锁并保留 request。
+- terminal 状态严格按所有 items 聚合：`error > failed/warning > running > passed`。terminal 不允许 `running` item；只有全部 item 为 `passed` 才能保存 `passed`。
+- `summary`、`items`、`items[].name`、`items[].detail` 必须非空；未知 item status、空 reviewer 输出和无明确结论均 fail-closed 为 `error`，不得默认通过。
+- 同一稳定 `reviewId` 只允许 `running -> terminal`。完全相同的重复请求幂等返回原记录；terminal 不得被修改，也不得回退到 running。
+- review row 与对应 progress event 必须在同一 SQLite 事务提交；提交成功后才广播。`review.start/done/error` 只写入触发审查的 `sessionId`。
+- 前端提交后立即插入带 `sessionId` 的本地 pending。真实事件或快照只能清理同 session 的 pending；双方都有 `reviewId` 时还必须匹配 `reviewId`。
+- 前端只接收当前 `workspacePath + worktreePath` 的事件；同 ID 按 `updatedAt` 单调合并，同时间戳 terminal 优先于 running。当前状态按活动 session 选择，历史仍保留 worktree 全量记录。
+- `review.get` 必须携带请求关联 ID；工作区切换后到达的旧 `review.got` 不得覆盖当前数据。
+- WebSocket 未注册入站事件必须忽略，不能原样广播；断线后迟到 reply 必须观察 client done/cancel，不能向已关闭 channel 发送。
+- passed terminal 保存成功后 workflow 进入 final baseline；dirty 审查和失败修复后的复审必须先刷新 baseline。`refreshing/finalizing` 期间继续阻止写操作。
+
+### 4. 校验与错误矩阵
+
+| 条件 | 结果 | 行为 |
+| --- | --- | --- |
+| URL session 与 body session 不一致 | HTTP `400` | 不发送 prompt |
+| session 不存在或不属于 workspace | HTTP `404` | 不发送 prompt，不泄露其他 workspace |
+| summary/items/name/detail 为空，status 非法，或总体 state 与 items 不一致 | HTTP/MCP 参数错误 | 不写 review，不写 progress |
+| 相同 reviewId 的完全相同 running/terminal 重试 | 成功 | 返回原记录，不新增 progress |
+| terminal 后再修改或回退 running | 参数错误 | 保留原 terminal |
+| progress 写入或事务提交失败 | 内部错误 | review 与 progress 一起回滚，不广播半成功事件 |
+| 未注册 WebSocket 入站 type | 忽略 | 不调用 handler，不广播 |
+
+### 5. Good / Base / Bad Cases
+
+- Good：同一 `reviewId` 依次保存 running 和 passed；数据库只有一条 review、两条生命周期 progress，前端不会被迟到 running 回滚，随后触发 final baseline。
+- Base：两个 session 同时审查并乱序完成；各自 pending、progress 和 terminal 只更新自己的 session，worktree 历史可同时看到两轮。
+- Bad：reviewer 文本写“通过”但 item 为 `warning`，或客户端发送伪造 `review.updated`；前者必须聚合为 failed，后者不得被服务端转广播。
+
+### 6. 必需测试
+
+- workflow：覆盖 running 保存失败不消费 request、并发 reviewer 只启动一次、空输出转 error、跨 session pending 隔离、items 聚合只升不降、failed 修复后先刷新、passed 后 final 可达，以及 refreshing/finalizing 写门禁。
+- 服务与存储：覆盖旧表增量迁移可重复执行、稳定 ID 幂等、terminal 不可变、双会话乱序、worktree 查询隔离、session 归属、review/progress 故障回滚和提交后广播。
+- WebSocket/API/MCP：覆盖关联 ID、未知入站事件不广播、断线迟到 reply 不 panic、URL/body session 错配、workspace/session 错配和 `reviewId/sessionId` schema 映射。
+- 前端：覆盖 HTTP 返回后的防重、旧闭包与工作区切换、同 ID 乱序合并、双 session pending 配对、跨 worktree 拒绝、空/非法/聚合不一致数据 fail-closed。
+- 变更后从各包目录运行 `bun test`、`bun typecheck`、相关文件 ESLint、`bun run build`、`go test ./...`、`go build ./...` 和 `go vet ./...`；race 测试受当前 Go/Windows 工具链能力约束。
+
+### 7. Wrong vs Correct
+
+错误：
+
+```ts
+// HTTP 已返回，但 running 事件还没到；本地没有 pending，用户可重复提交。
+await sendReview()
+setReviewing(false)
+```
+
+正确：提交前按 workspace + session 原子防重并立即插入 pending；请求失败只回滚该 pending，真实同 session 事件到达后再替换。
+
+错误：
+
+```go
+saveReview(row)
+saveProgress(event) // 第二步失败会留下半成功 review
+broadcast(row)
+```
+
+正确：在同一 SQLite transaction 中写 review 与 progress，`Commit` 成功后再依次广播持久化后的事件。

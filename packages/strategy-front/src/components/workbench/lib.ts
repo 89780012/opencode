@@ -1,4 +1,5 @@
-import { CircleAlert, CircleCheck, CircleDot, LoaderCircle, type LucideIcon } from "lucide-react"
+import { createElement } from "react"
+import { CircleAlert, CircleCheck, CircleDot, LoaderCircle, type LucideProps } from "lucide-react"
 import type { ReviewStatus, StepStatus, TimelineEvent } from "./data"
 
 export function sleep(ms: number) {
@@ -43,11 +44,11 @@ export function status(status: ReviewStatus) {
   return "处理中"
 }
 
-export function badge(status: StepStatus): LucideIcon {
-  if (status === "done") return CircleCheck
-  if (status === "error") return CircleAlert
-  if (status === "running") return LoaderCircle
-  return CircleDot
+export function badge(status: StepStatus, props: LucideProps) {
+  if (status === "done") return createElement(CircleCheck, props)
+  if (status === "error") return createElement(CircleAlert, props)
+  if (status === "running") return createElement(LoaderCircle, props)
+  return createElement(CircleDot, props)
 }
 
 export function kind(type: TimelineEvent["type"]) {

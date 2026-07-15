@@ -17,7 +17,7 @@ import {
   type Analysis,
   type Chart,
 } from "../src/state.js"
-import type { Memory, Project } from "../src/types.js"
+import type { Memory, Project, SaveReview } from "../src/types.js"
 
 type Row = {
   message: string
@@ -65,6 +65,7 @@ function setup(input: ReturnType<typeof ctx>, dep: Parameters<typeof build>[1] =
   return build(input, {
     memory: restored(),
     projects: projects(),
+    saveReview: async () => {},
     ...dep,
   })
 }
@@ -690,16 +691,22 @@ describe("smartx workspace analysis", () => {
     expect(pending.has(id)).toBe(false)
   })
 
-  test("injects hidden review workflow when user asks for review", async () => {
+  test("keeps a review request until the reviewer running state is saved", async () => {
     const rows: Row[] = []
     const id = key("f:/repo", "f:/repo")
     const reviewRequests = new Set<string>()
+    const reviewRuns = new Set<string>()
+    const saved: SaveReview[] = []
     const hooks = setup(ctx("f:/repo", rows), {
       workspaces: new Map([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]]),
       charts: new Map([
         [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() }],
       ]),
       reviewRequests,
+      reviewRuns,
+      saveReview: async (input) => {
+        saved.push(input)
+      },
     })
 
     await hooks["chat.message"]?.(
@@ -717,8 +724,418 @@ describe("smartx workspace analysis", () => {
     expect(out.system.join("\n")).toContain("strategy-reviewer")
     expect(out.system.join("\n")).toContain("smartx_save_review")
     expect(out.system.join("\n")).toContain("第 3 轮")
+    expect(reviewRequests.size).toBe(1)
+
+    await hooks["tool.execute.before"]?.(
+      { sessionID: "s1", tool: "task", callID: "review-1" },
+      { args: { subagent_type: "strategy-reviewer" } },
+    )
+
     expect(reviewRequests.size).toBe(0)
+    expect(reviewRuns.has(id + "\x00s1")).toBe(true)
+    expect(saved[0]).toMatchObject({ reviewId: "review-1", sessionId: "s1", state: "running" })
+    await hooks["chat.message"]?.(
+      { sessionID: "s1", messageID: "m2", agent: "smartx-helper" },
+      {
+        message: {} as never,
+        parts: [{ type: "text", text: "review again" } as never],
+      },
+    )
+    expect(reviewRequests.size).toBe(0)
+    await expect(
+      hooks["tool.execute.before"]?.(
+        { sessionID: "s1", tool: "task", callID: "review-2" },
+        { args: { subagent_type: "strategy-reviewer" } },
+      ),
+    ).rejects.toThrow("active review")
+    expect(saved).toHaveLength(1)
     expect(rows.some((item) => item.message === "workspace review requested")).toBe(true)
+  })
+
+  test("rejects a reviewer that has no user request or review fix", async () => {
+    const id = workspace()
+    const saved: SaveReview[] = []
+    const hooks = setup(ctx("f:/repo"), {
+      workspaces: new Map([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]]),
+      charts: new Map([
+        [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() }],
+      ]),
+      saveReview: async (input) => {
+        saved.push(input)
+      },
+    })
+
+    await expect(
+      hooks["tool.execute.before"]?.(
+        { sessionID: "s1", tool: "task", callID: "review-1" },
+        { args: { subagent_type: "strategy-reviewer" } },
+      ),
+    ).rejects.toThrow("not requested")
+    expect(saved).toHaveLength(0)
+  })
+
+  test("reserves a review before the running state save completes", async () => {
+    const id = workspace()
+    const scope = id + "\x00s1"
+    const runs = new Set<string>()
+    let start = () => {}
+    const started = new Promise<void>((done) => {
+      start = done
+    })
+    let release = () => {}
+    const wait = new Promise<void>((done) => {
+      release = done
+    })
+    const saved: SaveReview[] = []
+    const hooks = setup(ctx("f:/repo"), {
+      workspaces: new Map([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]]),
+      charts: new Map([
+        [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() }],
+      ]),
+      reviewRequests: new Set([scope]),
+      reviewRuns: runs,
+      saveReview: async (input) => {
+        saved.push(input)
+        start()
+        await wait
+      },
+    })
+
+    const first = hooks["tool.execute.before"]?.(
+      { sessionID: "s1", tool: "task", callID: "review-1" },
+      { args: { subagent_type: "strategy-reviewer" } },
+    )
+    await started
+    const second = hooks["tool.execute.before"]?.(
+      { sessionID: "s1", tool: "task", callID: "review-2" },
+      { args: { subagent_type: "strategy-reviewer" } },
+    )
+    release()
+    const result = await Promise.allSettled([first, second])
+
+    expect(result[0].status).toBe("fulfilled")
+    expect(result[1].status).toBe("rejected")
+    expect(saved).toHaveLength(1)
+    expect(runs.has(scope)).toBe(true)
+  })
+
+  test("turns a missing reviewer task output into an error pending", async () => {
+    const id = workspace()
+    const scope = id + "\x00s1"
+    const pending = new Map()
+    const runs = new Set<string>()
+    const hooks = setup(ctx("f:/repo"), {
+      workspaces: new Map([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]]),
+      charts: new Map([
+        [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() }],
+      ]),
+      pending,
+      reviewRequests: new Set([scope]),
+      reviewRuns: runs,
+    })
+
+    await hooks["tool.execute.before"]?.(
+      { sessionID: "s1", tool: "task", callID: "review-1" },
+      { args: { subagent_type: "strategy-reviewer" } },
+    )
+    await hooks["tool.execute.after"]?.(
+      { sessionID: "s1", tool: "task", callID: "review-1", args: { subagent_type: "strategy-reviewer" } },
+      undefined as never,
+    )
+
+    expect(runs.has(scope)).toBe(false)
+    expect(pending.get(scope)).toMatchObject({ reviewId: "review-1", sessionId: "s1", state: "error" })
+  })
+
+  test("keeps a review request when the running state cannot be saved", async () => {
+    const id = workspace()
+    const requests = new Set([id + "\x00s1"])
+    const hooks = setup(ctx("f:/repo"), {
+      workspaces: new Map([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]]),
+      charts: new Map([
+        [
+          id,
+          {
+            workspace: "f:/repo",
+            worktree: "f:/repo",
+            state: "done",
+            mermaidCode: "flowchart TD",
+            errorText: "",
+            updated: Date.now(),
+          },
+        ],
+      ]),
+      reviewRequests: requests,
+      saveReview: async () => {
+        throw new Error("review service unavailable")
+      },
+    })
+
+    await expect(
+      hooks["tool.execute.before"]?.(
+        { sessionID: "s1", tool: "task", callID: "review-1" },
+        { args: { subagent_type: "strategy-reviewer" } },
+      ),
+    ).rejects.toThrow("review service unavailable")
+    expect(requests.has(id + "\x00s1")).toBe(true)
+  })
+
+  test("refreshes a dirty baseline before consuming the review request", async () => {
+    const id = workspace()
+    const requests = new Set([id + "\x00s1"])
+    const workspaces = new Map([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]])
+    const charts = new Map<string, Chart>([
+      [
+        id,
+        {
+          workspace: "f:/repo",
+          worktree: "f:/repo",
+          state: "done",
+          mermaidCode: "flowchart TD",
+          errorText: "",
+          updated: Date.now(),
+        },
+      ],
+    ])
+    const hooks = setup(ctx("f:/repo"), {
+      workspaces,
+      charts,
+      dirtyStates: new Map([[id, { state: "dirty", updated: Date.now(), reason: "write" }]]),
+      reviewRequests: requests,
+    })
+    const out = { system: [] as string[] }
+
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, out)
+
+    expect(out.system.join("\n")).toContain("代码审查")
+    expect(workspaces.get(id)?.state).toBe("requested")
+    expect(charts.get(id)?.state).toBe("requested")
+    expect(requests.has(id + "\x00s1")).toBe(true)
+  })
+
+  test("treats an empty reviewer result as an error", async () => {
+    const pending = new Map()
+    const hooks = setup(ctx("f:/repo"), { pending })
+    const scope = workspace() + "\x00s1"
+
+    await hooks["tool.execute.after"]?.(
+      { sessionID: "s1", tool: "task", callID: "review-empty", args: { subagent_type: "strategy-reviewer" } },
+      { title: "", output: "", metadata: {} },
+    )
+
+    expect(pending.get(scope)).toMatchObject({
+      kind: "review",
+      reviewId: "review-empty",
+      sessionId: "s1",
+      state: "error",
+    })
+  })
+
+  test("rejects a terminal review save without a pending review for the session", async () => {
+    const hooks = setup(ctx("f:/repo"))
+
+    await expect(
+      hooks["tool.execute.before"]?.(
+        { sessionID: "s1", tool: "smartx_save_review", callID: "save-1" },
+        {
+          args: {
+            reviewId: "forged",
+            sessionId: "s1",
+            workspacePath: "f:/repo",
+            worktreePath: "f:/repo",
+            state: "passed",
+            summary: "passed",
+            items: [{ name: "review", status: "passed", detail: "passed", suggestion: "" }],
+            suggestions: [],
+          },
+        },
+      ),
+    ).rejects.toThrow("no pending review")
+  })
+
+  test("rejects empty, invalid, and running terminal review items", async () => {
+    const pending = new Map()
+    const hooks = setup(ctx("f:/repo"), { pending })
+
+    await hooks["tool.execute.after"]?.(
+      { sessionID: "s1", tool: "task", callID: "review-1", args: { subagent_type: "strategy-reviewer" } },
+      { title: "", output: "review conclusion: passed\nno blocking issue", metadata: {} },
+    )
+
+    const call = (items: unknown[], summary = "review complete") =>
+      hooks["tool.execute.before"]?.(
+        { sessionID: "s1", tool: "smartx_save_review", callID: "save-1" },
+        {
+          args: {
+            reviewId: "review-1",
+            sessionId: "s1",
+            workspacePath: "f:/repo",
+            worktreePath: "f:/repo",
+            state: "passed",
+            summary,
+            items,
+            suggestions: [],
+          },
+        },
+      )
+
+    await expect(call([])).rejects.toThrow("valid statuses")
+    await expect(call([{ name: "review", status: "unknown", detail: "invalid", suggestion: "" }])).rejects.toThrow(
+      "valid statuses",
+    )
+    await expect(call([{ name: "review", status: "running", detail: "still running", suggestion: "" }])).rejects.toThrow(
+      "valid statuses",
+    )
+    await expect(call([{ name: "", status: "passed", detail: "passed", suggestion: "" }])).rejects.toThrow(
+      "valid statuses",
+    )
+    await expect(call([{ name: "review", status: "passed", detail: "", suggestion: "" }])).rejects.toThrow(
+      "valid statuses",
+    )
+    await expect(
+      call([{ name: "review", status: "passed", detail: "passed", suggestion: "" }], ""),
+    ).rejects.toThrow("non-empty terminal review summary")
+    expect(pending.has(workspace() + "\x00s1")).toBe(true)
+  })
+
+  test("does not let terminal items weaken a failed reviewer result", async () => {
+    const pending = new Map()
+    const hooks = setup(ctx("f:/repo"), { pending })
+
+    await hooks["tool.execute.after"]?.(
+      { sessionID: "s1", tool: "task", callID: "review-1", args: { subagent_type: "strategy-reviewer" } },
+      { title: "", output: "review conclusion: failed\nmissing stop loss", metadata: {} },
+    )
+
+    await expect(
+      hooks["tool.execute.before"]?.(
+        { sessionID: "s1", tool: "smartx_save_review", callID: "save-1" },
+        {
+          args: {
+            reviewId: "review-1",
+            sessionId: "s1",
+            workspacePath: "f:/repo",
+            worktreePath: "f:/repo",
+            state: "passed",
+            summary: "passed",
+            items: [{ name: "review", status: "passed", detail: "passed", suggestion: "" }],
+            suggestions: [],
+          },
+        },
+      ),
+    ).rejects.toThrow("less severe")
+    expect(pending.has(workspace() + "\x00s1")).toBe(true)
+  })
+
+  test("clears the repair queue when terminal items escalate a failed review to error", async () => {
+    const id = workspace()
+    const scope = id + "\x00s1"
+    const rows: Row[] = []
+    const pending = new Map()
+    const fixes = new Map()
+    const hooks = setup(ctx("f:/repo", rows), {
+      workspaces: new Map([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]]),
+      charts: new Map([
+        [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() }],
+      ]),
+      pending,
+      reviewFixes: fixes,
+    })
+
+    await hooks["tool.execute.after"]?.(
+      { sessionID: "s1", tool: "task", callID: "review-1", args: { subagent_type: "strategy-reviewer" } },
+      { title: "", output: "review conclusion: failed\nmissing stop loss", metadata: {} },
+    )
+    expect(fixes.has(scope)).toBe(true)
+
+    const call = {
+      args: {
+        workspacePath: "f:/repo",
+        worktreePath: "f:/repo",
+        state: "failed",
+        summary: "review execution error",
+        items: [{ name: "review", status: "error", detail: "review execution error", suggestion: "retry" }],
+        suggestions: ["retry"],
+      },
+    }
+    await hooks["tool.execute.before"]?.({ sessionID: "s1", tool: "smartx_save_review", callID: "save-1" }, call)
+    expect(call.args.state).toBe("error")
+    await hooks["tool.execute.after"]?.(
+      { sessionID: "s1", tool: "smartx_save_review", callID: "save-1", args: call.args },
+      { title: "", output: "{}", metadata: {} },
+    )
+
+    expect(pending.has(scope)).toBe(false)
+    expect(fixes.has(scope)).toBe(false)
+    expect(rows.find((item) => item.message === "workspace review saved through mcp")?.extra?.state).toBe("error")
+  })
+
+  test("isolates concurrent review pending state by session and review id", async () => {
+    const pending = new Map()
+    const hooks = setup(ctx("f:/repo"), { pending })
+    const id = workspace()
+    const one = id + "\x00s1"
+    const two = id + "\x00s2"
+
+    await Promise.all([
+      hooks["tool.execute.after"]?.(
+        { sessionID: "s1", tool: "task", callID: "review-1", args: { subagent_type: "strategy-reviewer" } },
+        { title: "", output: "review conclusion: error\nfirst review failed to run", metadata: {} },
+      ),
+      hooks["tool.execute.after"]?.(
+        { sessionID: "s2", tool: "task", callID: "review-2", args: { subagent_type: "strategy-reviewer" } },
+        { title: "", output: "review conclusion: error\nsecond review failed to run", metadata: {} },
+      ),
+    ])
+
+    expect(pending.get(one)).toMatchObject({ reviewId: "review-1", sessionId: "s1" })
+    expect(pending.get(two)).toMatchObject({ reviewId: "review-2", sessionId: "s2" })
+
+    const first = { system: [] as string[] }
+    const second = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, first)
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s2", model: {} as never }, second)
+    expect(first.system.join("\n")).toContain("first review")
+    expect(first.system.join("\n")).not.toContain("second review")
+    expect(second.system.join("\n")).toContain("second review")
+
+    await hooks["tool.execute.after"]?.(
+      {
+        sessionID: "s1",
+        tool: "smartx_save_review",
+        callID: "save-wrong",
+        args: {
+          reviewId: "review-2",
+          sessionId: "s1",
+          workspacePath: "f:/repo",
+          worktreePath: "f:/repo",
+          state: "error",
+          items: [{ name: "review", status: "error", detail: "failed", suggestion: "retry" }],
+        },
+      },
+      { title: "", output: "{}", metadata: {} },
+    )
+    expect(pending.has(one)).toBe(true)
+    expect(pending.has(two)).toBe(true)
+
+    await hooks["tool.execute.after"]?.(
+      {
+        sessionID: "s1",
+        tool: "smartx_save_review",
+        callID: "save-1",
+        args: {
+          reviewId: "review-1",
+          sessionId: "s1",
+          workspacePath: "f:/repo",
+          worktreePath: "f:/repo",
+          state: "error",
+          items: [{ name: "review", status: "error", detail: "failed", suggestion: "retry" }],
+        },
+      },
+      { title: "", output: "{}", metadata: {} },
+    )
+    expect(pending.has(one)).toBe(false)
+    expect(pending.has(two)).toBe(true)
   })
 
   test("saves failed review before asking the main agent to fix it", async () => {
@@ -727,14 +1144,18 @@ describe("smartx workspace analysis", () => {
     const charts = new Map<string, Chart>()
     const pending = new Map()
     const fixes = new Map()
+    const id = key("f:/repo", "f:/repo")
+    const scope = id + "\x00s1"
+    const requests = new Set<string>([scope])
+    const dirt = new Map()
     const hooks = setup(ctx("f:/repo", rows), {
       workspaces,
       charts,
       pending,
+      dirtyStates: dirt,
       reviewFixes: fixes,
+      reviewRequests: requests,
     })
-    const id = key("f:/repo", "f:/repo")
-    const fixID = id + "\x00" + "s1"
     workspaces.set(id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"]))
     charts.set(id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() })
 
@@ -757,32 +1178,55 @@ describe("smartx workspace analysis", () => {
       },
     )
 
-    expect(pending.get(id)?.kind).toBe("review")
-    expect(pending.get(id)?.state).toBe("failed")
-    expect(fixes.get(fixID)?.attempt).toBe(1)
+    expect(pending.get(scope)).toMatchObject({ kind: "review", reviewId: "c1", sessionId: "s1", state: "failed" })
+    expect(fixes.get(scope)?.attempt).toBe(1)
 
     const save = { system: [] as string[] }
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, save)
     expect(save.system.join("\n")).toContain("smartx_save_review")
     expect(save.system.join("\n")).toContain("审查报告")
+    expect(save.system.join("\n")).toContain("reviewId: c1")
+    expect(save.system.join("\n")).toContain("sessionId: s1")
 
+    const call = {
+      args: {
+        workspacePath: "forged",
+        worktreePath: "forged",
+        state: "passed",
+        summary: "missing stop loss",
+        items: [{ name: "risk control", status: "failed", detail: "missing stop loss", suggestion: "add stop loss" }],
+        suggestions: [],
+      },
+    }
+    await hooks["tool.execute.before"]?.({ sessionID: "s1", tool: "smartx_save_review", callID: "c2" }, call)
+    expect(call.args).toMatchObject({
+      reviewId: "c1",
+      sessionId: "s1",
+      workspacePath: "f:/repo",
+      worktreePath: "f:/repo",
+      state: "failed",
+    })
     await hooks["tool.execute.after"]?.(
       {
         sessionID: "s1",
         tool: "smartx_save_review",
         callID: "c2",
-        args: {
-          workspacePath: "f:/repo",
-          worktreePath: "f:/repo",
-          state: "failed",
-          items: [{ name: "risk control", status: "failed", detail: "missing stop loss", suggestion: "add stop loss" }],
-        },
+        args: call.args,
       },
       { title: "", output: "{}", metadata: {} },
     )
 
-    expect(pending.has(id)).toBe(false)
-    expect(fixes.get(fixID)?.attempt).toBe(1)
+    expect(pending.has(scope)).toBe(false)
+    expect(fixes.get(scope)?.attempt).toBe(1)
+
+    await hooks["chat.message"]?.(
+      { sessionID: "s1", messageID: "m2", agent: "smartx-helper" },
+      {
+        message: {} as never,
+        parts: [{ type: "text", text: "review again" } as never],
+      },
+    )
+    expect(requests.has(scope)).toBe(false)
 
     const fix = { system: [] as string[] }
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, fix)
@@ -792,6 +1236,31 @@ describe("smartx workspace analysis", () => {
     expect(fix.system.join("\n")).toContain("strategy-reviewer")
     expect(fix.system.join("\n")).toContain("missing stop loss")
     expect(rows.some((item) => item.message === "workspace review needs fix")).toBe(true)
+
+    await hooks["tool.execute.after"]?.(
+      {
+        sessionID: "s1",
+        tool: "write",
+        callID: "c3",
+        args: { filePath: "f:/repo/a.ts", content: "fixed" },
+      },
+      { title: "", output: "Wrote file successfully.", metadata: {} },
+    )
+
+    const refresh = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, refresh)
+    expect(refresh.system.join("\n")).toContain("策略复审")
+    expect(requests.has(scope)).toBe(true)
+    expect(fixes.get(scope)?.attempt).toBe(1)
+
+    workspaces.set(id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"]))
+    charts.set(id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() })
+    dirt.set(id, { state: "clean", updated: Date.now(), reason: "" })
+
+    const retry = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, retry)
+    expect(retry.system.join("\n")).toContain("strategy-reviewer")
+    expect(retry.system.join("\n")).not.toContain("必须自己根据审查报告修复代码")
   })
 
   test("finalizes after a passed review", async () => {
@@ -799,8 +1268,9 @@ describe("smartx workspace analysis", () => {
     const workspaces = new Map<string, Analysis>()
     const charts = new Map<string, Chart>()
     const pending = new Map()
-    const hooks = setup(ctx("f:/repo", rows), { workspaces, charts, pending })
+    const hooks = setup(ctx("f:/repo", rows), { workspaces, charts, pending, memory: restored(true) })
     const id = key("f:/repo", "f:/repo")
+    const scope = id + "\x00s1"
     workspaces.set(id, doneAnalysis("f:/repo", "f:/repo", "", ["old analysis"]))
     charts.set(id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() })
 
@@ -818,58 +1288,55 @@ describe("smartx workspace analysis", () => {
       },
     )
 
-    expect(pending.get(id)?.kind).toBe("review")
-    expect(pending.get(id)?.state).toBe("passed")
+    expect(pending.get(scope)).toMatchObject({ kind: "review", reviewId: "c1", sessionId: "s1", state: "passed" })
 
     const save = { system: [] as string[] }
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, save)
     expect(save.system.join("\n")).toContain("smartx_save_review")
     expect(save.system.join("\n")).toContain("no blocking issue")
 
+    const call = {
+      args: {
+        workspacePath: "f:/repo",
+        worktreePath: "f:/repo",
+        state: "passed",
+        summary: "passed",
+        items: [{ name: "requirements", status: "passed", detail: "passed", suggestion: "" }],
+        suggestions: [],
+      },
+    }
+    await hooks["tool.execute.before"]?.({ sessionID: "s1", tool: "smartx_save_review", callID: "c2" }, call)
     await hooks["tool.execute.after"]?.(
       {
         sessionID: "s1",
         tool: "smartx_save_review",
         callID: "c2",
-        args: {
-          workspacePath: "f:/repo",
-          worktreePath: "f:/repo",
-          state: "passed",
-          items: [{ name: "requirements", status: "passed", detail: "passed", suggestion: "" }],
-        },
+        args: call.args,
       },
+      { title: "", output: "{}", metadata: {} },
     )
 
-    expect(pending.has(id)).toBe(false)
+    expect(pending.has(scope)).toBe(false)
+    expect(workspaces.get(id)?.state).toBe("requested")
+    expect(charts.get(id)?.state).toBe("requested")
 
-    await hooks["tool.execute.after"]?.(
-      {
-        sessionID: "s1",
-        tool: "write",
-        callID: "c3",
-        args: { filePath: "f:/repo/a.ts", content: "changed" },
-      },
-      { title: "", output: "Wrote file successfully.", metadata: {} },
+    const memory = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, memory)
+    expect(memory.system.join("\n")).toContain("save_project_state")
+
+    const project = {
+      args: { workspacePath: "f:/repo", worktreePath: "f:/repo", dirty: false },
+    }
+    await hooks["tool.execute.before"]?.(
+      { sessionID: "s1", tool: "smartx_save_project_state", callID: "c3" },
+      project,
     )
-
-    await hooks["chat.message"]?.(
-      { sessionID: "s1", messageID: "m2", agent: "smartx-helper" },
-      {
-        message: {} as never,
-        parts: [{ type: "text", text: "final summary" } as never],
-      },
-    )
-
-    const refresh = { system: [] as string[] }
-    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, refresh)
-    expect(refresh.system.join("\n")).toContain("save_project_state")
-
     await hooks["tool.execute.after"]?.(
       {
         sessionID: "s1",
         tool: "smartx_save_project_state",
-        callID: "c4",
-        args: { workspacePath: "f:/repo", worktreePath: "f:/repo" },
+        callID: "c3",
+        args: project.args,
       },
       { title: "", output: "{}", metadata: {} },
     )
@@ -937,12 +1404,16 @@ describe("smartx workspace analysis", () => {
   test("fixes saved review when any item is not passed", async () => {
     const pending = new Map()
     const fixes = new Map()
+    const id = key("f:/repo", "f:/repo")
     const hooks = setup(ctx("f:/repo"), {
       pending,
       reviewFixes: fixes,
+      workspaces: new Map([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]]),
+      charts: new Map([
+        [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() }],
+      ]),
     })
-    const id = key("f:/repo", "f:/repo")
-    const fixID = id + "\x00" + "s1"
+    const scope = id + "\x00s1"
 
     await hooks["tool.execute.after"]?.(
       {
@@ -958,26 +1429,41 @@ describe("smartx workspace analysis", () => {
       },
     )
 
+    const call = {
+      args: {
+        reviewId: "forged",
+        sessionId: "forged",
+        workspacePath: "forged",
+        worktreePath: "forged",
+        state: "passed",
+        summary: "risk control needs reinforcement",
+        items: [
+          { name: "requirements", status: "passed", detail: "passed", suggestion: "" },
+          { name: "risk control", status: "warning", detail: "needs reinforcement", suggestion: "add risk control" },
+        ],
+        suggestions: ["add risk control"],
+      },
+    }
+    await hooks["tool.execute.before"]?.({ sessionID: "s1", tool: "smartx_save_review", callID: "c2" }, call)
+    expect(call.args).toMatchObject({
+      reviewId: "c1",
+      sessionId: "s1",
+      workspacePath: "f:/repo",
+      worktreePath: "f:/repo",
+      state: "failed",
+    })
     await hooks["tool.execute.after"]?.(
       {
         sessionID: "s1",
         tool: "smartx_save_review",
         callID: "c2",
-        args: {
-          workspacePath: "f:/repo",
-          worktreePath: "f:/repo",
-          state: "passed",
-          items: [
-            { name: "requirements", status: "passed", detail: "passed", suggestion: "" },
-            { name: "risk control", status: "warning", detail: "needs reinforcement", suggestion: "add risk control" },
-          ],
-        },
+        args: call.args,
       },
       { title: "", output: "{}", metadata: {} },
     )
 
-    expect(pending.has(id)).toBe(false)
-    expect(fixes.get(fixID)?.attempt).toBe(1)
+    expect(pending.has(scope)).toBe(false)
+    expect(fixes.get(scope)?.attempt).toBe(1)
 
     const fix = { system: [] as string[] }
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, fix)
@@ -999,6 +1485,7 @@ describe("smartx workspace analysis", () => {
       reviewFixes: fixes,
     })
     const id = key("f:/repo", "f:/repo")
+    const scope = id + "\x00s1"
 
     await hooks["tool.execute.after"]?.(
       {
@@ -1014,9 +1501,8 @@ describe("smartx workspace analysis", () => {
       },
     )
 
-    expect(fixes.get(id + "\x00" + "s1")?.attempt).toBe(3)
-    expect(pending.get(id)?.kind).toBe("review")
-    expect(pending.get(id)?.state).toBe("failed")
+    expect(fixes.get(scope)?.attempt).toBe(3)
+    expect(pending.get(scope)).toMatchObject({ kind: "review", reviewId: "c1", sessionId: "s1", state: "failed" })
 
     const save = { system: [] as string[] }
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, save)
@@ -1028,6 +1514,8 @@ describe("smartx workspace analysis", () => {
         tool: "smartx_save_review",
         callID: "c2",
         args: {
+          reviewId: "c1",
+          sessionId: "s1",
           workspacePath: "f:/repo",
           worktreePath: "f:/repo",
           state: "failed",
@@ -1041,7 +1529,7 @@ describe("smartx workspace analysis", () => {
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, fix)
     expect(fix.system.join("\n")).toContain("3")
     expect(fix.system.join("\n")).toContain("strategy-reviewer")
-    expect(fixes.has(id + "\x00" + "s1")).toBe(false)
+    expect(fixes.has(scope)).toBe(false)
   })
 
   test("requires project memory restore before sustained work", async () => {
@@ -1072,6 +1560,13 @@ describe("smartx workspace analysis", () => {
       hooks["tool.execute.before"]?.(
         { sessionID: "s1", tool: "skill", callID: "c3" },
         { args: { name: "smartx-develop" } },
+      ),
+    ).rejects.toThrow("restoring project memory")
+
+    await expect(
+      hooks["tool.execute.before"]?.(
+        { sessionID: "s1", tool: "smartx_save_project_state", callID: "c4" },
+        { args: { workspacePath: "f:/repo", worktreePath: "f:/repo", dirty: false } },
       ),
     ).rejects.toThrow("restoring project memory")
   })

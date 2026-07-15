@@ -81,5 +81,5 @@ export function reviewState(text: string) {
   if (/((审查)?(结论|结果)|review\s*(result|conclusion))\s*[:：-]?\s*(通过|passed)/i.test(out)) return "passed" as const
   if (/(无法完成|无法审查|未能完成|error)/i.test(out)) return "error" as const
   if (/(未通过|不通过|失败|风险|问题|failed)/i.test(out)) return "failed" as const
-  return "passed" as const
+  return "error" as const
 }

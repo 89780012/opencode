@@ -28,6 +28,9 @@ describe("smartx workflow state", () => {
     expect(reviewState("review result: failed")).toBe("failed")
     expect(reviewState("review status: error")).toBe("error")
     expect(reviewState("there are still failed checks")).toBe("failed")
+    expect(reviewState("")).toBe("error")
+    expect(reviewState("审查结果为空")).toBe("error")
+    expect(reviewState("审查已经完成")).toBe("error")
   })
 
   test("detects final intent variants", () => {
@@ -38,4 +41,3 @@ describe("smartx workflow state", () => {
     expect(wantsFinal("不要结束")).toBe(false)
   })
 })
-

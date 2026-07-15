@@ -47,6 +47,7 @@ type Opt = {
   baselineModes: Map<string, Mode>
   reviewFixes: Map<string, Fix>
   reviewRequests: Set<string>
+  reviewRuns: Set<string>
   finalRequests: Set<string>
   childSessions: Set<string>
   parent: (id: string) => Promise<boolean>
@@ -101,22 +102,35 @@ function sameWorkspace(input: unknown, workspace: string, worktree: string, writ
   return result
 }
 
-/** 规范化 review item 的 status，方便做大小写无关的比较。*/
-function normalizeStatus(input: unknown) {
-  if (typeof input !== "string") return ""
-  return input.trim().toLowerCase()
+/** 按 service 契约聚合终态检查项；空、非法和 running 检查项都返回无效。 */
+function aggregate(input: unknown) {
+  if (!Array.isArray(input) || !input.length) return "" as const
+  const list = input.map((item) => {
+    if (!item || typeof item !== "object") return ""
+    const row = item as Record<string, unknown>
+    if (typeof row.name !== "string" || !row.name.trim()) return ""
+    if (typeof row.detail !== "string" || !row.detail.trim()) return ""
+    const status = row.status
+    return typeof status === "string" ? status.trim() : ""
+  })
+  if (list.some((status) => !["passed", "warning", "failed", "error"].includes(status))) return "" as const
+  if (list.includes("error")) return "error" as const
+  if (list.some((status) => status === "failed" || status === "warning")) return "failed" as const
+  return "passed" as const
+}
+
+/** 审查状态严重度只允许持平或上升，防止 failed/error 被模型改写成 passed。 */
+function rank(input: "passed" | "failed" | "error") {
+  if (input === "error") return 2
+  if (input === "failed") return 1
+  return 0
 }
 
 /** 判断 `save_review` 提交的所有检查项是否都已通过。*/
 function reviewPassed(input: unknown) {
   if (!input || typeof input !== "object") return false
   const args = input as Record<string, unknown>
-  if (args.state !== "passed") return false
-  if (!Array.isArray(args.items) || !args.items.length) return false
-  return args.items.every(
-    (item) =>
-      item && typeof item === "object" && normalizeStatus((item as Record<string, unknown>).status) === "passed",
-  )
+  return args.state === "passed" && aggregate(args.items) === "passed"
 }
 
 /** 生成 workspace + session 维度的修复记录 key。*/
@@ -127,6 +141,13 @@ function fixKey(id: string, session: string) {
 /** 生成 workspace + session 维度的请求 key。*/
 function requestKey(id: string, session: string) {
   return id + "\x00" + session
+}
+
+/** 当前会话优先读取自己的审查 pending，基线 pending 仍保持 workspace 级。 */
+function current(opt: Opt, session?: string) {
+  const item = session ? opt.pending.get(requestKey(opt.id, session)) : undefined
+  if (item?.kind === "review") return item
+  return opt.pending.get(opt.id)
 }
 
 /** 对只能在主会话运行的本地能力做恢复会话兼容校验。 */
@@ -232,18 +253,18 @@ export function createWorkspace(opt: Opt) {
 
       // 获取到当前快照
       const snap = await snapshot(opt)
+      const sessionID = input.sessionID
 
       // 当前的状态管理
       const state = stateView({
         analysis: snap.analysis,
         chart: snap.chart,
         project: snap.project,
-        pendingSave: opt.pending.get(opt.id),
+        pendingSave: current(opt, sessionID),
         dirtyState: opt.dirtyStates.get(opt.id) ?? cleanDirt(),
         projectMemory: opt.memory.get(opt.id) ?? cleanMemory(snap.project),
         baselineMode: opt.baselineModes.get(opt.id) ?? "boot",
       })
-      const sessionID = input.sessionID
 
       return flow([
         /** 1. 当前轮需要先保存 project memory 时，优先注入保存提醒。*/
@@ -300,6 +321,20 @@ export function createWorkspace(opt: Opt) {
           if (!sessionID) return false
           const fix = opt.reviewFixes.get(fixKey(opt.id, sessionID))
           if (!fix) return false
+          const requestID = requestKey(opt.id, sessionID)
+          if (opt.reviewRequests.has(requestID)) return false
+          if (state.life === "dirty" && fix.attempt < limit) {
+            opt.reviewRequests.add(requestID)
+            reset(opt, "refresh")
+            await opt.write("workspace review fix refresh injected", {
+              sessionID,
+              workspace: opt.workspace,
+              worktree: opt.worktree,
+              attempt: fix.attempt,
+            })
+            output.system.push(noteRefresh("策略复审"))
+            return true
+          }
           await opt.write("workspace review fix injected", {
             sessionID,
             workspace: opt.workspace,
@@ -316,9 +351,17 @@ export function createWorkspace(opt: Opt) {
           if (!sessionID) return false
           const requestID = requestKey(opt.id, sessionID)
           if (!opt.reviewRequests.has(requestID)) return false
-          // 允许在 dirty 状态下进行审查，不强制刷新基线
-          if (state.life !== "ready" && state.life !== "dirty") return false
-          opt.reviewRequests.delete(requestID)
+          if (state.life === "dirty") {
+            reset(opt, "refresh")
+            await opt.write("workspace review refresh injected", {
+              sessionID,
+              workspace: opt.workspace,
+              worktree: opt.worktree,
+            })
+            output.system.push(noteRefresh("代码审查"))
+            return true
+          }
+          if (state.life !== "ready") return false
           await opt.write("workspace review gate injected", {
             sessionID,
             workspace: opt.workspace,
@@ -349,45 +392,7 @@ export function createWorkspace(opt: Opt) {
           if (state.life === "ready") opt.finalRequests.delete(requestID)
           return false
         }),
-        /** 7. 自动 final 检测：当审查通过且调试完成时自动触发最终收口 */
-        step("auto_final", async () => {
-          // 确保必要的 ID 存在
-          if (!sessionID || !opt.id) return false
-
-          // 安全地检查 pendingSave 的类型和状态
-          const pendingSave = state.pendingSave
-          const isReviewPassed =
-            pendingSave != null &&
-            typeof pendingSave === "object" &&
-            "kind" in pendingSave &&
-            pendingSave.kind === "review" &&
-            "state" in pendingSave &&
-            pendingSave.state === "passed"
-
-          // 检查是否满足自动 final 条件：
-          // 1. 审查刚刚完成且状态为 passed
-          // 2. 工作区有代码变更（dirty 状态）
-          // 3. 没有其他 pending 的 review/final 请求
-          const hasDirtyChanges = state.life === "dirty"
-          const requestID = requestKey(opt.id, sessionID)
-          const noExistingRequests = !opt.reviewRequests.has(requestID) && !opt.finalRequests.has(requestID)
-
-          if (isReviewPassed && hasDirtyChanges && noExistingRequests) {
-            // 清除 review pending 状态
-            opt.pending.delete(opt.id)
-            // 触发 final 流程
-            opt.finalRequests.add(requestID)
-            await opt.write("workspace auto final triggered", {
-              sessionID,
-              workspace: opt.workspace,
-              worktree: opt.worktree,
-              reason: "review passed",
-            })
-            return true
-          }
-          return false
-        }),
-        /** 8. 工作区自然收尾时，提醒先完成 project memory 保存。*/
+        /** 7. 工作区自然收尾时，提醒先完成 project memory 保存。*/
         step("close", async () => {
           // 只有不是子会话、没有挂起修复、也没有 review/final 请求时，才会自然收尾。
           if (
@@ -491,6 +496,29 @@ export function createWorkspace(opt: Opt) {
         delete args.requestKey
         if (mcp(input, "run_backtest")) args.requestKey = "ai:" + input.callID
       }
+      if (mcp(input, "save_review")) {
+        const item = opt.pending.get(requestKey(opt.id, input.sessionID))
+        if (item?.kind !== "review") throw new Error("SmartX workflow has no pending review for this session.")
+        const args =
+          output.args && typeof output.args === "object" && !Array.isArray(output.args)
+            ? (output.args as Record<string, unknown>)
+            : {}
+        const state = aggregate(args.items)
+        if (!state)
+          throw new Error(
+            "SmartX workflow requires non-empty terminal review items with valid statuses, names, and details.",
+          )
+        if (typeof args.summary !== "string" || !args.summary.trim())
+          throw new Error("SmartX workflow requires a non-empty terminal review summary.")
+        if (rank(state) < rank(item.state))
+          throw new Error("SmartX workflow cannot save a review state less severe than the reviewer result.")
+        output.args = args
+        args.reviewId = item.reviewId
+        args.sessionId = item.sessionId
+        args.workspacePath = opt.workspace
+        args.worktreePath = opt.worktree
+        args.state = state
+      }
       if (!opt.childSessions.has(input.sessionID)) {
         // 1. 先读取当前工作区快照，拿到 analysis / chart / project 的最新状态。
         const snap = await snapshot(opt)
@@ -499,7 +527,7 @@ export function createWorkspace(opt: Opt) {
           analysis: snap.analysis,
           chart: snap.chart,
           project: snap.project,
-          pendingSave: opt.pending.get(opt.id),
+          pendingSave: current(opt, input.sessionID),
           dirtyState: opt.dirtyStates.get(opt.id) ?? cleanDirt(),
           projectMemory: opt.memory.get(opt.id) ?? cleanMemory(snap.project),
           baselineMode: opt.baselineModes.get(opt.id) ?? "boot",
@@ -542,8 +570,17 @@ export function createWorkspace(opt: Opt) {
         step("review", async () => {
           // 只有真正启动了 strategy-reviewer，才会预写 running review 结果。
           if (!review({ tool: input.tool, args: output.args })) return false
+          const id = requestKey(opt.id, input.sessionID)
+          if (opt.reviewRuns.has(id)) throw new Error("SmartX workflow already has an active review for this session.")
+          if (!opt.reviewRequests.has(id) && !opt.reviewFixes.has(id))
+            throw new Error("SmartX workflow review was not requested for this session.")
+          if (opt.pending.get(id)?.kind === "review")
+            throw new Error("SmartX workflow requires saving the pending review before starting another review.")
+          opt.reviewRuns.add(id)
           await opt
             .saveReview({
+              reviewId: input.callID,
+              sessionId: input.sessionID,
               workspacePath: opt.workspace,
               worktreePath: opt.worktree,
               state: "running",
@@ -558,14 +595,11 @@ export function createWorkspace(opt: Opt) {
               ],
               suggestions: [],
             })
-            .catch((err) =>
-              opt.write("workspace review running save failed", {
-                sessionID: input.sessionID,
-                workspace: opt.workspace,
-                worktree: opt.worktree,
-                error: err instanceof Error ? err.message : String(err),
-              }),
-            )
+            .catch((err) => {
+              opt.reviewRuns.delete(id)
+              throw err
+            })
+          opt.reviewRequests.delete(id)
           await opt.write("workspace review started", {
             sessionID: input.sessionID,
             workspace: opt.workspace,
@@ -744,11 +778,17 @@ export function createWorkspace(opt: Opt) {
             !ok(output)
           )
             return false
-          const item = opt.pending.get(opt.id)
-          if (item?.kind === "review") opt.pending.delete(opt.id)
-          const done = item?.kind === "review" && reviewPassed(input.args)
-          if (done) opt.reviewFixes.delete(fixKey(opt.id, input.sessionID))
-          if (item?.kind === "review" && !done && item.state !== "error") {
+          const id = requestKey(opt.id, input.sessionID)
+          const item = opt.pending.get(id)
+          if (item?.kind !== "review") return false
+          const args = input.args && typeof input.args === "object" ? (input.args as Record<string, unknown>) : {}
+          if (args.reviewId !== item.reviewId || args.sessionId !== item.sessionId) return false
+          const state = aggregate(args.items)
+          if (!state || args.state !== state || rank(state) < rank(item.state)) return false
+          opt.pending.delete(id)
+          const done = item.state === "passed" && reviewPassed(args)
+          if (done || state === "error") opt.reviewFixes.delete(fixKey(opt.id, input.sessionID))
+          if (state === "failed") {
             const fix = opt.reviewFixes.get(fixKey(opt.id, input.sessionID))
             const attempt = Math.min(fix?.attempt ?? 1, limit)
             opt.reviewFixes.set(fixKey(opt.id, input.sessionID), {
@@ -759,11 +799,16 @@ export function createWorkspace(opt: Opt) {
               reviewText: item.reviewText,
             })
           }
+          if (done) {
+            opt.finalRequests.add(id)
+            reset(opt, "final")
+          }
           await opt.write("workspace review saved through mcp", {
             sessionID: input.sessionID,
             workspace: opt.workspace,
             worktree: opt.worktree,
-            state: item?.kind === "review" ? item.state : undefined,
+            reviewId: item.reviewId,
+            state,
             passed: done,
           })
           return true
@@ -800,7 +845,8 @@ export function createWorkspace(opt: Opt) {
         step("review_done", async () => {
           // review 子 agent 返回后，先解析结论，再决定是否要继续修复。
           if (!review(input)) return false
-          const text = reviewText(output.output) || "审查结果为空"
+          opt.reviewRuns.delete(requestKey(opt.id, input.sessionID))
+          const text = reviewText(output?.output ?? "") || "审查结果为空"
           const state = reviewState(text)
           const fix = opt.reviewFixes.get(fixKey(opt.id, input.sessionID))
           if (state === "failed") {
@@ -820,8 +866,10 @@ export function createWorkspace(opt: Opt) {
             })
           }
           if (state !== "failed") opt.reviewFixes.delete(fixKey(opt.id, input.sessionID))
-          opt.pending.set(opt.id, {
+          opt.pending.set(requestKey(opt.id, input.sessionID), {
             kind: "review",
+            reviewId: input.callID,
+            sessionId: input.sessionID,
             workspacePath: opt.workspace,
             worktreePath: opt.worktree,
             state,

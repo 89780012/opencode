@@ -85,14 +85,24 @@ func migrate(ctx context.Context, db *sql.DB) error {
 	defer tx.Rollback()
 
 	for _, col := range []struct {
-		name string
-		sql  string
+		table string
+		name  string
+		sql   string
 	}{
-		{name: "request_key", sql: "alter table backtest_runs add column request_key text not null default ''"},
-		{name: "revision", sql: "alter table backtest_runs add column revision integer not null default 0"},
+		{table: "backtest_runs", name: "request_key", sql: "alter table backtest_runs add column request_key text not null default ''"},
+		{table: "backtest_runs", name: "revision", sql: "alter table backtest_runs add column revision integer not null default 0"},
+		{table: "workspace_reviews", name: "review_id", sql: "alter table workspace_reviews add column review_id text not null default ''"},
+		{table: "workspace_reviews", name: "session_id", sql: "alter table workspace_reviews add column session_id text not null default ''"},
 	} {
+		var exists int
+		if err := tx.QueryRowContext(ctx, `select count(*) from sqlite_master where type = 'table' and name = ?`, col.table).Scan(&exists); err != nil {
+			return err
+		}
+		if exists == 0 {
+			continue
+		}
 		var count int
-		if err := tx.QueryRowContext(ctx, `select count(*) from pragma_table_info('backtest_runs') where name = ?`, col.name).Scan(&count); err != nil {
+		if err := tx.QueryRowContext(ctx, `select count(*) from pragma_table_info(?) where name = ?`, col.table, col.name).Scan(&count); err != nil {
 			return err
 		}
 		if count == 0 {
@@ -102,12 +112,24 @@ func migrate(ctx context.Context, db *sql.DB) error {
 		}
 	}
 
-	for _, stmt := range []string{
-		`create unique index if not exists idx_backtest_runs_session_request_key on backtest_runs(workspace_path, session_id, request_key) where request_key <> ''`,
-		`create index if not exists idx_backtest_runs_active_session on backtest_runs(workspace_path, session_id) where status in ('pending', 'running')`,
-		`create index if not exists idx_backtest_runs_active_plugin on backtest_runs(plugin_id) where status in ('pending', 'running')`,
+	for _, idx := range []struct {
+		table string
+		sql   string
+	}{
+		{table: "backtest_runs", sql: `create unique index if not exists idx_backtest_runs_session_request_key on backtest_runs(workspace_path, session_id, request_key) where request_key <> ''`},
+		{table: "backtest_runs", sql: `create index if not exists idx_backtest_runs_active_session on backtest_runs(workspace_path, session_id) where status in ('pending', 'running')`},
+		{table: "backtest_runs", sql: `create index if not exists idx_backtest_runs_active_plugin on backtest_runs(plugin_id) where status in ('pending', 'running')`},
+		{table: "workspace_reviews", sql: `create unique index if not exists idx_workspace_reviews_scope_review on workspace_reviews(workspace_path, worktree_path, review_id) where review_id <> ''`},
+		{table: "workspace_reviews", sql: `create index if not exists idx_workspace_reviews_scope_updated on workspace_reviews(workspace_path, worktree_path, updated_at desc)`},
 	} {
-		if _, err := tx.ExecContext(ctx, stmt); err != nil {
+		var exists int
+		if err := tx.QueryRowContext(ctx, `select count(*) from sqlite_master where type = 'table' and name = ?`, idx.table).Scan(&exists); err != nil {
+			return err
+		}
+		if exists == 0 {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, idx.sql); err != nil {
 			return err
 		}
 	}
@@ -187,6 +209,8 @@ var schema = []string{
 	id text primary key,
 	workspace_path text not null,
 	worktree_path text not null,
+	review_id text not null default '',
+	session_id text not null default '',
 	state text not null,
 	summary text not null,
 	items text not null,

@@ -30,7 +30,6 @@ export function gate(state: View, toolKind: Kind) {
     }
     return "SmartX workflow requires completing the initial workspace baseline before running a backtest."
   }
-  if (state.pendingSave?.kind === "review") return state.life === "ready" || state.life === "dirty" ? "" : ""
   // idle 状态：等待基线初始化
   if (state.life === "idle") {
     // 只读操作、分析操作、刷新操作和其他操作被允许
@@ -41,6 +40,7 @@ export function gate(state: View, toolKind: Kind) {
       toolKind === "project_init" ||
       toolKind === "project_resume" ||
       toolKind === "project_get" ||
+      toolKind === "project_save" ||
       toolKind === "project_validate" ||
       toolKind === "other"
     )
@@ -62,6 +62,7 @@ export function gate(state: View, toolKind: Kind) {
       toolKind === "project_init" ||
       toolKind === "project_resume" ||
       toolKind === "project_get" ||
+      toolKind === "project_save" ||
       toolKind === "project_validate"
     )
       return ""
@@ -70,13 +71,13 @@ export function gate(state: View, toolKind: Kind) {
   }
   // ready 状态：基线已建立，可以正常开发
   if (state.life === "ready") return ""
-  // 如果有代码变动，如果审查代码 必须要进行工作区分析和流程图刷新
+  // 如果有代码变动，审查前必须先刷新工作区分析和流程图。
   // if (state.life === "dirty") {
   //   if (toolKind === "review")
   //     return "SmartX workflow requires refreshing workspace analysis and flowchart before review."
   //   return ""
   // }
-  // refreshing 状态：代码变更后正在刷新基线
+  // // refreshing 状态：代码变更后正在刷新基线
   // if (state.life === "refreshing") {
   //   // 只读操作、分析操作、流程图操作、保存操作、刷新操作和项目初始化操作被允许
   //   if (
@@ -88,6 +89,7 @@ export function gate(state: View, toolKind: Kind) {
   //     toolKind === "project_init" ||
   //     toolKind === "project_resume" ||
   //     toolKind === "project_get" ||
+  //     toolKind === "project_save" ||
   //     toolKind === "project_validate"
   //   )
   //     return ""
@@ -106,6 +108,7 @@ export function gate(state: View, toolKind: Kind) {
       toolKind === "project_init" ||
       toolKind === "project_resume" ||
       toolKind === "project_get" ||
+      toolKind === "project_save" ||
       toolKind === "project_validate"
     )
       return ""

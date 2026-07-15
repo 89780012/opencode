@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -667,7 +668,7 @@ func (s *Service) GetReview(ctx context.Context, req ReviewGet) (ReviewRow, erro
 	if err != nil {
 		return ReviewRow{}, err
 	}
-	row, err := scanReview(doc.QueryRowContext(ctx, `select id, workspace_path, worktree_path, state, summary, items, suggestions, updated_at from workspace_reviews where workspace_path = ? and worktree_path = ? order by updated_at desc limit 1`,
+	row, err := scanReview(doc.QueryRowContext(ctx, `select id, workspace_path, worktree_path, review_id, session_id, state, summary, items, suggestions, updated_at from workspace_reviews where workspace_path = ? and worktree_path = ? order by updated_at desc limit 1`,
 		req.WorkspacePath, req.WorktreePath))
 	if err == sql.ErrNoRows {
 		return ReviewRow{}, db.ErrNotFound
@@ -680,15 +681,19 @@ func (s *Service) GetReview(ctx context.Context, req ReviewGet) (ReviewRow, erro
 
 func (s *Service) ListReviews(ctx context.Context, req ReviewGet) ([]ReviewRow, error) {
 	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
+	req.WorktreePath = strings.TrimSpace(req.WorktreePath)
 	if req.WorkspacePath == "" {
 		return nil, fmt.Errorf("workspacePath is required")
+	}
+	if req.WorktreePath == "" {
+		req.WorktreePath = req.WorkspacePath
 	}
 	doc, err := db.Open()
 	if err != nil {
 		return nil, err
 	}
-	rows, err := doc.QueryContext(ctx, `select id, workspace_path, worktree_path, state, summary, items, suggestions, updated_at from workspace_reviews where workspace_path = ? order by updated_at desc`,
-		req.WorkspacePath)
+	rows, err := doc.QueryContext(ctx, `select id, workspace_path, worktree_path, review_id, session_id, state, summary, items, suggestions, updated_at from workspace_reviews where workspace_path = ? and worktree_path = ? order by updated_at desc`,
+		req.WorkspacePath, req.WorktreePath)
 	if err != nil {
 		return nil, err
 	}
@@ -708,8 +713,8 @@ func (s *Service) ListReviews(ctx context.Context, req ReviewGet) ([]ReviewRow, 
 	return out, rows.Close()
 }
 
-func recent(ctx context.Context, doc *sql.DB, workspace string, worktree string) (ReviewRow, error) {
-	row, err := scanReview(doc.QueryRowContext(ctx, `select id, workspace_path, worktree_path, state, summary, items, suggestions, updated_at from workspace_reviews where workspace_path = ? and worktree_path = ? order by updated_at desc limit 1`,
+func running(ctx context.Context, doc queryer, workspace string, worktree string) (ReviewRow, error) {
+	row, err := scanReview(doc.QueryRowContext(ctx, `select id, workspace_path, worktree_path, review_id, session_id, state, summary, items, suggestions, updated_at from workspace_reviews where workspace_path = ? and worktree_path = ? and state = 'running' order by updated_at desc limit 1`,
 		workspace, worktree))
 	if err == sql.ErrNoRows {
 		return ReviewRow{}, nil
@@ -720,6 +725,8 @@ func recent(ctx context.Context, doc *sql.DB, workspace string, worktree string)
 func (s *Service) SaveReview(ctx context.Context, req ReviewReq) (ReviewRow, error) {
 	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
 	req.WorktreePath = strings.TrimSpace(req.WorktreePath)
+	req.ReviewID = strings.TrimSpace(req.ReviewID)
+	req.SessionID = strings.TrimSpace(req.SessionID)
 	req.State = strings.TrimSpace(req.State)
 	req.Summary = strings.TrimSpace(req.Summary)
 	req.Items = reviewItems(req.Items)
@@ -730,11 +737,32 @@ func (s *Service) SaveReview(ctx context.Context, req ReviewReq) (ReviewRow, err
 	if req.WorktreePath == "" {
 		req.WorktreePath = req.WorkspacePath
 	}
-	if req.State == "" {
-		req.State = reviewState(req.Items)
+	if req.Summary == "" {
+		return ReviewRow{}, fmt.Errorf("%w: summary is required", ErrInput)
 	}
-	if req.State != "running" && req.State != "passed" && req.State != "failed" && req.State != "error" {
-		return ReviewRow{}, fmt.Errorf("invalid review state")
+	if len(req.Items) == 0 {
+		return ReviewRow{}, fmt.Errorf("%w: items is required", ErrInput)
+	}
+	for _, item := range req.Items {
+		if item.Name == "" {
+			return ReviewRow{}, fmt.Errorf("%w: review item name is required", ErrInput)
+		}
+		if item.Detail == "" {
+			return ReviewRow{}, fmt.Errorf("%w: review item detail is required", ErrInput)
+		}
+		if !reviewStatus(item.Status) {
+			return ReviewRow{}, fmt.Errorf("%w: invalid review item status", ErrInput)
+		}
+	}
+	state := reviewState(req.Items)
+	if req.State == "" {
+		req.State = state
+	}
+	if !reviewStatus(req.State) || req.State == "warning" {
+		return ReviewRow{}, fmt.Errorf("%w: invalid review state", ErrInput)
+	}
+	if req.State != state {
+		return ReviewRow{}, fmt.Errorf("%w: review state does not match items", ErrInput)
 	}
 	body, err := json.Marshal(req.Items)
 	if err != nil {
@@ -744,55 +772,137 @@ func (s *Service) SaveReview(ctx context.Context, req ReviewReq) (ReviewRow, err
 	if err != nil {
 		return ReviewRow{}, err
 	}
+	explicit := req.SessionID != ""
+	if !explicit {
+		var err error
+		req.SessionID, err = s.progressSession(ctx, req.WorkspacePath)
+		if err != nil {
+			return ReviewRow{}, err
+		}
+	}
 	now := time.Now().UnixMilli()
 	doc, err := db.Open()
 	if err != nil {
 		return ReviewRow{}, err
 	}
-	id := "review_" + hash(fmt.Sprintf("%s\x00%s\x00%d\x00%s", req.WorkspacePath, req.WorktreePath, now, req.Summary))
-	if req.State != "running" {
-		prev, err := recent(ctx, doc, req.WorkspacePath, req.WorktreePath)
+	tx, err := doc.BeginTx(ctx, nil)
+	if err != nil {
+		return ReviewRow{}, err
+	}
+	defer tx.Rollback()
+	if explicit {
+		var workspace string
+		err := tx.QueryRowContext(ctx, "select workspace_path from sessions where id = ?", req.SessionID).Scan(&workspace)
+		if err == sql.ErrNoRows {
+			return ReviewRow{}, fmt.Errorf("%w: session does not belong to workspace", ErrInput)
+		}
 		if err != nil {
 			return ReviewRow{}, err
 		}
-		if prev.State == "running" {
-			id = prev.ID
+		if workspace != req.WorkspacePath {
+			return ReviewRow{}, fmt.Errorf("%w: session does not belong to workspace", ErrInput)
 		}
 	}
-	_, err = doc.ExecContext(ctx, `insert into workspace_reviews(id, workspace_path, worktree_path, state, summary, items, suggestions, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?)
-on conflict(id) do update set state = excluded.state, summary = excluded.summary, items = excluded.items, suggestions = excluded.suggestions, updated_at = excluded.updated_at`,
-		id, req.WorkspacePath, req.WorktreePath, req.State, req.Summary, string(body), string(tips), now)
+
+	id := "review_" + hash(fmt.Sprintf("%s\x00%s\x00%s", req.WorkspacePath, req.WorktreePath, req.ReviewID))
+	if req.ReviewID == "" {
+		id = "review_" + hash(fmt.Sprintf("%s\x00%s\x00%d\x00%s", req.WorkspacePath, req.WorktreePath, time.Now().UnixNano(), req.Summary))
+	}
+	if req.ReviewID == "" && req.State != "running" {
+		prev, err := running(ctx, tx, req.WorkspacePath, req.WorktreePath)
+		if err != nil {
+			return ReviewRow{}, err
+		}
+		if prev.ID != "" {
+			id = prev.ID
+			req.ReviewID = prev.ReviewID
+			if req.SessionID == "" {
+				req.SessionID = prev.SessionID
+			}
+		}
+	}
+	prev, err := getReview(ctx, tx, id)
 	if err != nil {
 		return ReviewRow{}, err
 	}
-	session, err := s.progressSession(ctx, req.WorkspacePath)
-	if err != nil {
-		return ReviewRow{}, err
+	if prev.ID != "" && prev.SessionID != "" && req.SessionID != "" && prev.SessionID != req.SessionID {
+		return ReviewRow{}, fmt.Errorf("%w: review session does not match", ErrInput)
 	}
-	title, err := reviewTitle(ctx, req.WorkspacePath, session, req.State)
-	if err != nil {
-		return ReviewRow{}, err
+	if prev.ID != "" && req.SessionID == "" {
+		req.SessionID = prev.SessionID
 	}
-	if err := s.pushProgress(ctx, req.WorkspacePath, progressInput{
-		session: session,
-		kind:    progressKindReview(req.State),
-		state:   progressState(req.State),
-		title:   title,
-		detail:  req.Summary,
-		source:  "service",
-	}); err != nil {
-		return ReviewRow{}, err
-	}
-	return ReviewRow{
+	row := ReviewRow{
 		ID:            id,
 		WorkspacePath: req.WorkspacePath,
 		WorktreePath:  req.WorktreePath,
+		ReviewID:      req.ReviewID,
+		SessionID:     req.SessionID,
 		State:         req.State,
 		Summary:       req.Summary,
 		Items:         req.Items,
 		Suggestions:   req.Suggestions,
 		UpdatedAt:     now,
-	}, nil
+	}
+	if sameReview(prev, row) {
+		return prev, nil
+	}
+	if prev.ID != "" && prev.State != "running" {
+		return ReviewRow{}, fmt.Errorf("%w: terminal review cannot be changed", ErrInput)
+	}
+	if prev.ID != "" && req.State == "running" {
+		return ReviewRow{}, fmt.Errorf("%w: running review cannot be changed", ErrInput)
+	}
+	_, err = tx.ExecContext(ctx, `insert into workspace_reviews(id, workspace_path, worktree_path, review_id, session_id, state, summary, items, suggestions, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+on conflict(id) do update set review_id = excluded.review_id, session_id = excluded.session_id, state = excluded.state, summary = excluded.summary, items = excluded.items, suggestions = excluded.suggestions, updated_at = excluded.updated_at`,
+		row.ID, row.WorkspacePath, row.WorktreePath, row.ReviewID, row.SessionID, row.State, row.Summary, string(body), string(tips), row.UpdatedAt)
+	if err != nil {
+		return ReviewRow{}, err
+	}
+	var event *ProgressEvent
+	if row.SessionID != "" {
+		round, err := reviewRound(ctx, tx, row.WorkspacePath, row.SessionID, row.State)
+		if err != nil {
+			return ReviewRow{}, err
+		}
+		if row.State != "running" && prev.ID != "" {
+			value, err := savedRound(ctx, tx, row.ID)
+			if err != nil {
+				return ReviewRow{}, err
+			}
+			if value > 0 {
+				round = value
+			}
+		}
+		payload, err := json.Marshal(map[string]any{"reviewId": row.ReviewID, "round": round})
+		if err != nil {
+			return ReviewRow{}, err
+		}
+		item := ProgressEvent{
+			ID:            "progress_" + hash(row.ID+"\x00"+row.State),
+			WorkspacePath: row.WorkspacePath,
+			SessionID:     row.SessionID,
+			Kind:          progressKindReview(row.State),
+			State:         progressState(row.State),
+			Title:         reviewTitle(round, row.State),
+			Detail:        row.Summary,
+			Source:        "service",
+			Payload:       payload,
+			CreatedAt:     now,
+		}
+		if err := putProgress(ctx, tx, item); err != nil {
+			return ReviewRow{}, err
+		}
+		event = &item
+	}
+	if err := tx.Commit(); err != nil {
+		return ReviewRow{}, err
+	}
+	if event != nil && s.evt != nil {
+		if msg, err := json.Marshal(event); err == nil {
+			s.evt(ctx, "progress.updated", msg)
+		}
+	}
+	return row, nil
 }
 
 func (s *Service) AppendProgress(ctx context.Context, req ProgressAppend) (ProgressEvent, error) {
@@ -948,6 +1058,17 @@ func (s *Service) writeProgress(ctx context.Context, doc *sql.Tx, row ProgressEv
 		return err
 	}
 	_, err = doc.ExecContext(ctx, `insert into session_progress_events(id, workspace_path, session_id, kind, state, title, detail, source, payload, created_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		row.ID, row.WorkspacePath, row.SessionID, row.Kind, row.State, row.Title, row.Detail, row.Source, string(body), row.CreatedAt)
+	return err
+}
+
+func putProgress(ctx context.Context, doc *sql.Tx, row ProgressEvent) error {
+	body, err := json.Marshal(row.Payload)
+	if err != nil {
+		return err
+	}
+	_, err = doc.ExecContext(ctx, `insert into session_progress_events(id, workspace_path, session_id, kind, state, title, detail, source, payload, created_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+on conflict(id) do update set workspace_path = excluded.workspace_path, session_id = excluded.session_id, kind = excluded.kind, state = excluded.state, title = excluded.title, detail = excluded.detail, source = excluded.source, payload = excluded.payload, created_at = excluded.created_at`,
 		row.ID, row.WorkspacePath, row.SessionID, row.Kind, row.State, row.Title, row.Detail, row.Source, string(body), row.CreatedAt)
 	return err
 }
@@ -1178,30 +1299,22 @@ func progressState(state string) string {
 	return "done"
 }
 
-func reviewTitle(ctx context.Context, workspace string, session string, state string) (string, error) {
-	round, err := reviewRound(ctx, workspace, session, state)
-	if err != nil {
-		return "", err
-	}
+func reviewTitle(round int, state string) string {
 	if state == "running" {
-		return fmt.Sprintf("开始第%d轮审查", round), nil
+		return fmt.Sprintf("开始第%d轮审查", round)
 	}
 	if state == "error" {
-		return fmt.Sprintf("第%d轮审查异常", round), nil
+		return fmt.Sprintf("第%d轮审查异常", round)
 	}
-	return fmt.Sprintf("第%d轮审查结束", round), nil
+	return fmt.Sprintf("第%d轮审查结束", round)
 }
 
-func reviewRound(ctx context.Context, workspace string, session string, state string) (int, error) {
+func reviewRound(ctx context.Context, doc queryer, workspace string, session string, state string) (int, error) {
 	if session == "" {
 		return 1, nil
 	}
-	doc, err := db.Open()
-	if err != nil {
-		return 0, err
-	}
 	var count int
-	err = doc.QueryRowContext(ctx, `select count(*) from session_progress_events where workspace_path = ? and session_id = ? and kind = ?`,
+	err := doc.QueryRowContext(ctx, `select count(*) from session_progress_events where workspace_path = ? and session_id = ? and kind = ?`,
 		workspace, session, "review.start").Scan(&count)
 	if err != nil {
 		return 0, err
@@ -1218,6 +1331,24 @@ func reviewRound(ctx context.Context, workspace string, session string, state st
 		return 0, err
 	}
 	return count + 1, nil
+}
+
+func savedRound(ctx context.Context, doc queryer, id string) (int, error) {
+	var body string
+	err := doc.QueryRowContext(ctx, "select payload from session_progress_events where id = ?", "progress_"+hash(id+"\x00running")).Scan(&body)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	data := struct {
+		Round int `json:"round"`
+	}{}
+	if err := json.Unmarshal([]byte(body), &data); err != nil {
+		return 0, nil
+	}
+	return data.Round, nil
 }
 
 func pickSummary(text string, list []string) string {
@@ -1419,6 +1550,10 @@ type scanner interface {
 	Scan(...any) error
 }
 
+type queryer interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+
 type execer interface {
 	ExecContext(context.Context, string, ...any) (sql.Result, error)
 }
@@ -1441,7 +1576,7 @@ func scanReview(rows scanner) (ReviewRow, error) {
 	var row ReviewRow
 	var items string
 	var tips string
-	if err := rows.Scan(&row.ID, &row.WorkspacePath, &row.WorktreePath, &row.State, &row.Summary, &items, &tips, &row.UpdatedAt); err != nil {
+	if err := rows.Scan(&row.ID, &row.WorkspacePath, &row.WorktreePath, &row.ReviewID, &row.SessionID, &row.State, &row.Summary, &items, &tips, &row.UpdatedAt); err != nil {
 		return ReviewRow{}, err
 	}
 	if err := json.Unmarshal([]byte(items), &row.Items); err != nil {
@@ -1524,36 +1659,57 @@ func cleanHits(list []Hit) []Hit {
 }
 
 func reviewItems(list []ReviewItem) []ReviewItem {
-	out := list[:0]
+	out := make([]ReviewItem, 0, len(list))
 	for _, item := range list {
 		item.Name = strings.TrimSpace(item.Name)
 		item.Status = strings.TrimSpace(item.Status)
 		item.Detail = strings.TrimSpace(item.Detail)
 		item.Suggestion = strings.TrimSpace(item.Suggestion)
-		if item.Name == "" && item.Detail == "" && item.Suggestion == "" {
-			continue
-		}
-		if item.Status != "passed" && item.Status != "failed" && item.Status != "warning" && item.Status != "running" && item.Status != "error" {
-			item.Status = "passed"
-		}
 		out = append(out, item)
 	}
 	return out
 }
 
 func reviewState(list []ReviewItem) string {
+	state := "passed"
 	for _, item := range list {
 		if item.Status == "error" {
 			return "error"
 		}
 		if item.Status == "failed" || item.Status == "warning" {
-			return "failed"
+			state = "failed"
+			continue
 		}
-		if item.Status == "running" {
-			return "running"
+		if item.Status == "running" && state == "passed" {
+			state = "running"
 		}
 	}
-	return "passed"
+	return state
+}
+
+func reviewStatus(state string) bool {
+	return state == "running" || state == "passed" || state == "failed" || state == "warning" || state == "error"
+}
+
+func getReview(ctx context.Context, doc queryer, id string) (ReviewRow, error) {
+	row, err := scanReview(doc.QueryRowContext(ctx, `select id, workspace_path, worktree_path, review_id, session_id, state, summary, items, suggestions, updated_at from workspace_reviews where id = ?`, id))
+	if err == sql.ErrNoRows {
+		return ReviewRow{}, nil
+	}
+	return row, err
+}
+
+func sameReview(a ReviewRow, b ReviewRow) bool {
+	return a.ID != "" &&
+		a.ID == b.ID &&
+		a.WorkspacePath == b.WorkspacePath &&
+		a.WorktreePath == b.WorktreePath &&
+		a.ReviewID == b.ReviewID &&
+		a.SessionID == b.SessionID &&
+		a.State == b.State &&
+		a.Summary == b.Summary &&
+		slices.Equal(a.Items, b.Items) &&
+		slices.Equal(a.Suggestions, b.Suggestions)
 }
 
 func items(text string) []string {

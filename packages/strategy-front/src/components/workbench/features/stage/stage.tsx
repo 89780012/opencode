@@ -33,8 +33,8 @@ export function StageView() {
   })
   const path = real.workspace?.path ?? ""
   const revision = useAppSelector((state) => selectRequirementReview(state, path, stage.active))
-  const aligned = !!stage.active && real.chat.selectedSessionId === stage.active
-  const disabled = !aligned || chat.busy || chat.submitting || real.chat.creating
+  const aligned = !!path && stage.path === path && !!stage.active && real.chat.selectedSessionId === stage.active
+  const disabled = !aligned || chat.busy || chat.submitting || real.chat.creating || stage.reviewing
   const session = stage.stage === "session"
   const empty = real.entry.load
     ? real.entry.phase === "init"
@@ -46,6 +46,12 @@ export function StageView() {
     dispatch(updateSessionAbortStatus({ sessionId: real.chat.selectedSessionId || "", status: false }))
     dispatch(setStage("session"))
     return chat.submit({ text }, { clear })
+  }
+
+  const inspect = async (text: string) => {
+    dispatch(updateSessionAbortStatus({ sessionId: real.chat.selectedSessionId || "", status: false }))
+    dispatch(setStage("session"))
+    if (await stage.review(text)) chat.draft.clear()
   }
 
   const review = async () => {
@@ -108,13 +114,15 @@ export function StageView() {
       {stage.stage === "timeline" ? <TimelineStage cur={stage.cur} active={stage.active} /> : null}
       <Composer
         busy={chat.busy}
-        disabled={real.chat.creating}
+        disabled={real.chat.creating || !aligned}
         submitting={chat.submitting || real.chat.creating}
+        reviewing={stage.reviewing}
         value={chat.draft.text}
         mode={session ? mode : "narrow"}
         onAbort={() => void real.abort()}
         onChange={chat.draft.setText}
         onSend={(text) => void send(text)}
+        onReview={(text) => void inspect(text)}
       />
     </>
   )

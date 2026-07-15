@@ -3,11 +3,13 @@ package workbench
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -315,6 +317,303 @@ func TestSaveReviewUpdatesRunningReview(t *testing.T) {
 	if reviews[1].Title != "第1轮审查结束" {
 		t.Fatalf("done title = %q", reviews[1].Title)
 	}
+}
+
+func TestSaveReviewValidatesAndAggregatesItems(t *testing.T) {
+	base := func() ReviewReq {
+		return ReviewReq{
+			WorkspacePath: t.TempDir(),
+			ReviewID:      "review-validation",
+			Summary:       "review summary",
+			Items: []ReviewItem{{
+				Name:   "risk",
+				Status: "passed",
+				Detail: "checked",
+			}},
+		}
+	}
+	cases := map[string]func(*ReviewReq){
+		"summary": func(req *ReviewReq) { req.Summary = " " },
+		"items":   func(req *ReviewReq) { req.Items = nil },
+		"blank item": func(req *ReviewReq) {
+			req.Items = append(req.Items, ReviewItem{})
+		},
+		"status": func(req *ReviewReq) { req.Items[0].Status = "unknown" },
+		"state": func(req *ReviewReq) {
+			req.State = "passed"
+			req.Items[0].Status = "failed"
+		},
+	}
+	for name, change := range cases {
+		t.Run(name, func(t *testing.T) {
+			req := base()
+			change(&req)
+			if _, err := NewService(nil, nil, nil, "").SaveReview(t.Context(), req); !errors.Is(err, ErrInput) {
+				t.Fatalf("error = %v, want ErrInput", err)
+			}
+		})
+	}
+
+	row, err := NewService(nil, nil, nil, "").SaveReview(t.Context(), ReviewReq{
+		WorkspacePath: t.TempDir(),
+		ReviewID:      "review-precedence",
+		Summary:       "mixed results",
+		Items: []ReviewItem{
+			{Name: "running", Status: "running", Detail: "started"},
+			{Name: "failed", Status: "failed", Detail: "failed later"},
+			{Name: "error", Status: "error", Detail: "errored last"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if row.State != "error" {
+		t.Fatalf("state = %q, want error", row.State)
+	}
+}
+
+func TestSaveReviewIsIdempotentAndTerminalImmutable(t *testing.T) {
+	svc := NewService(nil, nil, nil, "")
+	dir := t.TempDir()
+	ses := seed(t, dir)
+	events := make(chan string, 8)
+	svc.SetEvent(func(_ context.Context, kind string, _ json.RawMessage) {
+		events <- kind
+	})
+	run := ReviewReq{
+		WorkspacePath: dir,
+		WorktreePath:  dir,
+		ReviewID:      "call-review-1",
+		SessionID:     ses,
+		State:         "running",
+		Summary:       "review started",
+		Items: []ReviewItem{{
+			Name:   "review",
+			Status: "running",
+			Detail: "reviewer is running",
+		}},
+	}
+	first, err := svc.SaveReview(t.Context(), run)
+	if err != nil {
+		t.Fatal(err)
+	}
+	again, err := svc.SaveReview(t.Context(), run)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again.ID != first.ID || again.UpdatedAt != first.UpdatedAt {
+		t.Fatalf("duplicate running review changed row: first=%#v again=%#v", first, again)
+	}
+
+	done := ReviewReq{
+		WorkspacePath: dir,
+		WorktreePath:  dir,
+		ReviewID:      run.ReviewID,
+		SessionID:     ses,
+		State:         "failed",
+		Summary:       "review failed",
+		Items: []ReviewItem{{
+			Name:   "risk",
+			Status: "failed",
+			Detail: "risk is missing",
+		}},
+	}
+	start := make(chan struct{})
+	errs := make(chan error, 2)
+	var wait sync.WaitGroup
+	for range 2 {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			<-start
+			_, err := svc.SaveReview(context.Background(), done)
+			errs <- err
+		}()
+	}
+	close(start)
+	wait.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	doc, err := db.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var count int
+	if err := doc.QueryRowContext(t.Context(), `select count(*) from workspace_reviews where workspace_path = ? and worktree_path = ? and review_id = ?`, dir, dir, run.ReviewID).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("review count = %d, want 1", count)
+	}
+	if err := doc.QueryRowContext(t.Context(), `select count(*) from session_progress_events where workspace_path = ? and session_id = ? and kind like 'review.%'`, dir, ses).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Fatalf("progress count = %d, want 2", count)
+	}
+	if len(events) != 2 {
+		t.Fatalf("event count = %d, want 2", len(events))
+	}
+	changed := done
+	changed.Summary = "late result"
+	if _, err := svc.SaveReview(t.Context(), changed); !errors.Is(err, ErrInput) {
+		t.Fatalf("terminal update error = %v, want ErrInput", err)
+	}
+}
+
+func TestSaveReviewKeepsRoundForConcurrentRuns(t *testing.T) {
+	svc := NewService(nil, nil, nil, "")
+	dir := t.TempDir()
+	ses := seed(t, dir)
+	start := func(id string) ReviewRow {
+		t.Helper()
+		row, err := svc.SaveReview(t.Context(), ReviewReq{
+			WorkspacePath: dir,
+			ReviewID:      id,
+			SessionID:     ses,
+			State:         "running",
+			Summary:       id + " started",
+			Items:         []ReviewItem{{Name: "review", Status: "running", Detail: "running"}},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return row
+	}
+	one := start("concurrent-one")
+	start("concurrent-two")
+	_, err := svc.SaveReview(t.Context(), ReviewReq{
+		WorkspacePath: dir,
+		ReviewID:      "concurrent-one",
+		SessionID:     ses,
+		State:         "passed",
+		Summary:       "first review passed",
+		Items:         []ReviewItem{{Name: "review", Status: "passed", Detail: "passed"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc, err := db.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var title string
+	if err := doc.QueryRowContext(t.Context(), "select title from session_progress_events where id = ?", "progress_"+hash(one.ID+"\x00passed")).Scan(&title); err != nil {
+		t.Fatal(err)
+	}
+	if title != "第1轮审查结束" {
+		t.Fatalf("title = %q, want first round", title)
+	}
+}
+
+func TestSaveReviewRollsBackWhenProgressFails(t *testing.T) {
+	svc := NewService(nil, nil, nil, "")
+	dir := t.TempDir()
+	ses := seed(t, dir)
+	doc, err := db.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := fmt.Sprintf("fail_review_progress_%d", time.Now().UnixNano())
+	_, err = doc.ExecContext(t.Context(), fmt.Sprintf(`create trigger %s before insert on session_progress_events when new.session_id = '%s' begin select raise(abort, 'forced progress failure'); end`, name, ses))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = doc.ExecContext(context.Background(), "drop trigger if exists "+name)
+	})
+	events := make(chan string, 1)
+	svc.SetEvent(func(_ context.Context, kind string, _ json.RawMessage) {
+		events <- kind
+	})
+	_, err = svc.SaveReview(t.Context(), ReviewReq{
+		WorkspacePath: dir,
+		ReviewID:      "rollback-review",
+		SessionID:     ses,
+		State:         "running",
+		Summary:       "review started",
+		Items:         []ReviewItem{{Name: "review", Status: "running", Detail: "running"}},
+	})
+	if err == nil {
+		t.Fatal("review save succeeded despite progress failure")
+	}
+	var count int
+	if err := doc.QueryRowContext(t.Context(), `select count(*) from workspace_reviews where review_id = ?`, "rollback-review").Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Fatalf("review count = %d, want rollback", count)
+	}
+	if len(events) != 0 {
+		t.Fatalf("event count = %d, want 0", len(events))
+	}
+}
+
+func TestSaveReviewScopesSessionAndWorktree(t *testing.T) {
+	svc := NewService(nil, nil, nil, "")
+	dir := t.TempDir()
+	ses := seed(t, dir)
+	other := t.TempDir()
+	_, err := svc.SaveReview(t.Context(), ReviewReq{
+		WorkspacePath: other,
+		ReviewID:      "wrong-session",
+		SessionID:     ses,
+		Summary:       "wrong session",
+		Items:         []ReviewItem{{Name: "scope", Status: "passed", Detail: "checked"}},
+	})
+	if !errors.Is(err, ErrInput) {
+		t.Fatalf("scope error = %v, want ErrInput", err)
+	}
+	for _, item := range []struct {
+		id   string
+		path string
+	}{
+		{id: "worktree-one", path: filepath.Join(dir, "one")},
+		{id: "worktree-two", path: filepath.Join(dir, "two")},
+	} {
+		_, err := svc.SaveReview(t.Context(), ReviewReq{
+			WorkspacePath: dir,
+			WorktreePath:  item.path,
+			ReviewID:      item.id,
+			Summary:       item.id,
+			Items:         []ReviewItem{{Name: "scope", Status: "passed", Detail: "checked"}},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	list, err := svc.ListReviews(t.Context(), ReviewGet{WorkspacePath: dir, WorktreePath: filepath.Join(dir, "one")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 || list[0].ReviewID != "worktree-one" {
+		t.Fatalf("reviews = %#v", list)
+	}
+}
+
+func seed(t *testing.T, workspace string) string {
+	t.Helper()
+	doc, err := db.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := fmt.Sprintf("ses_review_%d", time.Now().UnixNano())
+	now := time.Now().UnixMilli()
+	_, err = doc.ExecContext(t.Context(), `insert into sessions(id, workspace_path, title, body, analysis, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?)`, id, workspace, "review", "{}", "", now, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = doc.ExecContext(context.Background(), "delete from session_progress_events where workspace_path = ?", workspace)
+		_, _ = doc.ExecContext(context.Background(), "delete from workspace_reviews where workspace_path = ?", workspace)
+		_, _ = doc.ExecContext(context.Background(), "delete from sessions where id = ?", id)
+	})
+	return id
 }
 
 func TestProgressDedupesImmediateDuplicate(t *testing.T) {

@@ -164,6 +164,8 @@ type ReviewItem struct {
 type ReviewReq struct {
 	WorkspacePath string       `json:"workspacePath"`
 	WorktreePath  string       `json:"worktreePath"`
+	ReviewID      string       `json:"reviewId,omitempty"`
+	SessionID     string       `json:"sessionId,omitempty"`
 	State         string       `json:"state,omitempty"`
 	Summary       string       `json:"summary"`
 	Items         []ReviewItem `json:"items"`
@@ -179,6 +181,8 @@ type ReviewRow struct {
 	ID            string       `json:"id"`
 	WorkspacePath string       `json:"workspacePath"`
 	WorktreePath  string       `json:"worktreePath"`
+	ReviewID      string       `json:"reviewId,omitempty"`
+	SessionID     string       `json:"sessionId,omitempty"`
 	State         string       `json:"state"`
 	Summary       string       `json:"summary"`
 	Items         []ReviewItem `json:"items"`

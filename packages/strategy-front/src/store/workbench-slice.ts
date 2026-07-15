@@ -54,6 +54,8 @@ export type WorkbenchReview = {
   id: string
   workspacePath: string
   worktreePath: string
+  reviewId: string
+  sessionId: string
   state: "idle" | "running" | "passed" | "failed" | "error"
   summary: string
   items: WorkbenchReviewItem[]
@@ -155,6 +157,41 @@ function title(item: WorkbenchProgressEvent, state: { start: number; end: number
   return { ...item, title: `第${round}轮审查结束` }
 }
 
+function pending(item: WorkbenchReview) {
+  return item.id.startsWith("pending_")
+}
+
+function match(a: WorkbenchReview, b: WorkbenchReview) {
+  if (!a.sessionId || a.sessionId !== b.sessionId) return false
+  if (a.reviewId && b.reviewId) return a.reviewId === b.reviewId
+  return true
+}
+
+function scoped(item: WorkbenchReview, path: string) {
+  return item.workspacePath === path && item.worktreePath === path
+}
+
+function rank(state: WorkbenchReview["state"]) {
+  if (state === "idle") return 0
+  if (state === "running") return 1
+  return 2
+}
+
+function newer(a: WorkbenchReview, b: WorkbenchReview) {
+  if (a.updatedAt > b.updatedAt) return a
+  if (a.updatedAt < b.updatedAt) return b
+  return rank(a.state) >= rank(b.state) ? a : b
+}
+
+function merge(a: WorkbenchReview[], b: WorkbenchReview[]) {
+  const rows = [...a, ...b].reduce((all, item) => {
+    const old = all.get(item.id)
+    all.set(item.id, old ? newer(old, item) : item)
+    return all
+  }, new Map<string, WorkbenchReview>())
+  return Array.from(rows.values()).sort((a, b) => b.updatedAt - a.updatedAt || a.id.localeCompare(b.id))
+}
+
 const slice = createSlice({
   name: "workbench",
   initialState,
@@ -207,9 +244,59 @@ const slice = createSlice({
       state.flowchartPath = action.payload.workspacePath
       state.flowchart = action.payload.flowchart
     },
-    setReviews(state, action: PayloadAction<{ workspacePath: string; reviews: WorkbenchReview[] }>) {
+    setReviewScope(state, action: PayloadAction<{ workspacePath: string }>) {
+      if (state.reviewPath === action.payload.workspacePath) return
       state.reviewPath = action.payload.workspacePath
-      state.reviews = action.payload.reviews
+      state.reviews = []
+    },
+    setReviews(state, action: PayloadAction<{ workspacePath: string; reviews: WorkbenchReview[] }>) {
+      if (state.reviewPath !== action.payload.workspacePath) return
+      const rows = action.payload.reviews.filter((item) => scoped(item, action.payload.workspacePath))
+      state.reviews = merge(state.reviews, rows).filter(
+        (item) =>
+          !pending(item) || !rows.some((row) => !pending(row) && match(item, row) && row.updatedAt >= item.updatedAt),
+      )
+    },
+    startReview(
+      state,
+      action: PayloadAction<{ workspacePath: string; sessionId: string; id: string; updatedAt: number }>,
+    ) {
+      if (state.reviewPath !== action.payload.workspacePath || state.sessionPath !== action.payload.workspacePath)
+        return
+      if (
+        !state.sessions.some(
+          (item) => item.id === action.payload.sessionId && item.workspacePath === action.payload.workspacePath,
+        )
+      )
+        return
+      if (state.reviews.some((item) => pending(item) && item.sessionId === action.payload.sessionId)) return
+      const current = state.reviews.find((item) => !pending(item) && item.sessionId === action.payload.sessionId)
+      if (current?.state === "running") return
+      state.reviews = merge(state.reviews, [
+        {
+          id: action.payload.id,
+          workspacePath: action.payload.workspacePath,
+          worktreePath: action.payload.workspacePath,
+          reviewId: "",
+          sessionId: action.payload.sessionId,
+          state: "running",
+          summary: "审查请求已提交，正在等待 strategy-reviewer 开始处理。",
+          items: [
+            {
+              name: "等待审查",
+              status: "running",
+              detail: "审查请求已发送。",
+              suggestion: "",
+            },
+          ],
+          suggestions: [],
+          updatedAt: action.payload.updatedAt,
+        },
+      ])
+    },
+    rollbackReview(state, action: PayloadAction<{ workspacePath: string; id: string }>) {
+      if (state.reviewPath !== action.payload.workspacePath) return
+      state.reviews = state.reviews.filter((item) => item.id !== action.payload.id || !pending(item))
     },
     setProgress(
       state,
@@ -283,12 +370,18 @@ const slice = createSlice({
       state.backtestActive = action.payload
     },
     upsertReview(state, action: PayloadAction<{ workspacePath: string; review: WorkbenchReview }>) {
-      state.reviewPath = action.payload.workspacePath
-      const stale = action.payload.review.state !== "running"
-      state.reviews = [
-        action.payload.review,
-        ...state.reviews.filter((item) => item.id !== action.payload.review.id && !(stale && item.id.startsWith("pending_"))),
-      ].sort((a, b) => b.updatedAt - a.updatedAt)
+      if (
+        state.reviewPath !== action.payload.workspacePath ||
+        !scoped(action.payload.review, action.payload.workspacePath)
+      )
+        return
+      const rows = pending(action.payload.review)
+        ? state.reviews
+        : state.reviews.filter(
+            (item) =>
+              !pending(item) || !match(item, action.payload.review) || item.updatedAt > action.payload.review.updatedAt,
+          )
+      state.reviews = merge(rows, [action.payload.review])
     },
     upsertSession(state, action: PayloadAction<{ session: WorkbenchSession }>) {
       const idx = state.sessions.findIndex((item) => item.id === action.payload.session.id)
@@ -343,9 +436,12 @@ export const {
   setQuestions,
   setProgress,
   setRequirements,
+  setReviewScope,
   setReviews,
   setSessions,
   setStage,
+  startReview,
+  rollbackReview,
   upsertProgress,
   upsertBacktest,
   updateBacktest,

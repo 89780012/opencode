@@ -7,15 +7,22 @@ export function Composer(props: {
   busy?: boolean
   disabled?: boolean
   submitting?: boolean
+  reviewing?: boolean
   placeholder?: string
   mode?: "narrow" | "full"
   onAbort?: () => void
   onChange: (value: string) => void
   onSend: (text: string) => void
+  onReview: (text: string) => void
 }) {
   const send = () => {
     if (!props.value.trim()) return
     props.onSend(props.value)
+  }
+
+  const review = () => {
+    if (!props.value.trim()) return
+    props.onReview(props.value)
   }
 
   const key = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -69,10 +76,10 @@ export function Composer(props: {
           <button
             type="button"
             className={`${css.action} ${css.reviewsend}`}
-            onClick={() => void 0}
-            aria-label="发送并审查"
-            title="发送并审查"
-            disabled={locked || !props.value.trim()}
+            onClick={review}
+            aria-label={props.reviewing ? "审查请求已提交" : "发送并审查"}
+            title={props.reviewing ? "审查请求已提交" : "发送并审查"}
+            disabled={locked || props.reviewing || !props.value.trim()}
           >
             <ClipboardCheck size={15} />
           </button>

@@ -15,6 +15,7 @@ type Dep = {
   baselineModes?: Map<string, Mode>
   reviewFixes?: Map<string, Fix>
   reviewRequests?: Set<string>
+  reviewRuns?: Set<string>
   finalRequests?: Set<string>
   childSessions?: Set<string>
   parent?: (id: string) => Promise<boolean>
@@ -37,6 +38,7 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
   const baselineModes = dep.baselineModes ?? new Map<string, Mode>()
   const reviewFixes = dep.reviewFixes ?? new Map<string, Fix>()
   const reviewRequests = dep.reviewRequests ?? new Set<string>()
+  const reviewRuns = dep.reviewRuns ?? new Set<string>()
   const finalRequests = dep.finalRequests ?? new Set<string>()
   const childSessions = dep.childSessions ?? new Set<string>()
   const workspace = ctx.directory
@@ -66,6 +68,7 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
     baselineModes,
     reviewFixes,
     reviewRequests,
+    reviewRuns,
     finalRequests,
     childSessions,
     parent:
@@ -126,12 +129,23 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
 
       //识别是否是审查请求
       if (wantsReview(text)) {
-        reviewRequests.add(id + "\x00" + input.sessionID)
-        await write("workspace review requested", {
-          sessionID: input.sessionID,
-          workspace,
-          worktree,
-        })
+        const request = id + "\x00" + input.sessionID
+        const active =
+          reviewRuns.has(request) || pending.get(request)?.kind === "review" || reviewFixes.has(request)
+        if (!active) {
+          reviewRequests.add(request)
+          await write("workspace review requested", {
+            sessionID: input.sessionID,
+            workspace,
+            worktree,
+          })
+        }
+        if (active)
+          await write("workspace duplicate review ignored", {
+            sessionID: input.sessionID,
+            workspace,
+            worktree,
+          })
       }
 
       //识别到是要求收尾的请求

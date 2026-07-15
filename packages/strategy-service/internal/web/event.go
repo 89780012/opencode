@@ -35,9 +35,13 @@ type socketHub struct {
 }
 
 type socketClient struct {
-	hub  *socketHub
-	conn *websocket.Conn
-	send chan []byte
+	hub    *socketHub
+	conn   *websocket.Conn
+	send   chan []byte
+	done   chan struct{}
+	once   sync.Once
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 type socketHandler func(context.Context, *socketClient, socketEvent) bool
@@ -60,10 +64,14 @@ func (h *socketHub) serve(c *gin.Context) {
 		return
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
 	client := &socketClient{
-		hub:  h,
-		conn: conn,
-		send: make(chan []byte, 32),
+		hub:    h,
+		conn:   conn,
+		send:   make(chan []byte, 32),
+		done:   make(chan struct{}),
+		ctx:    ctx,
+		cancel: cancel,
 	}
 	h.add(client)
 	client.emit("socket.connected", nil)
@@ -80,31 +88,36 @@ func (h *socketHub) add(client *socketClient) {
 
 func (h *socketHub) remove(client *socketClient) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
-	if _, ok := h.clients[client]; !ok {
-		return
-	}
+	_, ok := h.clients[client]
 	delete(h.clients, client)
-	close(client.send)
+	h.mu.Unlock()
+	if ok {
+		client.stop()
+	}
 }
 
 func (h *socketHub) broadcast(data []byte) {
+	drop := []*socketClient{}
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	for client := range h.clients {
 		select {
+		case <-client.done:
+			delete(h.clients, client)
 		case client.send <- data:
 		default:
 			delete(h.clients, client)
-			close(client.send)
+			drop = append(drop, client)
 		}
+	}
+	h.mu.Unlock()
+	for _, client := range drop {
+		client.stop()
 	}
 }
 
 func (c *socketClient) read() {
 	defer func() {
 		c.hub.remove(c)
-		_ = c.conn.Close()
 	}()
 
 	c.conn.SetReadLimit(socketSize)
@@ -122,14 +135,13 @@ func (c *socketClient) read() {
 			return
 		}
 
-		evt, msg, ok := normalize(data)
+		evt, _, ok := normalize(data)
 		if !ok {
 			continue
 		}
-		if c.hub.handle != nil && c.hub.handle(context.Background(), c, evt) {
-			continue
+		if c.hub.handle != nil {
+			c.hub.handle(c.ctx, c, evt)
 		}
-		c.hub.broadcast(msg)
 	}
 }
 
@@ -137,17 +149,15 @@ func (c *socketClient) write() {
 	tick := time.NewTicker(socketPing)
 	defer func() {
 		tick.Stop()
-		_ = c.conn.Close()
+		c.stop()
 	}()
 
 	for {
 		select {
-		case data, ok := <-c.send:
+		case <-c.done:
+			return
+		case data := <-c.send:
 			_ = c.conn.SetWriteDeadline(time.Now().Add(socketWrite))
-			if !ok {
-				_ = c.conn.WriteMessage(websocket.CloseMessage, nil)
-				return
-			}
 			if err := c.conn.WriteMessage(websocket.TextMessage, data); err != nil {
 				return
 			}
@@ -179,7 +189,6 @@ func (h *socketHub) emitBroadcast(kind string, payload json.RawMessage) {
 	h.broadcast(msg)
 }
 
-
 func (c *socketClient) reply(id string, kind string, payload json.RawMessage) {
 	msg, err := json.Marshal(socketEvent{
 		ID:      id,
@@ -190,7 +199,30 @@ func (c *socketClient) reply(id string, kind string, payload json.RawMessage) {
 	if err != nil {
 		return
 	}
-	c.send <- msg
+	select {
+	case <-c.done:
+		return
+	case c.send <- msg:
+	default:
+		c.stop()
+	}
+}
+
+func (c *socketClient) stop() {
+	if c == nil {
+		return
+	}
+	c.once.Do(func() {
+		if c.done != nil {
+			close(c.done)
+		}
+		if c.cancel != nil {
+			c.cancel()
+		}
+		if c.conn != nil {
+			_ = c.conn.Close()
+		}
+	})
 }
 
 func normalize(data []byte) (socketEvent, []byte, bool) {

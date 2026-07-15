@@ -9,7 +9,6 @@ import css from "../styles/review/review.module.css"
 
 function Row(props: { item: Step }) {
   const [open, setOpen] = useState(false)
-  const Icon = badge(props.item.status)
   const more = !!props.item.detail || !!props.item.suggestion
 
   return (
@@ -22,10 +21,10 @@ function Row(props: { item: Step }) {
         disabled={!more}
       >
         <span className={css.stepmain}>
-          <Icon
-            size={15}
-            className={`${css.stepicon} ${css[`stepicon_${tone(props.item.status)}`]} ${props.item.status === "running" ? css.spin : ""}`}
-          />
+          {badge(props.item.status, {
+            size: 15,
+            className: `${css.stepicon} ${css[`stepicon_${tone(props.item.status)}`]} ${props.item.status === "running" ? css.spin : ""}`,
+          })}
           <strong>{props.item.text}</strong>
         </span>
         <span className={css.stepright}>
@@ -178,7 +177,7 @@ export function Review(props: {
                               <span>{item.time}</span>
                             </div>
                             <p>
-                              {lead(item.status)} {item.status === "passed" ? "已通过" : "未通过"}
+                              {lead(item.status)} {text(item.status)}
                             </p>
                           </button>
                         ))}

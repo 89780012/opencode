@@ -65,6 +65,8 @@ export type ReviewItem = {
 }
 
 export type SaveReview = {
+  reviewId: string
+  sessionId: string
   workspacePath: string
   worktreePath: string
   state?: "running" | "passed" | "failed" | "error"
@@ -91,6 +93,8 @@ export type Pending =
     }
   | {
       kind: "review"
+      reviewId: string
+      sessionId: string
       workspacePath: string
       worktreePath: string
       state: "passed" | "failed" | "error"

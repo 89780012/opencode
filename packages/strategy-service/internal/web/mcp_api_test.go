@@ -16,6 +16,7 @@ import (
 	"strategy-service/internal/backtest"
 	"strategy-service/internal/db"
 	"strategy-service/internal/smartx"
+	"strategy-service/internal/workbench"
 
 	"github.com/gin-gonic/gin"
 )
@@ -43,6 +44,7 @@ func TestMCPProjectStateToolsAreListed(t *testing.T) {
 		t.Fatalf("tools is %T", result["tools"])
 	}
 	names := map[string]bool{}
+	var review map[string]any
 	for _, item := range list {
 		row, ok := item.(map[string]any)
 		if !ok {
@@ -50,6 +52,9 @@ func TestMCPProjectStateToolsAreListed(t *testing.T) {
 		}
 		name, _ := row["name"].(string)
 		names[name] = true
+		if name == "save_review" {
+			review = row
+		}
 	}
 	for _, name := range []string{
 		"init_project_state",
@@ -61,10 +66,92 @@ func TestMCPProjectStateToolsAreListed(t *testing.T) {
 		"list_backtests",
 		"get_backtest",
 		"get_backtest_config",
+		"save_review",
 	} {
 		if !names[name] {
 			t.Fatalf("missing MCP tool %s", name)
 		}
+	}
+	input, ok := review["inputSchema"].(map[string]any)
+	if !ok {
+		t.Fatalf("save_review input schema = %#v", review["inputSchema"])
+	}
+	required, ok := input["required"].([]any)
+	if !ok {
+		t.Fatalf("save_review required = %#v", input["required"])
+	}
+	got := map[string]bool{}
+	for _, item := range required {
+		name, _ := item.(string)
+		got[name] = true
+	}
+	for _, name := range []string{"reviewId", "sessionId"} {
+		if !got[name] {
+			t.Fatalf("save_review missing required field %s", name)
+		}
+	}
+}
+
+func TestMCPSaveReviewMapsIdentity(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	doc, err := db.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	workspace := filepath.Join(t.TempDir(), "mcp-review")
+	session := fmt.Sprintf("ses_mcp_review_%d", time.Now().UnixNano())
+	now := time.Now().UnixMilli()
+	_, err = doc.ExecContext(t.Context(), `insert into sessions(id, workspace_path, title, body, analysis, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?)`, session, workspace, "review", "{}", "", now, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = doc.ExecContext(context.Background(), "delete from session_progress_events where workspace_path = ?", workspace)
+		_, _ = doc.ExecContext(context.Background(), "delete from workspace_reviews where workspace_path = ?", workspace)
+		_, _ = doc.ExecContext(context.Background(), "delete from sessions where id = ?", session)
+	})
+	api := &API{bench: workbench.NewService(nil, nil, nil, "")}
+	body, err := json.Marshal(rpcReq{
+		JSONRPC: "2.0",
+		ID:      1,
+		Method:  "tools/call",
+		Params: map[string]any{
+			"name": "save_review",
+			"arguments": map[string]any{
+				"workspacePath": workspace,
+				"worktreePath":  workspace,
+				"reviewId":      "review-call-id",
+				"sessionId":     session,
+				"state":         "passed",
+				"summary":       "审查通过",
+				"items": []any{map[string]any{
+					"name":   "完整性",
+					"status": "passed",
+					"detail": "实现完整",
+				}},
+				"suggestions": []any{},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(rec)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(string(body)))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	api.mcpPost(ctx)
+	var out rpcRes
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatal(err)
+	}
+	result, ok := out.Result.(map[string]any)
+	if !ok {
+		t.Fatalf("result = %#v", out.Result)
+	}
+	row, ok := result["structuredContent"].(map[string]any)
+	if !ok || row["reviewId"] != "review-call-id" || row["sessionId"] != session {
+		t.Fatalf("structured content = %#v", result["structuredContent"])
 	}
 }
 
