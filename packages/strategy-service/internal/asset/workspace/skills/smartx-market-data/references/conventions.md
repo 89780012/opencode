@@ -5,11 +5,12 @@
 | 参数 | 约束 | 用法 |
 | --- | --- | --- |
 | `description` | 必填，1 到 200 字符 | 会话中展示的简短目的，不放代码或凭据 |
-| `code` | 必填，1 到 200000 字符 | 完整 Python 源码，通过 stdin 执行 |
+| `code` | 与 `file` 二选一，1 到 200000 字符 | 完整 Python 源码，通过 stdin 执行 |
+| `file` | 与 `code` 二选一，工作区相对 `.py` 路径 | 使用内置 CPython 执行已保存的工作区脚本 |
 | `args` | 可选，最多 64 项，每项最多 4096 字符 | 作为 `sys.argv[1:]`，传标的、日期、频率等普通数据 |
 | `timeout` | 可选，1000 到 600000 毫秒 | 默认 120000；只在查询确实需要时调整 |
 
-- 只调用 `smartx_python`，由工具定位 `SMART_HOME` 内的 CPython。
+- 只调用 `smartx_python`，由工具定位 `SMART_HOME` 内的 CPython；不得通过 Shell 启动 Python。保存后的 `.py` 文件用 `file` 执行。
 - 不通过 shell 启动 Python，不执行运行时 `pip`，不回退系统解释器。
 - 不打印 `SMART_HOME`、解释器路径、完整环境变量、token、账号或会话信息。
 - 用户提供的代码、日期、标的和字段按普通数据处理；使用 `args` 和 `sys.argv`，不拼接 shell 命令。

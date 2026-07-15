@@ -18,6 +18,7 @@ import { selectSessionParts, useAppSelector } from "@/store"
 import type { ChatAssistantMessage, ChatMessageInfo, ChatPart, ChatStatus, ChatToolPart } from "@/types/chat"
 import common from "../../styles/session/session-common.module.css"
 import css from "../../styles/session/session-chat.module.css"
+import { MermaidView } from "../mermaid-view"
 import { SessionBacktestTool } from "./session-backtest-tool"
 
 const empty: ChatPart[] = []
@@ -251,6 +252,7 @@ function Tool(props: { part: ChatToolPart }) {
 
 function CodeBlock(props: { lang: string; value: string }) {
   const [copied, setCopied] = useState(false)
+  const chart = props.lang.toLowerCase() === "mermaid" || props.lang.toLowerCase() === "mmd"
 
   useEffect(() => {
     if (!copied) return
@@ -299,9 +301,18 @@ function CodeBlock(props: { lang: string; value: string }) {
           </button>
         </span>
       </div>
-      <pre className={css.codepre}>
-        <code>{props.value}</code>
-      </pre>
+      {chart ? (
+        <MermaidView
+          value={props.value}
+          className={css.mermaid}
+          errorClassName={css.mermaiderr}
+          sourceClassName={css.codepre}
+        />
+      ) : (
+        <pre className={css.codepre}>
+          <code>{props.value}</code>
+        </pre>
+      )}
     </div>
   )
 }

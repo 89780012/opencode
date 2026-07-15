@@ -15,6 +15,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const helper = "smartx-helper"
+
 func (a *API) modelChainGet(c *gin.Context) {
 	if a == nil || a.chain == nil {
 		bad(c, fmt.Errorf("model chain service is nil"))
@@ -52,12 +54,11 @@ func (a *API) modelChainPrompt(c *gin.Context) {
 		return
 	}
 	var req modelchain.Prompt
-	req.Agent = "smartx-helper"
-
 	if err := c.ShouldBindJSON(&req); err != nil {
 		bad(c, err)
 		return
 	}
+	helperAgent(&req)
 	id := strings.TrimSpace(c.Param("sessionId"))
 	if id == "" {
 		bad(c, fmt.Errorf("sessionId is required"))
@@ -93,6 +94,10 @@ func (a *API) modelChainPrompt(c *gin.Context) {
 	}
 	a.recordQuestion(req)
 	ok(c, true)
+}
+
+func helperAgent(req *modelchain.Prompt) {
+	req.Agent = helper
 }
 
 func (a *API) recordQuestion(req modelchain.Prompt) {

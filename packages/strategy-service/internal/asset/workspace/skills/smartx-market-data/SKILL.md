@@ -35,9 +35,9 @@ description: 通过 smartx_python 使用 SMART_HOME 内置 CPython 中已安装�
 
 ## `smartx_python` 约束
 
-- `description` 写不超过 200 字的简短目的，`code` 写完整源码，`args` 传普通字符串，`timeout` 只在确有需要时设置为 1000 到 600000 毫秒。
+- `description` 写不超过 200 字的简短目的；内联源码写入 `code`，已保存的工作区 `.py` 脚本写入 `file`，两者只能传一个。`args` 传普通字符串，`timeout` 只在确有需要时设置为 1000 到 600000 毫秒。
 - 禁止用 Bash、CMD、PowerShell、AppleScript 或终端启动 `python`、`python3`、`cpython`。
-- 禁止执行 `pip`、安装、升级或卸载包，禁止创建临时启动脚本或常驻 REPL。
+- 禁止执行 `pip`、安装、升级或卸载包，禁止为绕过工具创建临时启动脚本或常驻 REPL；需要执行已保存脚本时使用 `file`。
 - 禁止输出 `SMART_HOME` 真实路径、完整环境变量、访问令牌、账号、会话或其他凭据。
 - 查询从最小标的和最短时间窗口开始，禁止无分页抓取全市场、全历史或高频明细。
 - DataFrame 和类似表格遵守 `references/conventions.md` 的行、列、文本上限，禁止直接打印无界完整表。

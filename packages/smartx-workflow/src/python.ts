@@ -1,12 +1,15 @@
 import path from "node:path"
-import { stat } from "node:fs/promises"
-import { tool } from "@opencode-ai/plugin"
+import { realpath, stat } from "node:fs/promises"
+import { tool, type ToolContext } from "@opencode-ai/plugin"
 
 const timeout = 120_000
 const maximum = 600_000
 const output = 512 * 1024
 const live = 30 * 1024
 const grace = 250
+const runtimes = /^(?:(?:python|pypy)(?:3(?:\.\d+)?)?|py|ipython)(?:\.exe)?$/i
+const managers = /^(?:pip(?:3(?:\.\d+)?)?|uv|poetry|pipenv|conda|venv|virtualenv|jupyter)(?:\.exe)?$/i
+const wrappers = new Set(["env", "command", "sudo", "doas"])
 
 type Runtime = {
   home?: string
@@ -17,7 +20,7 @@ type Runtime = {
 
 type Opt = {
   find?: () => Promise<string>
-  cmd?: (bin: string, args: string[]) => string[]
+  cmd?: (bin: string, args: string[], file?: string) => string[]
   start?: (id: string) => void
 }
 
@@ -25,8 +28,8 @@ type Proc = Bun.Subprocess<"pipe", "pipe", "pipe">
 export type Layout = "production" | "development"
 
 /** 生成固定参数数组；源码本身不会进入命令行。 */
-export function argv(bin: string, args: string[]) {
-  return [bin, "-u", "-", ...args]
+export function argv(bin: string, args: string[], file?: string) {
+  return [bin, "-u", file ?? "-", ...args]
 }
 
 /** 为 Python 创建可流式读取、无控制台闪窗且可按进程组终止的启动参数。 */
@@ -112,6 +115,81 @@ export async function interpreter(opt: Runtime = {}) {
   throw new Error("SmartX Python interpreter was not found in the configured SMART_HOME CPython layouts.")
 }
 
+type Source = {
+  code?: string
+  file?: string
+}
+
+function clean(value: string) {
+  const text = value.trim()
+  if ((text.startsWith("\"") && text.endsWith("\"")) || (text.startsWith("'") && text.endsWith("'")))
+    return text.slice(1, -1)
+  return text
+}
+
+function words(value: string) {
+  return value.match(/(?:[^\s"'`]|\\.)+|"(?:\\.|[^"])*"|'(?:\\.|[^'])*'/g)?.map(clean) ?? []
+}
+
+function executable(value: string) {
+  return path.basename(value.replaceAll("\\", "/")).toLowerCase()
+}
+
+function command(value: string): boolean {
+  const list = words(value)
+  const index = list.findIndex((item) => item !== "&" && !/^[A-Za-z_][A-Za-z0-9_]*=/.test(item))
+  if (index < 0) return false
+  const name = executable(list[index] ?? "")
+  const rest = list.slice(index + 1)
+  if (wrappers.has(name)) return command(rest.join(" "))
+  if (name === "cmd" && /^\/[ck]$/i.test(rest[0] ?? "")) return command(rest.slice(1).join(" "))
+  if (["powershell", "pwsh"].includes(name)) {
+    const index = rest.findIndex((item) => ["-command", "-c"].includes(item.toLowerCase()))
+    if (index >= 0) return command(rest.slice(index + 1).join(" "))
+  }
+  if (["start", "start-process"].includes(name))
+    return rest.some((item) => {
+      const name = executable(item)
+      return runtimes.test(name) || managers.test(name) || name.endsWith(".py")
+    })
+  if (runtimes.test(name) || name.endsWith(".py")) return true
+  if (managers.test(name)) return true
+  if (["bash", "sh", "zsh", "fish"].includes(name)) {
+    const index = rest.findIndex((item) => item === "-c" || item === "-lc")
+    if (index >= 0) return command(rest.slice(index + 1).join(" "))
+  }
+  return false
+}
+
+/** 判断 Bash 工具是否会绕过 SmartX 内置 Python 执行 Python。 */
+export function ambient(input: unknown) {
+  if (!input || typeof input !== "object") return false
+  const value = (input as Record<string, unknown>).command
+  if (typeof value !== "string") return false
+  if (/\$\{?PYTHON/i.test(value)) return true
+  return value.split(/&&|\|\||[;&|\n]/).some(command)
+}
+
+async function source(input: { code?: string; file?: string }, ctx: Pick<ToolContext, "directory" | "worktree">) {
+  const code = input.code?.trim() ? input.code : undefined
+  const file = input.file?.trim()
+  if (!!code === !!file) throw new Error("SmartX Python requires exactly one of code or file.")
+  if (code) return { code } satisfies Source
+  if (!file) throw new Error("SmartX Python requires exactly one of code or file.")
+  if (path.isAbsolute(file)) throw new Error("SmartX Python file must be relative to the active worktree.")
+
+  const root = await realpath(ctx.worktree).catch(() => "")
+  const target = await realpath(path.resolve(ctx.directory, file)).catch(() => "")
+  if (!root || !target) throw new Error("SmartX Python file was not found in the active worktree.")
+  const rel = path.relative(root, target)
+  if (!rel || rel === ".." || rel.startsWith(".." + path.sep) || path.isAbsolute(rel))
+    throw new Error("SmartX Python file must stay inside the active worktree.")
+  const info = await stat(target).catch(() => undefined)
+  if (!info?.isFile()) throw new Error("SmartX Python file must be a regular file.")
+  if (path.extname(target).toLowerCase() !== ".py") throw new Error("SmartX Python file must use the .py extension.")
+  return { file: target } satisfies Source
+}
+
 function clip(value: string, omitted: number, max: number) {
   if (!omitted && value.length <= max) return value
   const skipped = omitted + Math.max(0, value.length - max)
@@ -146,10 +224,17 @@ async function drain(stream: ReadableStream<Uint8Array>, append: (value: string)
 export function python(opt: Opt = {}) {
   return tool({
     description:
-      "Run Python source with the CPython bundled under SMART_HOME. Use it for akshare, baostock, tushare, and other installed Python packages. Source is sent through stdin; packages are never installed at runtime.",
+      "Run Python code or a workspace-relative .py file with the CPython bundled under SMART_HOME. Use this instead of shell Python commands. Packages are never installed at runtime.",
     args: {
       description: tool.schema.string().trim().min(1).max(200).describe("Short description shown in the session"),
-      code: tool.schema.string().min(1).max(200_000).describe("Complete Python source code"),
+      code: tool.schema.string().max(200_000).optional().describe("Complete Python source code"),
+      file: tool.schema
+        .string()
+        .trim()
+        .min(1)
+        .max(4_096)
+        .optional()
+        .describe("Workspace-relative .py file to execute"),
       args: tool.schema.array(tool.schema.string().max(4_096)).max(64).optional().describe("Values exposed as sys.argv[1:]"),
       timeout: tool.schema
         .number()
@@ -165,6 +250,8 @@ export function python(opt: Opt = {}) {
         if (ctx.abort.aborted) throw new Error("SmartX Python execution was aborted before start.")
       }
       check()
+      const src = await source(params, ctx)
+      check()
       await ctx.ask({
         permission: "smartx_python",
         patterns: ["*"],
@@ -177,7 +264,7 @@ export function python(opt: Opt = {}) {
       check()
       const args = params.args ?? []
       const limit = params.timeout ?? timeout
-      const command = (opt.cmd ?? argv)(bin, args)
+      const command = (opt.cmd ?? argv)(bin, args, src.file)
       const proc = (() => {
         try {
           return Bun.spawn(command, options(ctx.directory))
@@ -246,7 +333,7 @@ export function python(opt: Opt = {}) {
         if (reason) {
           await stop()
         } else {
-          proc.stdin.write(params.code)
+          if (src.code) proc.stdin.write(src.code)
           proc.stdin.end()
           code = await proc.exited
         }

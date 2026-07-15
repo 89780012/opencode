@@ -92,7 +92,6 @@ export function StageView() {
         <Flow
           cur={stage.cur}
           flow={stage.flowchart}
-          id={stage.active}
           busy={stage.testing}
           onRun={() => void stage.backtest()}
           onSave={stage.saveFlowchart}

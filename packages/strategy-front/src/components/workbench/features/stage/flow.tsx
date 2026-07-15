@@ -1,11 +1,12 @@
 import { Code2, LoaderCircle, Maximize2, Minus, Play, Plus, Save, Workflow } from "lucide-react"
 import { useEffect, useRef, useState, type PointerEvent, type WheelEvent } from "react"
+import { flowText } from "@/lib/mermaid"
 import type { WorkbenchFlowchart } from "@/store/workbench-slice"
 import type { SessionItem } from "../../data"
 import ui from "../../../shared/styles/ui.module.css"
 import css from "../../styles/stage/stage.module.css"
+import { MermaidView } from "../mermaid-view"
 
-let boot = false
 const ZOOM_MIN = 0.3
 const ZOOM_MAX = 3
 const ZOOM_STEP = 0.15
@@ -13,12 +14,10 @@ const ZOOM_STEP = 0.15
 export function Flow(props: {
   cur: SessionItem
   flow: WorkbenchFlowchart | null
-  id: string
   busy: boolean
   onRun: () => void
   onSave: (code: string) => Promise<void>
 }) {
-  const ref = useRef<HTMLDivElement | null>(null)
   const box = useRef<HTMLDivElement | null>(null)
   const start = useRef({ x: 0, y: 0, px: 0, py: 0 })
   const [mode, setMode] = useState<"chart" | "source">("chart")
@@ -37,39 +36,6 @@ export function Flow(props: {
     setZoom(1)
     setPan({ x: 0, y: 0 })
   }, [props.cur.flowchartCode])
-
-  useEffect(() => {
-    if (mode !== "chart") return
-    const node = ref.current
-    if (!node) return
-    if (!props.cur.flowchartCode) {
-      node.innerHTML = ""
-      return
-    }
-    let on = true
-    node.innerHTML = ""
-    import("mermaid")
-      .then((mod) => {
-        const chart = mod.default
-        if (!boot) {
-          chart.initialize({ startOnLoad: false, securityLevel: "loose", theme: "default" })
-          boot = true
-        }
-        return chart.render(`workbench-${props.id}`, props.cur.flowchartCode)
-      })
-      .then((res) => {
-        if (!on || !res || !ref.current) return
-        ref.current.innerHTML = res.svg
-        res.bindFunctions?.(ref.current)
-      })
-      .catch(() => {
-        if (!on || !ref.current) return
-        ref.current.textContent = props.cur.flowchartCode
-      })
-    return () => {
-      on = false
-    }
-  }, [mode, props.cur.flowchartCode, props.id])
 
   const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))
 
@@ -112,7 +78,9 @@ export function Flow(props: {
     setSaving(true)
     setErr("")
     try {
-      await props.onSave(draft)
+      const code = flowText(draft)
+      await props.onSave(code)
+      setDraft(code)
       setMode("chart")
     } catch (error) {
       setErr(error instanceof Error ? error.message : String(error))
@@ -194,9 +162,12 @@ export function Flow(props: {
           onPointerUp={() => setDragging(false)}
           style={{ cursor: dragging ? "grabbing" : "grab" }}
         >
-          <div
-            ref={ref}
+          <MermaidView
+            value={props.cur.flowchartCode}
+            flow
             className={css.flow}
+            errorClassName={css.flowerr}
+            sourceClassName={css.flowpre}
             style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: "0 0" }}
           />
         </div>

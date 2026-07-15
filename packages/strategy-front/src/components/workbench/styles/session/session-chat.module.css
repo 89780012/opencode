@@ -1096,6 +1096,66 @@
   padding: 0;
 }
 
+.mermaid {
+  min-height: 8rem;
+  display: flex;
+  justify-content: center;
+  overflow: auto;
+  background: #ffffff;
+  padding: 0.9rem;
+}
+
+.mermaid :global(svg) {
+  max-width: none;
+  height: auto;
+}
+
+.mermaiderr {
+  border-top: 1px solid #fecaca;
+  background: #fff7f7;
+  color: #991b1b;
+  padding: 0.72rem 0.84rem;
+}
+
+.mermaiderr > div {
+  display: flex;
+  align-items: center;
+  gap: 0.38rem;
+}
+
+.mermaiderr strong {
+  color: #991b1b;
+  font-size: 0.78rem;
+}
+
+.mermaiderr p {
+  margin: 0.38rem 0 0;
+  color: #b91c1c;
+  font-size: 0.72rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.mermaiderr button {
+  min-height: 1.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.26rem;
+  border: 1px solid #fecaca;
+  border-radius: 0.42rem;
+  margin-top: 0.52rem;
+  background: #ffffff;
+  color: #991b1b;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.2rem 0.48rem;
+}
+
+.mermaiderr button:hover {
+  background: #fee2e2;
+}
+
 .tooltop {
   display: flex;
   align-items: center;

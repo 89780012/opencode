@@ -111,6 +111,19 @@ describe("smartx workspace analysis", () => {
     expect(kind({ tool: "smartx_python" })).toBe("exec")
   })
 
+  test("rejects ambient Python Bash calls before workspace gates", async () => {
+    const hooks = setup(ctx("f:/repo"))
+    const before = hooks["tool.execute.before"]
+    if (!before) throw new Error("tool execute before hook was not registered")
+
+    await expect(
+      before(
+        { sessionID: "s1", tool: "bash", callID: "call-python-shell" },
+        { args: { command: "python scripts/query.py" } },
+      ),
+    ).rejects.toThrow("smartx_python")
+  })
+
   test("tracks workspace analysis states", () => {
     expect(requestAnalysis("f:/repo").state).toBe("requested")
     expect(freshAnalysis("f:/repo").state).toBe("running")
@@ -275,8 +288,8 @@ describe("smartx workspace analysis", () => {
     const first = { system: [] as string[] }
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, first)
 
-    expect(first.system.length).toBe(1)
-    expect(first.system.join("\n")).toContain("workspace-analyzer")
+    expect(first.system.some((item) => item.includes("smartx_python"))).toBe(true)
+    expect(first.system.some((item) => item.includes("workspace-analyzer"))).toBe(true)
   })
 
   test("allows read tools before analysis starts but blocks writes", async () => {

@@ -58,6 +58,18 @@ describe("workbench session tool", () => {
     ).toEqual({ lang: "python", value: " \n", meta: "" })
   })
 
+  test("renders a saved SmartX Python file as Python input", () => {
+    const body = payload(
+      part({
+        status: "pending",
+        input: { description: "run saved query", file: "scripts/query.py", args: ["000001"] },
+        raw: "",
+      }),
+    )
+
+    expect(body).toEqual({ lang: "python", value: "scripts/query.py", meta: '{\n  "args": [\n    "000001"\n  ]\n}' })
+  })
+
   test("omits empty Python arguments and keeps generic tools compatible", () => {
     const python = payload(
       part({

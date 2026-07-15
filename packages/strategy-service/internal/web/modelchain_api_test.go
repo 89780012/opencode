@@ -16,6 +16,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func TestModelChainPromptUsesSmartxHelper(t *testing.T) {
+	req := modelchain.Prompt{Agent: "general"}
+	helperAgent(&req)
+	if req.Agent != helper {
+		t.Fatalf("agent = %q", req.Agent)
+	}
+}
+
 func TestModelChainPromptRejectsSessionMismatch(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	api := &API{chain: modelchain.NewService(nil)}

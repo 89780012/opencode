@@ -14,7 +14,7 @@ function json(value: unknown) {
 
 function meta(input: Record<string, unknown>) {
   const pairs = Object.entries(input).filter(([key, value]) => {
-    if (key === "code" || key === "description" || value === undefined) return false
+    if (key === "code" || key === "description" || key === "file" || value === undefined) return false
     return !Array.isArray(value) || value.length > 0
   })
   return pairs.length ? json(Object.fromEntries(pairs)) : ""
@@ -29,10 +29,11 @@ export function output(part: ChatToolPart) {
 
 export function payload(part: ChatToolPart): { lang: string; value: string; meta?: string } {
   const code = part.tool === "smartx_python" && typeof part.state.input.code === "string" ? part.state.input.code : ""
-  if (code) {
+  const file = part.tool === "smartx_python" && typeof part.state.input.file === "string" ? part.state.input.file : ""
+  if (code || file) {
     return {
       lang: "python",
-      value: code,
+      value: code || file,
       meta: meta(part.state.input),
     }
   }

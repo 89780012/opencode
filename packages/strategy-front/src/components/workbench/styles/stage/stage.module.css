@@ -56,6 +56,78 @@
   height: auto;
 }
 
+.flowerr {
+  position: absolute;
+  right: 1rem;
+  bottom: 1rem;
+  left: 1rem;
+  max-height: min(24rem, calc(100% - 2rem));
+  overflow: auto;
+  border: 1px solid #fecaca;
+  border-radius: 0.75rem;
+  background: #fff7f7;
+  color: #991b1b;
+  padding: 0.8rem;
+  pointer-events: auto;
+  cursor: default;
+  box-shadow: 0 14px 30px rgba(127, 29, 29, 0.12);
+}
+
+.flowerr > div {
+  display: flex;
+  align-items: center;
+  gap: 0.42rem;
+}
+
+.flowerr strong {
+  color: #991b1b;
+  font-size: 0.82rem;
+}
+
+.flowerr p {
+  margin: 0.42rem 0 0;
+  color: #b91c1c;
+  font-size: 0.72rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.flowerr button {
+  min-height: 1.8rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  border: 1px solid #fecaca;
+  border-radius: 0.45rem;
+  margin-top: 0.58rem;
+  background: #ffffff;
+  color: #991b1b;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.22rem 0.52rem;
+}
+
+.flowerr button:hover {
+  background: #fee2e2;
+}
+
+.flowpre {
+  max-height: 10rem;
+  overflow: auto;
+  margin: 0.62rem 0 0;
+  border: 1px solid #fecaca;
+  border-radius: 0.55rem;
+  background: #ffffff;
+  color: #7f1d1d;
+  font-family: var(--font-code);
+  font-size: 0.68rem;
+  line-height: 1.55;
+  padding: 0.58rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .flowbox {
   flex: 1;
   min-height: 0;

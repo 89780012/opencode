@@ -3,7 +3,10 @@ import { key, wantsFinal, wantsReview, type Analysis, type Chart, type Dirt, typ
 import { loadChartRemote, loadProjectRemote, loadRemote, saveReviewRemote } from "./remote.js"
 import type { Fix, Memory, Pending, Project, SaveReview } from "./types.js"
 import { createWorkspace } from "./workspace.js"
-import { python } from "./python.js"
+import { ambient, python } from "./python.js"
+
+const pythonPolicy =
+  "In a SmartX workspace, run all Python through smartx_python. Use code for inline source or file for a workspace-relative .py script; do not invoke Python, package managers, or virtual environments through Bash."
 
 type Dep = {
   workspaces?: Map<string, Analysis>
@@ -161,10 +164,13 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
     "experimental.chat.system.transform": async (input, output) => {
       /** 执行 workspace 级门禁提示。 */
       if (!input.sessionID) return
+      output.system.push(pythonPolicy)
       await workspaceFlow.system(input, output)
     },
     "tool.execute.before": async (input, output) => {
       /** 工具执行前做硬门禁和启动态标记。 */
+      if (input.tool === "bash" && ambient(output.args))
+        throw new Error("SmartX Python must run through smartx_python. Use code or a workspace-relative .py file.")
       await workspaceFlow.before(input, output)
     },
     "tool.execute.after": async (input, output) => {

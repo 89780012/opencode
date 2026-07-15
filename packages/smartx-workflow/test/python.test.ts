@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import path from "node:path"
-import { mkdir, mkdtemp, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, symlink } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import type { ToolContext } from "@opencode-ai/plugin"
-import { argv, candidates, interpreter, layout, options, python } from "../src/python.js"
+import { ambient, argv, candidates, interpreter, layout, options, python } from "../src/python.js"
 
 type Meta = {
   title?: string
@@ -30,13 +30,15 @@ function context(
   asks: string[],
   agent = "smartx-helper",
   wait?: () => Promise<void>,
+  dir = process.cwd(),
+  root = dir,
 ): ToolContext {
   return {
     sessionID: "s1",
     messageID: "m1",
     agent,
-    directory: process.cwd(),
-    worktree: process.cwd(),
+    directory: dir,
+    worktree: root,
     abort: signal,
     metadata(input) {
       rows.push(input)
@@ -87,8 +89,85 @@ describe("SmartX Python runtime", () => {
     expect(layout()).toBe("development")
     expect(layout("production")).toBe("production")
     expect(argv("python", ["a&b", "$(noop)"])).toEqual(["python", "-u", "-", "a&b", "$(noop)"])
+    expect(argv("python", ["a&b"], "script.py")).toEqual(["python", "-u", "script.py", "a&b"])
     expect(options(dir, "win32")).toMatchObject({ windowsHide: true, detached: false })
     expect(options(dir, "linux")).toMatchObject({ windowsHide: true, detached: true })
+  })
+
+  test("executes a workspace Python file without a shell", async () => {
+    const dir = await home()
+    const file = path.join(dir, "query.py")
+    await Bun.write(file, "print('query')\n")
+    const rows: Meta[] = []
+    const asks: string[] = []
+    const ctrl = new AbortController()
+    let seen: { args: string[]; file?: string } | undefined
+    const run = python({
+      find: async () => process.execPath,
+      cmd: (bin, args, file) => {
+        seen = { args, file }
+        return [bin, "-e", "console.log('file=' + Bun.argv[1]);", "--", file ?? "", ...args]
+      },
+    })
+
+    const value = await run.execute(
+      { description: "run saved query", file: "query.py", args: ["000001"] },
+      context(ctrl.signal, rows, asks, "smartx-helper", undefined, dir),
+    )
+
+    expect(seen).toEqual({ args: ["000001"], file })
+    expect(value).toContain(`file=${file}`)
+    expect(asks).toEqual(["smartx_python"])
+  })
+
+  test("rejects unsafe or ambiguous Python file input before resolving the interpreter", async () => {
+    const dir = await home()
+    const outside = path.join(path.dirname(dir), "outside.py")
+    await Bun.write(outside, "print('outside')\n")
+    await Bun.write(path.join(dir, "note.txt"), "not python\n")
+    const ctrl = new AbortController()
+    let found = false
+    const run = python({
+      find: async () => {
+        found = true
+        return process.execPath
+      },
+    })
+    const ctx = context(ctrl.signal, [], [], "smartx-helper", undefined, dir)
+
+    await expect(
+      run.execute({ description: "ambiguous", code: "print(1)", file: "note.txt" }, ctx),
+    ).rejects.toThrow("exactly one")
+    await expect(run.execute({ description: "outside", file: "../outside.py" }, ctx)).rejects.toThrow("inside the active worktree")
+    await expect(run.execute({ description: "extension", file: "note.txt" }, ctx)).rejects.toThrow(".py extension")
+    await expect(run.execute({ description: "absolute", file: outside }, ctx)).rejects.toThrow("relative")
+    const link = path.join(dir, "linked.py")
+    const linked = await symlink(outside, link).then(() => true).catch(() => false)
+    if (linked) await expect(run.execute({ description: "link", file: "linked.py" }, ctx)).rejects.toThrow("inside the active worktree")
+    expect(found).toBe(false)
+  })
+
+  test("detects ambient Python shell launches without blocking ordinary text commands", () => {
+    for (const command of [
+      "python job.py",
+      "py job.py",
+      "pypy job.py",
+      "python -m pip install akshare",
+      "pip3.12 install akshare",
+      "uv run python job.py",
+      "conda run python job.py",
+      "./job.py",
+      "env PYTHONPATH=src python job.py",
+      "cmd /c \"python job.py\"",
+      "powershell -Command \"python job.py\"",
+      "Start-Process python -ArgumentList job.py",
+      "echo ready & python job.py",
+      "bash -c 'python job.py'",
+    ]) {
+      expect(ambient({ command })).toBe(true)
+    }
+    expect(ambient({ command: "echo python job.py" })).toBe(false)
+    expect(ambient({ command: "git status && bun test" })).toBe(false)
   })
 
   test("streams stdin, arguments, UTF-8 environment, stdout, and stderr", async () => {
