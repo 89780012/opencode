@@ -1,5 +1,99 @@
 # Strategy Workbench
 
+## 场景：安装级首次初始化引导
+
+### 1. 范围与触发条件
+
+- 修改 `packages/strategy-front` 的工作台首次引导、Provider/模型链/回测确认或首个策略创建时，必须遵守本契约。
+- 修改 `packages/strategy-service` 的 `setup_state`、setup API 或策略创建 WebSocket 关联时，必须同步检查前端状态机。
+- 初始化完成状态属于本地安装，不属于 workspace、session 或账号；业务配置仍以原 Provider、model-chain、backtest 和 session 数据为事实来源。
+
+### 2. 签名
+
+- 读取：`GET /api/setup/status`
+- 确认：`PUT /api/setup/steps/:step`，`step = provider|model|backtest|strategy`
+- 重置：`POST /api/setup/reset`
+- 创建：`session.create -> session.created|session.create.error`，请求和响应使用同一 WebSocket `id`
+- 存储：SQLite 单例表 `setup_state`，固定 `id = 1`
+- 前端本地 UI 状态：`strategy-front.onboarding.v1`
+
+### 3. 契约
+
+setup API 的 `data` 使用以下结构：
+
+```json
+{
+  "version": 1,
+  "providerConfirmedAt": 0,
+  "modelConfirmedAt": 0,
+  "backtestConfirmedAt": 0,
+  "strategyConfirmedAt": 0,
+  "completedAt": 0,
+  "updatedAt": 0
+}
+```
+
+- `setup_state` 对应列为 `version`、四个 `*_confirmed_at`、`completed_at`、`updated_at`；表和初始化必须可重复执行。
+- 确认接口幂等：已确认步骤返回原时间；四步均确认后写入 `completedAt`。未知步骤返回 `400`，存储错误返回通用 `500`。
+- 前端必须区分 `confirmed` 与 `ready`：确认时间只表示用户确认过；Provider 必须已加载、已连接且含模型，模型链必须至少包含一个仍属于已连接 Provider 的模型。
+- 顺序固定为 Provider -> 模型链 -> 回测配置 -> 首个策略。模型链必须等待保存成功后确认；回测只在 `PUT /api/backtest/config` 成功后确认。
+- 空工作区加载后不得自动打开创建策略弹窗。未完成且当前工作区为空时显示非阻塞入口；设置关闭、稍后继续和刷新不得清除服务端确认状态。
+- 首个策略只有在 `session.created.id` 属于本次弹窗已发送的请求集合、`workspacePath` 匹配当前工作区且 `session.id` 有效时才成功。发送失败、`session.create.error` 和超时保留表单；超时请求 ID 暂时保留，以接收迟到成功。
+- 匹配创建成功后先在本地 UI 状态写 `pending: true`，再确认 strategy；确认成功清除 pending。响应丢失或页面重载时允许按该标记重试确认，但不得凭“工作区出现任意 session”完成正在进行的引导。
+- 老用户迁移只适用于 `updatedAt === 0 && completedAt === 0` 且已存在策略的安装；迁移按顺序幂等确认四步。已开始引导后不得再次进入老用户迁移。
+- 完成后配置失效只显示“需处理”并允许修复，不重播完整引导；模型链修复保存成功后必须同步更新引导 readiness。
+- Coachmark 使用稳定 `data-onboarding` 目标；目标缺失时显示可操作的固定提示。定位必须响应 resize、捕获阶段 scroll 和 DOM 目标增删，不依赖 `ResizeObserver`、`clip-path` 或 Flex `gap`。
+
+### 4. 校验与错误矩阵
+
+| 条件 | 结果 | 行为 |
+| --- | --- | --- |
+| setup 状态或模型链读取失败 | 前端错误态 | 保留重试入口，不猜测完成状态 |
+| Provider 未加载、连接为空或没有模型 | 当前步骤未就绪 | 禁止确认并显示真实加载错误 |
+| 模型链保存或 setup model 确认失败 | 当前步骤失败 | 不进入回测，保留当前选择 |
+| 回测配置保存失败 | 当前步骤失败 | 不写 backtest 确认 |
+| Socket 未连接或发送失败 | 创建失败 | 保留标题、需求和分析结果，可重试 |
+| `session.create.error` 或 60 秒超时 | 创建失败 | 退出 creating，保留表单；迟到事件仍按请求 ID 校验 |
+| `session.created` ID 或 workspace 不匹配 | 忽略 | 不关闭弹窗，不确认 strategy |
+| 策略已创建但 strategy 确认失败 | pending 错误态 | 自动补试一次并提供显式重试，不重复创建策略 |
+| 完成后 Provider/模型链失效 | 已完成、需处理 | 显示设置红点，不回退 `completedAt` |
+
+### 5. Good / Base / Bad Cases
+
+- Good：新安装从非阻塞入口依次保存三项配置；创建请求 `req-1` 收到同工作区 `session.created(req-1)` 后完成，刷新和切换空工作区不再重播。
+- Base：用户关闭设置或选择稍后，之后从设置页继续未完成步骤；服务端确认时间保持不变。
+- Bad：仅因 session 列表从空变为非空就完成正在进行的引导，发送 `session.create` 后立即关弹窗，或模型链保存失败仍确认 model。
+
+### 6. 必需测试
+
+- 存储：默认值、四步完成时间、重复确认幂等、非法步骤、reset 和数据库重复初始化。
+- API：覆盖 GET、四种合法 PUT、非法 PUT、reset 及内部错误映射。
+- 前端纯状态：步骤推进、已确认但 readiness 失效回退、确认读取，以及只有 `updatedAt === 0` 的已有策略安装可迁移。
+- 浏览器：空工作区不自动弹窗、手动加号可打开、Provider/模型/回测目标定位、策略请求 ID 与 workspace 匹配、错误/超时保留表单、窄屏无横向溢出。
+- 从包目录运行 `go test ./...`、`go build ./...`、`go vet ./...`、目标 Bun 测试、`bun typecheck`、相关文件 ESLint 和 `bun run build`；完整 lint 的仓库既有失败必须单独报告。
+
+### 7. Wrong vs Correct
+
+错误：
+
+```ts
+useEffect(() => {
+  if (sessions.length === 0) openModal()
+}, [sessions])
+```
+
+正确：空工作区只显示可忽略、可恢复的初始化入口；创建弹窗仅由用户动作打开。
+
+错误：
+
+```ts
+socket.emit("session.create", payload)
+closeModal()
+confirmStrategy()
+```
+
+正确：为请求生成稳定 ID，保持 creating 状态，只在同 ID、同 workspace 的 `session.created` 到达后关闭并确认；错误和超时保留表单。
+
 ## 场景：当前会话需求清单保存
 
 ### 1. 范围与触发条件
