@@ -319,6 +319,15 @@ row, err := service.Run(c.Request.Context(), req) // 请求 context 驱动完整
 
 正确：启动请求只负责事务创建 `pending` 记录；Manager 使用服务生命周期 context 执行 SmartX 启动、查询、持久化和通知，并在数据库关闭前停止所有 worker。
 
+### 8. AI 回测技能与发布契约
+
+- `smartx-backtest` 负责策略回测准备、单次配置 patch、异步启动、状态读取和终态报告解释；策略代码修改仍必须联用 `smartx-develop`，不得把 skill 目录中的 `demo.py` 当作当前 workspace 的自动入口。
+- MCP 配置名固定为 `smartx`，OpenCode 工具名固定为 `smartx_run_backtest`、`smartx_list_backtests`、`smartx_get_backtest` 和 `smartx_get_backtest_config`。工作流兼容前缀匹配，但前端工具卡与 scoped HTTP 对账精确识别 `smartx_run_backtest`，发布时不得改名。
+- 只有用户明确要求运行、重新运行或重试时才能启动。成功后立即返回 run ID、reason、status 和 progress；不得在同一轮循环查询等待终态。用户后续问进度或历史时用 list，问指定结果时用 get；只有 `done && hasResult` 才解释实际 summary。
+- 模型只提供可选 `config` patch 或只读工具的业务参数。`workspacePath`、`sessionId` 和 `requestKey` 由 workflow 注入，`pluginId` 由服务端从 workspace 推导；不得用 `smartx_python`、Shell、HTTP 或直接 `smartx-cli` 绕过 MCP。
+- `packages/strategy-service/internal/asset/workspace/skills` 会被 Go embed 收录，但 strategy-service 启动不负责安装其中的 skill。SmartX 发布链必须把匹配版本的完整 `smartx-backtest`、`smartx-market-data`、`smartx-helper` 和 `smartx-workflow` 产物一起分发到 OpenCode 配置，并在安装或更新 skill 后重启 OpenCode 以刷新目录。
+- 变更技能包后至少运行 UTF-8 模式的 `quick_validate.py`、解析 `demo.py` 语法，并从 `packages/strategy-service` 运行 `go test -p 1 ./...`、`go build ./...` 和 `go vet ./...`。
+
 ## 场景：策略审查闭环与实时状态
 
 ### 1. 范围与触发条件

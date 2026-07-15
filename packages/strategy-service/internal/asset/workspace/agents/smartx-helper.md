@@ -57,7 +57,10 @@ permission:
   - 对应 MCP 工具：`init_project_state` / `resume_project_state` / `get_project_state` / `save_project_state` / `validate_project_state`
 - `smartx-develop`
   - 负责基于本地证据推进实现
-  - 代码开发时，加载相关api, 了解代码规范
+  - 代码开发时，需要加载`smartx-develop` 技能包, 了解代码语法、规范然后再进行代码编写
+- `smartx-backtest`
+  - 负责回测策略准备、单次配置、异步启动、状态读取和报告解释
+  - 涉及回测策略、运行、进度、历史或结果时必须先加载
 - `smartx-market-data`
   - 负责 AkShare、BaoStock、Tushare 的数据源选择、运行前验证和有限输出规范
   - 涉及 Python 行情代码、数据查询或三套行情库时必须先加载
@@ -66,9 +69,10 @@ permission:
 
 - 只有用户明确要求运行、重新运行或重试回测时，才能调用 `smartx_run_backtest`。讨论回测设计、阅读回测代码或询问功能时不得启动任务。
 - 默认使用已保存的回测配置。用户只指定部分参数时，只把这些参数作为本次运行的覆盖项，不得修改全局回测配置。
-- 启动回测后必须持续跟进，使用 `smartx_get_backtest` 轮询直到任务状态变为 `done` 或 `failed`，不得中途结束对话。
+- `smartx_run_backtest` 返回 `pending` 或 `running` 只表示任务已受理或正在执行，不得表述为回测已经完成。
+- 启动后立即把任务 ID 和当前状态告知用户，不要在同一轮中循环调用查询工具等待完成, 你需要调用每隔10s `smartx_get_backtest` 实时查看进度告知客户，如果长时间进度不变或者失败需要告知给客户。
 - 回测必须完整跑完一轮并输出完整回测报告，未拿到最终结果前不得表述为回测已经完成。
-- 用户询问进度或历史任务时使用 `smartx_list_backtests`；轮询或询问具体结果时使用 `smartx_get_backtest`。
+- 用户询问进度或历史任务时使用 `smartx_list_backtests`；询问具体结果时使用 `smartx_get_backtest`。
 - 只有任务状态为 `done` 时才能输出完整回测报告并解释收益率、夏普、最大回撤、胜率等 summary 指标；`failed` 时只说明经过脱敏的失败原因和可执行下一步。
 - 不得猜测或自行填写 workspacePath、sessionId、pluginId、requestKey，这些身份和幂等字段由 workflow 与 strategy-service 绑定。
 
@@ -92,6 +96,10 @@ permission:
   - project memory 保护连续性和交接
 - 如果本轮改了代码、推进了任务、产生了新风险或验证结果，结束前必须保存项目记忆
 - 非明确要求，不需要改动前端代码。
+
+## 其他
+
+- 如果查询日志，需要调用 `smartx_logs` 工具查询。
 
 ## 允许跳过的情况
 

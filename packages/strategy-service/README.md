@@ -85,7 +85,9 @@ This packages:
 
 Pass `-- --clean` to either command to clear that command's old output first.
 
-Both release scripts rebuild `packages/smartx-workflow/dist/smartx-workflow.js` before building strategy-service. The workflow `dist` directory is not committed, so the SmartX release manager must distribute that artifact together with the matching `smartx-helper` agent and the complete `smartx-market-data` skill directory. Treat the workflow artifact, helper, and skill as one compatible release; do not publish only part of the set.
+Both release scripts rebuild `packages/smartx-workflow/dist/smartx-workflow.js` before building strategy-service. The workflow `dist` directory is not committed, so the SmartX release manager must distribute that artifact together with the matching `smartx-helper` agent and the complete `smartx-market-data` and `smartx-backtest` skill directories. Treat the workflow artifact, helper, and skills as one compatible release; do not publish only part of the set.
+
+The embedded workspace directory is source packaging only: strategy-service does not install embedded skills at startup. SmartX must install the complete skill directories under `~/.config/opencode/skills/` and restart OpenCode after installing or updating them so the skill catalog is reloaded. Keep the strategy-service MCP config name as `smartx`; the workbench recognizes the resulting `smartx_run_backtest` tool name.
 
 SmartX continues to own automatic builtin, skill, and MCP provisioning. The host must inject the original, unescaped `SMART_HOME` into the strategy-service environment before starting the managed OpenCode process. After changing `SMART_HOME` or `SMARTX_PYTHON_LAYOUT`, restart strategy-service so it reloads the host environment. When only the embedded CPython or packages at the same path change, restarting OpenCode is sufficient. Explicit `/system/opencode/start` and `/system/opencode/restart` requests refresh the strategy-service MCP configuration before OpenCode starts; hot-reloading a skill does not refresh process environment variables.
 
