@@ -83,7 +83,8 @@ export function kind(input: { tool: string; args?: unknown }) {
   if (mcp(input, "validate_project_state")) return "project_validate" as const
   if (mcp(input, "refresh_workspace")) return "refresh" as const
   if (mcp(input, "save_analysis") || mcp(input, "save_flowchart") || mcp(input, "save_review")) return "save" as const
-  if (skill(input) === "smartx-develop") return "write" as const
+  // 只是纯粹的读操作 不应被视为写操作
+  // if (skill(input) === "smartx-develop") return "write" as const
   if (input.tool === "task") {
     const args = input.args
     const sub = args && typeof args === "object" ? (args as Record<string, unknown>).subagent_type : undefined
