@@ -43,7 +43,7 @@ permission:
 3. `smartx-develop`
    - 当进行代码开发时，需要首先加载smartx-develop 技能包, 严格按照开发规范进行代码编写。
 4. `strategy-reviewer`
-   - 代码开发完成后，如果用户明确需求审查, 则使用 `strategy-reviewer` 进行策略审查，确保实现满足需求且无明显缺陷。
+   - 代码开发完成后，如果用户明确需求审查, 则使用 `strategy-reviewer` 子agent 进行策略审查，确保实现满足需求且无明显缺陷。
 5. `project-manager`
    - 本轮有新进展时：`save_project_state`, 再次 `workspace-analyzer -> smartx_save_analysis -> strategy-flowchart-generator -> smartx_save_flowchart` 刷新相关信息
 6. 最终总结 / 交接
@@ -61,9 +61,6 @@ permission:
 - `smartx-market-data`
   - 负责 AkShare、BaoStock、Tushare 的数据源选择、运行前验证和有限输出规范
   - 涉及 Python 行情代码、数据查询或三套行情库时必须先加载
-- `strategy-reviewer`
-  - 负责审查策略实现的完整性、正确性和可靠性
-  - 在代码开发完成如果用户明确需求审查则需要调用，并输出中文审查报告
 
 ## AI 回测协议
 
