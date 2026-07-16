@@ -692,7 +692,10 @@ func (s *Service) ListReviews(ctx context.Context, req ReviewGet) ([]ReviewRow, 
 	if err != nil {
 		return nil, err
 	}
-	rows, err := doc.QueryContext(ctx, `select id, workspace_path, worktree_path, review_id, session_id, state, summary, items, suggestions, updated_at from workspace_reviews where workspace_path = ? and worktree_path = ? order by updated_at desc`,
+	// rows, err := doc.QueryContext(ctx, `select id, workspace_path, worktree_path, review_id, session_id, state, summary, items, suggestions, updated_at from workspace_reviews where workspace_path = ? and worktree_path = ? order by updated_at desc`,
+	// 	req.WorkspacePath, req.WorktreePath)
+	//TODO 先不按照worktree_path查询
+	rows, err := doc.QueryContext(ctx, `select id, workspace_path, worktree_path, review_id, session_id, state, summary, items, suggestions, updated_at from workspace_reviews where workspace_path = ? order by updated_at desc`,
 		req.WorkspacePath, req.WorktreePath)
 	if err != nil {
 		return nil, err
