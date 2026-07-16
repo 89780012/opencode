@@ -44,6 +44,15 @@
 | refresh/final/close baseline 提示 | baseline | 必须以本轮 `enabled` 显式旁路，不能只依赖 `life` 的间接状态 |
 | 普通写入与 Python taint | 通用工作流入口 | 必须携带同一轮配置快照，确保 pending 失效判断与 before/after 一致 |
 
+#### 蓝图文案契约
+
+- analysis 和 flowchart 面向不写代码的策略研究、交易和运营人员；源码仅作为事实证据，最终文案必须描述业务条件、市场信息、指标计算、交易动作、风控规则和状态结果。
+- analysis 条目和 flowchart 节点不得出现文件名、函数名、变量名、参数名、枚举名、调用语法或 Python、JavaScript、SDK、API 等开发术语。
+- 函数调用必须改写为业务含义，订阅和回调必须改写为触发关系，计算函数必须改写为指标含义；重试、范围扩大、默认值和上限等实际行为必须保留。
+- 禁止在 `strategy-front` 展示层用正则猜测或替换技术标识符；前端原样展示已保存快照，语义转换由生成端负责。
+- 修改该契约时必须同步 `packages/smartx-workflow/agents/{workspace-analyzer,strategy-flowchart-generator}.md`、`packages/strategy-service/internal/asset/workspace/agents/` 中的同名发布资产，以及 `packages/smartx-workflow/src/note.ts` 的运行时提醒。
+- 历史 analysis/flowchart 快照不自动改写；新规则只对下一次 baseline 分析与流程图生成生效。
+
 ### 4. 校验与错误矩阵
 
 | 条件 | 结果 | 行为 |
@@ -65,6 +74,7 @@
 
 - 配置存储：默认关闭、开启值保留、旧表迁移可重复执行且旧行得到 `0`。
 - workflow：配置读取成功/缺失/失败、关闭时不注入、相关工具执行前拒绝、普通写入仍标记 dirty、下一轮切换生效。
+- 蓝图文案：`noteAnalysis()` 必须保留非技术读者、禁止源码标识符和业务化改写示例的断言；两份 Agent 配置必须同步相同输出约束。
 - 前端：类型检查、定向 ESLint 和生产构建；关闭时不得显示等待分析/流程图。
 - 从包目录运行 `go test -p 1 ./...`、`go build ./...`、`go vet ./...`、`bun test`、`bun typecheck` 和 `bun run build`。
 

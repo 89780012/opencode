@@ -321,6 +321,9 @@ describe("smartx workspace analysis", () => {
   test("builds a hidden system gate reminder", () => {
     expect(noteAnalysis()).toContain("workspace-analyzer")
     expect(noteAnalysis()).toContain("requirements")
+    expect(noteAnalysis()).toContain("不写代码的策略研究、交易和运营人员")
+    expect(noteAnalysis()).toContain("不得出现文件名、函数名、变量名")
+    expect(noteAnalysis()).toContain("每次收到新报价后重新判断交易信号")
   })
 
   test("records analyzer results and asks the main agent to save through mcp", async () => {
