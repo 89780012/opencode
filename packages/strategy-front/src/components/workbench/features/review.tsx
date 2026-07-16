@@ -1,4 +1,4 @@
-import { ChevronDown, ClipboardCheck, Clock3, History, X } from "lucide-react"
+import { ChevronDown, ClipboardCheck, Clock3, History, RefreshCw, X } from "lucide-react"
 import { useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react"
 import type { Step } from "../data"
 import { useWorkbench } from "../hooks/use-workbench"
@@ -59,8 +59,11 @@ export function Review(props: {
   resizing: boolean
   onDown: (event: PointerEvent<HTMLDivElement>) => void
   onKey: (event: KeyboardEvent<HTMLDivElement>) => void
+  onQuery: () => boolean
   onClose: () => void
   onOpen: () => void
+  querying: boolean
+  queryable: boolean
 }) {
   const app = useWorkbench(props.onOpen)
   const [pick, setPick] = useState("")
@@ -75,6 +78,11 @@ export function Review(props: {
   }
   const icon = app.cur.reviewView === "current" || pick ? <Clock3 size={14} /> : <History size={14} />
   const label = app.cur.reviewView === "current" || pick ? "查看历史" : "查看当前"
+  const query = () => {
+    setPick("")
+    app.view("current")
+    props.onQuery()
+  }
 
   return (
     <aside className={css.root}>
@@ -102,6 +110,16 @@ export function Review(props: {
                 </span>
               </div>
               <div className={css.actions}>
+                <button
+                  type="button"
+                  className={css.action}
+                  onClick={query}
+                  aria-label="查询审查结果"
+                  title={props.querying ? "正在查询审查结果" : "查询审查结果"}
+                  disabled={!props.queryable || props.querying}
+                >
+                  <RefreshCw size={14} className={props.querying ? css.spin : undefined} />
+                </button>
                 <button
                   type="button"
                   className={css.action}

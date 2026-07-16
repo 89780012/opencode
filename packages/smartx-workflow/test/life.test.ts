@@ -34,6 +34,13 @@ describe("smartx lifecycle view", () => {
     ).toBe("dirty")
   })
 
+  test("keeps dirty lifecycle for project memory while baseline is disabled", () => {
+    const state = view({ baseline: false, dirtyState: { state: "dirty", updated: 1, reason: "write" } })
+    expect(state.life).toBe("dirty")
+    expect(state.dirtyState.state).toBe("dirty")
+    expect(view({ baseline: false, dirtyState: cleanDirt() }).life).toBe("ready")
+  })
+
   test("allows backtests only after project memory and baseline are ready", () => {
     const memory = { hasProjectState: true, hasRestoredState: true, needsSave: false }
     const analysis = doneAnalysis("f:/repo")

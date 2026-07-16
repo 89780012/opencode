@@ -19,7 +19,7 @@ export function Workbench() {
   useWorkbenchAnalysisSync()
   useWorkbenchBacktestSync()
   useWorkbenchFlowchartSync()
-  useWorkbenchReviewSync()
+  const review = useWorkbenchReviewSync()
 
   const panel = usePanels()
 
@@ -59,8 +59,11 @@ export function Workbench() {
         resizing={panel.right.active}
         onDown={panel.right.onDown}
         onKey={panel.right.onKey}
+        onQuery={review.query}
         onClose={() => panel.right.setOpen(false)}
         onOpen={() => panel.right.setOpen(true)}
+        querying={review.loading}
+        queryable={review.ready}
       />
     </>
   )

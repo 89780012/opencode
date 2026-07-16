@@ -15,6 +15,7 @@ This spec describes the current OpenCode monorepo. Use it before coding so chang
 | [SDK Plugin Script](./sdk-plugin-script.md) | Editing generated SDK, plugin APIs, release scripts, or shared script helpers |
 | [Testing And Quality](./testing-quality.md) | Choosing verification commands, test style, mocks, type checks, or formatting |
 | [Strategy Workbench](./strategy-workbench.md) | Editing the strategy workbench session requirements API, persistence, or editor synchronization |
+| [Strategy Workflow Config](./strategy-workflow-config.md) | Editing the installation-level workspace analysis and flowchart switch across strategy packages |
 | [SmartX Python Runtime](./smartx-python-runtime.md) | Editing SmartX Python execution, agent routing, shell policy, or related workbench rendering |
 
 ## Repository Map

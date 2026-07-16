@@ -1,6 +1,6 @@
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 import { key, wantsFinal, wantsReview, type Analysis, type Chart, type Dirt, type Mode } from "./state.js"
-import { loadChartRemote, loadProjectRemote, loadRemote, saveReviewRemote } from "./remote.js"
+import { loadBaselineRemote, loadChartRemote, loadProjectRemote, loadRemote, saveReviewRemote } from "./remote.js"
 import type { Fix, Memory, Pending, Project, SaveReview } from "./types.js"
 import { createWorkspace } from "./workspace.js"
 import { ambient, python } from "./python.js"
@@ -27,6 +27,7 @@ type Dep = {
   loadChart?: (workspace: string, worktree: string) => Promise<Chart | undefined>
   loadProject?: (workspace: string, worktree: string) => Promise<Project | undefined>
   saveReview?: (input: SaveReview) => Promise<void>
+  baseline?: () => Promise<boolean>
   runtime?: NonNullable<Parameters<typeof python>[0]>
 }
 
@@ -48,6 +49,14 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
   const worktree = ctx.worktree || ctx.directory
   const id = workspace ? key(workspace, worktree) : ""
   const service = dep.service ?? Bun.env.STRATEGY_SERVICE_URL ?? ""
+  const flags = new Map<string, boolean>()
+  const active = dep.baseline ?? (() => loadBaselineRemote(service))
+  const flag = async (session: string, fresh = false) => {
+    if (!fresh && flags.has(session)) return flags.get(session) ?? false
+    const on = await active().catch(() => false)
+    flags.set(session, on)
+    return on
+  }
   /** 统一把插件内部事件写入 opencode 日志。 */
   const write = async (message: string, extra?: Record<string, unknown>) => {
     await ctx.client.app
@@ -100,7 +109,7 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
     tool: {
       smartx_python: python({
         ...dep.runtime,
-        start: (session) => workspaceFlow.taint(session, "smartx_python"),
+        start: (session) => workspaceFlow.taint(session, "smartx_python", flags.get(session) ?? false),
       }),
     },
     event: async (input) => {
@@ -165,17 +174,17 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
       /** 执行 workspace 级门禁提示。 */
       if (!input.sessionID) return
       output.system.push(pythonPolicy)
-      await workspaceFlow.system(input, output)
+      await workspaceFlow.system(input, output, await flag(input.sessionID, true))
     },
     "tool.execute.before": async (input, output) => {
       /** 工具执行前做硬门禁和启动态标记。 */
       if (input.tool === "bash" && ambient(output.args))
         throw new Error("SmartX Python must run through smartx_python. Use code or a workspace-relative .py file.")
-      await workspaceFlow.before(input, output)
+      await workspaceFlow.before(input, output, await flag(input.sessionID))
     },
     "tool.execute.after": async (input, output) => {
       /** 工具执行后推进 workspace 状态。 */
-      await workspaceFlow.after(input, output)
+      await workspaceFlow.after(input, output, await flag(input.sessionID))
     },
   }
 }

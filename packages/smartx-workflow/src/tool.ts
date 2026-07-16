@@ -46,6 +46,17 @@ export function flowchart(input: Call | string) {
   return call.args?.subagent_type === chart
 }
 
+/** 判断调用是否属于可配置的工作区基线流程。 */
+export function baseline(input: Call) {
+  return (
+    analyze(input) ||
+    flowchart(input) ||
+    mcp(input, "refresh_workspace") ||
+    mcp(input, "save_analysis") ||
+    mcp(input, "save_flowchart")
+  )
+}
+
 /** 判断是否启动了策略审查子 agent。 */
 export function review(input: Call | string) {
   const call = item(input)

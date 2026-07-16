@@ -16,6 +16,7 @@ import {
   noteBoot,
   noteChart,
   noteClose,
+  noteDisabled,
   noteFinal,
   noteFix,
   noteRefresh,
@@ -26,7 +27,7 @@ import {
   limit,
 } from "./note.js"
 import { items, mermaid, reviewState, reviewText, serial } from "./parse.js"
-import { analyze, backtest, flowchart, kind, mcp, python, review } from "./tool.js"
+import { analyze, backtest, baseline, flowchart, kind, mcp, python, review } from "./tool.js"
 import type { Analysis, Chart, Dirt, Fix, Memory, Mode, Pending, Project, SaveReview } from "./types.js"
 import { flow, step } from "./workflow.js"
 
@@ -205,7 +206,7 @@ function mark(opt: Opt, reason: string) {
 }
 
 /** 记录已经开始且可能产生副作用的执行，确保失败路径也会刷新基线和项目记忆。 */
-async function dirty(opt: Opt, session: string, tool: string) {
+async function dirty(opt: Opt, session: string, tool: string, enabled = true) {
   mark(opt, tool)
   const memory = opt.memory.get(opt.id) ?? cleanMemory(opt.projects.get(opt.id))
   opt.memory.set(opt.id, {
@@ -213,6 +214,7 @@ async function dirty(opt: Opt, session: string, tool: string) {
     hasRestoredState: memory.hasRestoredState,
     needsSave: memory.hasRestoredState,
   })
+  if (!enabled) reset(opt, "refresh")
   await opt.write("workspace dirtied", {
     sessionID: session,
     workspace: opt.workspace,
@@ -234,7 +236,7 @@ function reset(opt: Opt, mode?: Mode) {
 export function createWorkspace(opt: Opt) {
   return {
     /** Python 进程启动后立即保守标脏，不依赖可能缺席的 after hook。 */
-    taint: (session: string, tool: string) => void dirty(opt, session, tool).catch(() => {}),
+    taint: (session: string, tool: string, enabled = true) => void dirty(opt, session, tool, enabled).catch(() => {}),
     /** 外部显式要求刷新时，重建基线并记录日志。*/
     reset: async (reason: Reason, detail = "") => {
       if (!opt.workspace || !opt.id) return false
@@ -248,8 +250,10 @@ export function createWorkspace(opt: Opt) {
       return true
     },
     /** 模型出手前，决定这一轮应该注入哪一种隐藏系统提示。*/
-    system: async (input: Parameters<System>[0], output: Parameters<System>[1]) => {
+    system: async (input: Parameters<System>[0], output: Parameters<System>[1], enabled = true) => {
       if (!opt.workspace || !opt.id) return false
+
+      if (!enabled) output.system.push(noteDisabled())
 
       // 获取到当前快照
       const snap = await snapshot(opt)
@@ -264,6 +268,7 @@ export function createWorkspace(opt: Opt) {
         dirtyState: opt.dirtyStates.get(opt.id) ?? cleanDirt(),
         projectMemory: opt.memory.get(opt.id) ?? cleanMemory(snap.project),
         baselineMode: opt.baselineModes.get(opt.id) ?? "boot",
+        baseline: enabled,
       })
 
       return flow([
@@ -303,6 +308,7 @@ export function createWorkspace(opt: Opt) {
         }),
         /** 3. 当前轮已经有待保存的 baseline 产物时，先去做 MCP 保存。*/
         step("save", async () => {
+          if (!enabled) return false
           // analysis / flowchart 已经产出，但还没同步进策略服务时，先强制保存。
           const pendingSave = state.pendingSave
           if (!pendingSave) return false
@@ -323,7 +329,7 @@ export function createWorkspace(opt: Opt) {
           if (!fix) return false
           const requestID = requestKey(opt.id, sessionID)
           if (opt.reviewRequests.has(requestID)) return false
-          if (state.life === "dirty" && fix.attempt < limit) {
+          if (enabled && state.life === "dirty" && fix.attempt < limit) {
             opt.reviewRequests.add(requestID)
             reset(opt, "refresh")
             await opt.write("workspace review fix refresh injected", {
@@ -351,7 +357,7 @@ export function createWorkspace(opt: Opt) {
           if (!sessionID) return false
           const requestID = requestKey(opt.id, sessionID)
           if (!opt.reviewRequests.has(requestID)) return false
-          if (state.life === "dirty") {
+          if (enabled && state.life === "dirty") {
             reset(opt, "refresh")
             await opt.write("workspace review refresh injected", {
               sessionID,
@@ -361,7 +367,7 @@ export function createWorkspace(opt: Opt) {
             output.system.push(noteRefresh("代码审查"))
             return true
           }
-          if (state.life !== "ready") return false
+          if (enabled && state.life !== "ready") return false
           await opt.write("workspace review gate injected", {
             sessionID,
             workspace: opt.workspace,
@@ -377,7 +383,7 @@ export function createWorkspace(opt: Opt) {
           const requestID = requestKey(opt.id, sessionID)
           if (!opt.finalRequests.has(requestID)) return false
           // 工作区已变脏时，先切到 final 模式并重建基线，再继续收口。
-          if (state.life === "dirty") {
+          if (enabled && state.life === "dirty") {
             opt.finalRequests.delete(requestID)
             reset(opt, "final")
             await opt.write("workspace final gate injected", {
@@ -389,11 +395,12 @@ export function createWorkspace(opt: Opt) {
             return true
           }
           // 如果已经干净收口完成，就清掉这次 final 请求。
-          if (state.life === "ready") opt.finalRequests.delete(requestID)
+          if (!enabled || state.life === "ready") opt.finalRequests.delete(requestID)
           return false
         }),
         /** 7. 工作区自然收尾时，提醒先完成 project memory 保存。*/
         step("close", async () => {
+          if (!enabled) return false
           // 只有不是子会话、没有挂起修复、也没有 review/final 请求时，才会自然收尾。
           if (
             !sessionID ||
@@ -430,6 +437,7 @@ export function createWorkspace(opt: Opt) {
         }),
         /** 9. analysis 已完成但 flowchart 还没准备好时，先推进流程图生成。*/
         step("chart", async () => {
+          if (!enabled) return false
           // analysis 必须已经 done，才有资格启动 flowchart。
           const chart = state.chart
           if (state.analysis?.state !== "done" || chart?.state === "done" || chart?.state === "generating") return false
@@ -480,7 +488,7 @@ export function createWorkspace(opt: Opt) {
       ])
     },
     /** 工具执行前做硬门禁，并记录 analysis / review / chart 的启动状态。*/
-    before: async (input: Parameters<Before>[0], output: Parameters<Before>[1]) => {
+    before: async (input: Parameters<Before>[0], output: Parameters<Before>[1], enabled = true) => {
       if (!opt.workspace || !opt.id) return false
       if (python(input)) await main(opt, input, "python")
       if (backtest(input)) {
@@ -496,6 +504,8 @@ export function createWorkspace(opt: Opt) {
         delete args.requestKey
         if (mcp(input, "run_backtest")) args.requestKey = "ai:" + input.callID
       }
+      if (!enabled && baseline({ tool: input.tool, args: output.args }))
+        throw new Error("SmartX workspace analysis and flowchart generation are disabled by system configuration.")
       if (mcp(input, "save_review")) {
         const item = opt.pending.get(requestKey(opt.id, input.sessionID))
         if (item?.kind !== "review") throw new Error("SmartX workflow has no pending review for this session.")
@@ -625,7 +635,7 @@ export function createWorkspace(opt: Opt) {
       ])
     },
     /** 工具执行后推进 project memory、baseline 以及 review 队列状态。 */
-    after: async (input: Parameters<After>[0], output: Parameters<After>[1]) => {
+    after: async (input: Parameters<After>[0], output: Parameters<After>[1], enabled = true) => {
       if (!opt.workspace || !opt.id) return false
 
       return flow([
@@ -713,7 +723,7 @@ export function createWorkspace(opt: Opt) {
           if (value !== "write" && value !== "exec") return false
           // Python 已在进程启动回调中保守标记，避免成功后重复写日志和更新时间。
           if (python(input)) return false
-          await dirty(opt, input.sessionID, input.tool)
+          await dirty(opt, input.sessionID, input.tool, enabled)
           return false
         }),
         step("refresh", async () => {
@@ -800,7 +810,7 @@ export function createWorkspace(opt: Opt) {
           }
           if (done) {
             opt.finalRequests.add(id)
-            reset(opt, "final")
+            if (enabled) reset(opt, "final")
           }
           await opt.write("workspace review saved through mcp", {
             sessionID: input.sessionID,

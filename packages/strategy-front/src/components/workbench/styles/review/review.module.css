@@ -120,9 +120,14 @@
     color 0.16s ease;
 }
 
-.action:hover {
+.action:hover:not(:disabled) {
   background: #e5e7eb;
   color: #0f172a;
+}
+
+.action:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .body {

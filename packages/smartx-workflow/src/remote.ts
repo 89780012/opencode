@@ -16,6 +16,21 @@ type ProjectRow = {
   updatedAt: number
 }
 
+type ConfigRow = {
+  workflow?: {
+    baseline?: boolean
+  }
+}
+
+/** 读取安装级工作区基线开关；缺少服务或读取失败时保持关闭。 */
+export async function loadBaselineRemote(service: string) {
+  if (!service) return false
+  const resp = await fetch(new URL("/api/system/config", service))
+  if (!resp.ok) return false
+  const body = (await resp.json()) as { data?: ConfigRow }
+  return body.data?.workflow?.baseline === true
+}
+
 /** 把 analysis 结果保存到 strategy-service。 */
 export async function saveRemote(service: string, input: Save) {
   if (!service) return

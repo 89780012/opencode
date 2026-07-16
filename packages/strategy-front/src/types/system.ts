@@ -10,6 +10,9 @@ export interface SystemConfig {
   logs: {
     tail: number
   }
+  workflow: {
+    baseline: boolean
+  }
 }
 
 export interface LogSource {
@@ -55,5 +58,8 @@ export const systemDefault: SystemConfig = {
   },
   logs: {
     tail: 200,
+  },
+  workflow: {
+    baseline: false,
   },
 }

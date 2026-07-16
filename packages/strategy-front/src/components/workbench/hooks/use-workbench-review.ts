@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 import { socket, type SocketEvent } from "@/lib/socket-bus"
 import { useAppDispatch } from "@/store"
@@ -88,21 +88,39 @@ export function useWorkbenchReviewSync() {
   const [search] = useSearchParams()
   const path = search.get("path")?.trim() ?? ""
   const request = useRef("")
+  const [ready, setReady] = useState(socket.ready())
+  const [loading, setLoading] = useState(false)
+
+  const query = useCallback(() => {
+    if (!path || !socket.ready() || request.current) return false
+    const id = key()
+    request.current = id
+    setLoading(true)
+    if (socket.emit("review.get", { workspacePath: path, worktreePath: path }, id)) return true
+    request.current = ""
+    setLoading(false)
+    return false
+  }, [path])
 
   useEffect(() => {
     request.current = ""
     dispatch(setReviewScope({ workspacePath: path }))
-    const send = () => {
-      if (!path) return
-      const id = key()
-      request.current = id
-      socket.emit("review.get", { workspacePath: path, worktreePath: path }, id)
+    const open = () => {
+      setReady(true)
+      query()
     }
-    if (socket.ready()) {
-      send()
+    const close = () => {
+      request.current = ""
+      setReady(false)
+      setLoading(false)
     }
-    return socket.on("socket.open", send)
-  }, [dispatch, path])
+    const timer = window.setTimeout(socket.ready() ? open : close, 0)
+    const off = [socket.on("socket.open", open), socket.on("socket.close", close)]
+    return () => {
+      window.clearTimeout(timer)
+      off.forEach((item) => item())
+    }
+  }, [dispatch, path, query])
 
   useEffect(() => {
     const got = (event: SocketEvent) => {
@@ -111,6 +129,7 @@ export function useWorkbenchReviewSync() {
         ? event.payload.map(parse).filter((item): item is WorkbenchReview => !!item)
         : []
       request.current = ""
+      setLoading(false)
       dispatch(
         setReviews({
           workspacePath: path,
@@ -127,4 +146,6 @@ export function useWorkbenchReviewSync() {
     const off = [socket.on("review.got", got), socket.on("review.updated", updated)]
     return () => off.forEach((item) => item())
   }, [dispatch, path])
+
+  return { query, loading, ready: ready && !!path }
 }

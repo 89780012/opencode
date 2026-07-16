@@ -18,7 +18,7 @@ export function SettingsDialog(props: {
         <div className={css.dialogbar}>
           <div>
             <strong>设置</strong>
-            <span>Provider、模型和回测配置</span>
+            <span>Provider、模型、回测和系统配置</span>
           </div>
           <button type="button" className={ui.icon} onClick={() => props.onOpenChange(false)} aria-label="关闭设置">
             <X size={14} />

@@ -154,3 +154,46 @@ func TestBacktestMigrationAddsIdempotencyColumnsAndIndex(t *testing.T) {
 		t.Fatalf("request key in another session failed: %v", err)
 	}
 }
+
+func TestConfigMigrationAddsWorkflowBaseline(t *testing.T) {
+	doc, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer doc.Close()
+	ctx := context.Background()
+	_, err = doc.ExecContext(ctx, `create table config (
+		id integer primary key check (id = 1),
+		theme_mode text not null,
+		theme_accent text not null,
+		logs_tail integer not null,
+		updated_at integer not null
+	)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = doc.ExecContext(ctx, `insert into config(id, theme_mode, theme_accent, logs_tail, updated_at) values (1, 'dark', 'graphite', 200, 1)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := migrate(ctx, doc); err != nil {
+		t.Fatal(err)
+	}
+	if err := migrate(ctx, doc); err != nil {
+		t.Fatalf("second migration failed: %v", err)
+	}
+	var count int
+	if err := doc.QueryRowContext(ctx, `select count(*) from pragma_table_info('config') where name = 'workflow_baseline'`).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("workflow_baseline column count = %d", count)
+	}
+	var baseline bool
+	if err := doc.QueryRowContext(ctx, `select workflow_baseline from config where id = 1`).Scan(&baseline); err != nil {
+		t.Fatal(err)
+	}
+	if baseline {
+		t.Fatal("migrated workflow baseline is enabled")
+	}
+}

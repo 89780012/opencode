@@ -713,6 +713,11 @@
   color: #dc2626;
 }
 
+.flowmark_off {
+  color: #64748b;
+  background: #f1f5f9;
+}
+
 .flowmark_pending {
   color: #94a3b8;
 }

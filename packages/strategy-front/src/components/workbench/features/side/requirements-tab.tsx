@@ -2,6 +2,7 @@ import {
   ChartColumn,
   CheckCircle2,
   CircleAlert,
+  CircleOff,
   Clock3,
   LoaderCircle,
   Settings,
@@ -23,17 +24,28 @@ import css from "../../styles/side/side.module.css"
 type Mark = {
   key: string
   label: string
-  tone: "pending" | "running" | "done" | "error"
+  tone: "pending" | "running" | "done" | "error" | "off"
 }
 
 function FlowStateIcon(props: { tone: Mark["tone"] }) {
+  if (props.tone === "off") return <CircleOff size={13} />
   if (props.tone === "done") return <CheckCircle2 size={13} />
   if (props.tone === "running") return <LoaderCircle size={13} className={ui.spin} />
   if (props.tone === "error") return <CircleAlert size={13} />
   return <Clock3 size={13} />
 }
 
-function FlowState(props: { analysis: WorkbenchAnalysis | null; flowchart: WorkbenchFlowchart | null }) {
+function FlowState(props: { analysis: WorkbenchAnalysis | null; flowchart: WorkbenchFlowchart | null; baseline: boolean }) {
+  if (!props.baseline) {
+    return (
+      <div className={css.flowstate}>
+        <div className={`${css.flowmark} ${css.flowmark_off}`}>
+          <FlowStateIcon tone="off" />
+          <span>{props.analysis || props.flowchart ? "自动更新已关闭" : "未启用"}</span>
+        </div>
+      </div>
+    )
+  }
   const marks: Mark[] = [
     {
       key: "analysis",
@@ -74,7 +86,10 @@ function FlowState(props: { analysis: WorkbenchAnalysis | null; flowchart: Workb
   )
 }
 
-function Logic(props: { analysis: WorkbenchAnalysis | null }) {
+function Logic(props: { analysis: WorkbenchAnalysis | null; baseline: boolean }) {
+  if (!props.baseline && !props.analysis) {
+    return <p className={css.logic}>工作区分析与流程图未启用。</p>
+  }
   if (!props.analysis) {
     return (
       <>
@@ -153,6 +168,7 @@ export function RequirementsTab(props: {
   cur: SessionItem
   analysis: WorkbenchAnalysis | null
   flowchart: WorkbenchFlowchart | null
+  baseline: boolean
   progress: WorkbenchProgressEvent[]
   open: Record<string, boolean>
   risk: string
@@ -179,16 +195,16 @@ export function RequirementsTab(props: {
         icon={Workflow}
         title="策略逻辑蓝图"
         onToggle={() => props.onToggle("logic")}
-        action={
+        action={props.baseline || props.flowchart ? (
           <button type="button" className={css.tag} onClick={() => dispatch(setStage("flowchart"))}>
             <Workflow size={12} />
             <span>流程图</span>
           </button>
-        }
+        ) : null}
       >
         <div className={css.logicbox}>
-          <FlowState analysis={props.analysis} flowchart={props.flowchart} />
-          <Logic analysis={props.analysis} />
+          <FlowState analysis={props.analysis} flowchart={props.flowchart} baseline={props.baseline} />
+          <Logic analysis={props.analysis} baseline={props.baseline} />
         </div>
       </Compact>
 

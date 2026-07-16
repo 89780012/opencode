@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 import { ClipboardList, MessageSquareMore, Sparkles } from "lucide-react"
+import { useSystem } from "@/components/system/system-provider"
 import {
   selectWorkbench,
   selectWorkbenchAnalysis,
@@ -30,6 +31,7 @@ const init = {
 
 export function Side() {
   const app = useWorkbench()
+  const sys = useSystem()
   const state = useAppSelector(selectWorkbench)
   const [search] = useSearchParams()
   const path = search.get("path")?.trim() ?? ""
@@ -79,6 +81,7 @@ export function Side() {
           cur={app.cur}
           analysis={analysis}
           flowchart={flowchart}
+          baseline={sys.cfg.workflow.baseline}
           progress={progress}
           open={open}
           risk={app.risk}

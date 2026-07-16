@@ -8,6 +8,7 @@ export type View = {
   dirtyState: Dirt
   projectMemory: Memory
   baselineMode: Mode
+  baseline: boolean
   life: Life
 }
 
@@ -63,15 +64,19 @@ export function view(input: {
   dirtyState?: Dirt
   projectMemory?: Memory
   baselineMode?: Mode
+  baseline?: boolean
 }) {
   const dirtyState = input.dirtyState ?? cleanDirt()
   const projectMemory = input.projectMemory ?? cleanMemory(input.project)
   const baselineMode = input.baselineMode ?? "boot"
+  const baseline = input.baseline !== false
   const busy = phase(baselineMode)
   let life: Life
 
-  // 1. 基线产物还在保存期内，直接视为忙碌态。
-  if (input.pendingSave?.kind === "analysis" || input.pendingSave?.kind === "flowchart") {
+  // 关闭工作区基线时只忽略基线进度，dirty 仍驱动 project memory 保存。
+  if (!baseline) {
+    life = dirtyState.state === "dirty" ? "dirty" : "ready"
+  } else if (input.pendingSave?.kind === "analysis" || input.pendingSave?.kind === "flowchart") {
     life = busy
   } else if (needAnalysis(input.analysis)) {
     // 2. analysis 还没开始或仍在 requested，说明还停在基线起点。
@@ -98,6 +103,7 @@ export function view(input: {
     dirtyState,
     projectMemory,
     baselineMode,
+    baseline,
     life,
   } satisfies View
 }

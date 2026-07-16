@@ -1,10 +1,11 @@
-import { Box, ChartColumn, Cpu } from "lucide-react"
+import { Box, ChartColumn, Cpu, Settings2 } from "lucide-react"
 import { ConnectDialog } from "../dialogs/connect"
 import { CustomDialog } from "../dialogs/custom"
 import { useSettings } from "../hooks/use-settings"
 import { BacktestPanel } from "../panels/backtest"
 import { ModelsPanel } from "../panels/models"
 import { ProvidersPanel } from "../panels/providers"
+import { SystemPanel } from "../panels/system"
 import css from "../styles/settings.module.css"
 import type { Tab } from "../types"
 
@@ -12,6 +13,7 @@ const tabs = [
   { key: "providers", icon: Box, label: "提供商" },
   { key: "models", icon: Cpu, label: "模型" },
   { key: "backtest", icon: ChartColumn, label: "回测配置" },
+  { key: "system", icon: Settings2, label: "系统" },
 ] as const
 
 export function SettingsContent(props: { tab: Tab; onTab: (tab: Tab) => void }) {
@@ -44,6 +46,7 @@ export function SettingsContent(props: { tab: Tab; onTab: (tab: Tab) => void }) 
           {props.tab === "providers" ? <ProvidersPanel app={app} /> : null}
           {props.tab === "models" ? <ModelsPanel app={app} onProviders={() => props.onTab("providers")} /> : null}
           {props.tab === "backtest" ? <BacktestPanel /> : null}
+          {props.tab === "system" ? <SystemPanel /> : null}
         </main>
       </div>
 

@@ -39,16 +39,18 @@ permission:
    - 已有项目记忆：先 `resume_project_state`
    - 没有项目记忆：先 `init_project_state`
 2. workspace baseline
-   - 初次进入或 baseline 过期时：`workspace-analyzer -> smartx_save_analysis -> strategy-flowchart-generator -> smartx_save_flowchart`
+   - 只有 smartx-workflow 的系统策略明确启用并要求 baseline 时，才执行：`workspace-analyzer -> smartx_save_analysis -> strategy-flowchart-generator -> smartx_save_flowchart`
+   - 系统策略关闭 baseline 时，不得启动这两个子 agent，也不得调用对应的保存和刷新工具
 3. `smartx-develop`
    - 当进行代码开发时，需要首先加载smartx-develop 技能包, 严格按照开发规范进行代码编写。
 4. `strategy-reviewer`
    - 代码开发完成后，如果用户明确需求审查, 则使用 `strategy-reviewer` 子agent 进行策略审查，确保实现满足需求且无明显缺陷。
 5. `project-manager`
-   - 本轮有新进展时：`save_project_state`, 再次 `workspace-analyzer -> smartx_save_analysis -> strategy-flowchart-generator -> smartx_save_flowchart` 刷新相关信息
+   - 本轮有新进展时：先 `save_project_state`
+   - 仅当 smartx-workflow 的系统策略明确要求时，再刷新 workspace baseline
 6. 最终总结 / 交接
 
-这条链路里，恢复和保存都不是软建议，而是强制操作。
+这条链路里，项目记忆恢复和保存不是软建议；workspace baseline 是否执行由系统配置决定。
 
 ## 你拥有并应主动使用的 skill
 
@@ -116,7 +118,7 @@ permission:
 
 - 代码改完不等于完成
 - 只有在“验证通过”或“存在明确外部阻塞且已说明”时，任务才可以结束
-- 如果本轮有新进展，必须先 `save_project_state`，然后`workspace-analyzer -> smartx_save_analysis -> strategy-flowchart-generator -> smartx_save_flowchart` 刷新相关信息，最后给最终总结
+- 如果本轮有新进展，必须先 `save_project_state`；只有系统策略明确要求时才刷新 workspace baseline，最后给最终总结
 
 ## 输出要求
 

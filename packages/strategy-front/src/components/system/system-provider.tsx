@@ -14,6 +14,16 @@ type State = {
 
 const Ctx = createContext<State | null>(null)
 
+function clean(cfg: SystemConfig) {
+  return {
+    ...systemDefault,
+    ...cfg,
+    theme: { ...systemDefault.theme, ...cfg.theme },
+    logs: { ...systemDefault.logs, ...cfg.logs },
+    workflow: { ...systemDefault.workflow, ...cfg.workflow },
+  }
+}
+
 export function SystemProvider(props: { children: ReactNode }) {
   const { setTheme } = useTheme()
   const [cfg, setCfg] = useState<SystemConfig>(systemDefault)
@@ -34,7 +44,7 @@ export function SystemProvider(props: { children: ReactNode }) {
       if (id !== seq.current) {
         return
       }
-      setCfg(next)
+      setCfg(clean(next))
     } catch (err) {
       if (id !== seq.current) {
         return
@@ -60,7 +70,7 @@ export function SystemProvider(props: { children: ReactNode }) {
       try {
         const out = await systemApi.saveConfig(next)
         if (id === seq.current) {
-          setCfg(out)
+          setCfg(clean(out))
         }
         return out
       } catch (err) {

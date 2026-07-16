@@ -2,6 +2,16 @@ import type { Analysis, Fix, Pending } from "./types.js"
 
 export const limit = 3
 
+/** 告知主 agent 当前安装已关闭工作区分析与流程图。 */
+export function noteDisabled() {
+  return [
+    "系统配置已关闭工作区分析与流程图。",
+    "不要启动 `workspace-analyzer` 或 `strategy-flowchart-generator` 子 agent。",
+    "不要调用 `smartx_save_analysis`、`smartx_save_flowchart` 或 `refresh_workspace`。",
+    "继续执行用户请求以及 project memory、审查、回测等其他流程。",
+  ].join("\n")
+}
+
 /** 生成 review 阶段的系统提示，约束主 agent 先取需求、再审查、再保存。 */
 export function noteReview(input: { workspace: string; worktree: string; sessionID: string }) {
   return [
@@ -17,8 +27,8 @@ export function noteReview(input: { workspace: string; worktree: string; session
     "6. 只有 `smartx_save_review.items` 里所有检查项的 status 都是 `passed`，才算审查完全通过；只要任一项是 `warning`、`failed` 或 `error`，都按未通过处理。",
     "7. 如果保存后的审查结果存在非 `passed` 项，主 agent 必须自己修复代码，不要让 `strategy-reviewer` 代修。",
     "8. 第 1、2 轮审查只要存在非 `passed` 项，保存后必须修复，并在修复完成后再次调用 `strategy-reviewer` 复审。",
-    "9. 第 3 轮如果全部 `passed`，保存后进入后续分析、流程图和最终收口；如果第 3 轮仍有非 `passed` 项，也必须先保存，再完成最后一次修复，然后直接给出最终结论，不再自动发起第 4 轮复审。",
-    "10. 审查全部通过并保存后，工作流会要求重新分析当前代码、重新生成并保存策略流程图，然后再进入最终收口。",
+    "9. 第 3 轮如果全部 `passed`，保存后进入后续收口；如果第 3 轮仍有非 `passed` 项，也必须先保存，再完成最后一次修复，然后直接给出最终结论，不再自动发起第 4 轮复审。",
+    "10. 审查全部通过并保存后，只有系统配置启用了 workspace baseline，工作流才会要求重新分析当前代码并重新生成流程图。",
     "11. `smartx_save_review` 的 `summary`、`items`、`items[].name`、`items[].detail`、`items[].suggestion`、`suggestions` 必须使用中文。",
     "12. MCP 保存成功后，再用中文简短回复用户审查结果和已执行的修复概况。",
     "",
