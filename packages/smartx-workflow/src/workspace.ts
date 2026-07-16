@@ -519,40 +519,41 @@ export function createWorkspace(opt: Opt) {
         args.worktreePath = opt.worktree
         args.state = state
       }
-      if (!opt.childSessions.has(input.sessionID)) {
-        // 1. 先读取当前工作区快照，拿到 analysis / chart / project 的最新状态。
-        const snap = await snapshot(opt)
-        // 2. 再把分散状态折叠成统一生命周期视图，方便后面做一次性判断。
-        const state = stateView({
-          analysis: snap.analysis,
-          chart: snap.chart,
-          project: snap.project,
-          pendingSave: current(opt, input.sessionID),
-          dirtyState: opt.dirtyStates.get(opt.id) ?? cleanDirt(),
-          projectMemory: opt.memory.get(opt.id) ?? cleanMemory(snap.project),
-          baselineMode: opt.baselineModes.get(opt.id) ?? "boot",
-        })
-        // 3. 把当前即将执行的工具归类成工作流动作类型。
-        const action = kind({ tool: input.tool, args: output.args })
-        // 4. 根据“当前状态 + 即将执行的动作”计算门禁结果；有返回文案就说明必须拦截。
-        const blockText = block(state, action)
-        if (blockText) {
-          // 还没建立 initial baseline，却已经想执行实现类动作时，先把状态重置回 boot 起点。
-          if (state.life === "idle") reset(opt, "boot")
-          await opt.write("workspace hard gate blocked tool", {
-            sessionID: input.sessionID,
-            workspace: opt.workspace,
-            worktree: opt.worktree,
-            tool: input.tool,
-            pending: state.pendingSave?.kind,
-            analysis: state.analysis?.state ?? "missing",
-            chart: state.chart?.state ?? "missing",
-            life: state.life,
-            kind: action,
-          })
-          throw new Error(blockText)
-        }
-      }
+      // 去掉门禁
+      // if (!opt.childSessions.has(input.sessionID)) {
+      //   // 1. 先读取当前工作区快照，拿到 analysis / chart / project 的最新状态。
+      //   const snap = await snapshot(opt)
+      //   // 2. 再把分散状态折叠成统一生命周期视图，方便后面做一次性判断。
+      //   const state = stateView({
+      //     analysis: snap.analysis,
+      //     chart: snap.chart,
+      //     project: snap.project,
+      //     pendingSave: current(opt, input.sessionID),
+      //     dirtyState: opt.dirtyStates.get(opt.id) ?? cleanDirt(),
+      //     projectMemory: opt.memory.get(opt.id) ?? cleanMemory(snap.project),
+      //     baselineMode: opt.baselineModes.get(opt.id) ?? "boot",
+      //   })
+      //   // 3. 把当前即将执行的工具归类成工作流动作类型。
+      //   const action = kind({ tool: input.tool, args: output.args })
+      //   // 4. 根据“当前状态 + 即将执行的动作”计算门禁结果；有返回文案就说明必须拦截。
+      //   const blockText = block(state, action)
+      //   if (blockText) {
+      //     // 还没建立 initial baseline，却已经想执行实现类动作时，先把状态重置回 boot 起点。
+      //     if (state.life === "idle") reset(opt, "boot")
+      //     await opt.write("workspace hard gate blocked tool", {
+      //       sessionID: input.sessionID,
+      //       workspace: opt.workspace,
+      //       worktree: opt.worktree,
+      //       tool: input.tool,
+      //       pending: state.pendingSave?.kind,
+      //       analysis: state.analysis?.state ?? "missing",
+      //       chart: state.chart?.state ?? "missing",
+      //       life: state.life,
+      //       kind: action,
+      //     })
+      //     throw new Error(blockText)
+      //   }
+      // }
       return flow([
         /** flowchart 子 agent 即将启动时，把 chart 标成 generating。*/
         step("chart", async () => {
@@ -572,8 +573,6 @@ export function createWorkspace(opt: Opt) {
           if (!review({ tool: input.tool, args: output.args })) return false
           const id = requestKey(opt.id, input.sessionID)
           if (opt.reviewRuns.has(id)) throw new Error("SmartX workflow already has an active review for this session.")
-          if (!opt.reviewRequests.has(id) && !opt.reviewFixes.has(id))
-            throw new Error("SmartX workflow review was not requested for this session.")
           if (opt.pending.get(id)?.kind === "review")
             throw new Error("SmartX workflow requires saving the pending review before starting another review.")
           opt.reviewRuns.add(id)
