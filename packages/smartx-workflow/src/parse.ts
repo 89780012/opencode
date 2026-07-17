@@ -1,3 +1,5 @@
+import type { ReviewItem, ReviewResult } from "./types.js"
+
 /** 提取 task_result 包裹的主体内容；没有包裹时直接返回原文。 */
 export function result(text: string) {
   const match = text.match(/<task_result>\s*([\s\S]*?)\s*<\/task_result>/)
@@ -82,4 +84,45 @@ export function reviewState(text: string) {
   if (/(无法完成|无法审查|未能完成|error)/i.test(out)) return "error" as const
   if (/(未通过|不通过|失败|风险|问题|failed)/i.test(out)) return "failed" as const
   return "error" as const
+}
+
+/** 严格解析 reviewer 的内部 JSON 契约；非法、空项或状态不一致时失败关闭。 */
+export function reviewResult(text: string): ReviewResult | undefined {
+  try {
+    const value: unknown = JSON.parse(fence(result(text)))
+    if (!value || typeof value !== "object" || Array.isArray(value)) return
+    const row = value as Record<string, unknown>
+    if (typeof row.summary !== "string" || !row.summary.trim() || !Array.isArray(row.items) || !row.items.length)
+      return
+    const list = row.items.map((item): ReviewItem | undefined => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) return
+      const data = item as Record<string, unknown>
+      if (typeof data.name !== "string" || !data.name.trim()) return
+      if (typeof data.detail !== "string" || !data.detail.trim()) return
+      if (typeof data.status !== "string" || !["passed", "warning", "failed", "error"].includes(data.status))
+        return
+      if (data.suggestion !== undefined && typeof data.suggestion !== "string") return
+      return {
+        name: data.name.trim(),
+        status: data.status as ReviewItem["status"],
+        detail: data.detail.trim(),
+        suggestion: typeof data.suggestion === "string" ? data.suggestion.trim() : "",
+      }
+    })
+    if (list.some((item) => !item)) return
+    const items = list.filter((item): item is ReviewItem => !!item)
+    const state = items.some((item) => item.status === "error")
+      ? "error"
+      : items.some((item) => item.status === "warning" || item.status === "failed")
+        ? "failed"
+        : "passed"
+    const declared = row.state === "warning" ? "failed" : row.state
+    if (declared !== state) return
+    if (row.suggestions !== undefined && !Array.isArray(row.suggestions)) return
+    const suggestions = (row.suggestions ?? []).map((item) => (typeof item === "string" ? item.trim() : ""))
+    if (suggestions.some((item) => !item)) return
+    return { state, summary: row.summary.trim(), items, suggestions }
+  } catch {
+    return
+  }
 }

@@ -9,6 +9,7 @@ import { useWorkbenchFlowchartSync } from "./hooks/use-workbench-flowchart"
 import { useWorkbenchQuestionSync } from "./hooks/use-workbench-question"
 import { useWorkbenchReviewSync } from "./hooks/use-workbench-review"
 import { useWorkbenchSessionSync } from "./hooks/use-workbench-session-sync"
+import { useWorkbenchWorkflowSync } from "./hooks/use-workbench-workflow"
 import { Handle } from "./layout/handle"
 import { Topbar } from "./layout/topbar"
 import shell from "./styles/layout/shell.module.css"
@@ -18,6 +19,7 @@ export function Workbench() {
   useWorkbenchQuestionSync()
   useWorkbenchAnalysisSync()
   useWorkbenchBacktestSync()
+  useWorkbenchWorkflowSync()
   useWorkbenchFlowchartSync()
   const review = useWorkbenchReviewSync()
 

@@ -8,6 +8,7 @@ import (
 
 	"strategy-service/internal/backtest"
 	"strategy-service/internal/db"
+	"strategy-service/internal/workbench"
 
 	"github.com/gin-gonic/gin"
 )
@@ -26,6 +27,7 @@ func backtestTools() []map[string]any {
 				"workspacePath": prop("string", "Current workspace path injected by the workflow."),
 				"sessionId":     prop("string", "Current main workbench session id injected by the workflow."),
 				"requestKey":    prop("string", "Stable tool call key injected by the workflow."),
+				"workflowId":    prop("string", "Optional automatic workflow id injected by the workflow."),
 				"config":        config,
 			}, []string{}),
 		},
@@ -104,6 +106,10 @@ func (a *API) mcpBacktest(c *gin.Context, id any, name string, args map[string]a
 		}
 		row, reason, err := a.back.RunPatch(c.Request.Context(), req)
 		if err == nil {
+			if err := a.bindBacktest(c, args, row.ID); err != nil {
+				mcpBacktestError(c, id, err)
+				return
+			}
 			mcpBacktestOK(c, id, map[string]any{"version": 1, "accepted": true, "reason": reason, "run": row.Brief()})
 			return
 		}
@@ -113,6 +119,10 @@ func (a *API) mcpBacktest(c *gin.Context, id any, name string, args map[string]a
 			return
 		}
 		if conflict.Run.WorkspacePath == req.WorkspacePath && conflict.Run.SessionID == req.SessionID {
+			if err := a.bindBacktest(c, args, conflict.Run.ID); err != nil {
+				mcpBacktestError(c, id, err)
+				return
+			}
 			mcpBacktestOK(c, id, map[string]any{"version": 1, "accepted": true, "reason": "active", "run": conflict.Run.Brief()})
 			return
 		}
@@ -152,6 +162,50 @@ func (a *API) mcpBacktest(c *gin.Context, id any, name string, args map[string]a
 		}
 		mcpBacktestOK(c, id, map[string]any{"version": 1, "config": config})
 	}
+}
+
+func (a *API) bindBacktest(c *gin.Context, args map[string]any, id string) error {
+	flow := text(args["workflowId"])
+	if flow == "" {
+		return nil
+	}
+	row, err := a.bench.GetWorkflow(c.Request.Context(), workbench.WorkflowGet{
+		WorkspacePath: text(args["workspacePath"]),
+		SessionID:     text(args["sessionId"]),
+	})
+	if err != nil {
+		return err
+	}
+	if row.ID != flow {
+		return errors.New("invalid automatic backtest workflow")
+	}
+	if row.Stage == "backtest" && row.State == "running" && row.BacktestID == id {
+		return nil
+	}
+	if row.Stage != "backtest" || row.State != "requested" || (row.BacktestID != "" && row.BacktestID != id) {
+		return errors.New("invalid automatic backtest workflow")
+	}
+	_, err = a.bench.UpdateWorkflow(c.Request.Context(), workbench.WorkflowUpdate{
+		ID:            row.ID,
+		WorkspacePath: row.WorkspacePath,
+		SessionID:     row.SessionID,
+		Stage:         "backtest",
+		State:         "running",
+		BacktestID:    id,
+		Summary:       "自动回测已启动。",
+	})
+	if err != nil {
+		return err
+	}
+	detail, load := a.back.Detail(c.Request.Context(), backtest.ScopedReq{
+		ID:            id,
+		WorkspacePath: row.WorkspacePath,
+		SessionID:     row.SessionID,
+	})
+	if load == nil && (detail.Status == "done" || detail.Status == "failed") {
+		_, err = a.bench.UpdateWorkflowBacktest(c.Request.Context(), row.WorkspacePath, row.SessionID, id, detail.Status, detail.Error)
+	}
+	return err
 }
 
 func decodePatch(args map[string]any) (*backtest.ConfigPatch, error) {

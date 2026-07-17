@@ -1,6 +1,7 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit"
 import { type Stage } from "@/components/workbench/data"
 import type { BacktestRun, BacktestUpdate } from "@/types/backtest"
+import type { Workflow } from "@/api/modules/workbench"
 
 export type WorkbenchSession = {
   id: string
@@ -96,6 +97,9 @@ type State = {
   progress: WorkbenchProgressEvent[]
   progressPath: string
   progressSession: string
+  workflow: Workflow | null
+  workflowPath: string
+  workflowSession: string
   backtests: BacktestRun[]
   backtestPath: string
   backtestSession: string
@@ -119,6 +123,9 @@ const initialState: State = {
   progress: [],
   progressPath: "",
   progressSession: "",
+  workflow: null,
+  workflowPath: "",
+  workflowSession: "",
   backtests: [],
   backtestPath: "",
   backtestSession: "",
@@ -205,6 +212,37 @@ const slice = createSlice({
     setQuestions(state, action: PayloadAction<{ workspacePath: string; questions: WorkbenchQuestion[] }>) {
       state.questionPath = action.payload.workspacePath
       state.questions = action.payload.questions
+    },
+    setWorkflow(
+      state,
+      action: PayloadAction<{ workspacePath: string; sessionId: string; workflow: Workflow | null }>,
+    ) {
+      const same = state.workflowPath === action.payload.workspacePath && state.workflowSession === action.payload.sessionId
+      if (same && state.workflow && !action.payload.workflow) return
+      if (
+        same &&
+        state.workflow &&
+        action.payload.workflow &&
+        state.workflow.id === action.payload.workflow.id &&
+        state.workflow.revision > action.payload.workflow.revision
+      ) return
+      if (
+        same &&
+        state.workflow &&
+        action.payload.workflow &&
+        state.workflow.id !== action.payload.workflow.id &&
+        state.workflow.updatedAt >= action.payload.workflow.updatedAt
+      ) return
+      state.workflowPath = action.payload.workspacePath
+      state.workflowSession = action.payload.sessionId
+      state.workflow = action.payload.workflow
+    },
+    upsertWorkflow(state, action: PayloadAction<Workflow>) {
+      const row = action.payload
+      if (state.workflowPath !== row.workspacePath || state.workflowSession !== row.sessionId) return
+      if (state.workflow && state.workflow.id === row.id && state.workflow.revision > row.revision) return
+      if (state.workflow && state.workflow.id !== row.id && state.workflow.updatedAt > row.updatedAt) return
+      state.workflow = row
     },
     setRequirements(
       state,
@@ -440,6 +478,7 @@ export const {
   setReviews,
   setSessions,
   setStage,
+  setWorkflow,
   startReview,
   rollbackReview,
   upsertProgress,
@@ -447,6 +486,7 @@ export const {
   updateBacktest,
   upsertReview,
   upsertSession,
+  upsertWorkflow,
 } = slice.actions
 
 export const workbenchReducer = slice.reducer

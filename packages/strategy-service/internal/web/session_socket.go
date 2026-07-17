@@ -3,7 +3,9 @@ package web
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
+	"strategy-service/internal/db"
 	"strategy-service/internal/utils"
 	"strategy-service/internal/workbench"
 )
@@ -96,6 +98,26 @@ func (a *API) handleProgressGet(ctx context.Context, client *socketClient, evt s
 		return
 	}
 	client.reply(evt.ID, "progress.got", utils.Pack(data))
+}
+
+func (a *API) handleWorkflowGet(ctx context.Context, client *socketClient, evt socketEvent) {
+	req := workbench.WorkflowGet{}
+	if len(evt.Payload) > 0 {
+		if err := json.Unmarshal(evt.Payload, &req); err != nil {
+			client.reply(evt.ID, "workflow.get.error", utils.Pack(socketError{Message: err.Error()}))
+			return
+		}
+	}
+	data, err := a.bench.GetWorkflow(ctx, req)
+	if errors.Is(err, db.ErrNotFound) {
+		client.reply(evt.ID, "workflow.got", nil)
+		return
+	}
+	if err != nil {
+		client.reply(evt.ID, "workflow.get.error", utils.Pack(socketError{Message: err.Error()}))
+		return
+	}
+	client.reply(evt.ID, "workflow.got", utils.Pack(data))
 }
 
 func (a *API) handleProgressAppend(ctx context.Context, client *socketClient, evt socketEvent) {

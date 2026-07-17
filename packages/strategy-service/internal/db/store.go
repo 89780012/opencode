@@ -94,6 +94,11 @@ func migrate(ctx context.Context, db *sql.DB) error {
 		{table: "workspace_reviews", name: "review_id", sql: "alter table workspace_reviews add column review_id text not null default ''"},
 		{table: "workspace_reviews", name: "session_id", sql: "alter table workspace_reviews add column session_id text not null default ''"},
 		{table: "config", name: "workflow_baseline", sql: "alter table config add column workflow_baseline integer not null default 0"},
+		{table: "config", name: "workflow_review", sql: "alter table config add column workflow_review integer not null default 0"},
+		{table: "config", name: "workflow_debug", sql: "alter table config add column workflow_debug integer not null default 0"},
+		{table: "config", name: "workflow_backtest", sql: "alter table config add column workflow_backtest integer not null default 0"},
+		{table: "workflow_runs", name: "debug_cursor", sql: "alter table workflow_runs add column debug_cursor text not null default '{}'"},
+		{table: "workflow_runs", name: "debug_request_key", sql: "alter table workflow_runs add column debug_request_key text not null default ''"},
 	} {
 		var exists int
 		if err := tx.QueryRowContext(ctx, `select count(*) from sqlite_master where type = 'table' and name = ?`, col.table).Scan(&exists); err != nil {
@@ -122,6 +127,8 @@ func migrate(ctx context.Context, db *sql.DB) error {
 		{table: "backtest_runs", sql: `create index if not exists idx_backtest_runs_active_plugin on backtest_runs(plugin_id) where status in ('pending', 'running')`},
 		{table: "workspace_reviews", sql: `create unique index if not exists idx_workspace_reviews_scope_review on workspace_reviews(workspace_path, worktree_path, review_id) where review_id <> ''`},
 		{table: "workspace_reviews", sql: `create index if not exists idx_workspace_reviews_scope_updated on workspace_reviews(workspace_path, worktree_path, updated_at desc)`},
+		{table: "workflow_runs", sql: `create unique index if not exists idx_workflow_runs_scope_code on workflow_runs(workspace_path, session_id, code_revision)`},
+		{table: "workflow_runs", sql: `create index if not exists idx_workflow_runs_scope_updated on workflow_runs(workspace_path, session_id, updated_at desc)`},
 	} {
 		var exists int
 		if err := tx.QueryRowContext(ctx, `select count(*) from sqlite_master where type = 'table' and name = ?`, idx.table).Scan(&exists); err != nil {
@@ -156,6 +163,9 @@ var schema = []string{
 	theme_accent text not null,
 	logs_tail integer not null,
 	workflow_baseline integer not null default 0,
+	workflow_review integer not null default 0,
+	workflow_debug integer not null default 0,
+	workflow_backtest integer not null default 0,
 	updated_at integer not null
 )`,
 	`create table if not exists workspaces (
@@ -243,6 +253,27 @@ var schema = []string{
 )`,
 	`create index if not exists idx_session_progress_events_workspace_session_created on session_progress_events(workspace_path, session_id, created_at desc)`,
 	`create index if not exists idx_session_progress_events_workspace_created on session_progress_events(workspace_path, created_at desc)`,
+	`create table if not exists workflow_runs (
+	id text primary key,
+	workspace_path text not null,
+	session_id text not null,
+	code_revision text not null,
+	stage text not null,
+	state text not null,
+	review_round integer not null default 0,
+	debug_id text not null default '',
+	debug_cursor text not null default '{}',
+	debug_request_key text not null default '',
+	backtest_id text not null default '',
+	review_enabled integer not null default 0,
+	debug_enabled integer not null default 0,
+	backtest_enabled integer not null default 0,
+	summary text not null default '',
+	error text not null default '',
+	revision integer not null default 0,
+	created_at integer not null,
+	updated_at integer not null
+)`,
 	`create table if not exists summaries (
 	workspace_path text not null,
 	session_id text not null,

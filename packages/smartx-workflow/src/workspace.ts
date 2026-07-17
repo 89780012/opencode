@@ -14,9 +14,11 @@ import {
 } from "./model.js"
 import {
   noteBoot,
+  noteBacktest,
   noteChart,
   noteClose,
   noteDisabled,
+  noteDebug,
   noteFinal,
   noteFix,
   noteRefresh,
@@ -26,9 +28,9 @@ import {
   noteSaveProject,
   limit,
 } from "./note.js"
-import { items, mermaid, reviewState, reviewText, serial } from "./parse.js"
-import { analyze, backtest, baseline, flowchart, kind, mcp, python, review } from "./tool.js"
-import type { Analysis, Chart, Dirt, Fix, Memory, Mode, Pending, Project, SaveReview } from "./types.js"
+import { items, mermaid, reviewResult, reviewState, reviewText, serial } from "./parse.js"
+import { analyze, backtest, baseline, debug, flowchart, kind, mcp, python, review } from "./tool.js"
+import type { Analysis, Automation, Chart, Dirt, Fix, Memory, Mode, Pending, Project, Run, RunStart, RunUpdate, SaveReview } from "./types.js"
 import { flow, step } from "./workflow.js"
 
 type System = NonNullable<Hooks["experimental.chat.system.transform"]>
@@ -51,6 +53,7 @@ type Opt = {
   reviewRuns: Set<string>
   finalRequests: Set<string>
   childSessions: Set<string>
+  runs: Map<string, Run>
   parent: (id: string) => Promise<boolean>
   workspace: string
   worktree: string
@@ -59,6 +62,9 @@ type Opt = {
   loadChart: (workspace: string, worktree: string) => Promise<Chart | undefined>
   loadProject: (workspace: string, worktree: string) => Promise<Project | undefined>
   saveReview: (input: SaveReview) => Promise<void>
+  loadRun: (workspace: string, session: string) => Promise<Run | undefined>
+  startRun: (input: RunStart) => Promise<Run>
+  updateRun: (input: RunUpdate) => Promise<Run>
   write: Log
 }
 
@@ -67,6 +73,16 @@ function ok(output: unknown) {
   if (!output || typeof output !== "object") return true
   if (!("isError" in output)) return true
   return output.isError !== true
+}
+
+function data(output: unknown) {
+  if (!output || typeof output !== "object" || !("output" in output) || typeof output.output !== "string") return {}
+  try {
+    const value = JSON.parse(output.output) as unknown
+    return value && typeof value === "object" ? (value as Record<string, unknown>) : {}
+  } catch {
+    return {}
+  }
 }
 
 /** 规范化路径，统一分隔符并转为小写，用于跨平台比较。*/
@@ -134,6 +150,16 @@ function reviewPassed(input: unknown) {
   return args.state === "passed" && aggregate(args.items) === "passed"
 }
 
+function report(input: SaveReview) {
+  return [
+    input.summary,
+    ...input.items.map((item) =>
+      [`${item.name}：${item.detail}`, item.suggestion ? `建议：${item.suggestion}` : ""].filter(Boolean).join("\n"),
+    ),
+    ...(input.suggestions.length ? ["综合建议：", ...input.suggestions] : []),
+  ].join("\n\n")
+}
+
 /** 生成 workspace + session 维度的修复记录 key。*/
 function fixKey(id: string, session: string) {
   return id + "\x00" + session
@@ -144,6 +170,27 @@ function requestKey(id: string, session: string) {
   return id + "\x00" + session
 }
 
+function stopped(run: Run) {
+  return run.stage === "done" || run.state === "failed" || run.state === "review_exhausted" || run.state === "cancelled"
+}
+
+function next(run: Run, stage: "review" | "debug") {
+  if (stage === "review" && run.debugEnabled) return { stage: "debug", state: "requested" } as const
+  if (run.backtestEnabled) return { stage: "backtest", state: "requested" } as const
+  return { stage: "done", state: "passed" } as const
+}
+
+async function change(opt: Opt, run: Run, input: Omit<RunUpdate, "id" | "workspacePath" | "sessionId">) {
+  const row = await opt.updateRun({
+    id: run.id,
+    workspacePath: run.workspacePath,
+    sessionId: run.sessionId,
+    ...input,
+  })
+  opt.runs.set(requestKey(opt.id, run.sessionId), row)
+  return row
+}
+
 /** 当前会话优先读取自己的审查 pending，基线 pending 仍保持 workspace 级。 */
 function current(opt: Opt, session?: string) {
   const item = session ? opt.pending.get(requestKey(opt.id, session)) : undefined
@@ -152,19 +199,24 @@ function current(opt: Opt, session?: string) {
 }
 
 /** 对只能在主会话运行的本地能力做恢复会话兼容校验。 */
-async function main(opt: Opt, input: Parameters<Before>[0], name: "backtest" | "python") {
+async function sub(opt: Opt, session: string, name: string, tool = "") {
   const child =
-    opt.childSessions.has(input.sessionID) ||
-    (await opt.parent(input.sessionID).catch(async (err) => {
+    opt.childSessions.has(session) ||
+    (await opt.parent(session).catch(async (err) => {
       await opt.write(`${name} session verification failed`, {
-        sessionID: input.sessionID,
-        tool: input.tool,
+        sessionID: session,
+        tool,
         error: String(err),
       })
       throw new Error("SmartX workflow could not verify the main session.")
     }))
+  if (child) opt.childSessions.add(session)
+  return child
+}
+
+async function main(opt: Opt, input: Parameters<Before>[0], name: "backtest" | "debug" | "python") {
+  const child = await sub(opt, input.sessionID, name, input.tool)
   if (!child) return
-  opt.childSessions.add(input.sessionID)
   await opt.write(`child session ${name} blocked`, {
     sessionID: input.sessionID,
     workspace: opt.workspace,
@@ -172,6 +224,7 @@ async function main(opt: Opt, input: Parameters<Before>[0], name: "backtest" | "
     tool: input.tool,
   })
   if (name === "python") throw new Error("SmartX Python is only available in the main session.")
+  if (name === "debug") throw new Error("SmartX debugging tools are only available in the main session.")
   throw new Error("SmartX backtest tools are only available in the main session.")
 }
 
@@ -197,17 +250,22 @@ async function snapshot(opt: Opt) {
 }
 
 /** 标记当前 workspace 已被写脏，后续 review / final 需要刷新基线。*/
-function mark(opt: Opt, reason: string) {
+function mark(opt: Opt, session: string, reason: string) {
+  const current = opt.dirtyStates.get(opt.id)
   opt.dirtyStates.set(opt.id, {
     state: "dirty",
-    updated: Date.now(),
+    updated: Math.max(Date.now(), (current?.updated ?? 0) + 1),
     reason,
+    session,
   })
 }
 
 /** 记录已经开始且可能产生副作用的执行，确保失败路径也会刷新基线和项目记忆。 */
 async function dirty(opt: Opt, session: string, tool: string, enabled = true) {
-  mark(opt, tool)
+  mark(opt, session, tool)
+  const id = fixKey(opt.id, session)
+  const fix = opt.reviewFixes.get(id)
+  if (fix) opt.reviewFixes.set(id, { ...fix, changed: true, resumes: 0 })
   const memory = opt.memory.get(opt.id) ?? cleanMemory(opt.projects.get(opt.id))
   opt.memory.set(opt.id, {
     hasProjectState: memory.hasProjectState,
@@ -235,6 +293,8 @@ function reset(opt: Opt, mode?: Mode) {
 /** workspace 级编排器，负责 system 注入、before 门禁和 after 状态推进。*/
 export function createWorkspace(opt: Opt) {
   return {
+    /** idle 驱动复用主会话校验，恢复后的子 session 也不得推进自动流程。 */
+    child: (session: string) => sub(opt, session, "pipeline"),
     /** Python 进程启动后立即保守标脏，不依赖可能缺席的 after hook。 */
     taint: (session: string, tool: string, enabled = true) => void dirty(opt, session, tool, enabled).catch(() => {}),
     /** 外部显式要求刷新时，重建基线并记录日志。*/
@@ -250,8 +310,10 @@ export function createWorkspace(opt: Opt) {
       return true
     },
     /** 模型出手前，决定这一轮应该注入哪一种隐藏系统提示。*/
-    system: async (input: Parameters<System>[0], output: Parameters<System>[1], enabled = true) => {
+    system: async (input: Parameters<System>[0], output: Parameters<System>[1], cfg: Automation) => {
       if (!opt.workspace || !opt.id) return false
+
+      const enabled = cfg.baseline
 
       if (!enabled) output.system.push(noteDisabled())
 
@@ -308,10 +370,10 @@ export function createWorkspace(opt: Opt) {
         }),
         /** 3. 当前轮已经有待保存的 baseline 产物时，先去做 MCP 保存。*/
         step("save", async () => {
-          if (!enabled) return false
-          // analysis / flowchart 已经产出，但还没同步进策略服务时，先强制保存。
           const pendingSave = state.pendingSave
           if (!pendingSave) return false
+          if (!enabled && pendingSave.kind !== "review") return false
+          // analysis / flowchart / review 已经产出，但还没同步进策略服务时，先强制保存。
           await opt.write("workspace mcp save reminder injected", {
             sessionID,
             workspace: opt.workspace,
@@ -350,6 +412,54 @@ export function createWorkspace(opt: Opt) {
           output.system.push(noteFix(fix))
           if (fix.attempt >= limit) opt.reviewFixes.delete(fixKey(opt.id, sessionID))
           return true
+        }),
+        step("pipeline", async () => {
+          if (!sessionID || (!cfg.review && !cfg.debug && !cfg.backtest)) return false
+          if (await sub(opt, sessionID, "pipeline")) return false
+          const id = requestKey(opt.id, sessionID)
+          const loaded = await opt.loadRun(opt.workspace, sessionID).catch(() => undefined)
+          if (loaded) opt.runs.set(id, loaded)
+          const dirty = opt.dirtyStates.get(opt.id) ?? cleanDirt()
+          let run = opt.runs.get(id)
+          if (!run || stopped(run)) {
+            if (
+              dirty.state !== "dirty" ||
+              (dirty.session && dirty.session !== sessionID) ||
+              dirty.updated <= (run?.updatedAt ?? 0) ||
+              state.projectMemory.needsSave ||
+              state.pendingSave
+            )
+              return false
+            run = await opt.startRun({
+              workspacePath: opt.workspace,
+              sessionId: sessionID,
+              codeRevision: String(dirty.updated),
+              review: cfg.review,
+              debug: cfg.debug,
+              backtest: cfg.backtest,
+            })
+            opt.runs.set(id, run)
+          }
+          if (stopped(run)) return false
+          if (opt.finalRequests.has(id)) {
+            if (enabled && state.life !== "ready") return false
+            opt.finalRequests.delete(id)
+          }
+          if (run.stage === "review" && run.state === "passed") run = await change(opt, run, next(run, "review"))
+          if (run.stage === "debug" && run.state === "passed") run = await change(opt, run, next(run, "debug"))
+          if (run.stage === "review") {
+            if (run.state === "requested" || run.state === "fixing") opt.reviewRequests.add(id)
+            return false
+          }
+          if (run.stage === "debug") {
+            output.system.push(noteDebug(run.state === "running" ? "running" : "requested"))
+            return true
+          }
+          if (run.stage === "backtest" && run.state === "requested") {
+            output.system.push(noteBacktest())
+            return true
+          }
+          return false
         }),
         /** 5. 用户明确要求 review 时，优先进入审查流程。*/
         step("review", async () => {
@@ -488,9 +598,27 @@ export function createWorkspace(opt: Opt) {
       ])
     },
     /** 工具执行前做硬门禁，并记录 analysis / review / chart 的启动状态。*/
-    before: async (input: Parameters<Before>[0], output: Parameters<Before>[1], enabled = true) => {
+    before: async (input: Parameters<Before>[0], output: Parameters<Before>[1], cfg: Automation) => {
       if (!opt.workspace || !opt.id) return false
+      const enabled = cfg.baseline
       if (python(input)) await main(opt, input, "python")
+      if (debug(input)) {
+        const run = opt.runs.get(requestKey(opt.id, input.sessionID))
+        if (run?.stage === "debug" && !stopped(run)) {
+          await main(opt, input, "debug")
+          const args =
+            output.args && typeof output.args === "object" && !Array.isArray(output.args)
+              ? (output.args as Record<string, unknown>)
+              : {}
+          output.args = args
+          args.workspacePath = opt.workspace
+          args.sessionId = input.sessionID
+          args.workflowId = run.id
+          args.requestKey = `pipeline:${run.id}:${mcp(input, "start") ? "start" : "logs"}`
+          delete args.name
+          if (mcp(input, "logs")) args.debugId = run.debugId
+        }
+      }
       if (backtest(input)) {
         await main(opt, input, "backtest")
         const args =
@@ -502,7 +630,12 @@ export function createWorkspace(opt: Opt) {
         args.sessionId = input.sessionID
         delete args.pluginId
         delete args.requestKey
-        if (mcp(input, "run_backtest")) args.requestKey = "ai:" + input.callID
+        delete args.workflowId
+        if (mcp(input, "run_backtest")) {
+          const run = opt.runs.get(requestKey(opt.id, input.sessionID))
+          args.requestKey = run?.stage === "backtest" ? `pipeline:${run.id}` : "ai:" + input.callID
+          if (run?.stage === "backtest") args.workflowId = run.id
+        }
       }
       if (!enabled && baseline({ tool: input.tool, args: output.args }))
         throw new Error("SmartX workspace analysis and flowchart generation are disabled by system configuration.")
@@ -585,6 +718,13 @@ export function createWorkspace(opt: Opt) {
           if (opt.reviewRuns.has(id)) throw new Error("SmartX workflow already has an active review for this session.")
           if (opt.pending.get(id)?.kind === "review")
             throw new Error("SmartX workflow requires saving the pending review before starting another review.")
+          const loaded = opt.runs.get(id) ?? (await opt.loadRun(opt.workspace, input.sessionID).catch(() => undefined))
+          if (loaded) opt.runs.set(id, loaded)
+          const run = loaded
+          if (run?.stage === "review") {
+            const round = Math.min(run.reviewRound + 1, limit)
+            await change(opt, run, { stage: "review", state: "running", reviewRound: round })
+          }
           opt.reviewRuns.add(id)
           await opt
             .saveReview({
@@ -593,12 +733,12 @@ export function createWorkspace(opt: Opt) {
               workspacePath: opt.workspace,
               worktreePath: opt.worktree,
               state: "running",
-              summary: "审查已开始，当前由 strategy-reviewer 接手处理。",
+              summary: "审查已开始，当前由审查智能体接手处理。",
               items: [
                 {
                   name: "审查进行中",
                   status: "running",
-                  detail: "strategy-reviewer 子 agent 正在执行审查。",
+                  detail: "审查智能体正在逐项检查策略实现。",
                   suggestion: "",
                 },
               ],
@@ -635,10 +775,46 @@ export function createWorkspace(opt: Opt) {
       ])
     },
     /** 工具执行后推进 project memory、baseline 以及 review 队列状态。 */
-    after: async (input: Parameters<After>[0], output: Parameters<After>[1], enabled = true) => {
+    after: async (input: Parameters<After>[0], output: Parameters<After>[1], cfg: Automation) => {
       if (!opt.workspace || !opt.id) return false
 
+      const enabled = cfg.baseline
+
       return flow([
+        step("debug", async () => {
+          if (!debug(input)) return false
+          const id = requestKey(opt.id, input.sessionID)
+          const run = opt.runs.get(id)
+          if (!run || run.stage !== "debug") return false
+          const body = data(output)
+          if (!ok(output)) {
+            await change(opt, run, {
+              stage: "done",
+              state: "failed",
+              error: typeof body.error === "string" ? body.error : "自动调试工具执行失败",
+            })
+            return true
+          }
+          if (mcp(input, "start")) {
+            await change(opt, run, {
+              stage: "debug",
+              state: "running",
+              debugId: typeof body.debugId === "string" ? body.debugId : input.callID,
+              summary: "策略已启动，等待增量日志检查。",
+            })
+            return true
+          }
+          if (body.state === "passed") {
+            await change(opt, run, { ...next(run, "debug"), summary: "自动调试通过。" })
+            return true
+          }
+          await change(opt, run, {
+            stage: "done",
+            state: "failed",
+            error: typeof body.summary === "string" ? body.summary : "自动调试未通过",
+          })
+          return true
+        }),
         step("project_init", async () => {
           // 只有 init_project_state 成功返回，才说明记忆是“新建成功”。
           if (
@@ -797,20 +973,37 @@ export function createWorkspace(opt: Opt) {
           opt.pending.delete(id)
           const done = item.state === "passed" && reviewPassed(args)
           if (done || state === "error") opt.reviewFixes.delete(fixKey(opt.id, input.sessionID))
+          const run = opt.runs.get(id)
+          const fix = opt.reviewFixes.get(fixKey(opt.id, input.sessionID))
+          const attempt = Math.min(fix?.attempt ?? run?.reviewRound ?? 1, limit)
           if (state === "failed") {
-            const fix = opt.reviewFixes.get(fixKey(opt.id, input.sessionID))
-            const attempt = Math.min(fix?.attempt ?? 1, limit)
-            opt.reviewFixes.set(fixKey(opt.id, input.sessionID), {
-              workspacePath: opt.workspace,
-              worktreePath: opt.worktree,
-              sessionID: input.sessionID,
-              attempt,
-              reviewText: item.reviewText,
-            })
+            if (attempt >= limit) opt.reviewFixes.delete(fixKey(opt.id, input.sessionID))
+            if (attempt < limit)
+              opt.reviewFixes.set(fixKey(opt.id, input.sessionID), {
+                workspacePath: opt.workspace,
+                worktreePath: opt.worktree,
+                sessionID: input.sessionID,
+                attempt,
+                reviewText: item.reviewText,
+              })
           }
           if (done) {
             opt.finalRequests.add(id)
             if (enabled) reset(opt, "final")
+          }
+          if (run?.stage === "review") {
+            if (done) await change(opt, run, { ...next(run, "review"), reviewRound: attempt, summary: String(args.summary) })
+            if (!done && state === "failed" && attempt < limit)
+              await change(opt, run, { stage: "review", state: "fixing", reviewRound: attempt, summary: String(args.summary) })
+            if (!done && state === "failed" && attempt >= limit)
+              await change(opt, run, {
+                stage: "review",
+                state: "review_exhausted",
+                reviewRound: limit,
+                error: String(args.summary),
+              })
+            if (state === "error")
+              await change(opt, run, { stage: "done", state: "failed", reviewRound: attempt, error: String(args.summary) })
           }
           await opt.write("workspace review saved through mcp", {
             sessionID: input.sessionID,
@@ -852,20 +1045,55 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
         step("review_done", async () => {
-          // review 子 agent 返回后，先解析结论，再决定是否要继续修复。
+          // 自动 reviewer 的结构化结果在插件内直接校验和保存，原始 JSON 不进入用户界面。
           if (!review(input)) return false
-          opt.reviewRuns.delete(requestKey(opt.id, input.sessionID))
-          const text = reviewText(output?.output ?? "") || "审查结果为空"
-          const state = reviewState(text)
+          const id = requestKey(opt.id, input.sessionID)
+          const parsed = reviewResult(output?.output ?? "")
+          const item: SaveReview = parsed
+            ? {
+                ...parsed,
+                reviewId: input.callID,
+                sessionId: input.sessionID,
+                workspacePath: opt.workspace,
+                worktreePath: opt.worktree,
+              }
+            : {
+                reviewId: input.callID,
+                sessionId: input.sessionID,
+                workspacePath: opt.workspace,
+                worktreePath: opt.worktree,
+                state: "error",
+                summary: "审查结果格式异常，请重新审查。",
+                items: [
+                  {
+                    name: "审查结果格式",
+                    status: "error",
+                    detail: "审查智能体未返回有效的结构化审查结果。",
+                    suggestion: "重新执行审查。",
+                  },
+                ],
+                suggestions: ["重新执行审查。"],
+              }
+          if (output && typeof output === "object" && "output" in output)
+            output.output = item.state === "passed" ? `自动审查通过：${item.summary}` : `自动审查未通过：${item.summary}`
+          await opt.saveReview(item)
+          opt.reviewRuns.delete(id)
+          opt.reviewRequests.delete(id)
+          opt.pending.delete(id)
+          const run = opt.runs.get(id) ?? (await opt.loadRun(opt.workspace, input.sessionID).catch(() => undefined))
+          if (run) opt.runs.set(id, run)
           const fix = opt.reviewFixes.get(fixKey(opt.id, input.sessionID))
-          if (state === "failed") {
-            const attempt = Math.min((fix?.attempt ?? 0) + 1, limit)
+          const attempt = Math.min(run?.reviewRound ?? (fix?.attempt ?? 0) + 1, limit)
+          const text = report(item)
+          if (item.state === "failed" && attempt < limit) {
             opt.reviewFixes.set(fixKey(opt.id, input.sessionID), {
               workspacePath: opt.workspace,
               worktreePath: opt.worktree,
               sessionID: input.sessionID,
               attempt,
               reviewText: text,
+              changed: false,
+              resumes: 0,
             })
             await opt.write("workspace review needs fix", {
               sessionID: input.sessionID,
@@ -874,21 +1102,32 @@ export function createWorkspace(opt: Opt) {
               attempt,
             })
           }
-          if (state !== "failed") opt.reviewFixes.delete(fixKey(opt.id, input.sessionID))
-          opt.pending.set(requestKey(opt.id, input.sessionID), {
-            kind: "review",
-            reviewId: input.callID,
-            sessionId: input.sessionID,
-            workspacePath: opt.workspace,
-            worktreePath: opt.worktree,
-            state,
-            reviewText: text,
-          })
+          if (item.state !== "failed" || attempt >= limit) opt.reviewFixes.delete(fixKey(opt.id, input.sessionID))
+          if (item.state === "passed") {
+            opt.finalRequests.add(id)
+            if (enabled) reset(opt, "final")
+          }
+          if (run?.stage === "review") {
+            if (item.state === "passed")
+              await change(opt, run, { ...next(run, "review"), reviewRound: attempt, summary: item.summary })
+            if (item.state === "failed" && attempt < limit)
+              await change(opt, run, { stage: "review", state: "fixing", reviewRound: attempt, summary: item.summary })
+            if (item.state === "failed" && attempt >= limit)
+              await change(opt, run, {
+                stage: "review",
+                state: "review_exhausted",
+                reviewRound: limit,
+                error: item.summary,
+              })
+            if (item.state === "error")
+              await change(opt, run, { stage: "done", state: "failed", reviewRound: attempt, error: item.summary })
+          }
           await opt.write("workspace review completed", {
             sessionID: input.sessionID,
             workspace: opt.workspace,
             worktree: opt.worktree,
-            state,
+            state: item.state,
+            structured: true,
           })
           return true
         }),

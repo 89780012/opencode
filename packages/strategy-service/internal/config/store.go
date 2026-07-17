@@ -28,6 +28,9 @@ type Logs struct {
 
 type Workflow struct {
 	Baseline bool `json:"baseline"`
+	Review   bool `json:"review"`
+	Debug    bool `json:"debug"`
+	Backtest bool `json:"backtest"`
 }
 
 type Store struct{}
@@ -44,6 +47,9 @@ func Default() Config {
 		},
 		Workflow: Workflow{
 			Baseline: false,
+			Review:   false,
+			Debug:    false,
+			Backtest: false,
 		},
 	}
 }
@@ -70,7 +76,7 @@ func (s *Store) LoadUserConfig() (Config, error) {
 		return Default(), err
 	}
 	cfg := Default()
-	err = doc.QueryRow("select theme_mode, theme_accent, logs_tail, workflow_baseline from config where id = 1").Scan(&cfg.Theme.Mode, &cfg.Theme.Accent, &cfg.Logs.Tail, &cfg.Workflow.Baseline)
+	err = doc.QueryRow("select theme_mode, theme_accent, logs_tail, workflow_baseline, workflow_review, workflow_debug, workflow_backtest from config where id = 1").Scan(&cfg.Theme.Mode, &cfg.Theme.Accent, &cfg.Logs.Tail, &cfg.Workflow.Baseline, &cfg.Workflow.Review, &cfg.Workflow.Debug, &cfg.Workflow.Backtest)
 	if errors.Is(err, sql.ErrNoRows) {
 		return cfg, nil
 	}
@@ -87,8 +93,8 @@ func (s *Store) Save(cfg Config) (Config, error) {
 		return Default(), err
 	}
 	cfg = clean(cfg)
-	_, err = doc.Exec(`insert into config(id, theme_mode, theme_accent, logs_tail, workflow_baseline, updated_at) values (1, ?, ?, ?, ?, ?)
-on conflict(id) do update set theme_mode = excluded.theme_mode, theme_accent = excluded.theme_accent, logs_tail = excluded.logs_tail, workflow_baseline = excluded.workflow_baseline, updated_at = excluded.updated_at`, cfg.Theme.Mode, cfg.Theme.Accent, cfg.Logs.Tail, cfg.Workflow.Baseline, time.Now().UnixMilli())
+	_, err = doc.Exec(`insert into config(id, theme_mode, theme_accent, logs_tail, workflow_baseline, workflow_review, workflow_debug, workflow_backtest, updated_at) values (1, ?, ?, ?, ?, ?, ?, ?, ?)
+on conflict(id) do update set theme_mode = excluded.theme_mode, theme_accent = excluded.theme_accent, logs_tail = excluded.logs_tail, workflow_baseline = excluded.workflow_baseline, workflow_review = excluded.workflow_review, workflow_debug = excluded.workflow_debug, workflow_backtest = excluded.workflow_backtest, updated_at = excluded.updated_at`, cfg.Theme.Mode, cfg.Theme.Accent, cfg.Logs.Tail, cfg.Workflow.Baseline, cfg.Workflow.Review, cfg.Workflow.Debug, cfg.Workflow.Backtest, time.Now().UnixMilli())
 	if err != nil {
 		return Default(), err
 	}
@@ -112,6 +118,9 @@ func clean(cfg Config) Config {
 		out.Logs.Tail = clamp(cfg.Logs.Tail)
 	}
 	out.Workflow.Baseline = cfg.Workflow.Baseline
+	out.Workflow.Review = cfg.Workflow.Review
+	out.Workflow.Debug = cfg.Workflow.Debug
+	out.Workflow.Backtest = cfg.Workflow.Backtest
 	return out
 }
 

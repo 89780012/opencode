@@ -25,11 +25,16 @@ type Config struct {
 }
 
 type Service struct {
-	cfg Config
+	cfg   Config
+	mu    sync.RWMutex
+	debug map[string]Debug
 }
 
 type Input struct {
-	Name string `json:"name"`
+	Name    string           `json:"name"`
+	DebugID string           `json:"-"`
+	Started int64            `json:"-"`
+	Cursor  map[string]int64 `json:"-"`
 }
 
 type Result struct {
@@ -37,6 +42,17 @@ type Result struct {
 	Account  string `json:"account"`
 	WindowId string `json:"window_id"`
 	Output   string `json:"output"`
+	DebugID  string `json:"debugId"`
+	Started  int64  `json:"startedAt"`
+	Live     bool   `json:"live"`
+}
+
+type Debug struct {
+	ID      string
+	Name    string
+	Filter  string
+	Started int64
+	Cursor  map[string]int64
 }
 
 type BacktestInput struct {
@@ -85,11 +101,23 @@ func New(cfg Config) *Service {
 		cfg.Timeout = 30 * time.Second
 	}
 
-	return &Service{cfg: cfg}
+	return &Service{cfg: cfg, debug: map[string]Debug{}}
 }
 
 func (s *Service) Dir() (string, error) {
 	return s.logDir()
+}
+
+func (s *Service) Claim(name string, id string) (Debug, error) {
+	filter := strings.TrimSpace(name)
+	if filter == "" {
+		return Debug{}, errors.New("name is required")
+	}
+	id = strings.TrimSpace(id)
+	if id == "" {
+		id = fmt.Sprintf("debug_%d", time.Now().UnixNano())
+	}
+	return Debug{ID: id, Name: filter + "-local", Filter: filter, Started: time.Now().UnixMilli(), Cursor: s.cursor(filter)}, nil
 }
 
 func (s *Service) Start(ctx context.Context, in Input) (Result, error) {
@@ -98,31 +126,93 @@ func (s *Service) Start(ctx context.Context, in Input) (Result, error) {
 	if plat != "windows" && plat != "darwin" {
 		return Result{}, fmt.Errorf("unsupported platform: %s", plat)
 	}
-	name := strings.TrimSpace(in.Name)
-	if name == "" {
-		return Result{}, errors.New("name is required")
+	run, err := s.Claim(in.Name, in.DebugID)
+	if err != nil {
+		return Result{}, err
 	}
-	name = name + "-local"
+	if in.Started > 0 {
+		run.Started = in.Started
+	}
+	if in.Cursor != nil {
+		run.Cursor = copyCursor(in.Cursor)
+	}
 
 	account := strings.TrimSpace(s.cfg.Account)
 	id := strings.TrimSpace(s.cfg.WindowId)
 	//pass := strings.TrimSpace(s.cfg.Password)
 	pass := "123456" //登录状态随便写密码
 
-	slog.Info("start strategy", "name", name, "account", account, "id", id, "pass", pass)
-	out, err := s.run(ctx, name, account, id, pass)
+	slog.Info("start strategy", "name", run.Name, "account", account, "id", id, "pass", pass)
+	out, err := s.run(ctx, run.Name, account, id, pass)
 	if err != nil {
 		return Result{}, err
 	}
 
 	result := Result{
-		Name:     name,
+		Name:     run.Name,
 		Account:  account,
 		WindowId: id,
 		Output:   out,
+		DebugID:  run.ID,
+		Started:  run.Started,
+		Live:     true,
 	}
+	s.mu.Lock()
+	s.debug[result.DebugID] = run
+	s.mu.Unlock()
 	slog.Info("start strategy run", "result", result)
 	return result, nil
+}
+
+func (s *Service) Alive(ctx context.Context, name string) bool {
+	out, err := s.status(ctx, strings.TrimSpace(name))
+	return err == nil && live(out)
+}
+
+func (s *Service) Debug(id string) (Debug, bool) {
+	s.mu.RLock()
+	run, ok := s.debug[strings.TrimSpace(id)]
+	s.mu.RUnlock()
+	if !ok {
+		return Debug{}, false
+	}
+	run.Cursor = copyCursor(run.Cursor)
+	return run, true
+}
+
+func (s *Service) Restore(run Debug) {
+	run.ID = strings.TrimSpace(run.ID)
+	run.Name = strings.TrimSpace(run.Name)
+	run.Filter = strings.TrimSpace(run.Filter)
+	if run.ID == "" || run.Name == "" {
+		return
+	}
+	run.Cursor = copyCursor(run.Cursor)
+	s.mu.Lock()
+	if _, ok := s.debug[run.ID]; !ok {
+		s.debug[run.ID] = run
+	}
+	s.mu.Unlock()
+}
+
+func copyCursor(cursor map[string]int64) map[string]int64 {
+	out := make(map[string]int64, len(cursor))
+	for path, off := range cursor {
+		out[path] = off
+	}
+	return out
+}
+
+func (s *Service) cursor(name string) map[string]int64 {
+	meta, err := s.Meta(name, 20)
+	if err != nil {
+		return map[string]int64{}
+	}
+	out := make(map[string]int64, len(meta.Files))
+	for _, file := range meta.Files {
+		out[file.Path] = file.Size
+	}
+	return out
 }
 
 func (s *Service) Backtest(ctx context.Context, in BacktestInput) (BacktestResult, error) {

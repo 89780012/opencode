@@ -643,7 +643,9 @@
 }
 
 .foldhead {
-  width: auto;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   border: 0;
   border-radius: 0.48rem;
   background: transparent;
@@ -651,7 +653,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 0.45rem;
+  gap: 0;
   padding: 0.1rem 0;
   text-align: left;
   font: inherit;
@@ -671,10 +673,11 @@
 } */
 
 .foldtitle {
+  flex: 1 1 auto;
   min-width: 0;
   display: inline-flex;
   align-items: center;
-  gap: 0.38rem;
+  gap: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -709,11 +712,50 @@
 
 .foldmeta {
   flex: none;
+  max-width: 40%;
+  margin-left: 0.45rem;
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0;
   color: #6b7280;
   font-size: 0.72rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.foldlabel {
+  min-width: 0;
+  margin-left: 0.38rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron {
+  flex: none;
+  margin-left: 0.45rem;
+  color: currentColor;
+  transition: transform 0.16s ease;
+}
+
+.user .foldhead {
+  color: #f8fafc;
+}
+
+.user .foldmeta,
+.user .chevron {
+  color: #cbd5e1;
+}
+
+.user .foldbody {
+  border-left-color: #475569;
+  color: #f8fafc;
+}
+
+.user .foldbody .markdown,
+.user .reviewnote {
+  color: #f8fafc;
 }
 
 .foldbody {
@@ -748,6 +790,12 @@
 
 .chevronon {
   transform: rotate(180deg);
+}
+
+.reviewnote {
+  color: #4b5563;
+  font-size: 0.78rem;
+  line-height: 1.55;
 }
 
 .pre {
@@ -1120,7 +1168,7 @@
 .mermaiderr > div {
   display: flex;
   align-items: center;
-  gap: 0.38rem;
+  gap: 0;
 }
 
 .mermaiderr strong {

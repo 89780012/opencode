@@ -21,6 +21,10 @@ export function backtest(input: { tool: string }) {
   return backtests.some((name) => mcp(input, name))
 }
 
+export function debug(input: { tool: string }) {
+  return input.tool === "smartx_start" || input.tool === "smartx_logs"
+}
+
 /** 判断当前调用是否为 SmartX 内置 Python 工具。 */
 export function python(input: { tool: string }) {
   return input.tool === "smartx_python"

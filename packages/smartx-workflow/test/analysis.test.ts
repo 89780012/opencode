@@ -2,7 +2,7 @@
 import type { ToolContext } from "@opencode-ai/plugin"
 import { build } from "../src/hooks.js"
 import { loadBaselineRemote, loadRemote } from "../src/remote.js"
-import { backtest, kind, python } from "../src/tool.js"
+import { backtest, debug, kind, python } from "../src/tool.js"
 import {
   analyze,
   doneAnalysis,
@@ -17,7 +17,7 @@ import {
   type Analysis,
   type Chart,
 } from "../src/state.js"
-import type { Memory, Pending, Project, SaveReview } from "../src/types.js"
+import type { Memory, Pending, Project, Run, SaveReview } from "../src/types.js"
 
 type Row = {
   message: string
@@ -102,6 +102,26 @@ describe("smartx workspace analysis", () => {
     expect(kind({ tool: "list_backtests" })).toBe("read")
     expect(kind({ tool: "get_backtest" })).toBe("read")
     expect(kind({ tool: "get_backtest_config" })).toBe("read")
+  })
+
+  test("matches only configured SmartX debug tools", () => {
+    expect(debug({ tool: "smartx_start" })).toBe(true)
+    expect(debug({ tool: "smartx_logs" })).toBe(true)
+    expect(debug({ tool: "docker_start" })).toBe(false)
+    expect(debug({ tool: "server_logs" })).toBe(false)
+    expect(debug({ tool: "start" })).toBe(false)
+  })
+
+  test("preserves manual SmartX debug arguments without an automatic run", async () => {
+    const hooks = setup(ctx("f:/repo"))
+    const start = { args: { name: "manual", extra: "keep" } }
+    const logs = { args: { name: "manual", seconds: 2 } }
+
+    await hooks["tool.execute.before"]?.({ sessionID: "s1", tool: "smartx_start", callID: "manual-start" }, start)
+    await hooks["tool.execute.before"]?.({ sessionID: "s1", tool: "smartx_logs", callID: "manual-logs" }, logs)
+
+    expect(start.args).toEqual({ name: "manual", extra: "keep" })
+    expect(logs.args).toEqual({ name: "manual", seconds: 2 })
   })
 
   test("registers and classifies the SmartX Python tool", () => {
@@ -718,6 +738,30 @@ describe("smartx workspace analysis", () => {
     ).rejects.toThrow("main session")
   })
 
+  test("does not create an automatic pipeline for a restored child session", async () => {
+    const id = workspace()
+    let starts = 0
+    const hooks = build(ctx("f:/repo"), {
+      projects: projects(),
+      memory: restored(),
+      dirtyStates: new Map([[id, { state: "dirty", updated: 100, reason: "edit" }]]),
+      workflow: async () => ({ baseline: false, review: true, debug: true, backtest: true }),
+      parent: async (session) => session === "s2",
+      loadRun: async () => undefined,
+      startRun: async () => {
+        starts++
+        throw new Error("child pipeline must not start")
+      },
+    })
+    const out = { system: [] as string[] }
+
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s2", model: {} as never }, out)
+
+    expect(starts).toBe(0)
+    expect(out.system.join("\n")).not.toContain("strategy-reviewer")
+    expect(out.system.join("\n")).not.toContain("smartx_start")
+  })
+
   test("rejects SmartX Python in child sessions before execution", async () => {
     const hooks = setup(ctx("f:/repo"), { parent: async (id) => id === "s2" })
 
@@ -1000,11 +1044,12 @@ describe("smartx workspace analysis", () => {
     expect(runs.has(scope)).toBe(true)
   })
 
-  test("turns a missing reviewer task output into an error pending", async () => {
+  test("turns a missing reviewer task output into a saved error", async () => {
     const id = workspace()
     const scope = id + "\x00s1"
     const pending = new Map()
     const runs = new Set<string>()
+    const saved: SaveReview[] = []
     const hooks = setup(ctx("f:/repo"), {
       workspaces: new Map([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]]),
       charts: new Map([
@@ -1013,6 +1058,9 @@ describe("smartx workspace analysis", () => {
       pending,
       reviewRequests: new Set([scope]),
       reviewRuns: runs,
+      saveReview: async (input) => {
+        saved.push(input)
+      },
     })
 
     await hooks["tool.execute.before"]?.(
@@ -1025,7 +1073,8 @@ describe("smartx workspace analysis", () => {
     )
 
     expect(runs.has(scope)).toBe(false)
-    expect(pending.get(scope)).toMatchObject({ reviewId: "review-1", sessionId: "s1", state: "error" })
+    expect(pending.has(scope)).toBe(false)
+    expect(saved.at(-1)).toMatchObject({ reviewId: "review-1", sessionId: "s1", state: "error" })
   })
 
   test("keeps a review request when the running state cannot be saved", async () => {
@@ -1096,7 +1145,13 @@ describe("smartx workspace analysis", () => {
 
   test("treats an empty reviewer result as an error", async () => {
     const pending = new Map()
-    const hooks = setup(ctx("f:/repo"), { pending })
+    const saved: SaveReview[] = []
+    const hooks = setup(ctx("f:/repo"), {
+      pending,
+      saveReview: async (input) => {
+        saved.push(input)
+      },
+    })
     const scope = workspace() + "\x00s1"
 
     await hooks["tool.execute.after"]?.(
@@ -1104,8 +1159,8 @@ describe("smartx workspace analysis", () => {
       { title: "", output: "", metadata: {} },
     )
 
-    expect(pending.get(scope)).toMatchObject({
-      kind: "review",
+    expect(pending.has(scope)).toBe(false)
+    expect(saved.at(-1)).toMatchObject({
       reviewId: "review-empty",
       sessionId: "s1",
       state: "error",
@@ -1137,11 +1192,15 @@ describe("smartx workspace analysis", () => {
   test("rejects empty, invalid, and running terminal review items", async () => {
     const pending = new Map()
     const hooks = setup(ctx("f:/repo"), { pending })
-
-    await hooks["tool.execute.after"]?.(
-      { sessionID: "s1", tool: "task", callID: "review-1", args: { subagent_type: "strategy-reviewer" } },
-      { title: "", output: "review conclusion: passed\nno blocking issue", metadata: {} },
-    )
+    pending.set(workspace() + "\x00s1", {
+      kind: "review",
+      reviewId: "review-1",
+      sessionId: "s1",
+      workspacePath: "f:/repo",
+      worktreePath: "f:/repo",
+      state: "passed",
+      reviewText: "通过",
+    })
 
     const call = (items: unknown[], summary = "review complete") =>
       hooks["tool.execute.before"]?.(
@@ -1182,11 +1241,15 @@ describe("smartx workspace analysis", () => {
   test("does not let terminal items weaken a failed reviewer result", async () => {
     const pending = new Map()
     const hooks = setup(ctx("f:/repo"), { pending })
-
-    await hooks["tool.execute.after"]?.(
-      { sessionID: "s1", tool: "task", callID: "review-1", args: { subagent_type: "strategy-reviewer" } },
-      { title: "", output: "review conclusion: failed\nmissing stop loss", metadata: {} },
-    )
+    pending.set(workspace() + "\x00s1", {
+      kind: "review",
+      reviewId: "review-1",
+      sessionId: "s1",
+      workspacePath: "f:/repo",
+      worktreePath: "f:/repo",
+      state: "failed",
+      reviewText: "缺少止损",
+    })
 
     await expect(
       hooks["tool.execute.before"]?.(
@@ -1222,11 +1285,22 @@ describe("smartx workspace analysis", () => {
       pending,
       reviewFixes: fixes,
     })
-
-    await hooks["tool.execute.after"]?.(
-      { sessionID: "s1", tool: "task", callID: "review-1", args: { subagent_type: "strategy-reviewer" } },
-      { title: "", output: "review conclusion: failed\nmissing stop loss", metadata: {} },
-    )
+    pending.set(scope, {
+      kind: "review",
+      reviewId: "review-1",
+      sessionId: "s1",
+      workspacePath: "f:/repo",
+      worktreePath: "f:/repo",
+      state: "failed",
+      reviewText: "缺少止损",
+    })
+    fixes.set(scope, {
+      workspacePath: "f:/repo",
+      worktreePath: "f:/repo",
+      sessionID: "s1",
+      attempt: 1,
+      reviewText: "缺少止损",
+    })
     expect(fixes.has(scope)).toBe(true)
 
     const call = {
@@ -1251,72 +1325,35 @@ describe("smartx workspace analysis", () => {
     expect(rows.find((item) => item.message === "workspace review saved through mcp")?.extra?.state).toBe("error")
   })
 
-  test("isolates concurrent review pending state by session and review id", async () => {
-    const pending = new Map()
-    const hooks = setup(ctx("f:/repo"), { pending })
-    const id = workspace()
-    const one = id + "\x00s1"
-    const two = id + "\x00s2"
+  test("isolates concurrent structured review saves by session and review id", async () => {
+    const saved: SaveReview[] = []
+    const hooks = setup(ctx("f:/repo"), {
+      saveReview: async (input) => {
+        saved.push(input)
+      },
+    })
+    const output = (summary: string) =>
+      JSON.stringify({
+        state: "error",
+        summary,
+        items: [{ name: "审查执行", status: "error", detail: summary, suggestion: "重新审查" }],
+        suggestions: ["重新审查"],
+      })
 
     await Promise.all([
       hooks["tool.execute.after"]?.(
         { sessionID: "s1", tool: "task", callID: "review-1", args: { subagent_type: "strategy-reviewer" } },
-        { title: "", output: "review conclusion: error\nfirst review failed to run", metadata: {} },
+        { title: "", output: output("第一轮审查执行失败"), metadata: {} },
       ),
       hooks["tool.execute.after"]?.(
         { sessionID: "s2", tool: "task", callID: "review-2", args: { subagent_type: "strategy-reviewer" } },
-        { title: "", output: "review conclusion: error\nsecond review failed to run", metadata: {} },
+        { title: "", output: output("第二轮审查执行失败"), metadata: {} },
       ),
     ])
 
-    expect(pending.get(one)).toMatchObject({ reviewId: "review-1", sessionId: "s1" })
-    expect(pending.get(two)).toMatchObject({ reviewId: "review-2", sessionId: "s2" })
-
-    const first = { system: [] as string[] }
-    const second = { system: [] as string[] }
-    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, first)
-    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s2", model: {} as never }, second)
-    expect(first.system.join("\n")).toContain("first review")
-    expect(first.system.join("\n")).not.toContain("second review")
-    expect(second.system.join("\n")).toContain("second review")
-
-    await hooks["tool.execute.after"]?.(
-      {
-        sessionID: "s1",
-        tool: "smartx_save_review",
-        callID: "save-wrong",
-        args: {
-          reviewId: "review-2",
-          sessionId: "s1",
-          workspacePath: "f:/repo",
-          worktreePath: "f:/repo",
-          state: "error",
-          items: [{ name: "review", status: "error", detail: "failed", suggestion: "retry" }],
-        },
-      },
-      { title: "", output: "{}", metadata: {} },
-    )
-    expect(pending.has(one)).toBe(true)
-    expect(pending.has(two)).toBe(true)
-
-    await hooks["tool.execute.after"]?.(
-      {
-        sessionID: "s1",
-        tool: "smartx_save_review",
-        callID: "save-1",
-        args: {
-          reviewId: "review-1",
-          sessionId: "s1",
-          workspacePath: "f:/repo",
-          worktreePath: "f:/repo",
-          state: "error",
-          items: [{ name: "review", status: "error", detail: "failed", suggestion: "retry" }],
-        },
-      },
-      { title: "", output: "{}", metadata: {} },
-    )
-    expect(pending.has(one)).toBe(false)
-    expect(pending.has(two)).toBe(true)
+    expect(saved).toHaveLength(2)
+    expect(saved.find((item) => item.sessionId === "s1")).toMatchObject({ reviewId: "review-1" })
+    expect(saved.find((item) => item.sessionId === "s2")).toMatchObject({ reviewId: "review-2" })
   })
 
   test("saves failed review before asking the main agent to fix it", async () => {
@@ -1325,6 +1362,7 @@ describe("smartx workspace analysis", () => {
     const charts = new Map<string, Chart>()
     const pending = new Map()
     const fixes = new Map()
+    const saved: SaveReview[] = []
     const id = key("f:/repo", "f:/repo")
     const scope = id + "\x00s1"
     const requests = new Set<string>([scope])
@@ -1336,6 +1374,9 @@ describe("smartx workspace analysis", () => {
       dirtyStates: dirt,
       reviewFixes: fixes,
       reviewRequests: requests,
+      saveReview: async (input) => {
+        saved.push(input)
+      },
     })
     workspaces.set(id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"]))
     charts.set(id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() })
@@ -1354,50 +1395,18 @@ describe("smartx workspace analysis", () => {
       },
       {
         title: "",
-        output: ["<task_result>", "review conclusion: failed\n\nissue: missing stop loss.\nsuggestion: add stop loss protection.", "</task_result>"].join("\n"),
+        output: JSON.stringify({
+          state: "failed",
+          summary: "缺少止损保护",
+          items: [{ name: "风险控制", status: "failed", detail: "缺少止损保护", suggestion: "增加止损规则" }],
+          suggestions: ["增加止损规则"],
+        }),
         metadata: {},
       },
     )
 
-    expect(pending.get(scope)).toMatchObject({ kind: "review", reviewId: "c1", sessionId: "s1", state: "failed" })
-    expect(fixes.get(scope)?.attempt).toBe(1)
-
-    const save = { system: [] as string[] }
-    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, save)
-    expect(save.system.join("\n")).toContain("smartx_save_review")
-    expect(save.system.join("\n")).toContain("审查报告")
-    expect(save.system.join("\n")).toContain("reviewId: c1")
-    expect(save.system.join("\n")).toContain("sessionId: s1")
-
-    const call = {
-      args: {
-        workspacePath: "forged",
-        worktreePath: "forged",
-        state: "passed",
-        summary: "missing stop loss",
-        items: [{ name: "risk control", status: "failed", detail: "missing stop loss", suggestion: "add stop loss" }],
-        suggestions: [],
-      },
-    }
-    await hooks["tool.execute.before"]?.({ sessionID: "s1", tool: "smartx_save_review", callID: "c2" }, call)
-    expect(call.args).toMatchObject({
-      reviewId: "c1",
-      sessionId: "s1",
-      workspacePath: "f:/repo",
-      worktreePath: "f:/repo",
-      state: "failed",
-    })
-    await hooks["tool.execute.after"]?.(
-      {
-        sessionID: "s1",
-        tool: "smartx_save_review",
-        callID: "c2",
-        args: call.args,
-      },
-      { title: "", output: "{}", metadata: {} },
-    )
-
     expect(pending.has(scope)).toBe(false)
+    expect(saved.at(-1)).toMatchObject({ reviewId: "c1", sessionId: "s1", state: "failed" })
     expect(fixes.get(scope)?.attempt).toBe(1)
 
     await hooks["chat.message"]?.(
@@ -1413,9 +1422,8 @@ describe("smartx workspace analysis", () => {
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, fix)
     expect(fix.system.join("\n")).toContain("最新一轮 SmartX 策略审查未通过")
     expect(fix.system.join("\n")).toContain("主 agent")
-    expect(fix.system.join("\n")).toContain("smartx_save_review")
     expect(fix.system.join("\n")).toContain("strategy-reviewer")
-    expect(fix.system.join("\n")).toContain("missing stop loss")
+    expect(fix.system.join("\n")).toContain("缺少止损保护")
     expect(rows.some((item) => item.message === "workspace review needs fix")).toBe(true)
 
     await hooks["tool.execute.after"]?.(
@@ -1449,7 +1457,16 @@ describe("smartx workspace analysis", () => {
     const workspaces = new Map<string, Analysis>()
     const charts = new Map<string, Chart>()
     const pending = new Map()
-    const hooks = setup(ctx("f:/repo", rows), { workspaces, charts, pending, memory: restored(true) })
+    const saved: SaveReview[] = []
+    const hooks = setup(ctx("f:/repo", rows), {
+      workspaces,
+      charts,
+      pending,
+      memory: restored(true),
+      saveReview: async (input) => {
+        saved.push(input)
+      },
+    })
     const id = key("f:/repo", "f:/repo")
     const scope = id + "\x00s1"
     workspaces.set(id, doneAnalysis("f:/repo", "f:/repo", "", ["old analysis"]))
@@ -1464,40 +1481,18 @@ describe("smartx workspace analysis", () => {
       },
       {
         title: "",
-        output: ["<task_result>", "review conclusion: passed\n\nno blocking issue.", "</task_result>"].join("\n"),
+        output: JSON.stringify({
+          state: "passed",
+          summary: "未发现阻断问题",
+          items: [{ name: "需求覆盖", status: "passed", detail: "实现满足需求", suggestion: "" }],
+          suggestions: [],
+        }),
         metadata: {},
       },
     )
 
-    expect(pending.get(scope)).toMatchObject({ kind: "review", reviewId: "c1", sessionId: "s1", state: "passed" })
-
-    const save = { system: [] as string[] }
-    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, save)
-    expect(save.system.join("\n")).toContain("smartx_save_review")
-    expect(save.system.join("\n")).toContain("no blocking issue")
-
-    const call = {
-      args: {
-        workspacePath: "f:/repo",
-        worktreePath: "f:/repo",
-        state: "passed",
-        summary: "passed",
-        items: [{ name: "requirements", status: "passed", detail: "passed", suggestion: "" }],
-        suggestions: [],
-      },
-    }
-    await hooks["tool.execute.before"]?.({ sessionID: "s1", tool: "smartx_save_review", callID: "c2" }, call)
-    await hooks["tool.execute.after"]?.(
-      {
-        sessionID: "s1",
-        tool: "smartx_save_review",
-        callID: "c2",
-        args: call.args,
-      },
-      { title: "", output: "{}", metadata: {} },
-    )
-
     expect(pending.has(scope)).toBe(false)
+    expect(saved.at(-1)).toMatchObject({ reviewId: "c1", sessionId: "s1", state: "passed" })
     expect(workspaces.get(id)?.state).toBe("requested")
     expect(charts.get(id)?.state).toBe("requested")
 
@@ -1605,42 +1600,17 @@ describe("smartx workspace analysis", () => {
       },
       {
         title: "",
-        output: ["<task_result>", "review conclusion: passed\n\nrisk control needs reinforcement.", "</task_result>"].join("\n"),
+        output: JSON.stringify({
+          state: "failed",
+          summary: "风险控制需要加强",
+          items: [
+            { name: "需求覆盖", status: "passed", detail: "需求已覆盖", suggestion: "" },
+            { name: "风险控制", status: "warning", detail: "风险控制需要加强", suggestion: "增加风险保护" },
+          ],
+          suggestions: ["增加风险保护"],
+        }),
         metadata: {},
       },
-    )
-
-    const call = {
-      args: {
-        reviewId: "forged",
-        sessionId: "forged",
-        workspacePath: "forged",
-        worktreePath: "forged",
-        state: "passed",
-        summary: "risk control needs reinforcement",
-        items: [
-          { name: "requirements", status: "passed", detail: "passed", suggestion: "" },
-          { name: "risk control", status: "warning", detail: "needs reinforcement", suggestion: "add risk control" },
-        ],
-        suggestions: ["add risk control"],
-      },
-    }
-    await hooks["tool.execute.before"]?.({ sessionID: "s1", tool: "smartx_save_review", callID: "c2" }, call)
-    expect(call.args).toMatchObject({
-      reviewId: "c1",
-      sessionId: "s1",
-      workspacePath: "f:/repo",
-      worktreePath: "f:/repo",
-      state: "failed",
-    })
-    await hooks["tool.execute.after"]?.(
-      {
-        sessionID: "s1",
-        tool: "smartx_save_review",
-        callID: "c2",
-        args: call.args,
-      },
-      { title: "", output: "{}", metadata: {} },
     )
 
     expect(pending.has(scope)).toBe(false)
@@ -1648,26 +1618,50 @@ describe("smartx workspace analysis", () => {
 
     const fix = { system: [] as string[] }
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, fix)
-    expect(fix.system.join("\n")).toContain("needs reinforcement")
+    expect(fix.system.join("\n")).toContain("风险控制需要加强")
     expect(fix.system.join("\n")).toContain("strategy-reviewer")
   })
 
-  test("saves third failed review before the final fix", async () => {
+  test("stops after the third failed review is saved", async () => {
     const pending = new Map()
-    const fixes = new Map([[key("f:/repo", "f:/repo") + "\x00" + "s1", {
+    const scope = key("f:/repo", "f:/repo") + "\x00" + "s1"
+    const fixes = new Map([[scope, {
       workspacePath: "f:/repo",
       worktreePath: "f:/repo",
       sessionID: "s1",
       attempt: 3,
       reviewText: "review conclusion: failed",
     }]])
+    let run: Run = {
+      id: "workflow-third",
+      workspacePath: "f:/repo",
+      sessionId: "s1",
+      codeRevision: "code-1",
+      stage: "review",
+      state: "running",
+      reviewRound: 3,
+      debugId: "",
+      backtestId: "",
+      reviewEnabled: true,
+      debugEnabled: true,
+      backtestEnabled: true,
+      summary: "",
+      error: "",
+      revision: 3,
+      createdAt: 1,
+      updatedAt: 3,
+    }
+    const runs = new Map([[scope, run]])
     const hooks = setup(ctx("f:/repo"), {
       pending,
       reviewFixes: fixes,
+      runs,
+      updateRun: async (input) => {
+        run = { ...run, ...input, revision: run.revision + 1, updatedAt: run.updatedAt + 1 }
+        runs.set(scope, run)
+        return run
+      },
     })
-    const id = key("f:/repo", "f:/repo")
-    const scope = id + "\x00s1"
-
     await hooks["tool.execute.after"]?.(
       {
         sessionID: "s1",
@@ -1677,40 +1671,131 @@ describe("smartx workspace analysis", () => {
       },
       {
         title: "",
-        output: ["<task_result>", "review conclusion: failed\n\nissue: still missing stop loss.", "</task_result>"].join("\n"),
+        output: JSON.stringify({
+          state: "failed",
+          summary: "仍然缺少止损",
+          items: [{ name: "风险控制", status: "failed", detail: "仍然缺少止损", suggestion: "增加止损" }],
+          suggestions: ["增加止损"],
+        }),
         metadata: {},
       },
     )
 
-    expect(fixes.get(scope)?.attempt).toBe(3)
-    expect(pending.get(scope)).toMatchObject({ kind: "review", reviewId: "c1", sessionId: "s1", state: "failed" })
-
-    const save = { system: [] as string[] }
-    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, save)
-    expect(save.system.join("\n")).toContain("smartx_save_review")
-
-    await hooks["tool.execute.after"]?.(
-      {
-        sessionID: "s1",
-        tool: "smartx_save_review",
-        callID: "c2",
-        args: {
-          reviewId: "c1",
-          sessionId: "s1",
-          workspacePath: "f:/repo",
-          worktreePath: "f:/repo",
-          state: "failed",
-          items: [{ name: "risk control", status: "failed", detail: "still missing stop loss", suggestion: "add stop loss" }],
-        },
-      },
-      { title: "", output: "{}", metadata: {} },
-    )
+    expect(pending.has(scope)).toBe(false)
 
     const fix = { system: [] as string[] }
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, fix)
-    expect(fix.system.join("\n")).toContain("3")
-    expect(fix.system.join("\n")).toContain("strategy-reviewer")
+    expect(fix.system.join("\n")).not.toContain("最后一次自动修复")
+    expect(fix.system.join("\n")).not.toContain("待修复的审查报告")
     expect(fixes.has(scope)).toBe(false)
+    expect(run).toMatchObject({ stage: "review", state: "review_exhausted", reviewRound: 3 })
+  })
+
+  test("runs automatic review, debug, and backtest in order", async () => {
+    const id = workspace()
+    const scope = id + "\x00s1"
+    let current: Run | undefined
+    const runs = new Map<string, Run>()
+    const pending = new Map<string, Pending>()
+    const update = async (input: Parameters<NonNullable<Parameters<typeof build>[1]["updateRun"]>>[0]) => {
+      current = { ...current!, ...input, revision: current!.revision + 1, updatedAt: current!.updatedAt + 1 }
+      return current
+    }
+    const hooks = build(ctx(), {
+      runs,
+      pending,
+      projects: projects(),
+      memory: restored(),
+      dirtyStates: new Map([[id, { state: "dirty", updated: 100, reason: "edit" }]]),
+      workflow: async () => ({ baseline: false, review: true, debug: true, backtest: true }),
+      loadRun: async () => current,
+      startRun: async (input) => {
+        current = {
+          id: "workflow-1",
+          workspacePath: input.workspacePath,
+          sessionId: input.sessionId,
+          codeRevision: input.codeRevision,
+          stage: "review",
+          state: "requested",
+          reviewRound: 0,
+          debugId: "",
+          backtestId: "",
+          reviewEnabled: true,
+          debugEnabled: true,
+          backtestEnabled: true,
+          summary: "",
+          error: "",
+          revision: 1,
+          createdAt: 100,
+          updatedAt: 100,
+        }
+        return current
+      },
+      updateRun: update,
+      saveReview: async () => {},
+    })
+
+    const reviewNote = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, reviewNote)
+    expect(reviewNote.system.join("\n")).toContain("strategy-reviewer")
+    expect(current?.stage).toBe("review")
+
+    await hooks["tool.execute.before"]?.(
+      { sessionID: "s1", tool: "task", callID: "review-1" },
+      { args: { subagent_type: "strategy-reviewer" } },
+    )
+    expect(current).toMatchObject({ state: "running", reviewRound: 1 })
+    await hooks["tool.execute.after"]?.(
+      { sessionID: "s1", tool: "task", callID: "review-1", args: { subagent_type: "strategy-reviewer" } },
+      {
+        title: "",
+        output: JSON.stringify({
+          state: "passed",
+          summary: "审查通过",
+          items: [{ name: "语法", status: "passed", detail: "检查通过", suggestion: "" }],
+          suggestions: [],
+        }),
+        metadata: {},
+      },
+    )
+    expect(pending.has(scope)).toBe(false)
+    expect(current?.stage).toBe("debug")
+
+    const startNote = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, startNote)
+    expect(startNote.system.join("\n")).toContain("smartx_start")
+    const start = { args: { name: "forged" } as Record<string, unknown> }
+    await hooks["tool.execute.before"]?.({ sessionID: "s1", tool: "smartx_start", callID: "start-1" }, start)
+    expect(start.args).toMatchObject({ workflowId: "workflow-1", workspacePath: "f:/repo", sessionId: "s1" })
+    expect(start.args.name).toBeUndefined()
+    await hooks["tool.execute.after"]?.(
+      { sessionID: "s1", tool: "smartx_start", callID: "start-1", args: start.args },
+      { title: "", output: JSON.stringify({ debugId: "debug-1", live: true }), metadata: {} },
+    )
+    expect(current).toMatchObject({ stage: "debug", state: "running", debugId: "debug-1" })
+
+    const logsNote = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, logsNote)
+    expect(logsNote.system.join("\n")).toContain("smartx_logs")
+    const logs = { args: {} as Record<string, unknown> }
+    await hooks["tool.execute.before"]?.({ sessionID: "s1", tool: "smartx_logs", callID: "logs-1" }, logs)
+    expect(logs.args).toMatchObject({ workflowId: "workflow-1", debugId: "debug-1" })
+    await hooks["tool.execute.after"]?.(
+      { sessionID: "s1", tool: "smartx_logs", callID: "logs-1", args: logs.args },
+      { title: "", output: JSON.stringify({ state: "passed", summary: "ok" }), metadata: {} },
+    )
+    expect(current).toMatchObject({ stage: "backtest", state: "requested" })
+
+    const backtestNote = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, backtestNote)
+    expect(backtestNote.system.join("\n")).toContain("smartx_run_backtest")
+    const backtestCall = { args: {} as Record<string, unknown> }
+    await hooks["tool.execute.before"]?.(
+      { sessionID: "s1", tool: "smartx_run_backtest", callID: "backtest-1" },
+      backtestCall,
+    )
+    expect(backtestCall.args).toMatchObject({ workflowId: "workflow-1", requestKey: "pipeline:workflow-1" })
+    expect(runs.get(scope)?.id).toBe("workflow-1")
   })
 
   test("requires project memory restore before sustained work", async () => {

@@ -174,6 +174,60 @@ func (a *API) workbenchProgressGet(c *gin.Context) {
 	ok(c, data)
 }
 
+func (a *API) workbenchWorkflowGet(c *gin.Context) {
+	req := workbench.WorkflowGet{}
+	if err := c.ShouldBindQuery(&req); err != nil {
+		bad(c, err)
+		return
+	}
+	data, err := a.bench.GetWorkflow(c.Request.Context(), req)
+	if errors.Is(err, db.ErrNotFound) {
+		ok(c, nil)
+		return
+	}
+	if err != nil {
+		bad(c, err)
+		return
+	}
+	ok(c, data)
+}
+
+func (a *API) workbenchWorkflowPost(c *gin.Context) {
+	body := workbench.WorkflowStart{}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		bad(c, err)
+		return
+	}
+	data, err := a.bench.StartWorkflow(c.Request.Context(), body)
+	if errors.Is(err, db.ErrNotFound) {
+		fail(c, 404, "session not found", nil)
+		return
+	}
+	if err != nil {
+		bad(c, err)
+		return
+	}
+	ok(c, data)
+}
+
+func (a *API) workbenchWorkflowPut(c *gin.Context) {
+	body := workbench.WorkflowUpdate{}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		bad(c, err)
+		return
+	}
+	data, err := a.bench.UpdateWorkflow(c.Request.Context(), body)
+	if errors.Is(err, db.ErrNotFound) {
+		fail(c, 404, "workflow not found", nil)
+		return
+	}
+	if err != nil {
+		bad(c, err)
+		return
+	}
+	ok(c, data)
+}
+
 func (a *API) workbenchProjectStateGet(c *gin.Context) {
 	req := workbench.ProjectStateGet{}
 	if err := c.ShouldBindQuery(&req); err != nil {

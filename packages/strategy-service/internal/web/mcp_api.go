@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -78,6 +80,10 @@ func (a *API) mcpPost(c *gin.Context) {
 								"type":        "string",
 								"description": "Extension name.",
 							},
+							"workspacePath": prop("string", "Current workspace path injected by the workflow."),
+							"sessionId":     prop("string", "Current main session id injected by the workflow."),
+							"workflowId":    prop("string", "Automatic workflow id injected by the workflow."),
+							"requestKey":    prop("string", "Stable automatic stage key injected by the workflow."),
 						},
 						"required":             []string{"name"},
 						"additionalProperties": false,
@@ -105,6 +111,11 @@ func (a *API) mcpPost(c *gin.Context) {
 								"type":        "integer",
 								"description": "Maximum number of files to inspect. Defaults to 3.",
 							},
+							"workspacePath": prop("string", "Current workspace path injected by the workflow."),
+							"sessionId":     prop("string", "Current main session id injected by the workflow."),
+							"workflowId":    prop("string", "Automatic workflow id injected by the workflow."),
+							"debugId":       prop("string", "Debug run id injected by the workflow."),
+							"requestKey":    prop("string", "Stable automatic stage key injected by the workflow."),
 						},
 						"additionalProperties": false,
 					},
@@ -141,6 +152,7 @@ func (a *API) mcpPost(c *gin.Context) {
 					"inputSchema": schema(map[string]any{
 						"workspacePath": prop("string", "Workspace path."),
 						"worktreePath":  prop("string", "Worktree path. Defaults to workspacePath."),
+						"sessionId":     prop("string", "Workbench session id used to restore an automatic review."),
 					}, []string{"workspacePath"}),
 				},
 				{
@@ -306,21 +318,95 @@ func (a *API) mcpPost(c *gin.Context) {
 		)
 		switch name {
 		case "start":
+			name, row, err := a.mcpDebug(c.Request.Context(), args)
+			if err != nil {
+				mcpToolResult(c, req.ID, err.Error(), nil, true)
+				return
+			}
+			if row.ID != "" {
+				key := text(args["requestKey"])
+				recovering := row.DebugID != "" && row.DebugRequestKey != ""
+				if row.DebugRequestKey != "" && row.DebugRequestKey != key {
+					mcpToolResult(c, req.ID, "debug request key does not belong to workflow", nil, true)
+					return
+				}
+				if row.State == "running" && row.DebugID != "" {
+					body := map[string]any{"version": 1, "accepted": true, "reason": "idempotent", "debugId": row.DebugID, "live": true, "workflowId": row.ID}
+					mcpToolResult(c, req.ID, jsonText(body), body, false)
+					return
+				}
+				if row.DebugID == "" || row.DebugRequestKey == "" {
+					row, err = a.mcpClaimDebug(c.Request.Context(), row, name, key)
+					if err != nil {
+						mcpToolResult(c, req.ID, err.Error(), nil, true)
+						return
+					}
+				}
+				if recovering {
+					a.mcpRestoreDebug(row, name)
+				}
+				if recovering && a.sx.Alive(c.Request.Context(), name+"-local") {
+					row, err = a.mcpBindDebug(c.Request.Context(), row, smartx.Result{DebugID: row.DebugID})
+					if err != nil {
+						mcpToolResult(c, req.ID, err.Error(), nil, true)
+						return
+					}
+					body := map[string]any{"version": 1, "accepted": true, "reason": "recovered", "debugId": row.DebugID, "live": true, "workflowId": row.ID}
+					mcpToolResult(c, req.ID, jsonText(body), body, false)
+					return
+				}
+			}
 			out, err := a.sx.Start(c.Request.Context(), smartx.Input{
-				Name: text(args["name"]),
+				Name:    name,
+				DebugID: row.DebugID,
+				Started: row.UpdatedAt,
+				Cursor:  row.DebugCursor,
 			})
 			if err != nil {
 				mcpToolResult(c, req.ID, err.Error(), nil, true)
 				return
 			}
+			if row.ID != "" {
+				row, err = a.mcpBindDebug(c.Request.Context(), row, out)
+				if err != nil {
+					mcpToolResult(c, req.ID, err.Error(), nil, true)
+					return
+				}
+			}
 			body := map[string]any{
-				"name":      out.Name,
-				"account":   out.Account,
-				"window_id": out.WindowId,
-				"output":    out.Output,
+				"version":    1,
+				"accepted":   true,
+				"reason":     "created",
+				"name":       out.Name,
+				"account":    out.Account,
+				"window_id":  out.WindowId,
+				"output":     out.Output,
+				"debugId":    out.DebugID,
+				"startedAt":  out.Started,
+				"live":       out.Live,
+				"workflowId": row.ID,
 			}
 			mcpToolResult(c, req.ID, jsonText(body), body, false)
 		case "logs":
+			name, row, check := a.mcpDebug(c.Request.Context(), args)
+			if check != nil {
+				mcpToolResult(c, req.ID, check.Error(), nil, true)
+				return
+			}
+			if row.ID != "" {
+				if row.DebugID == "" {
+					mcpToolResult(c, req.ID, "automatic debug run has not started", nil, true)
+					return
+				}
+				a.mcpRestoreDebug(row, name)
+				out, err := a.sx.WatchDebug(c.Request.Context(), row.DebugID, number(args["tail"]), number(args["limit"]), time.Duration(number(args["seconds"]))*time.Second)
+				if err != nil {
+					mcpToolResult(c, req.ID, err.Error(), nil, true)
+					return
+				}
+				mcpToolResult(c, req.ID, jsonText(out), out, false)
+				return
+			}
 			out, err := a.sx.Watch(c.Request.Context(), text(args["name"]), number(args["tail"]), number(args["limit"]), time.Duration(number(args["seconds"]))*time.Second)
 			if err != nil {
 				mcpToolResult(c, req.ID, err.Error(), nil, true)
@@ -479,6 +565,7 @@ func (a *API) mcpPost(c *gin.Context) {
 				return a.bench.GetReview(ctx, workbench.ReviewGet{
 					WorkspacePath: text(args["workspacePath"]),
 					WorktreePath:  text(args["worktreePath"]),
+					SessionID:     text(args["sessionId"]),
 				})
 			})
 		default:
@@ -487,6 +574,80 @@ func (a *API) mcpPost(c *gin.Context) {
 	default:
 		mcpError(c, req.ID, -32601, "Method not found")
 	}
+}
+
+func (a *API) mcpDebug(ctx context.Context, args map[string]any) (string, workbench.WorkflowRow, error) {
+	id := text(args["workflowId"])
+	if id == "" {
+		return text(args["name"]), workbench.WorkflowRow{}, nil
+	}
+	row, err := a.bench.GetWorkflow(ctx, workbench.WorkflowGet{WorkspacePath: text(args["workspacePath"]), SessionID: text(args["sessionId"])})
+	if err != nil {
+		return "", workbench.WorkflowRow{}, err
+	}
+	if row.ID != id || row.Stage != "debug" || row.State == "failed" || row.State == "review_exhausted" {
+		return "", workbench.WorkflowRow{}, fmt.Errorf("invalid automatic debug workflow")
+	}
+	if debug := text(args["debugId"]); debug != "" && row.DebugID != debug {
+		return "", workbench.WorkflowRow{}, fmt.Errorf("debug run does not belong to workflow")
+	}
+	return filepath.Base(row.WorkspacePath), row, nil
+}
+
+func (a *API) mcpBindDebug(ctx context.Context, row workbench.WorkflowRow, out smartx.Result) (workbench.WorkflowRow, error) {
+	run, ok := a.sx.Debug(out.DebugID)
+	if !ok {
+		return workbench.WorkflowRow{}, fmt.Errorf("debug run context not found")
+	}
+	return a.bench.UpdateWorkflow(ctx, workbench.WorkflowUpdate{
+		ID:            row.ID,
+		WorkspacePath: row.WorkspacePath,
+		SessionID:     row.SessionID,
+		Stage:         "debug",
+		State:         "running",
+		DebugID:       out.DebugID,
+		DebugCursor:   run.Cursor,
+		Summary:       "策略已启动，等待增量日志检查。",
+	})
+}
+
+func (a *API) mcpClaimDebug(ctx context.Context, row workbench.WorkflowRow, name string, key string) (workbench.WorkflowRow, error) {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return workbench.WorkflowRow{}, fmt.Errorf("automatic debug request key is required")
+	}
+	id := row.DebugID
+	if id == "" {
+		id = strings.Replace(row.ID, "workflow_", "debug_", 1)
+	}
+	claim, err := a.sx.Claim(name, id)
+	if err != nil {
+		return workbench.WorkflowRow{}, err
+	}
+	return a.bench.UpdateWorkflow(ctx, workbench.WorkflowUpdate{
+		ID:              row.ID,
+		WorkspacePath:   row.WorkspacePath,
+		SessionID:       row.SessionID,
+		Stage:           "debug",
+		State:           "requested",
+		DebugID:         claim.ID,
+		DebugCursor:     claim.Cursor,
+		DebugRequestKey: key,
+		Summary:         "自动调试已声明，准备启动策略。",
+	})
+}
+
+func (a *API) mcpRestoreDebug(row workbench.WorkflowRow, name string) {
+	if _, ok := a.sx.Debug(row.DebugID); ok {
+		return
+	}
+	a.sx.Restore(smartx.Debug{
+		ID:      row.DebugID,
+		Name:    strings.TrimSpace(name) + "-local",
+		Filter:  strings.TrimSpace(name),
+		Started: row.UpdatedAt,
+		Cursor:  row.DebugCursor,
+	})
 }
 
 func mcpWorkbench(ctx context.Context, id any, c *gin.Context, run func(context.Context) (any, error)) {

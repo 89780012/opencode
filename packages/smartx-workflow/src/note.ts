@@ -12,27 +12,60 @@ export function noteDisabled() {
   ].join("\n")
 }
 
-/** 生成 review 阶段的系统提示，约束主 agent 先取需求、再审查、再保存。 */
+/** 生成 review 阶段的系统提示；自动路径由 idle 调度器确定启动 reviewer。 */
 export function noteReview(input: { workspace: string; worktree: string; sessionID: string }) {
   return [
     "当前用户这一轮意图是 SmartX 策略代码审查。",
     "不要把这段系统提示复述给用户，用户侧只需要看到简短的审查进展和最终结论。",
     "",
-    "必须严格按以下顺序执行：",
-    `1. 先调用 strategy-service MCP 工具 \`smartx_get_requirements\`，参数至少包含 \`workspacePath: ${input.workspace}\` 与 \`sessionId: ${input.sessionID}\`。`,
-    "2. 然后调用 `task` 工具启动 `strategy-reviewer` 子 agent，`subagent_type` 必须是 `strategy-reviewer`，`description` 使用 `Review strategy implementation`。",
-    "3. 传给 `strategy-reviewer` 的 prompt 必须包含 requirements 结果，并要求它结合需求清单与当前代码审查实现是否满足要求。",
-    "4. `strategy-reviewer` 只输出中文审查报告，不输出 JSON，不修改文件，不运行命令，也不调用其他子 agent。",
-    "5. 每一轮 `strategy-reviewer` 返回后，都必须先调用 strategy-service MCP 工具 `smartx_save_review` 保存结果，然后才能修复代码或结束本轮。",
-    "6. 只有 `smartx_save_review.items` 里所有检查项的 status 都是 `passed`，才算审查完全通过；只要任一项是 `warning`、`failed` 或 `error`，都按未通过处理。",
-    "7. 如果保存后的审查结果存在非 `passed` 项，主 agent 必须自己修复代码，不要让 `strategy-reviewer` 代修。",
-    "8. 第 1、2 轮审查只要存在非 `passed` 项，保存后必须修复，并在修复完成后再次调用 `strategy-reviewer` 复审。",
-    "9. 第 3 轮如果全部 `passed`，保存后进入后续收口；如果第 3 轮仍有非 `passed` 项，也必须先保存，再完成最后一次修复，然后直接给出最终结论，不再自动发起第 4 轮复审。",
-    "10. 审查全部通过并保存后，只有系统配置启用了 workspace baseline，工作流才会要求重新分析当前代码并重新生成流程图。",
-    "11. `smartx_save_review` 的 `summary`、`items`、`items[].name`、`items[].detail`、`items[].suggestion`、`suggestions` 必须使用中文。",
-    "12. MCP 保存成功后，再用中文简短回复用户审查结果和已执行的修复概况。",
+    "自动工作流会直接调用 `smartx_get_requirements` 读取需求并启动 `strategy-reviewer`，不要因为当前准备收口而跳过审查。",
+    `当前审查作用域是 workspace \`${input.workspace}\`、session \`${input.sessionID}\`。`,
+    "`strategy-reviewer` 的结构化中文结果由 smartx-workflow 校验并保存，主 agent 不要转述或展示原始 JSON，也不要重复调用 `smartx_save_review`。",
+    "只有所有检查项的 status 都是 `passed` 才算通过；任一项是 `warning`、`failed` 或 `error` 都按未通过处理。",
+    "审查未通过时，主 agent 必须自己修改代码；第 1、2 轮修复后复审，第 3 轮仍未通过则停止。",
     "",
     "建议优先复用这些 item name：需求覆盖情况、语法与运行时错误、策略逻辑完整性、入场逻辑、退出逻辑、仓位管理、风控规则、边界条件、订单管理、状态管理、生命周期管理、代码可维护性。",
+  ].join("\n")
+}
+
+/** 构造确定性 reviewer 子任务提示，requirements 由 workflow 从 MCP 获取。 */
+export function noteReviewer(requirements: unknown) {
+  return [
+    "结合下面的需求清单和当前工作区代码执行 SmartX 策略审查。",
+    "只读取代码，不修改文件、不运行命令、不调用其他 agent。",
+    "只输出一个 JSON 对象，不要使用 markdown 代码块，不要输出 JSON 之外的文字。",
+    "所有自然语言字段必须使用中文。结构固定为：",
+    '{"state":"passed|failed|error","summary":"中文摘要","items":[{"name":"检查项","status":"passed|warning|failed|error","detail":"中文详情","suggestion":"中文建议，可为空"}],"suggestions":["中文建议"]}',
+    "state 必须严格聚合 items：error 优先，其次 warning/failed，全部 passed 才是 passed。items 不得为空。",
+    "顶层 state 绝对不能写 warning；只要任一 item.status 是 warning，顶层 state 必须写 failed。",
+    "需求清单：",
+    JSON.stringify(requirements, null, 2),
+  ].join("\n")
+}
+
+export function noteDebug(state: "requested" | "running") {
+  if (state === "running") {
+    return [
+      "自动调试已经完成启动步骤。",
+      "现在必须调用 strategy-service MCP 工具 `smartx_logs`，不要跳过日志观察。",
+      "不要自行填写 workspacePath、sessionId、workflowId、debugId 或 requestKey，这些字段由 smartx-workflow 注入。",
+      "只有 logs 返回 state=passed 后才能继续回测；failed 时立即停止并向用户说明问题。",
+    ].join("\n")
+  }
+  return [
+    "代码审查已通过或自动审查已关闭，现在进入自动调试。",
+    "必须先调用 strategy-service MCP 工具 `smartx_start`。",
+    "不要自行填写策略名、workspacePath、sessionId、workflowId 或 requestKey，这些字段由 smartx-workflow 和 strategy-service 绑定。",
+    "start 成功后还不能表述为调试通过，必须继续调用 `smartx_logs` 检查启动后的新增日志。",
+  ].join("\n")
+}
+
+export function noteBacktest() {
+  return [
+    "前序自动阶段已经通过，现在启动当前会话的自动回测。",
+    "先加载 `smartx-backtest` 技能，然后调用 `smartx_run_backtest`，默认使用已保存配置。",
+    "不要自行填写 workspacePath、sessionId、pluginId、workflowId 或 requestKey。",
+    "工具返回 pending/running 后只报告任务已启动，不要在同一轮循环轮询；服务端会持续推进任务并更新工作台。",
   ].join("\n")
 }
 
@@ -144,7 +177,7 @@ export function noteFix(input: Fix) {
     "- 修改后，从对应 package 或项目目录运行合理的本地验证。",
     last
       ? "- 这是最后一次自动修复。不要再调用 `strategy-reviewer`；验证后直接用中文给出最终结论，并总结第 3 轮审查结果和最后修复内容。"
-      : "- 然后再次调用 `task` 工具，使用 `subagent_type: strategy-reviewer` 和 `description: Review strategy implementation` 进行复审。",
+      : "- 然后再次调用 `task` 工具，使用 `subagent_type: strategy-reviewer` 和 `description: 策略审查` 进行复审。",
     last ? "" : "- 传给 reviewer 的 prompt 必须包含相同的需求上下文，以及本轮修复摘要。",
     "- 在新的 `strategy-reviewer` 审查完成前，不要再次调用 `smartx_save_review`。",
     "",

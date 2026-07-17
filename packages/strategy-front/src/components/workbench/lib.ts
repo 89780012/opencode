@@ -56,6 +56,8 @@ export function kind(type: TimelineEvent["type"]) {
   if (type === "code") return "编码"
   if (type === "git") return "Git"
   if (type === "review") return "审查"
+  if (type === "debug") return "调试"
   if (type === "flowchart") return "流程图"
+  if (type === "workflow") return "流程"
   return "回测"
 }

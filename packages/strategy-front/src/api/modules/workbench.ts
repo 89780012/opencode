@@ -40,6 +40,23 @@ export type FlowchartSave = {
   source: "manual"
 }
 
+export type Workflow = {
+  id: string
+  workspacePath: string
+  sessionId: string
+  codeRevision: string
+  stage: "review" | "debug" | "backtest" | "done"
+  state: "requested" | "dispatching" | "running" | "fixing" | "passed" | "failed" | "review_exhausted" | "cancelled"
+  reviewRound: number
+  debugId?: string
+  backtestId?: string
+  summary?: string
+  error?: string
+  revision: number
+  createdAt: number
+  updatedAt: number
+}
+
 export const workbenchApi = {
   identify(message: string) {
     return request.post<Analyze, { message: string }>("/workbench/requirements/identify", { message }, { timeout: 60000 })
@@ -49,5 +66,9 @@ export const workbenchApi = {
   },
   saveFlowchart(input: FlowchartSave) {
     return request.post<Flowchart, FlowchartSave>("/workbench/flowchart", { ...input, state: input.state ?? "done" })
+  },
+  workflow(workspacePath: string, sessionId: string) {
+    const query = new URLSearchParams({ workspacePath, sessionId })
+    return request.get<Workflow | null>(`/workbench/workflow?${query.toString()}`)
   },
 }

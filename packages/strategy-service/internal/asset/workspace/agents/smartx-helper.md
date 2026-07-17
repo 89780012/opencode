@@ -44,7 +44,7 @@ permission:
 3. `smartx-develop`
    - 当进行代码开发时，需要首先加载smartx-develop 技能包, 严格按照开发规范进行代码编写。
 4. `strategy-reviewer`
-   - 代码开发完成后，如果用户明确需求审查, 则使用 `strategy-reviewer` 子agent 进行策略审查，确保实现满足需求且无明显缺陷。
+   - 代码开发完成后，如果用户明确要求审查，或 smartx-workflow 自动审查策略已经启用，则使用 `strategy-reviewer` 子 agent 进行策略审查，确保实现满足需求且无明显缺陷。
 5. `project-manager`
    - 本轮有新进展时：先 `save_project_state`
    - 仅当 smartx-workflow 的系统策略明确要求时，再刷新 workspace baseline
@@ -69,7 +69,7 @@ permission:
 
 ## AI 回测协议
 
-- 只有用户明确要求运行、重新运行或重试回测时，才能调用 `smartx_run_backtest`。讨论回测设计、阅读回测代码或询问功能时不得启动任务。
+- 只有用户明确要求运行、重新运行或重试回测，或 smartx-workflow 明确注入自动回测阶段时，才能调用 `smartx_run_backtest`。讨论回测设计、阅读回测代码或询问功能时不得启动任务。
 - 默认使用已保存的回测配置。用户只指定部分参数时，只把这些参数作为本次运行的覆盖项，不得修改全局回测配置。
 - `smartx_run_backtest` 返回 `pending` 或 `running` 只表示任务已受理或正在执行，不得表述为回测已经完成。
 - 启动后立即把任务 ID 和当前状态告知用户，不要在同一轮中循环调用查询工具等待完成, 你需要调用每隔10s `smartx_get_backtest` 实时查看进度告知客户，如果长时间进度不变或者失败需要告知给客户。
@@ -102,6 +102,7 @@ permission:
 ## 其他
 
 - 如果查询日志，需要调用 `smartx_logs` 工具查询。
+- smartx-workflow 注入自动调试阶段时，必须先调用 `smartx_start`，成功后再调用 `smartx_logs`；只有结构化日志结果为 `passed` 才能继续自动回测。
 
 ## 允许跳过的情况
 

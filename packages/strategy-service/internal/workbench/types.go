@@ -175,6 +175,7 @@ type ReviewReq struct {
 type ReviewGet struct {
 	WorkspacePath string `form:"workspacePath" json:"workspacePath"`
 	WorktreePath  string `form:"worktreePath" json:"worktreePath"`
+	SessionID     string `form:"sessionId" json:"sessionId"`
 }
 
 type ReviewRow struct {
@@ -282,4 +283,55 @@ type ProgressList struct {
 	WorkspacePath string          `json:"workspacePath"`
 	SessionID     string          `json:"sessionId"`
 	Events        []ProgressEvent `json:"events"`
+}
+
+type WorkflowGet struct {
+	WorkspacePath string `form:"workspacePath" json:"workspacePath"`
+	SessionID     string `form:"sessionId" json:"sessionId"`
+}
+
+type WorkflowStart struct {
+	WorkspacePath string `json:"workspacePath"`
+	SessionID     string `json:"sessionId"`
+	CodeRevision  string `json:"codeRevision"`
+	Review        bool   `json:"review"`
+	Debug         bool   `json:"debug"`
+	Backtest      bool   `json:"backtest"`
+}
+
+type WorkflowUpdate struct {
+	ID              string           `json:"id"`
+	WorkspacePath   string           `json:"workspacePath"`
+	SessionID       string           `json:"sessionId"`
+	Stage           string           `json:"stage"`
+	State           string           `json:"state"`
+	ReviewRound     int              `json:"reviewRound,omitempty"`
+	DebugID         string           `json:"debugId,omitempty"`
+	DebugCursor     map[string]int64 `json:"-"`
+	DebugRequestKey string           `json:"-"`
+	BacktestID      string           `json:"backtestId,omitempty"`
+	Summary         string           `json:"summary,omitempty"`
+	Error           string           `json:"error,omitempty"`
+}
+
+type WorkflowRow struct {
+	ID              string           `json:"id"`
+	WorkspacePath   string           `json:"workspacePath"`
+	SessionID       string           `json:"sessionId"`
+	CodeRevision    string           `json:"codeRevision"`
+	Stage           string           `json:"stage"`
+	State           string           `json:"state"`
+	ReviewRound     int              `json:"reviewRound"`
+	DebugID         string           `json:"debugId,omitempty"`
+	DebugCursor     map[string]int64 `json:"-"`
+	DebugRequestKey string           `json:"-"`
+	BacktestID      string           `json:"backtestId,omitempty"`
+	ReviewEnabled   bool             `json:"reviewEnabled"`
+	DebugEnabled    bool             `json:"debugEnabled"`
+	BacktestEnabled bool             `json:"backtestEnabled"`
+	Summary         string           `json:"summary,omitempty"`
+	Error           string           `json:"error,omitempty"`
+	Revision        int64            `json:"revision"`
+	CreatedAt       int64            `json:"createdAt"`
+	UpdatedAt       int64            `json:"updatedAt"`
 }

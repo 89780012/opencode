@@ -24,6 +24,9 @@ type Service struct {
 	prompts map[string]Prompt
 	used    map[string]map[string]bool
 	swap    map[string]bool
+	active  map[string]bool
+	gen     map[string]uint64
+	seq     uint64
 }
 
 var errNil = errors.New("model chain service is nil")
@@ -45,6 +48,8 @@ func NewService(op target) *Service {
 		prompts: map[string]Prompt{},
 		used:    map[string]map[string]bool{},
 		swap:    map[string]bool{},
+		active:  map[string]bool{},
+		gen:     map[string]uint64{},
 	}
 }
 
@@ -104,20 +109,28 @@ func (s *Service) Prompt(ctx context.Context, req Prompt) error {
 		return fmt.Errorf("model is required")
 	}
 
-	s.track(req)
-	return s.post(ctx, req, req.Model)
+	gen := s.track(req)
+	if err := s.post(ctx, req, req.Model); err != nil {
+		s.drop(req.SessionID, gen)
+		return err
+	}
+	return nil
 }
 
-func (s *Service) track(req Prompt) {
+func (s *Service) track(req Prompt) uint64 {
 	if s == nil {
-		return
+		return 0
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	s.seq++
 	s.prompts[req.SessionID] = req
 	s.used[req.SessionID] = map[string]bool{ref(req.Model): true}
 	s.swap[req.SessionID] = false
+	s.active[req.SessionID] = false
+	s.gen[req.SessionID] = s.seq
+	return s.seq
 }
 
 func (s *Service) Event(data []byte) {
@@ -128,7 +141,7 @@ func (s *Service) Event(data []byte) {
 	if json.Unmarshal(data, &evt) != nil {
 		return
 	}
-	go s.handle(context.Background(), evt)
+	s.handle(context.Background(), evt)
 }
 
 func (s *Service) handle(ctx context.Context, evt event) {
@@ -145,6 +158,10 @@ func (s *Service) handle(ctx context.Context, evt event) {
 		id := sid(evt.Properties)
 		if state["type"] == "busy" {
 			s.ready(id)
+			return
+		}
+		if state["type"] == "idle" {
+			s.idle(id)
 			return
 		}
 		msg := fmt.Sprint(state["message"])
@@ -173,6 +190,14 @@ func (s *Service) fail(ctx context.Context, sessionID string, msg string, cut bo
 		return
 	}
 
+	s.mu.Lock()
+	_, ok := s.prompts[sessionID]
+	blocked := s.swap[sessionID]
+	s.mu.Unlock()
+	if !ok || blocked {
+		return
+	}
+
 	cfg, err := s.Get()
 	if err != nil {
 		return
@@ -181,6 +206,7 @@ func (s *Service) fail(ctx context.Context, sessionID string, msg string, cut bo
 	s.mu.Lock()
 	req, ok := s.prompts[sessionID]
 	used := s.used[sessionID]
+	gen := s.gen[sessionID]
 	if !ok || s.swap[sessionID] {
 		s.mu.Unlock()
 		return
@@ -203,7 +229,7 @@ func (s *Service) fail(ctx context.Context, sessionID string, msg string, cut bo
 		Variant:       req.Variant,
 		Parts: []map[string]any{{
 			"type": "text",
-			"text": "继续【模型异常, 切换新模型继续, 当前模型是 "+ref(model)+"】",
+			"text": "继续【模型异常, 切换新模型继续, 当前模型是 " + ref(model) + "】",
 		}},
 	}
 	s.swap[sessionID] = true
@@ -211,22 +237,21 @@ func (s *Service) fail(ctx context.Context, sessionID string, msg string, cut bo
 	s.prompts[sessionID] = out
 	s.mu.Unlock()
 
-	//发起重试，请求是
-	slog.Info("model chain fallback, next", "session", sessionID, "model", ref(model), "swap", s.swap[sessionID], "prompt", s.prompts[sessionID] )
+	go func() {
+		slog.Info("model chain fallback, next", "session", sessionID, "model", ref(model), "swap", true, "prompt", out)
 
-	if cut {
-		if err := s.abort(ctx, req); err != nil {
-			slog.Warn("model chain abort failed", "session", sessionID, "error", err)
+		if cut {
+			if err := s.abort(ctx, req); err != nil {
+				slog.Warn("model chain abort failed", "session", sessionID, "error", err)
+			}
 		}
-	}
 
-	slog.Info("model chain switch", "session", sessionID, "model", out.Model.ModelID, "provider", out.Model.ProviderID, "error", msg)
-	if err := s.post(ctx, out, model); err != nil {
-		s.mu.Lock()
-		s.swap[sessionID] = false
-		s.mu.Unlock()
-		slog.Warn("model chain fallback continue failed", "session", sessionID, "model", ref(model), "error", err)
-	}
+		slog.Info("model chain switch", "session", sessionID, "model", out.Model.ModelID, "provider", out.Model.ProviderID, "error", msg)
+		if err := s.post(ctx, out, model); err != nil {
+			s.drop(sessionID, gen)
+			slog.Warn("model chain fallback continue failed", "session", sessionID, "model", ref(model), "error", err)
+		}
+	}()
 }
 
 func (s *Service) ready(id string) {
@@ -238,7 +263,43 @@ func (s *Service) ready(id string) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if _, ok := s.prompts[id]; !ok {
+		return
+	}
 	s.swap[id] = false
+	s.active[id] = true
+}
+
+func (s *Service) idle(id string) {
+	if s == nil || id == "" {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.swap[id] || !s.active[id] {
+		return
+	}
+	delete(s.prompts, id)
+	delete(s.used, id)
+	delete(s.swap, id)
+	delete(s.active, id)
+	delete(s.gen, id)
+}
+
+func (s *Service) drop(id string, gen uint64) {
+	if s == nil || id == "" || gen == 0 {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.gen[id] != gen {
+		return
+	}
+	delete(s.prompts, id)
+	delete(s.used, id)
+	delete(s.swap, id)
+	delete(s.active, id)
+	delete(s.gen, id)
 }
 
 func (s *Service) abort(ctx context.Context, req Prompt) error {

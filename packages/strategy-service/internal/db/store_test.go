@@ -155,6 +155,74 @@ func TestBacktestMigrationAddsIdempotencyColumnsAndIndex(t *testing.T) {
 	}
 }
 
+func TestConfigMigrationAddsWorkflowSwitches(t *testing.T) {
+	doc, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer doc.Close()
+	ctx := context.Background()
+	_, err = doc.ExecContext(ctx, `create table config (
+		id integer primary key,
+		theme_mode text not null,
+		theme_accent text not null,
+		logs_tail integer not null,
+		updated_at integer not null
+	)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := migrate(ctx, doc); err != nil {
+		t.Fatal(err)
+	}
+	if err := migrate(ctx, doc); err != nil {
+		t.Fatalf("second migration failed: %v", err)
+	}
+	for _, name := range []string{"workflow_baseline", "workflow_review", "workflow_debug", "workflow_backtest"} {
+		var count int
+		if err := doc.QueryRowContext(ctx, `select count(*) from pragma_table_info('config') where name = ?`, name).Scan(&count); err != nil {
+			t.Fatal(err)
+		}
+		if count != 1 {
+			t.Fatalf("column %s count = %d", name, count)
+		}
+	}
+}
+
+func TestWorkflowMigrationAddsDebugIdentity(t *testing.T) {
+	doc, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer doc.Close()
+	ctx := context.Background()
+	_, err = doc.ExecContext(ctx, `create table workflow_runs (
+		id text primary key,
+		workspace_path text not null,
+		session_id text not null,
+		code_revision text not null,
+		updated_at integer not null
+	)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := migrate(ctx, doc); err != nil {
+		t.Fatal(err)
+	}
+	if err := migrate(ctx, doc); err != nil {
+		t.Fatalf("second migration failed: %v", err)
+	}
+	for _, name := range []string{"debug_cursor", "debug_request_key"} {
+		var count int
+		if err := doc.QueryRowContext(ctx, `select count(*) from pragma_table_info('workflow_runs') where name = ?`, name).Scan(&count); err != nil {
+			t.Fatal(err)
+		}
+		if count != 1 {
+			t.Fatalf("column %s count = %d", name, count)
+		}
+	}
+}
+
 func TestConfigMigrationAddsWorkflowBaseline(t *testing.T) {
 	doc, err := sql.Open("sqlite", ":memory:")
 	if err != nil {

@@ -104,6 +104,34 @@ function map(event: ReturnType<typeof selectWorkbenchProgress>[number]): Timelin
   }
 }
 
+export function workflow(row: NonNullable<ReturnType<typeof selectWorkbench>["workflow"]>): TimelineEvent {
+  const type =
+    row.stage === "review" ? "review" : row.stage === "debug" ? "debug" : row.stage === "backtest" ? "backtest" : "workflow"
+  const labels = { review: "自动审查", debug: "自动调试", backtest: "自动回测", done: "自动流程" }
+  const states = {
+    requested: "等待执行",
+    dispatching: "正在调度审查智能体",
+    running: "正在执行",
+    fixing: "正在自动修复",
+    passed: "已通过",
+    failed: "执行失败",
+    review_exhausted: "审查达到轮次上限",
+    cancelled: "已取消",
+  }
+  return {
+    id: `${row.id}-${row.revision}`,
+    type,
+    label: labels[row.stage],
+    time: new Date(row.updatedAt).toLocaleString("zh-CN", {
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+    description: row.error || row.summary || states[row.state],
+  }
+}
+
 export function useWorkbench(setRight?: (open: boolean) => void) {
   const dispatch = useAppDispatch()
   const state = useAppSelector(selectWorkbench)
@@ -152,6 +180,10 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
       }))
     const back = runs.find((item) => item.id === state.backtestActive) ?? runs[0] ?? null
     const active = activeBacktest(runs)
+    const pipeline =
+      state.workflowPath === state.sessionPath && state.workflowSession === state.active ? state.workflow : null
+    const timeline = prog.map(map)
+    if (pipeline) timeline.push(workflow(pipeline))
     return {
       ...empty(),
       id: session.id,
@@ -171,9 +203,9 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
       backtestRun: active,
       backtestResults: back,
       backtestHistory: runs,
-      timelineEvents: prog.length > 0 ? prog.map(map) : createTimeline(session.title),
+      timelineEvents: timeline.length > 0 ? timeline : createTimeline(session.title),
     }
-  }, [flow, prog, row, rows, runs, state.active, state.backtestActive, state.sessions, view])
+  }, [flow, prog, row, rows, runs, state.active, state.backtestActive, state.sessions, state.sessionPath, state.workflow, state.workflowPath, state.workflowSession, view])
   const last = row ? (cur.reviewHistory.find((item) => item.id === row.id) ?? null) : null
   const risk = useMemo(() => {
     if (cur.reviewStatus === "passed") return "审查已通过"

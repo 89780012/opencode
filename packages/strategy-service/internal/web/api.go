@@ -93,8 +93,15 @@ func NewAPI(run *rt.Service, op *oc.Service, cfg *cfg.Store, sx *smartx.Service,
 		api.event.emitBroadcast(kind, payload)
 	})
 	api.back.SetEvent(func(ctx context.Context, kind string, payload json.RawMessage) {
-		_ = ctx
 		api.event.emitBroadcast(kind, payload)
+		if kind != "backtest.updated" {
+			return
+		}
+		row := backtest.Update{}
+		if json.Unmarshal(payload, &row) != nil {
+			return
+		}
+		_, _ = api.bench.UpdateWorkflowBacktest(ctx, row.WorkspacePath, row.SessionID, row.ID, row.Status, row.Error)
 	})
 	api.socketHandlers = map[string]socketHandlerFunc{
 		"analysis.get":    api.handleAnalysisGet,
@@ -102,6 +109,7 @@ func NewAPI(run *rt.Service, op *oc.Service, cfg *cfg.Store, sx *smartx.Service,
 		"progress.append": api.handleProgressAppend,
 		"progress.get":    api.handleProgressGet,
 		"review.get":      api.handleReviewGet,
+		"workflow.get":    api.handleWorkflowGet,
 		"question.append": api.handleQuestionAppend,
 		"question.delete": api.handleQuestionDelete,
 		"question.list":   api.handleQuestionList,
@@ -162,6 +170,9 @@ func (a *API) Register(r *gin.Engine) {
 	bench.POST("/progress", a.workbenchProgressPost)
 	bench.GET("/review", a.workbenchReviewGet)
 	bench.POST("/review", a.workbenchReviewPut)
+	bench.GET("/workflow", a.workbenchWorkflowGet)
+	bench.POST("/workflow", a.workbenchWorkflowPost)
+	bench.PUT("/workflow", a.workbenchWorkflowPut)
 	bench.GET("/project-state", a.workbenchProjectStateGet)
 	bench.POST("/project-state/init", a.workbenchProjectStateInit)
 	bench.POST("/project-state/resume", a.workbenchProjectStateResume)

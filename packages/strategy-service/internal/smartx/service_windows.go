@@ -46,13 +46,30 @@ func (s *Service) run(ctx context.Context, name string, account string, id strin
 		if err := write(fmt.Sprintf("startExtension %s", name)); err != nil {
 			return err
 		}
-		return waitTail(ctx, buf, n, []string{"smartx>"}, []string{
+		if err := waitTail(ctx, buf, n, []string{"smartx>"}, []string{
 			"start extension failed",
 			"startExtension failed",
 			"not found",
 			"error",
-		}, "smartx startExtension timeout")
+		}, "smartx startExtension timeout"); err != nil {
+			return err
+		}
+		n = buf.size()
+		if err := write(state(name)); err != nil {
+			return err
+		}
+		if err := waitTail(ctx, buf, n, []string{"smartx>"}, []string{"status extension failed", "not found", "error"}, "smartx statusExtension timeout"); err != nil {
+			return err
+		}
+		if !live(buf.text()[n:]) {
+			return fmt.Errorf("extension did not stay running")
+		}
+		return nil
 	})
+}
+
+func (s *Service) status(ctx context.Context, name string) (string, error) {
+	return s.command(ctx, state(name))
 }
 
 func (s *Service) backtest(ctx context.Context, name string, body string) (string, error) {

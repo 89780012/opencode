@@ -229,6 +229,11 @@
   background: #fffbeb;
 }
 
+.dot_debug {
+  border-color: #0891b2;
+  background: #ecfeff;
+}
+
 .dot_flowchart {
   border-color: #10b981;
   background: #ecfdf5;
@@ -237,6 +242,11 @@
 .dot_backtest {
   border-color: #ef4444;
   background: #fef2f2;
+}
+
+.dot_workflow {
+  border-color: #64748b;
+  background: #f8fafc;
 }
 
 .check {

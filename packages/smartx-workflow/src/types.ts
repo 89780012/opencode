@@ -27,6 +27,7 @@ export type Dirt = {
   state: "clean" | "dirty"
   updated: number
   reason: string
+  session?: string
 }
 
 export type Mode = "boot" | "refresh" | "final"
@@ -59,9 +60,16 @@ export type SaveChart = {
 
 export type ReviewItem = {
   name: string
-  status: string
+  status: "passed" | "warning" | "failed" | "error" | "running"
   detail: string
   suggestion: string
+}
+
+export type ReviewResult = {
+  state: "passed" | "failed" | "error"
+  summary: string
+  items: ReviewItem[]
+  suggestions: string[]
 }
 
 export type SaveReview = {
@@ -107,10 +115,61 @@ export type Fix = {
   sessionID: string
   attempt: number
   reviewText: string
+  changed?: boolean
+  resumes?: number
 }
 
 export type Memory = {
   hasProjectState: boolean
   hasRestoredState: boolean
   needsSave: boolean
+}
+
+export type Automation = {
+  baseline: boolean
+  review: boolean
+  debug: boolean
+  backtest: boolean
+}
+
+export type Run = {
+  id: string
+  workspacePath: string
+  sessionId: string
+  codeRevision: string
+  stage: "review" | "debug" | "backtest" | "done"
+  state: "requested" | "dispatching" | "running" | "fixing" | "passed" | "failed" | "review_exhausted" | "cancelled"
+  reviewRound: number
+  debugId: string
+  backtestId: string
+  reviewEnabled: boolean
+  debugEnabled: boolean
+  backtestEnabled: boolean
+  summary: string
+  error: string
+  revision: number
+  createdAt: number
+  updatedAt: number
+}
+
+export type RunStart = {
+  workspacePath: string
+  sessionId: string
+  codeRevision: string
+  review: boolean
+  debug: boolean
+  backtest: boolean
+}
+
+export type RunUpdate = {
+  id: string
+  workspacePath: string
+  sessionId: string
+  stage: Run["stage"]
+  state: Run["state"]
+  reviewRound?: number
+  debugId?: string
+  backtestId?: string
+  summary?: string
+  error?: string
 }

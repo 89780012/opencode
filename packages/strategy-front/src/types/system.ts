@@ -12,6 +12,9 @@ export interface SystemConfig {
   }
   workflow: {
     baseline: boolean
+    review: boolean
+    debug: boolean
+    backtest: boolean
   }
 }
 
@@ -61,5 +64,8 @@ export const systemDefault: SystemConfig = {
   },
   workflow: {
     baseline: false,
+    review: false,
+    debug: false,
+    backtest: false,
   },
 }

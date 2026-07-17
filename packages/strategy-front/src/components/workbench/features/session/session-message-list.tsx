@@ -13,6 +13,7 @@ import { memo, useEffect, useMemo, useState, type ReactNode } from "react"
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation"
 import { Response } from "@/components/ai-elements/response"
 import { backtestTool, partition } from "@/lib/backtest-tool"
+import { review, task } from "@/lib/session-review"
 import { ext, output, payload } from "@/lib/session-tool"
 import { selectSessionParts, useAppSelector } from "@/store"
 import type { ChatAssistantMessage, ChatMessageInfo, ChatPart, ChatStatus, ChatToolPart } from "@/types/chat"
@@ -160,10 +161,10 @@ function Fold(props: {
           ) : (
             <CheckCircle2 size={15} strokeWidth={2.3} />
           )}
-          {props.title}
+          <span className={css.foldlabel}>{props.title}</span>
         </span>
         {props.meta ? <span className={css.foldmeta}>{props.meta}</span> : null}
-        <ChevronDown size={14} className={open ? css.chevronon : ""} />
+        <ChevronDown size={14} className={`${css.chevron} ${open ? css.chevronon : ""}`} />
       </button>
       {open ? <div className={css.foldbody}>{props.children}</div> : null}
     </div>
@@ -429,9 +430,14 @@ function Part(props: { part: ChatPart; role: ChatMessageInfo["role"]; onOpenDiff
     )
   }
   if (props.part.type === "subtask") {
+    const item = task(props.part.agent, props.part.description)
     return (
-      <Fold title={props.part.description} meta={props.part.agent}>
-        <Markdown>{props.part.prompt}</Markdown>
+      <Fold title={item.title} meta={item.meta}>
+        {item.review ? (
+          <div className={css.reviewnote}>审查请求已提交，审查意见将用于后续代码修复。</div>
+        ) : (
+          <Markdown>{props.part.prompt}</Markdown>
+        )}
       </Fold>
     )
   }
@@ -500,7 +506,12 @@ const Item = memo(function Item(props: { info: ChatMessageInfo; onOpenDiff?: (fi
   )
 })
 
-const Group = memo(function Group(props: { infos: ChatAssistantMessage[]; onOpenDiff?: (file: string) => void }) {
+const Group = memo(function Group(props: {
+  parent: string
+  infos: ChatAssistantMessage[]
+  onOpenDiff?: (file: string) => void
+}) {
+  const parent = useAppSelector((state) => selectSessionParts(state, props.parent))
   const data = useAppSelector(
     (state) =>
       props.infos.map((info) => ({
@@ -511,6 +522,7 @@ const Group = memo(function Group(props: { infos: ChatAssistantMessage[]; onOpen
   )
   const body = useMemo(() => data.flatMap((item) => item.parts), [data])
   const list = useMemo(() => blocks(body, "assistant"), [body])
+  const status = review(props.infos, parent)
   const msg = useMemo(
     () =>
       data
@@ -519,6 +531,32 @@ const Group = memo(function Group(props: { infos: ChatAssistantMessage[]; onOpen
         .at(-1),
     [data],
   )
+
+  if (status) {
+    return (
+      <article className={`${css.msg} ${css.ai} ${css.group}`}>
+        <div className={css.avatar}>
+          <Bot size={14} />
+        </div>
+        <div className={css.card}>
+          <div className={css.process}>
+            <Fold title="执行过程" meta="1 步 · 1 个工具" state={status.done ? "done" : "running"}>
+              <div className={css.processBody}>
+                <Fold
+                  title={status.title}
+                  meta={status.meta}
+                  line={false}
+                  state={status.done ? "done" : "running"}
+                >
+                  <div className={css.reviewnote}>{status.detail}</div>
+                </Fold>
+              </div>
+            </Fold>
+          </div>
+        </div>
+      </article>
+    )
+  }
 
   if (list.length === 0 && !msg) return null
 
@@ -581,7 +619,12 @@ export function SessionMessageList(props: {
         ) : null}
         {list.map((item) =>
           item.type === "group" ? (
-            <Group key={`${item.parent}:${item.infos[0]?.id ?? ""}`} infos={item.infos} onOpenDiff={props.onOpenDiff} />
+            <Group
+              key={`${item.parent}:${item.infos[0]?.id ?? ""}`}
+              parent={item.parent}
+              infos={item.infos}
+              onOpenDiff={props.onOpenDiff}
+            />
           ) : (
             <Item key={item.info.id} info={item.info} onOpenDiff={props.onOpenDiff} />
           ),

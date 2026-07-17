@@ -658,6 +658,7 @@ func (s *Service) SaveFlowchart(ctx context.Context, req FlowchartReq) (Flowchar
 func (s *Service) GetReview(ctx context.Context, req ReviewGet) (ReviewRow, error) {
 	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
 	req.WorktreePath = strings.TrimSpace(req.WorktreePath)
+	req.SessionID = strings.TrimSpace(req.SessionID)
 	if req.WorkspacePath == "" {
 		return ReviewRow{}, fmt.Errorf("workspacePath is required")
 	}
@@ -668,8 +669,13 @@ func (s *Service) GetReview(ctx context.Context, req ReviewGet) (ReviewRow, erro
 	if err != nil {
 		return ReviewRow{}, err
 	}
-	row, err := scanReview(doc.QueryRowContext(ctx, `select id, workspace_path, worktree_path, review_id, session_id, state, summary, items, suggestions, updated_at from workspace_reviews where workspace_path = ? and worktree_path = ? order by updated_at desc limit 1`,
-		req.WorkspacePath, req.WorktreePath))
+	query := `select id, workspace_path, worktree_path, review_id, session_id, state, summary, items, suggestions, updated_at from workspace_reviews where workspace_path = ? and worktree_path = ? order by updated_at desc limit 1`
+	args := []any{req.WorkspacePath, req.WorktreePath}
+	if req.SessionID != "" {
+		query = `select id, workspace_path, worktree_path, review_id, session_id, state, summary, items, suggestions, updated_at from workspace_reviews where workspace_path = ? and session_id = ? order by updated_at desc limit 1`
+		args = []any{req.WorkspacePath, req.SessionID}
+	}
+	row, err := scanReview(doc.QueryRowContext(ctx, query, args...))
 	if err == sql.ErrNoRows {
 		return ReviewRow{}, db.ErrNotFound
 	}

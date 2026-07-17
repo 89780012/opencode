@@ -44,6 +44,7 @@ func TestMCPProjectStateToolsAreListed(t *testing.T) {
 		t.Fatalf("tools is %T", result["tools"])
 	}
 	names := map[string]bool{}
+	var start map[string]any
 	var review map[string]any
 	for _, item := range list {
 		row, ok := item.(map[string]any)
@@ -52,6 +53,9 @@ func TestMCPProjectStateToolsAreListed(t *testing.T) {
 		}
 		name, _ := row["name"].(string)
 		names[name] = true
+		if name == "start" {
+			start = row
+		}
 		if name == "save_review" {
 			review = row
 		}
@@ -89,6 +93,14 @@ func TestMCPProjectStateToolsAreListed(t *testing.T) {
 		if !got[name] {
 			t.Fatalf("save_review missing required field %s", name)
 		}
+	}
+	input, ok = start["inputSchema"].(map[string]any)
+	if !ok {
+		t.Fatalf("start input schema = %#v", start["inputSchema"])
+	}
+	required, ok = input["required"].([]any)
+	if !ok || len(required) != 1 || required[0] != "name" {
+		t.Fatalf("start required = %#v", input["required"])
 	}
 }
 
@@ -152,6 +164,169 @@ func TestMCPSaveReviewMapsIdentity(t *testing.T) {
 	row, ok := result["structuredContent"].(map[string]any)
 	if !ok || row["reviewId"] != "review-call-id" || row["sessionId"] != session {
 		t.Fatalf("structured content = %#v", result["structuredContent"])
+	}
+}
+
+func TestMCPBindDebugPersistsBeforeSuccess(t *testing.T) {
+	doc, err := db.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	workspace := filepath.Join(t.TempDir(), "mcp-debug")
+	session := fmt.Sprintf("ses_mcp_debug_%d", time.Now().UnixNano())
+	now := time.Now().UnixMilli()
+	_, err = doc.ExecContext(t.Context(), `insert into sessions(id, workspace_path, title, body, analysis, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?)`, session, workspace, "debug", "{}", "", now, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = doc.ExecContext(context.Background(), "delete from workflow_runs where workspace_path = ?", workspace)
+		_, _ = doc.ExecContext(context.Background(), "delete from sessions where id = ?", session)
+	})
+	bench := workbench.NewService(nil, nil, nil, "")
+	row, err := bench.StartWorkflow(t.Context(), workbench.WorkflowStart{
+		WorkspacePath: workspace,
+		SessionID:     session,
+		CodeRevision:  "code-1",
+		Debug:         true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sx := smartx.New(smartx.Config{})
+	sx.Restore(smartx.Debug{ID: "debug-1", Name: "mcp-debug-local", Filter: "mcp-debug", Cursor: map[string]int64{"strategy.log": 42}})
+	api := &API{bench: bench, sx: sx}
+
+	bound, err := api.mcpBindDebug(t.Context(), row, smartx.Result{DebugID: "debug-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bound.State != "running" || bound.DebugID != "debug-1" || bound.DebugCursor["strategy.log"] != 42 {
+		t.Fatalf("bound workflow = %#v", bound)
+	}
+	stored, err := bench.GetWorkflow(t.Context(), workbench.WorkflowGet{WorkspacePath: workspace, SessionID: session})
+	if err != nil || stored.State != "running" || stored.DebugCursor["strategy.log"] != 42 {
+		t.Fatalf("stored workflow = %#v, %v", stored, err)
+	}
+	body, err := json.Marshal(stored)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(body), "strategy.log") || strings.Contains(string(body), "debugCursor") {
+		t.Fatalf("workflow response leaked debug cursor: %s", body)
+	}
+	restarted := smartx.New(smartx.Config{})
+	(&API{sx: restarted}).mcpRestoreDebug(stored, "mcp-debug")
+	run, ok := restarted.Debug("debug-1")
+	if !ok || run.Name != "mcp-debug-local" || run.Filter != "mcp-debug" || run.Cursor["strategy.log"] != 42 {
+		t.Fatalf("restored service debug = %#v, %v", run, ok)
+	}
+}
+
+func TestMCPClaimDebugPersistsBeforeStart(t *testing.T) {
+	doc, err := db.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	workspace := filepath.Join(t.TempDir(), "mcp-debug-claim")
+	session := fmt.Sprintf("ses_mcp_debug_claim_%d", time.Now().UnixNano())
+	now := time.Now().UnixMilli()
+	_, err = doc.ExecContext(t.Context(), `insert into sessions(id, workspace_path, title, body, analysis, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?)`, session, workspace, "debug claim", "{}", "", now, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = doc.ExecContext(context.Background(), "delete from workflow_runs where workspace_path = ?", workspace)
+		_, _ = doc.ExecContext(context.Background(), "delete from sessions where id = ?", session)
+	})
+	bench := workbench.NewService(nil, nil, nil, "")
+	row, err := bench.StartWorkflow(t.Context(), workbench.WorkflowStart{
+		WorkspacePath: workspace,
+		SessionID:     session,
+		CodeRevision:  "code-claim",
+		Debug:         true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	api := &API{bench: bench, sx: smartx.New(smartx.Config{})}
+	row, err = api.mcpClaimDebug(t.Context(), row, "mcp-debug-claim", "pipeline:debug:start")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if row.State != "requested" || row.DebugID == "" || row.DebugRequestKey != "pipeline:debug:start" || row.DebugCursor == nil {
+		t.Fatalf("claimed workflow = %#v", row)
+	}
+	if _, ok := api.sx.Debug(row.DebugID); ok {
+		t.Fatal("fresh claim was incorrectly restored as an active debug run")
+	}
+	stored, err := bench.GetWorkflow(t.Context(), workbench.WorkflowGet{WorkspacePath: workspace, SessionID: session})
+	if err != nil || stored.DebugID != row.DebugID || stored.DebugRequestKey != "pipeline:debug:start" {
+		t.Fatalf("stored claim = %#v, %v", stored, err)
+	}
+	body, err := json.Marshal(stored)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(body), "debug_request") || strings.Contains(string(body), "pipeline:debug:start") {
+		t.Fatalf("workflow response leaked debug request key: %s", body)
+	}
+}
+
+func TestMCPBindBacktestAcceptsMatchingRunningRetry(t *testing.T) {
+	doc, err := db.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	workspace := filepath.Join(t.TempDir(), "mcp-backtest-retry")
+	session := fmt.Sprintf("ses_mcp_backtest_retry_%d", time.Now().UnixNano())
+	now := time.Now().UnixMilli()
+	_, err = doc.ExecContext(t.Context(), `insert into sessions(id, workspace_path, title, body, analysis, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?)`, session, workspace, "backtest retry", "{}", "", now, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = doc.ExecContext(context.Background(), "delete from workflow_runs where workspace_path = ?", workspace)
+		_, _ = doc.ExecContext(context.Background(), "delete from sessions where id = ?", session)
+	})
+	bench := workbench.NewService(nil, nil, nil, "")
+	row, err := bench.StartWorkflow(t.Context(), workbench.WorkflowStart{
+		WorkspacePath: workspace,
+		SessionID:     session,
+		CodeRevision:  "code-backtest-retry",
+		Backtest:      true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	row, err = bench.UpdateWorkflow(t.Context(), workbench.WorkflowUpdate{
+		ID:            row.ID,
+		WorkspacePath: workspace,
+		SessionID:     session,
+		Stage:         "backtest",
+		State:         "running",
+		BacktestID:    "backtest-retry-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(rec)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	err = (&API{bench: bench}).bindBacktest(ctx, map[string]any{
+		"workflowId":    row.ID,
+		"workspacePath": workspace,
+		"sessionId":     session,
+	}, "backtest-retry-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored, err := bench.GetWorkflow(t.Context(), workbench.WorkflowGet{WorkspacePath: workspace, SessionID: session})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.Revision != row.Revision || stored.BacktestID != row.BacktestID {
+		t.Fatalf("idempotent retry changed workflow = %#v", stored)
 	}
 }
 
