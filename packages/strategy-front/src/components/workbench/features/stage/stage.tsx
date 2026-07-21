@@ -45,9 +45,11 @@ export function StageView() {
     : real.entry.err || (real.path ? "没有可用工作区" : "缺少工作区路径")
 
   const send = async (text: string, clear = true, intake = true) => {
+    // 仅新建会话的第一条消息才自动录入需求，后续消息不再追加 TODO
+    const fresh = !real.chat.selectedSessionId
     dispatch(updateSessionAbortStatus({ sessionId: real.chat.selectedSessionId || "", status: false }))
     dispatch(setStage("session"))
-    return chat.submit({ text }, { clear, intake: intake && sys.cfg.workbench.intake })
+    return chat.submit({ text }, { clear, intake: intake && sys.cfg.workbench.intake && fresh })
   }
 
   const inspect = async (text: string) => {

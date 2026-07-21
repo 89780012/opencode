@@ -1,20 +1,20 @@
 import { useEffect, useState } from "react"
 import { Workbench } from "../workbench"
-import { SettingsDialog } from "../settings"
+import { SettingsPage } from "../settings"
 import type { Tab } from "../settings/types"
 import ui from "../shared/styles/ui.module.css"
 import { Rail } from "./layout/rail"
 import shell from "./styles/layout.module.css"
 
 export function Workstation() {
-  const [open, setOpen] = useState(false)
+  const [page, setPage] = useState<"bench" | "settings">("bench")
   const [tab, setTab] = useState<Tab>("providers")
 
   useEffect(() => {
     const open = (event: Event) => {
       const tab = (event as CustomEvent<{ tab?: Tab }>).detail?.tab
       if (tab) setTab(tab)
-      setOpen(true)
+      setPage("settings")
     }
     window.addEventListener("strategy-settings-open", open)
     return () => window.removeEventListener("strategy-settings-open", open)
@@ -24,19 +24,17 @@ export function Workstation() {
     <div className={ui.root}>
       <div className={shell.frame}>
         <Rail
-          page={open ? "settings" : "bench"}
-          onPage={(page) => {
-            if (page === "settings") {
+          page={page}
+          onPage={(next) => {
+            if (next === "settings") {
               setTab("providers")
-              setOpen(true)
-              return
             }
-            setOpen(false)
+            setPage(next)
           }}
         />
-        <Workbench />
+        <Workbench hidden={page === "settings"} />
+        {page === "settings" ? <SettingsPage tab={tab} onTab={setTab} /> : null}
       </div>
-      <SettingsDialog open={open} tab={tab} onTab={setTab} onOpenChange={setOpen} />
     </div>
   )
 }

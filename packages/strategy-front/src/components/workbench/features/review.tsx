@@ -54,6 +54,7 @@ function Advice(props: { tips: string[] }) {
 }
 
 export function Review(props: {
+  hidden?: boolean
   open: boolean
   width: number
   resizing: boolean
@@ -85,7 +86,7 @@ export function Review(props: {
   }
 
   return (
-    <aside className={css.root}>
+    <aside className={css.root} hidden={props.hidden}>
       {props.open ? (
         <>
           <Handle

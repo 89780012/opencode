@@ -14,7 +14,7 @@ import { Handle } from "./layout/handle"
 import { Topbar } from "./layout/topbar"
 import shell from "./styles/layout/shell.module.css"
 
-export function Workbench() {
+export function Workbench(props: { hidden?: boolean }) {
   useWorkbenchSessionSync()
   useWorkbenchQuestionSync()
   useWorkbenchAnalysisSync()
@@ -27,7 +27,7 @@ export function Workbench() {
 
   return (
     <>
-      <div className={shell.pane}>
+      <div className={shell.pane} hidden={props.hidden}>
         <div
           className={shell.shell}
           data-workbench
@@ -56,6 +56,7 @@ export function Workbench() {
         </div>
       </div>
       <Review
+        hidden={props.hidden}
         open={panel.right.open}
         width={panel.right.w}
         resizing={panel.right.active}
