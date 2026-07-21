@@ -179,7 +179,8 @@ describe("smartx workspace analysis", () => {
   test("loads the workspace baseline switch from system config", async () => {
     const prev = globalThis.fetch
     try {
-      globalThis.fetch = (async () => Response.json({ data: { workflow: { baseline: true } } })) satisfies typeof fetch
+      globalThis.fetch = (async () =>
+        Response.json({ data: { workbench: { intake: true }, workflow: { baseline: true } } })) satisfies typeof fetch
       expect(await loadBaselineRemote("http://localhost:4096")).toBe(true)
       globalThis.fetch = (async () => Response.json({ data: { workflow: {} } })) satisfies typeof fetch
       expect(await loadBaselineRemote("http://localhost:4096")).toBe(false)

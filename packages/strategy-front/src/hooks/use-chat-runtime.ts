@@ -4,6 +4,7 @@ import { chatApi, permissionApi, questionApi } from "@/api/modules"
 import { toast } from "sonner"
 import { buildRequestParts } from "@/lib/build-request-parts"
 import { log } from "@/lib/error"
+import { capture, settle, type Intake } from "@/lib/intake"
 import { load, save } from "@/lib/store"
 import {
   selectPermissionLoaded,
@@ -431,9 +432,10 @@ function useSubmit(input: {
 }) {
   const dispatch = useAppDispatch()
   const [submitting, setSubmitting] = useState(false)
+  const intakes = useRef(new Map<string, Intake>())
 
   const submit = useCallback(
-    async (msg: PromptInputMessage, opts?: { clear?: boolean }) => {
+    async (msg: PromptInputMessage, opts?: { clear?: boolean; intake?: boolean }) => {
       if (!input.workspacePath) {
         return
       }
@@ -451,7 +453,12 @@ function useSubmit(input: {
           dispatch(hydrateSessionMessages({ sessionId, records: [] }))
         }
         input.selectSession(sessionId)
-        await chatApi.sendPrompt(input.workspacePath, sessionId, { parts })
+        const text = msg.text.trim()
+        const scope = `${input.workspacePath}\u0000${sessionId}`
+        const req = opts?.intake && text ? capture(intakes.current, scope, text) : undefined
+        const id = req?.id ?? ""
+        await chatApi.sendPrompt(input.workspacePath, sessionId, { parts, intake: id ? { id } : undefined })
+        if (id) settle(intakes.current, scope, id)
         if (opts?.clear !== false) input.onSubmitted?.()
       } finally {
         setSubmitting(false)
@@ -484,7 +491,7 @@ export function useChatRuntime(input: Input) {
   })
 
   const submit = useCallback(
-    async (msg: PromptInputMessage, opts?: { clear?: boolean }) => {
+    async (msg: PromptInputMessage, opts?: { clear?: boolean; intake?: boolean }) => {
       try {
         await prompt.submit(msg, opts)
 

@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useSearchParams } from "react-router-dom"
+import { toast } from "sonner"
 import { type Analyze, type Hit, workbenchApi } from "@/api/modules/workbench"
-import { socket } from "@/lib/socket-bus"
+import { useSystem } from "@/components/system/system-provider"
+import { clearSession, createSession } from "@/lib/session-create"
+import { socket, type SocketEvent } from "@/lib/socket-bus"
 import { selectWorkbench, useAppDispatch, useAppSelector } from "@/store"
 import { setActive } from "@/store/workbench-slice"
 
@@ -63,6 +66,7 @@ function clean(list: string[]) {
 
 export function useWorkbenchModal() {
   const dispatch = useAppDispatch()
+  const sys = useSystem()
   const state = useAppSelector(selectWorkbench)
   const [search] = useSearchParams()
   const path = search.get("path")?.trim() ?? ""
@@ -70,6 +74,8 @@ export function useWorkbenchModal() {
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState(1)
   const [busy, setBusy] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const request = useRef("")
   const [shown, setShown] = useState("")
   const [title, setTitle] = useState(seed)
   const [reqs, setReqs] = useState<string[]>(line)
@@ -110,6 +116,34 @@ export function useWorkbenchModal() {
   }, [busy, open])
 
   useEffect(() => {
+    const done = (event: SocketEvent) => {
+      if (!event.id || event.id !== request.current) return
+      request.current = ""
+      setCreating(false)
+    }
+    const fail = (event: SocketEvent) => {
+      if (!event.id || event.id !== request.current) return
+      clearSession(event.id)
+      request.current = ""
+      setCreating(false)
+      toast.error("创建会话失败")
+    }
+    const off = [socket.on("session.created", done), socket.on("session.create.error", fail)]
+    return () => off.forEach((fn) => fn())
+  }, [])
+
+  useEffect(() => {
+    if (!creating) return
+    const timer = window.setTimeout(() => {
+      request.current = ""
+      setCreating(false)
+      toast.error("创建会话超时，请重试")
+    }, 60_000)
+    return () => window.clearTimeout(timer)
+  }, [creating])
+
+  useEffect(() => {
+    if (sys.load || sys.cfg.workbench.intake) return
     if (!empty) {
       setShown("")
       return
@@ -118,7 +152,7 @@ export function useWorkbenchModal() {
     if (open) return
     setShown(path)
     openModal()
-  }, [empty, open, openModal, path, shown])
+  }, [empty, open, openModal, path, shown, sys.cfg.workbench.intake, sys.load])
 
   const analyze = async (keep = false) => {
     const body = reqs
@@ -183,7 +217,19 @@ export function useWorkbenchModal() {
 
   const create = (title: string) => {
     if (!path) return false
-    return socket.emit("session.create", { workspacePath: path, title, requirements: clean(reqs), analysis: data })
+    return !!createSession(path, { workspacePath: path, title, requirements: clean(reqs), analysis: data })
+  }
+
+  const quick = () => {
+    if (!path || creating) return false
+    const id = createSession(path, { workspacePath: path, title: seed })
+    if (!id) {
+      toast.error("创建会话请求发送失败，请检查连接后重试")
+      return false
+    }
+    request.current = id
+    setCreating(true)
+    return true
   }
 
   const rows: Row[] = reqs.map((text) => ({
@@ -215,6 +261,8 @@ export function useWorkbenchModal() {
     rename,
     remove,
     create,
+    quick,
+    creating,
     open,
     openModal,
     close: () => {

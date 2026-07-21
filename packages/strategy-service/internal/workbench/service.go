@@ -182,7 +182,10 @@ func (s *Service) DeleteSession(ctx context.Context, req SessionDelete) error {
 	if count == 0 {
 		return db.ErrNotFound
 	}
-	_, err = doc.ExecContext(ctx, "delete from workspace_requirements where session_id = ?", req.ID)
+	if _, err = doc.ExecContext(ctx, "delete from workspace_requirements where session_id = ?", req.ID); err != nil {
+		return err
+	}
+	_, err = doc.ExecContext(ctx, "delete from workspace_requirement_receipts where session_id = ?", req.ID)
 	return err
 }
 
@@ -366,6 +369,55 @@ func (s *Service) SaveRequirements(ctx context.Context, req RequirementsSave) (R
 		SessionID:     req.SessionID,
 		Requirements:  items,
 	}, nil
+}
+
+func (s *Service) AppendRequirement(ctx context.Context, req RequirementAppend) (RequirementsRow, error) {
+	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
+	req.SessionID = strings.TrimSpace(req.SessionID)
+	req.RequestID = strings.TrimSpace(req.RequestID)
+	req.Text = strings.TrimSpace(req.Text)
+	if req.WorkspacePath == "" || req.SessionID == "" || req.RequestID == "" || req.Text == "" {
+		return RequirementsRow{}, fmt.Errorf("%w: workspacePath, sessionId, requestId and text are required", ErrInput)
+	}
+	doc, err := db.Open()
+	if err != nil {
+		return RequirementsRow{}, err
+	}
+	tx, err := doc.BeginTx(ctx, nil)
+	if err != nil {
+		return RequirementsRow{}, err
+	}
+	defer tx.Rollback()
+	var workspace string
+	err = tx.QueryRowContext(ctx, "select workspace_path from sessions where id = ?", req.SessionID).Scan(&workspace)
+	if err == sql.ErrNoRows || (err == nil && workspace != req.WorkspacePath) {
+		return RequirementsRow{}, db.ErrNotFound
+	}
+	if err != nil {
+		return RequirementsRow{}, err
+	}
+	res, err := tx.ExecContext(ctx, `insert or ignore into workspace_requirement_receipts(workspace_path, session_id, request_id, created_at) values (?, ?, ?, ?)`, req.WorkspacePath, req.SessionID, req.RequestID, time.Now().UnixMilli())
+	if err != nil {
+		return RequirementsRow{}, err
+	}
+	reqs, err := loadReqs(ctx, tx, req.WorkspacePath, req.SessionID)
+	if err != nil {
+		return RequirementsRow{}, err
+	}
+	count, err := res.RowsAffected()
+	if err != nil {
+		return RequirementsRow{}, err
+	}
+	if count > 0 {
+		reqs = append(reqs, req.Text)
+		if err := saveReqs(ctx, tx, req.WorkspacePath, req.SessionID, reqs, time.Now().UnixMilli()); err != nil {
+			return RequirementsRow{}, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return RequirementsRow{}, err
+	}
+	return RequirementsRow{WorkspacePath: req.WorkspacePath, SessionID: req.SessionID, Requirements: reqs}, nil
 }
 
 func (s *Service) SaveAnalysis(ctx context.Context, req AnalysisReq) (AnalysisRow, error) {
@@ -1613,7 +1665,7 @@ func loadSession(ctx context.Context, doc *sql.DB, id string) (SessionRow, error
 	return row, err
 }
 
-func loadReqs(ctx context.Context, doc *sql.DB, workspace string, id string) ([]string, error) {
+func loadReqs(ctx context.Context, doc queryer, workspace string, id string) ([]string, error) {
 	workspace = strings.TrimSpace(workspace)
 	id = strings.TrimSpace(id)
 	if workspace == "" || id == "" {

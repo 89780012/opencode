@@ -106,6 +106,13 @@ type RequirementsSave struct {
 	Requirements  []string `json:"requirements"`
 }
 
+type RequirementAppend struct {
+	WorkspacePath string `json:"workspacePath"`
+	SessionID     string `json:"sessionId"`
+	RequestID     string `json:"requestId"`
+	Text          string `json:"text"`
+}
+
 type RequirementsRow struct {
 	WorkspacePath string   `json:"workspacePath"`
 	SessionID     string   `json:"sessionId"`

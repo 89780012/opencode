@@ -21,6 +21,7 @@ function clean(cfg: SystemConfig) {
     theme: { ...systemDefault.theme, ...cfg.theme },
     logs: { ...systemDefault.logs, ...cfg.logs },
     workflow: { ...systemDefault.workflow, ...cfg.workflow },
+    workbench: { ...systemDefault.workbench, ...cfg.workbench },
   }
 }
 

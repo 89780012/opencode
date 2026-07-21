@@ -1,10 +1,18 @@
 import { useEffect } from "react"
 import { useSearchParams } from "react-router-dom"
 import { chatApi } from "@/api/modules"
+import { ownsSession } from "@/lib/session-create"
 import { socket, type SocketEvent } from "@/lib/socket-bus"
 import { useAppDispatch } from "@/store"
 import { setSelectedWorkspaceSession, setSessionStatus } from "@/store/chat-session-slice"
-import { deleteSession, setActive, setSessions, upsertSession, type WorkbenchSession } from "@/store/workbench-slice"
+import {
+  deleteSession,
+  setActive,
+  setRequirements,
+  setSessions,
+  upsertSession,
+  type WorkbenchSession,
+} from "@/store/workbench-slice"
 
 function obj(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object"
@@ -59,6 +67,18 @@ function parseCreated(value: unknown) {
   }
 }
 
+export function parseRequirements(value: unknown) {
+  if (!obj(value)) return null
+  if (typeof value.workspacePath !== "string" || typeof value.sessionId !== "string") return null
+  if (!Array.isArray(value.requirements)) return null
+  if (!value.requirements.every((item) => typeof item === "string")) return null
+  return {
+    workspacePath: value.workspacePath,
+    sessionId: value.sessionId,
+    requirements: value.requirements as string[],
+  }
+}
+
 export function useWorkbenchSessionSync() {
   const dispatch = useAppDispatch()
   const [search] = useSearchParams()
@@ -107,6 +127,16 @@ export function useWorkbenchSessionSync() {
 
   useEffect(() => {
     const fn = (event: SocketEvent) => {
+      const data = parseRequirements(event.payload)
+      if (!data || data.workspacePath !== path) return
+      dispatch(setRequirements(data))
+      socket.emit("session.list", { workspacePath: path })
+    }
+    return socket.on("requirements.updated", fn)
+  }, [dispatch, path])
+
+  useEffect(() => {
+    const fn = (event: SocketEvent) => {
       const id = parseID(event.payload)
       if (!id) return
       dispatch(deleteSession({ id }))
@@ -114,13 +144,13 @@ export function useWorkbenchSessionSync() {
       socket.emit("session.list", { workspacePath: path })
     }
     return socket.on("session.deleted", fn)
-  }, [dispatch])
+  }, [dispatch, path])
 
   useEffect(() => {
     const fn = (event: SocketEvent) => {
       if (!path) return
       const data = parseCreated(event.payload)
-      if (data && data.workspacePath === path) {
+      if (data && data.workspacePath === path && ownsSession(event.id, path)) {
         dispatch(setActive(data.id))
         dispatch(setSelectedWorkspaceSession({ workspace: path, sessionId: data.id }))
       }

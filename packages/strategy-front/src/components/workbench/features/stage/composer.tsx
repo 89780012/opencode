@@ -1,5 +1,5 @@
 import { ClipboardCheck, Send, Square } from "lucide-react"
-import type { KeyboardEvent } from "react"
+import { useEffect, useRef, type KeyboardEvent } from "react"
 import css from "../../styles/stage/composer.module.css"
 
 export function Composer(props: {
@@ -10,11 +10,19 @@ export function Composer(props: {
   reviewing?: boolean
   placeholder?: string
   mode?: "narrow" | "full"
+  focus?: string
   onAbort?: () => void
   onChange: (value: string) => void
   onSend: (text: string) => void
   onReview: (text: string) => void
 }) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (!props.focus || props.disabled) return
+    ref.current?.focus()
+  }, [props.disabled, props.focus])
+
   const send = () => {
     if (!props.value.trim()) return
     props.onSend(props.value)
@@ -43,6 +51,7 @@ export function Composer(props: {
     <div className={css.root}>
       <div className={`${css.box} ${props.mode === "full" ? css.full : ""}`}>
         <textarea
+          ref={ref}
           rows={2}
           className={css.input}
           disabled={props.disabled}

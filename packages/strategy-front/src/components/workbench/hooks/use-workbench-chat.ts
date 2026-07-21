@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react"
 import { useSearchParams } from "react-router-dom"
 import { toast } from "sonner"
+import { useSystem } from "@/components/system/system-provider"
 import { useStrategySession } from "@/hooks/use-strategy-session"
 import { useWorkspaceEntry } from "@/hooks/use-workspace-entry"
 import { log } from "@/lib/error"
@@ -9,6 +10,7 @@ import { updateSessionAbortStatus } from "@/store/chat-session-slice"
 
 export function useWorkbenchChat() {
   const dispatch = useAppDispatch()
+  const sys = useSystem()
   const [search] = useSearchParams()
   const path = search.get("path")?.trim() ?? ""
   const entry = useWorkspaceEntry(path) //主要做工作区初始化
@@ -33,6 +35,7 @@ export function useWorkbenchChat() {
 
   useEffect(() => {
     if (!workspace?.path) return
+    if (sys.load || sys.cfg.workbench.intake) return
     if (!chat.loaded) return
     if (chat.creating) return
     if (init.current === workspace.path) return
@@ -51,7 +54,7 @@ export function useWorkbenchChat() {
       log("自动创建工作台会话失败", err)
       toast.error("自动创建会话失败")
     })
-  }, [chat, workspace?.path])
+  }, [chat, sys.cfg.workbench.intake, sys.load, workspace?.path])
 
   const abort = async () => {
     dispatch(updateSessionAbortStatus({ sessionId: chat.selectedSessionId || "", status: true }))

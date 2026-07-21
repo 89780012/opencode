@@ -411,6 +411,10 @@ export type ChatInputPart = ChatTextInput | ChatFileInput
 export interface ChatPromptBody {
   messageID?: string // 保存问题消息ID
   parts: ChatInputPart[]
+  intake?: {
+    id: string
+    text?: string
+  }
 }
 
 export type ChatEvent =

@@ -88,6 +88,27 @@ func (a *API) modelChainPrompt(c *gin.Context) {
 		fail(c, 500, "failed to validate session", nil)
 		return
 	}
+	if req.Intake != nil {
+		text := strings.TrimSpace(req.Intake.Text)
+		if text == "" {
+			text = body(req.Parts)
+		}
+		data, err := a.bench.AppendRequirement(c.Request.Context(), workbench.RequirementAppend{
+			WorkspacePath: req.WorkspacePath,
+			SessionID:     req.SessionID,
+			RequestID:     req.Intake.ID,
+			Text:          text,
+		})
+		if errors.Is(err, workbench.ErrInput) {
+			bad(c, err)
+			return
+		}
+		if err != nil {
+			fail(c, 500, "failed to append requirement", nil)
+			return
+		}
+		a.event.emitBroadcast("requirements.updated", utils.Pack(data))
+	}
 	if err := a.chain.Prompt(c.Request.Context(), req); err != nil {
 		bad(c, err)
 		return

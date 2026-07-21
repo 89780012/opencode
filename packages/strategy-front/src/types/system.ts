@@ -16,6 +16,9 @@ export interface SystemConfig {
     debug: boolean
     backtest: boolean
   }
+  workbench: {
+    intake: boolean
+  }
 }
 
 export interface LogSource {
@@ -67,5 +70,8 @@ export const systemDefault: SystemConfig = {
     review: false,
     debug: false,
     backtest: false,
+  },
+  workbench: {
+    intake: false,
   },
 }

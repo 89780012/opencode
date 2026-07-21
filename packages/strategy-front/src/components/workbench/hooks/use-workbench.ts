@@ -2,7 +2,9 @@ import { useMemo, useRef, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 import { backtestApi, modelChainApi } from "@/api/modules"
 import { ApiError } from "@/api/errors"
+import { useSystem } from "@/components/system/system-provider"
 import { activeBacktest, backtestKey, isBacktestRun } from "@/lib/backtest"
+import { capture, settle, type Intake } from "@/lib/intake"
 import { toast } from "sonner"
 import {
   selectWorkbench,
@@ -25,6 +27,7 @@ import { useWorkbenchProgressSync } from "./use-workbench-progress"
 import type { BacktestConfig } from "@/types/backtest"
 
 const locks = new Set<string>()
+const intakes = new Map<string, Intake>()
 
 function status(state?: string): ReviewStatus {
   if (state === "running") return "running"
@@ -133,6 +136,7 @@ export function workflow(row: NonNullable<ReturnType<typeof selectWorkbench>["wo
 }
 
 export function useWorkbench(setRight?: (open: boolean) => void) {
+  const sys = useSystem()
   const dispatch = useAppDispatch()
   const state = useAppSelector(selectWorkbench)
   const [search] = useSearchParams()
@@ -239,6 +243,8 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
     const current = fresh.reviews.find((item) => !item.id.startsWith("pending_") && item.sessionId === session.id)
     if (wait || current?.state === "running" || locks.has(key)) return false
     const id = `pending_${backtestKey()}`
+    const source = text?.trim() ?? ""
+    const req = sys.cfg.workbench.intake && source ? capture(intakes, key, source) : undefined
     locks.add(key)
     dispatch(startReview({ workspacePath: path, sessionId: session.id, id, updatedAt: Date.now() }))
     try {
@@ -246,7 +252,9 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
         workspacePath: path,
         sessionId: session.id,
         parts: [{ type: "text", text: message(text) }],
+        intake: req ? { id: req.id, text: source } : undefined,
       })
+      if (req) settle(intakes, key, req.id)
       return true
     } catch {
       dispatch(rollbackReview({ workspacePath: path, id }))

@@ -26,21 +26,23 @@ func Open() (*sql.DB, error) {
 			state.err = err
 			return
 		}
-		db, err := sql.Open("sqlite", path)
-		if err != nil {
-			state.err = err
-			return
-		}
-		db.SetMaxOpenConns(1)
-		db.SetMaxIdleConns(1)
-		if err := initdb(db); err != nil {
-			_ = db.Close()
-			state.err = err
-			return
-		}
-		state.db = db
+		state.db, state.err = OpenPath(path)
 	})
 	return state.db, state.err
+}
+
+func OpenPath(path string) (*sql.DB, error) {
+	doc, err := sql.Open("sqlite", path)
+	if err != nil {
+		return nil, err
+	}
+	doc.SetMaxOpenConns(1)
+	doc.SetMaxIdleConns(1)
+	if err := initdb(doc); err != nil {
+		_ = doc.Close()
+		return nil, err
+	}
+	return doc, nil
 }
 
 func Path() (string, error) {
@@ -97,6 +99,7 @@ func migrate(ctx context.Context, db *sql.DB) error {
 		{table: "config", name: "workflow_review", sql: "alter table config add column workflow_review integer not null default 0"},
 		{table: "config", name: "workflow_debug", sql: "alter table config add column workflow_debug integer not null default 0"},
 		{table: "config", name: "workflow_backtest", sql: "alter table config add column workflow_backtest integer not null default 0"},
+		{table: "config", name: "workbench_intake", sql: "alter table config add column workbench_intake integer not null default 0"},
 		{table: "workflow_runs", name: "debug_cursor", sql: "alter table workflow_runs add column debug_cursor text not null default '{}'"},
 		{table: "workflow_runs", name: "debug_request_key", sql: "alter table workflow_runs add column debug_request_key text not null default ''"},
 	} {
@@ -166,6 +169,7 @@ var schema = []string{
 	workflow_review integer not null default 0,
 	workflow_debug integer not null default 0,
 	workflow_backtest integer not null default 0,
+	workbench_intake integer not null default 0,
 	updated_at integer not null
 )`,
 	`create table if not exists workspaces (
@@ -195,6 +199,13 @@ var schema = []string{
 	items text not null,
 	updated_at integer not null,
 	primary key(workspace_path, session_id)
+)`,
+	`create table if not exists workspace_requirement_receipts (
+	workspace_path text not null,
+	session_id text not null,
+	request_id text not null,
+	created_at integer not null,
+	primary key(workspace_path, session_id, request_id)
 )`,
 	`create table if not exists workspace_analysis (
 	workspace_path text not null,

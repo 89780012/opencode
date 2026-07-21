@@ -8,16 +8,10 @@ export function SystemPanel() {
   const sys = useSystem()
   const [busy, setBusy] = useState(false)
 
-  async function save(key: keyof typeof sys.cfg.workflow, value: boolean) {
+  async function save(cfg: typeof sys.cfg) {
     setBusy(true)
     try {
-      await sys.save({
-        ...sys.cfg,
-        workflow: {
-          ...sys.cfg.workflow,
-          [key]: value,
-        },
-      })
+      await sys.save(cfg)
       toast.success("系统配置已保存")
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "系统配置保存失败")
@@ -25,6 +19,11 @@ export function SystemPanel() {
       setBusy(false)
     }
   }
+
+  const workflow = (key: keyof typeof sys.cfg.workflow, value: boolean) =>
+    save({ ...sys.cfg, workflow: { ...sys.cfg.workflow, [key]: value } })
+
+  const intake = (value: boolean) => save({ ...sys.cfg, workbench: { ...sys.cfg.workbench, intake: value } })
 
   return (
     <section className={css.panel}>
@@ -38,6 +37,21 @@ export function SystemPanel() {
       <section className={css.section}>
         <div className={css.titleline}>
           <div className={css.title}>
+            <h3>对话式需求录入</h3>
+            <p>新建后直接进入会话，每次主动发送的内容同步追加到需求理解。</p>
+          </div>
+          <Switch
+            label="对话式需求录入"
+            checked={sys.cfg.workbench.intake}
+            disabled={sys.load || busy}
+            onChange={(value) => void intake(value)}
+          />
+        </div>
+      </section>
+
+      <section className={css.section}>
+        <div className={css.titleline}>
+          <div className={css.title}>
             <h3>工作区基线</h3>
             <p>启用后执行工作区分析，并根据分析结果生成流程图。</p>
           </div>
@@ -45,7 +59,7 @@ export function SystemPanel() {
             label="工作区分析与流程图"
             checked={sys.cfg.workflow.baseline}
             disabled={sys.load || busy}
-            onChange={(value) => void save("baseline", value)}
+            onChange={(value) => void workflow("baseline", value)}
           />
         </div>
       </section>
@@ -60,7 +74,7 @@ export function SystemPanel() {
             label="自动审查"
             checked={sys.cfg.workflow.review}
             disabled={sys.load || busy}
-            onChange={(value) => void save("review", value)}
+            onChange={(value) => void workflow("review", value)}
           />
         </div>
       </section>
@@ -75,7 +89,7 @@ export function SystemPanel() {
             label="自动调试"
             checked={sys.cfg.workflow.debug}
             disabled={sys.load || busy}
-            onChange={(value) => void save("debug", value)}
+            onChange={(value) => void workflow("debug", value)}
           />
         </div>
       </section>
@@ -90,7 +104,7 @@ export function SystemPanel() {
             label="自动回测"
             checked={sys.cfg.workflow.backtest}
             disabled={sys.load || busy}
-            onChange={(value) => void save("backtest", value)}
+            onChange={(value) => void workflow("backtest", value)}
           />
         </div>
       </section>

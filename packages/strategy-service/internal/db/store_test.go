@@ -178,7 +178,7 @@ func TestConfigMigrationAddsWorkflowSwitches(t *testing.T) {
 	if err := migrate(ctx, doc); err != nil {
 		t.Fatalf("second migration failed: %v", err)
 	}
-	for _, name := range []string{"workflow_baseline", "workflow_review", "workflow_debug", "workflow_backtest"} {
+	for _, name := range []string{"workflow_baseline", "workflow_review", "workflow_debug", "workflow_backtest", "workbench_intake"} {
 		var count int
 		if err := doc.QueryRowContext(ctx, `select count(*) from pragma_table_info('config') where name = ?`, name).Scan(&count); err != nil {
 			t.Fatal(err)
@@ -258,10 +258,14 @@ func TestConfigMigrationAddsWorkflowBaseline(t *testing.T) {
 		t.Fatalf("workflow_baseline column count = %d", count)
 	}
 	var baseline bool
-	if err := doc.QueryRowContext(ctx, `select workflow_baseline from config where id = 1`).Scan(&baseline); err != nil {
+	var intake bool
+	if err := doc.QueryRowContext(ctx, `select workflow_baseline, workbench_intake from config where id = 1`).Scan(&baseline, &intake); err != nil {
 		t.Fatal(err)
 	}
 	if baseline {
 		t.Fatal("migrated workflow baseline is enabled")
+	}
+	if intake {
+		t.Fatal("migrated workbench intake is enabled")
 	}
 }

@@ -1,4 +1,5 @@
 import { useRef, useState } from "react"
+import { useSystem } from "@/components/system/system-provider"
 import { useChatRuntime } from "@/hooks/use-chat-runtime"
 import { selectRequirementReview, useAppDispatch, useAppSelector } from "@/store"
 import { updateSessionAbortStatus } from "@/store/chat-session-slice"
@@ -18,6 +19,7 @@ const prompt = "需求已变更，请根据最新需求重新审查并修改策�
 
 export function StageView() {
   const dispatch = useAppDispatch()
+  const sys = useSystem()
   const stage = useStage()
   const real = useWorkbenchChat()
   const [mode, setMode] = useState<"narrow" | "full">("narrow")
@@ -42,10 +44,10 @@ export function StageView() {
       : "正在准备工作区..."
     : real.entry.err || (real.path ? "没有可用工作区" : "缺少工作区路径")
 
-  const send = async (text: string, clear = true) => {
+  const send = async (text: string, clear = true, intake = true) => {
     dispatch(updateSessionAbortStatus({ sessionId: real.chat.selectedSessionId || "", status: false }))
     dispatch(setStage("session"))
-    return chat.submit({ text }, { clear })
+    return chat.submit({ text }, { clear, intake: intake && sys.cfg.workbench.intake })
   }
 
   const inspect = async (text: string) => {
@@ -61,7 +63,7 @@ export function StageView() {
     gate.current = true
     setReviewing(true)
     try {
-      if (!(await send(prompt, false))) return
+      if (!(await send(prompt, false, false))) return
       dispatch(clearRequirementReview({ workspacePath: path, sessionId: id, revision: version }))
     } finally {
       gate.current = false
@@ -117,6 +119,7 @@ export function StageView() {
         submitting={chat.submitting || real.chat.creating}
         reviewing={stage.reviewing}
         value={chat.draft.text}
+        focus={sys.cfg.workbench.intake ? stage.active : ""}
         mode={session ? mode : "narrow"}
         onAbort={() => void real.abort()}
         onChange={chat.draft.setText}

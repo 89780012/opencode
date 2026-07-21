@@ -1,5 +1,6 @@
 import { FolderTree, HelpCircle, MessageCircle, Pencil, Plus, Trash2, type LucideIcon } from "lucide-react"
 import { useState, type ReactNode } from "react"
+import { useSystem } from "@/components/system/system-provider"
 import { useWorkbenchModal } from "../../hooks/use-workbench-modal"
 import { type WorkbenchQuestion, useWorkbenchQuestion } from "../../hooks/use-workbench-question"
 import { Compact } from "../../layout/compact"
@@ -125,6 +126,7 @@ function QuestionDialog(props: { item: WorkbenchQuestion | null; onClose: () => 
 
 export function SessionsTab(props: { open: Record<string, boolean>; onToggle: (key: string) => void }) {
   const modal = useWorkbenchModal()
+  const sys = useSystem()
   const questions = useWorkbenchQuestion()
   const [session, setSession] = useState<SessionAction>(null)
   const [question, setQuestion] = useState<WorkbenchQuestion | null>(null)
@@ -168,8 +170,13 @@ export function SessionsTab(props: { open: Record<string, boolean>; onToggle: (k
           <button
             type="button"
             className={css.headbtn}
+            disabled={sys.load || modal.creating}
             onClick={(event) => {
               event.stopPropagation()
+              if (sys.cfg.workbench.intake) {
+                modal.quick()
+                return
+              }
               modal.openModal()
             }}
             aria-label="新建会话"

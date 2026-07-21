@@ -18,6 +18,12 @@ type Prompt struct {
 	Model         Model            `json:"model"`
 	Variant       string           `json:"variant,omitempty"`
 	Parts         []map[string]any `json:"parts"`
+	Intake        *Intake          `json:"intake,omitempty"`
+}
+
+type Intake struct {
+	ID   string `json:"id"`
+	Text string `json:"text,omitempty"`
 }
 
 type event struct {

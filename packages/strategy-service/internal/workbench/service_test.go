@@ -833,6 +833,55 @@ func TestSaveRequirementsReplacesCurrentSession(t *testing.T) {
 	}
 }
 
+func TestAppendRequirementIsScopedAndIdempotent(t *testing.T) {
+	ctx := context.Background()
+	doc, err := db.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := t.TempDir()
+	id := fmt.Sprintf("ses_requirement_append_%d", time.Now().UnixNano())
+	now := time.Now().UnixMilli()
+	_, err = doc.ExecContext(ctx, `insert into sessions(id, workspace_path, title, body, analysis, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?)`, id, path, "requirements", "{}", "", now, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = doc.ExecContext(context.Background(), "delete from workspace_requirement_receipts where session_id = ?", id)
+		_, _ = doc.ExecContext(context.Background(), "delete from workspace_requirements where session_id = ?", id)
+		_, _ = doc.ExecContext(context.Background(), "delete from sessions where id = ?", id)
+	})
+	svc := NewService(nil, nil, nil, "")
+	first, err := svc.AppendRequirement(ctx, RequirementAppend{WorkspacePath: path, SessionID: id, RequestID: "req-1", Text: " first "})
+	if err != nil {
+		t.Fatal(err)
+	}
+	retry, err := svc.AppendRequirement(ctx, RequirementAppend{WorkspacePath: path, SessionID: id, RequestID: "req-1", Text: "first"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := svc.AppendRequirement(ctx, RequirementAppend{WorkspacePath: path, SessionID: id, RequestID: "req-2", Text: "first"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(first.Requirements, []string{"first"}) || !slices.Equal(retry.Requirements, first.Requirements) {
+		t.Fatalf("idempotent requirements = %#v / %#v", first.Requirements, retry.Requirements)
+	}
+	if !slices.Equal(second.Requirements, []string{"first", "first"}) {
+		t.Fatalf("repeated user requirements = %#v", second.Requirements)
+	}
+	invalid := []RequirementAppend{
+		{WorkspacePath: path, SessionID: id, RequestID: "", Text: "missing request"},
+		{WorkspacePath: path, SessionID: id, RequestID: "req-3", Text: " "},
+		{WorkspacePath: path + "-other", SessionID: id, RequestID: "req-4", Text: "wrong workspace"},
+	}
+	for _, req := range invalid {
+		if _, err := svc.AppendRequirement(ctx, req); err == nil {
+			t.Fatalf("AppendRequirement(%#v) succeeded", req)
+		}
+	}
+}
+
 func countProgress(events []ProgressEvent, kind string) int {
 	count := 0
 	for _, event := range events {
