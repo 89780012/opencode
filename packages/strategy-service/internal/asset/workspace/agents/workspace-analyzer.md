@@ -14,7 +14,8 @@ permission:
   webfetch: deny
   websearch: deny
   external_directory: {
-      "~/.xtp-smart/plugins/**": "allow"
+      "~/.xtp-smart/plugins/**": "allow",
+      "~/.config/opencode/**": "allow"
   }
 ---
 

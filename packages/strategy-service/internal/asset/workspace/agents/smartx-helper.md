@@ -19,7 +19,8 @@ permission:
   smartx_python: allow
   webfetch: allow
   external_directory: {
-      "~/.xtp-smart/plugins/**": "allow"
+      "~/.xtp-smart/plugins/**": "allow",
+      "~/.config/opencode/**": "allow"
   }
 ---
 
