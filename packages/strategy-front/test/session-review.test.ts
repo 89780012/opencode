@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { review, task } from "../src/lib/session-review"
+import { hidden, scope, task } from "../src/lib/session-review"
 
 describe("session review display", () => {
   test("hides the internal reviewer id and structured prompt", () => {
@@ -9,17 +9,25 @@ describe("session review display", () => {
     })
   })
 
-  test("replaces reviewer output with a Chinese workflow status", () => {
-    const status = review(
-      [{ agent: "strategy-reviewer", time: { completed: 1 } }],
-      [{ type: "subtask", agent: "strategy-reviewer" }],
-    )
-    expect(status).toEqual({
-      done: true,
-      title: "已调用 task",
-      meta: "策略审查",
-      detail: "审查结果正在保存，主智能体将按审查意见修复代码。",
-    })
-    expect(JSON.stringify(status)).not.toContain("strategy-reviewer")
+  test("reads the stable workflow identity from synthetic message metadata", () => {
+    expect(
+      scope([
+        {
+          type: "text",
+          metadata: { smartxWorkflowId: "workflow-1", smartxWorkflowAction: "review" },
+        },
+      ]),
+    ).toBe("workflow-1")
+    expect(scope([{ type: "text", metadata: { smartxWorkflowId: "" } }])).toBeUndefined()
+  })
+
+  test("hides only the synthetic workflow prompt", () => {
+    expect(
+      hidden([
+        { type: "text", synthetic: true, metadata: { smartxWorkflowId: "workflow-1" } },
+        { type: "subtask", agent: "strategy-reviewer" },
+      ]),
+    ).toBe(true)
+    expect(hidden([{ type: "text" }, { type: "tool", agent: "strategy-reviewer" }])).toBe(false)
   })
 })

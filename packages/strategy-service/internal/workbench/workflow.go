@@ -80,6 +80,38 @@ func (s *Service) GetWorkflow(ctx context.Context, req WorkflowGet) (WorkflowRow
 	return row, err
 }
 
+// CancelWorkflow 按当前持久化阶段原子取消最新流程，避免客户端读写之间的阶段竞态。
+func (s *Service) CancelWorkflow(ctx context.Context, req WorkflowGet) (WorkflowRow, error) {
+	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
+	req.SessionID = strings.TrimSpace(req.SessionID)
+	if req.WorkspacePath == "" || req.SessionID == "" {
+		return WorkflowRow{}, fmt.Errorf("%w: workflow scope is required", ErrInput)
+	}
+	doc, err := db.Open()
+	if err != nil {
+		return WorkflowRow{}, err
+	}
+	row, err := scanWorkflow(doc.QueryRowContext(ctx, `update workflow_runs
+set state = 'cancelled', error = ?, revision = revision + 1, updated_at = ?
+where id = (
+	select id from workflow_runs
+	where workspace_path = ? and session_id = ?
+	order by updated_at desc, created_at desc
+	limit 1
+)
+and stage <> 'done'
+and state not in ('failed', 'review_exhausted', 'cancelled')
+returning `+fields, "用户已停止自动工作流。", time.Now().UnixMilli(), req.WorkspacePath, req.SessionID))
+	if err == sql.ErrNoRows {
+		return s.GetWorkflow(ctx, req)
+	}
+	if err != nil {
+		return WorkflowRow{}, err
+	}
+	s.emitWorkflow(ctx, row)
+	return row, nil
+}
+
 func (s *Service) UpdateWorkflow(ctx context.Context, req WorkflowUpdate) (WorkflowRow, error) {
 	req.ID = strings.TrimSpace(req.ID)
 	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
@@ -163,7 +195,6 @@ func (s *Service) UpdateWorkflowBacktest(ctx context.Context, workspace string, 
 	}
 	if state == "failed" {
 		next = "failed"
-		stage = "done"
 	}
 	failure := ""
 	if state == "failed" {
@@ -191,7 +222,8 @@ func (s *Service) emitWorkflow(ctx context.Context, row WorkflowRow) {
 	}
 }
 
-const workflowSelect = `select id, workspace_path, session_id, code_revision, stage, state, review_round, debug_id, debug_cursor, debug_request_key, backtest_id, review_enabled, debug_enabled, backtest_enabled, summary, error, revision, created_at, updated_at from workflow_runs`
+const fields = `id, workspace_path, session_id, code_revision, stage, state, review_round, debug_id, debug_cursor, debug_request_key, backtest_id, review_enabled, debug_enabled, backtest_enabled, summary, error, revision, created_at, updated_at`
+const workflowSelect = `select ` + fields + ` from workflow_runs`
 
 func scanWorkflow(row scanner) (WorkflowRow, error) {
 	out := WorkflowRow{}

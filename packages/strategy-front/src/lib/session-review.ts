@@ -1,11 +1,8 @@
-type Info = {
-  agent: string
-  time: { completed?: number }
-}
-
 type Part = {
   type: string
   agent?: string
+  synthetic?: boolean
+  metadata?: Record<string, unknown>
 }
 
 export function task(agent: string, description: string) {
@@ -13,18 +10,15 @@ export function task(agent: string, description: string) {
   return { title: description, meta: agent, review: false }
 }
 
-export function review(infos: Info[], parts: Part[]) {
-  const active =
-    infos.some((item) => item.agent === "strategy-reviewer") ||
-    parts.some((item) => item.type === "subtask" && item.agent === "strategy-reviewer")
-  if (!active) return
-  const done = infos.length > 0 && infos.every((item) => !!item.time.completed)
-  return done
-    ? {
-        done,
-        title: "已调用 task",
-        meta: "策略审查",
-        detail: "审查结果正在保存，主智能体将按审查意见修复代码。",
-      }
-    : { done, title: "正在调用 task", meta: "策略审查", detail: "正在逐项核对需求与策略实现。" }
+/** 读取 smartx-workflow 写入消息部件的稳定流水线标识。 */
+export function scope(parts: Part[]) {
+  return parts
+    .map((part) => part.metadata?.smartxWorkflowId)
+    .find((value): value is string => typeof value === "string" && !!value.trim())
+}
+
+/** 只隐藏自动流程写入的用户侧控制消息，不隐藏后续 assistant 输出。 */
+export function hidden(parts: Part[]) {
+  if (!parts.length) return false
+  return parts.every((part) => part.type === "text" && part.synthetic) || !!scope(parts)
 }

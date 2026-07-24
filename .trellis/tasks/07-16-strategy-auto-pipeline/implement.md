@@ -81,12 +81,37 @@
 ## 9. 宿主外零侵入续跑返工
 
 - [x] smartx-workflow 监听主会话 idle，并以 single-flight + run revision 恢复非终态流水线；idle 时尚无 run 也会从当前 session 的 dirty revision 幂等创建。
-- [x] 自动 reviewer 改用 `promptAsync + SubtaskPart` 确定启动，结构化中文结果由 workflow 校验并直接保存。
+- [x] 自动 reviewer 使用 `promptAsync + SubtaskPart` 确定启动；普通中文报告返回主 agent，由主 agent 调用 `smartx_save_review`，workflow 只管理 pending、可信身份和保存后状态推进。
 - [x] 自动 debug/backtest 改为 workflow 直接调用 strategy-service `/mcp`，保持稳定 requestKey 和手工入口兼容。
 - [x] strategy-service 补齐直接 MCP logs 的 workflow 状态推进和重复调用幂等。
 - [x] 自动修复增加无进展续跑上限，避免静默退出和无限循环。
-- [x] strategy-front 增加“不展示原始 JSON”的回归断言，只消费 summary/items/suggestions。
-- [x] 覆盖 stop 后续跑、重复 idle、防重复 reviewer、JSON 失败关闭、保存失败脱敏、start/logs/backtest 顺序和恢复测试。
+- [x] strategy-front 只消费 MCP 持久化后的 summary/items/suggestions，不依赖 reviewer 内部输出格式。
+- [x] 覆盖 stop 后续跑、重复 idle、防重复 reviewer、普通中文报告 pending、主 agent MCP 保存、start/logs/backtest 顺序和恢复测试。
+
+## 11. Reviewer 输出职责返工
+
+- [x] 移除 reviewer JSON 输出要求、`reviewResult` 严格解析和 workflow 文本状态推断。
+- [x] reviewer 返回普通中文报告后只创建 session 级 review pending，不直接保存 terminal 或推进 run。
+- [x] 主 agent 通过 system pending 提示整理报告并调用 `smartx_save_review`；MCP 成功后才进入 fixing/debug/backtest。
+- [x] 保留 MCP/strategy-service 对最终 `summary/items/state` 的结构与聚合校验。
+
+## 12. 自动流程消息与代码 revision 清理
+
+- [x] 自动 reviewer/fix 续跑消息附加稳定 workflowId/action 元数据。
+- [x] strategy-front 隐藏 synthetic 用户提示但保留 assistant、工具和 reviewer 输出；workflow 状态迁移到右侧可展开收起的悬浮面板，调试/回测结果补充到主会话。
+- [x] workspace dirty 拆分活动时间与源码 revision；Python/Bash 运行不再单独触发审查。
+- [x] code revision 单独绑定 owner session，其他会话的运行活动不得接管。
+- [x] 增加运行后不重审、真实写入仍重审、消息元数据和中文展示回归测试。
+
+## 13. 审查意见修复
+
+- [x] review/running pending 丢失时，从同 workflowId 的最新已完成 reviewer tool part 恢复 reviewId 与普通文本报告。
+- [x] Redux 按 workflow ID 保留当前 scope 历史快照；未知旧 ID 使用中性历史卡，不再显示“状态同步中”。
+- [x] 无 workflow metadata 的手工 reviewer 恢复“策略审查”文案。
+- [x] 增加插件重启恢复、历史 workflow 终态和手工审查回归测试。
+- [x] 停止操作改用 strategy-service 原子取消接口，移除前端 GET/PUT 阶段竞态并保留服务端真实阶段。
+- [x] 终态 workflow 后的新手工复审链按 1、2、3 递增，第三轮失败后停止，不继承旧 run 轮次。
+- [x] 消息 metadata 命中未知历史 workflow ID 时渲染中性历史卡，不再直接隐藏。
 
 ## 10. 第二轮审查返工
 

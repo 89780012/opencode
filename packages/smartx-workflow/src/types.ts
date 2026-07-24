@@ -26,6 +26,10 @@ export type Project = {
 export type Dirt = {
   state: "clean" | "dirty"
   updated: number
+  /** 最近一次明确源码写入版本；普通运行活动不得推进它。 */
+  revision?: number
+  /** 产生源码版本的主会话；普通运行活动不得接管它。 */
+  owner?: string
   reason: string
   session?: string
 }
@@ -65,13 +69,6 @@ export type ReviewItem = {
   suggestion: string
 }
 
-export type ReviewResult = {
-  state: "passed" | "failed" | "error"
-  summary: string
-  items: ReviewItem[]
-  suggestions: string[]
-}
-
 export type SaveReview = {
   reviewId: string
   sessionId: string
@@ -105,7 +102,6 @@ export type Pending =
       sessionId: string
       workspacePath: string
       worktreePath: string
-      state: "passed" | "failed" | "error"
       reviewText: string
     }
 

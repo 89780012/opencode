@@ -173,6 +173,7 @@ func (a *API) Register(r *gin.Engine) {
 	bench.GET("/workflow", a.workbenchWorkflowGet)
 	bench.POST("/workflow", a.workbenchWorkflowPost)
 	bench.PUT("/workflow", a.workbenchWorkflowPut)
+	bench.PUT("/workflow/cancel", a.workbenchWorkflowCancel)
 	bench.GET("/project-state", a.workbenchProjectStateGet)
 	bench.POST("/project-state/init", a.workbenchProjectStateInit)
 	bench.POST("/project-state/resume", a.workbenchProjectStateResume)

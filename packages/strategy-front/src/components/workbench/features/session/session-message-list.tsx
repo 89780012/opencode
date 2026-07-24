@@ -7,14 +7,17 @@ import {
   Copy,
   Download,
   FileCode2,
+  History,
   LoaderCircle,
 } from "lucide-react"
 import { memo, useEffect, useMemo, useState, type ReactNode } from "react"
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation"
 import { Response } from "@/components/ai-elements/response"
 import { backtestTool, partition } from "@/lib/backtest-tool"
-import { review, task } from "@/lib/session-review"
+import { hidden, task } from "@/lib/session-review"
+import { bind } from "@/lib/session-workflow"
 import { ext, output, payload } from "@/lib/session-tool"
+import { fallback, terminal, view } from "@/lib/workflow-view"
 import { selectSessionParts, useAppSelector } from "@/store"
 import type { ChatAssistantMessage, ChatMessageInfo, ChatPart, ChatStatus, ChatToolPart } from "@/types/chat"
 import common from "../../styles/session/session-common.module.css"
@@ -34,6 +37,11 @@ type Entry =
       type: "group"
       parent: string
       infos: ChatAssistantMessage[]
+    }
+  | {
+      type: "workflow"
+      id: string
+      reviewId: string
     }
 type Block =
   | {
@@ -85,11 +93,13 @@ function internal(part: ChatPart) {
 }
 
 function shown(part: ChatPart) {
-  return part.type !== "step-start" && part.type !== "step-finish"
+  return part.type !== "step-start" && part.type !== "step-finish" && !(part.type === "text" && part.ignored)
 }
 
-function entries(messages: ChatMessageInfo[]) {
-  return messages.reduce<Entry[]>((list, info) => {
+export function entries(messages: ChatMessageInfo[], parts: Record<string, ChatPart[]>, ids: string[]) {
+  const rows = bind(messages, parts, ids)
+  const flows = Object.keys(rows)
+  const list = messages.reduce<Entry[]>((list, info) => {
     if (info.role !== "assistant") return list.concat({ type: "item", info })
     const last = list.at(-1)
     if (last?.type === "group" && last.parent === info.parentID) {
@@ -98,6 +108,19 @@ function entries(messages: ChatMessageInfo[]) {
     }
     return list.concat({ type: "group", parent: info.parentID, infos: [info] })
   }, [])
+  const pending = new Set(flows)
+  const linked = list.flatMap((item) => {
+    if (item.type === "workflow") return [item]
+    const key = item.type === "group" ? `group:${item.parent}` : `item:${item.info.id}`
+    const found = flows.filter((id) => rows[id]?.after === key)
+    found.forEach((id) => pending.delete(id))
+    return [item, ...found.map((id): Entry => ({ type: "workflow", id, reviewId: rows[id]?.reviewId ?? "" }))]
+  })
+  return linked.concat(
+    flows
+      .filter((id) => pending.has(id))
+      .map((id): Entry => ({ type: "workflow", id, reviewId: rows[id]?.reviewId ?? "" })),
+  )
 }
 
 function blocks(parts: ChatPart[], role: ChatMessageInfo["role"]) {
@@ -146,8 +169,9 @@ function Fold(props: {
   line?: boolean
   meta?: string
   state?: "running" | "done" | "warn" | "error"
+  initial?: boolean
 }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(props.initial ?? false)
   const state = props.state ?? "done"
 
   return (
@@ -469,12 +493,12 @@ const Item = memo(function Item(props: { info: ChatMessageInfo; onOpenDiff?: (fi
   const body = parts.length > 0 ? parts : empty
   const msg = err(props.info)
   const user = props.info.role === "user"
-  const synthetic = body.length > 0 && body.every((part: ChatPart) => part.type === "text" && part.synthetic)
+  const synthetic = user && hidden(body)
   const fromUser = user && !synthetic
   const list = useMemo(() => blocks(body, props.info.role), [body, props.info.role])
   const trace = !user && list.length === 1 && list[0]?.type === "proc"
 
-  if (list.length === 0 && !msg) return null
+  if ((user && synthetic) || (list.length === 0 && !msg)) return null
 
   if (body.length === 1 && body[0]?.type === "compaction") {
     const part = body[0]
@@ -506,12 +530,7 @@ const Item = memo(function Item(props: { info: ChatMessageInfo; onOpenDiff?: (fi
   )
 })
 
-const Group = memo(function Group(props: {
-  parent: string
-  infos: ChatAssistantMessage[]
-  onOpenDiff?: (file: string) => void
-}) {
-  const parent = useAppSelector((state) => selectSessionParts(state, props.parent))
+const Group = memo(function Group(props: { infos: ChatAssistantMessage[]; onOpenDiff?: (file: string) => void }) {
   const data = useAppSelector(
     (state) =>
       props.infos.map((info) => ({
@@ -522,7 +541,6 @@ const Group = memo(function Group(props: {
   )
   const body = useMemo(() => data.flatMap((item) => item.parts), [data])
   const list = useMemo(() => blocks(body, "assistant"), [body])
-  const status = review(props.infos, parent)
   const msg = useMemo(
     () =>
       data
@@ -531,32 +549,6 @@ const Group = memo(function Group(props: {
         .at(-1),
     [data],
   )
-
-  if (status) {
-    return (
-      <article className={`${css.msg} ${css.ai} ${css.group}`}>
-        <div className={css.avatar}>
-          <Bot size={14} />
-        </div>
-        <div className={css.card}>
-          <div className={css.process}>
-            <Fold title="执行过程" meta="1 步 · 1 个工具" state={status.done ? "done" : "running"}>
-              <div className={css.processBody}>
-                <Fold
-                  title={status.title}
-                  meta={status.meta}
-                  line={false}
-                  state={status.done ? "done" : "running"}
-                >
-                  <div className={css.reviewnote}>{status.detail}</div>
-                </Fold>
-              </div>
-            </Fold>
-          </div>
-        </div>
-      </article>
-    )
-  }
 
   if (list.length === 0 && !msg) return null
 
@@ -583,6 +575,109 @@ const Group = memo(function Group(props: {
   )
 })
 
+type ResultState = "done" | "error" | "neutral"
+
+function Result(props: { title: string; detail: string; state: ResultState; meta?: string; children?: ReactNode }) {
+  return (
+    <article className={`${css.msg} ${css.ai} ${css.group} ${css.phaseOutput}`} aria-live="polite">
+      <div className={css.avatar}>
+        <Bot size={14} />
+      </div>
+      <div className={css.card}>
+        <section className={css.output} data-state={props.state}>
+          <div className={css.outputHead}>
+            <span className={css.outputIcon}>
+              {props.state === "error" ? (
+                <CircleAlert size={15} />
+              ) : props.state === "neutral" ? (
+                <History size={15} />
+              ) : (
+                <CheckCircle2 size={15} />
+              )}
+            </span>
+            <span className={css.outputCopy}>
+              <strong>{props.title}</strong>
+              <span>{props.detail}</span>
+            </span>
+            {props.meta ? <code className={css.outputMeta}>{props.meta}</code> : null}
+          </div>
+          {props.children ? <div className={css.outputBody}>{props.children}</div> : null}
+        </section>
+      </div>
+    </article>
+  )
+}
+
+function value(data: Record<string, unknown>, key: string) {
+  const item = data[key]
+  if (typeof item === "number" || typeof item === "string") return String(item)
+  return "--"
+}
+
+function WorkflowResults(props: { id: string; reviewId: string }) {
+  const row = useAppSelector((state) => state.workbench.workflows[props.id] ?? null)
+  const reviews = useAppSelector((state) => state.workbench.reviews)
+  const backtests = useAppSelector((state) => state.workbench.backtests)
+  const review = useMemo(() => reviews.find((item) => item.reviewId === props.reviewId), [props.reviewId, reviews])
+  const backtest = useMemo(() => backtests.find((item) => item.id === row?.backtestId), [backtests, row?.backtestId])
+  const history = fallback(row)
+  if (history) return <Result {...history} />
+
+  const flow = view(row, review, backtest)
+  const debug = row.debugEnabled ? terminal(flow.debug) : undefined
+  const testing = row.backtestEnabled ? terminal(flow.backtest) : undefined
+
+  return (
+    <>
+      {debug ? (
+        <Result
+          title="自动调试输出"
+          detail={
+            debug === "error"
+              ? row.error || "策略启动或增量日志检查未通过。"
+              : "策略启动成功，存活状态和新增运行日志检查已通过。"
+          }
+          state={debug}
+          meta={row.debugId || undefined}
+        />
+      ) : null}
+      {testing ? (
+        <Result
+          title="自动回测输出"
+          detail={
+            testing === "error"
+              ? backtest?.error || row.error || "回测任务执行失败。"
+              : "回测已完成，结果已写入当前会话。"
+          }
+          state={testing}
+          meta={backtest?.btId || row.backtestId || undefined}
+        >
+          {backtest?.status === "done" ? (
+            <div className={css.outputMetrics}>
+              <span>
+                <b>累计收益</b>
+                {value(backtest.summary, "total_return")}
+              </span>
+              <span>
+                <b>夏普</b>
+                {value(backtest.summary, "sharpe_ratio")}
+              </span>
+              <span>
+                <b>最大回撤</b>
+                {value(backtest.summary, "max_falldown")}
+              </span>
+              <span>
+                <b>胜率</b>
+                {value(backtest.summary, "win_rate")}
+              </span>
+            </div>
+          ) : null}
+        </Result>
+      ) : null}
+    </>
+  )
+}
+
 export function SessionMessageList(props: {
   loading?: boolean
   messages: ChatMessageInfo[]
@@ -591,6 +686,8 @@ export function SessionMessageList(props: {
   onOpenDiff?: (file: string) => void
 }) {
   const [retry, setRetry] = useState<Retry | null>(null)
+  const parts = useAppSelector((state) => state.chatSession.parts)
+  const workflows = useAppSelector((state) => state.workbench.workflows)
 
   useEffect(() => {
     setRetry(null)
@@ -607,7 +704,14 @@ export function SessionMessageList(props: {
   }, [props.status])
 
   const note = props.status.type === "retry" ? props.status : retry
-  const list = useMemo(() => entries(props.messages), [props.messages])
+  const ids = useMemo(
+    () =>
+      Object.values(workflows)
+        .sort((a, b) => a.createdAt - b.createdAt)
+        .map((item) => item.id),
+    [workflows],
+  )
+  const list = useMemo(() => entries(props.messages, parts, ids), [ids, parts, props.messages])
 
   return (
     <Conversation className={css.body} autoScroll={false}>
@@ -618,13 +722,10 @@ export function SessionMessageList(props: {
           </div>
         ) : null}
         {list.map((item) =>
-          item.type === "group" ? (
-            <Group
-              key={`${item.parent}:${item.infos[0]?.id ?? ""}`}
-              parent={item.parent}
-              infos={item.infos}
-              onOpenDiff={props.onOpenDiff}
-            />
+          item.type === "workflow" ? (
+            <WorkflowResults key={item.id} id={item.id} reviewId={item.reviewId} />
+          ) : item.type === "group" ? (
+            <Group key={`${item.parent}:${item.infos[0]?.id ?? ""}`} infos={item.infos} onOpenDiff={props.onOpenDiff} />
           ) : (
             <Item key={item.info.id} info={item.info} onOpenDiff={props.onOpenDiff} />
           ),

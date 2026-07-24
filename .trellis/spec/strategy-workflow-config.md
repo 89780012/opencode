@@ -42,7 +42,7 @@
 | `dirtyState`、`projectMemory.needsSave` | 通用工作流 | 继续记录并驱动 `save_project_state`，不得伪装成 clean/ready |
 | analysis/flowchart pending | baseline | 无新写入时保留；关闭期间一旦写入，立即作废并重置到 refresh 起点 |
 | refresh/final/close baseline 提示 | baseline | 必须以本轮 `enabled` 显式旁路，不能只依赖 `life` 的间接状态 |
-| 普通写入与 Python taint | 通用工作流入口 | 必须携带同一轮配置快照，确保 pending 失效判断与 before/after 一致 |
+| 普通写入与 Python taint | 通用工作流入口 | 都可更新 workspace 活动和 project memory；只有明确源码写入推进 code revision，Python/Bash 运行不得单独触发审查 |
 
 #### 蓝图文案契约
 
@@ -98,7 +98,7 @@ const state = view({ ...input, baseline: cfg.workflow.baseline })
 ### 1. 范围与触发条件
 
 - 修改系统自动化开关、`workflow_runs`、review 自动触发、MCP `start/logs/run_backtest` 串联或工作台流水线同步时，必须遵守本契约。
-- 自动流程只由主会话成功的代码写入或执行触发；纯问答、只读探索、子会话和没有 dirty revision 的会话不得启动真实策略或回测。
+- 自动流程只由主会话成功的明确源码写入触发；Python/Bash 调试执行可标记 workspace 活动，但不得单独生成 code revision。纯问答、只读探索、子会话和没有代码 revision 的会话不得启动真实策略或回测。
 
 ### 2. 签名
 
@@ -134,24 +134,34 @@ const state = view({ ...input, baseline: cfg.workflow.baseline })
 - review 最多三轮，任意一轮全部 item 为 passed 后立即继续；第三轮失败必须保存并转 `review_exhausted`，不得执行未复审的最后修复或进入调试。
 - baseline 关闭时，system save 分支只能跳过 analysis/flowchart pending；review pending 必须继续注入 `save_review`。开启 baseline 且 review 通过时，先完成 final snapshot 再调试。
 - workflow 在每次 system transform 读取服务端配置和活动 run；before/after 复用同轮配置。内存 Map 只做当前工具链缓存，SQLite/HTTP 是恢复事实来源。
+- 成功收口使用 `done/passed`；失败必须使用实际阶段加 `failed`（例如 `review/failed`、`debug/failed`、`backtest/failed`），不得统一折叠为 `done/failed`。前端对旧 `done/failed` 数据只能根据精确 reviewId、debugId、backtestId 和对应持久化结果回退判断，不得把全部启用阶段视为已执行。
 - 主会话进入 `session.status=idle` 时，idle 驱动必须重新读取配置和服务端 run。若尚无 run，但当前会话刚产生了新的 dirty revision，则由 idle 驱动先创建 run，再按持久化阶段续跑；不得假设代码写入后一定还会发生下一次 system transform。
-- dirty revision 必须记录产生变更的 session；另一个主会话的 idle 事件不得接管该 revision。三个自动开关全关时，idle 驱动不得创建 run 或调用 reviewer/debug/backtest。
+- dirty 状态必须分别记录最近活动时间和源码 revision；revision 必须绑定产生写入的 owner session，另一个主会话的运行活动和 idle 事件不得接管。创建 run 以 codeRevision 是否变化判断，不得用 run.updatedAt 与本地活动时间比较。review/fixing 中的源码写入只设置当前修复上下文的 `changed=true`，必须保留当前触发 revision；只有终态后的新源码写入才能生成下一条 revision 和 workflow。三个自动开关全关时，idle 驱动不得创建 run 或调用 reviewer/debug/backtest。
 - system transform 创建或恢复自动 run 前必须查询 session parent；`session.created` 内存集合只做快速缓存，OpenCode/plugin 重启后的子会话仍不得触发流水线。
 - review 调度使用 `requested -> dispatching -> running`。`dispatching` 与进程内 single-flight 共同阻止重复 idle 启动多个 reviewer；超时的 `dispatching` 可恢复为 `requested` 后重试。
+- review 轮次以服务端同 workflow ID 的 `reviewRound` 为事实来源；保存结果时必须使用远端轮次与本地 fixing 缓存轮次的较大值并限制到 3。本地缓存落后不得把第 3 轮降回第 1/2 轮；同一非终态 run 的 `reviewRound >= 3` 时必须在执行前拒绝再次启动 reviewer。终态后的新手工审查链不受旧 run 限制，首次从第 1 轮开始，后续失败复审按本地 fixing 轮次递增到 2、3，第三轮失败后停止；终态后产生新源码 revision 时创建新 workflow，并从第 1 轮重新计数。
 - review 进入 `fixing` 后若插件重启，idle 驱动必须用 workspace/session 查询最近一次 `failed` 审查，重建中文修复上下文；不得因为进程内 `reviewFixes` 为空而终止仍可恢复的 run。
+- review 为 `running` 且 pending 丢失时，idle 驱动必须从 OpenCode 持久化会话消息恢复：父 synthetic metadata 必须命中当前 workflowId，选择时间最新的 `strategy-reviewer` task，且只有 completed output 才能用 tool part ID 和普通文本报告重建 pending。不得误用上一轮或其他 workflow 报告。
+- fixing 阶段只有明确源码写入才能设置 `changed` 并触发复审；运行测试、Python 调试或 Bash 执行不得伪装成代码修复，无源码进展时继续受有界恢复次数约束。
 - 自动 `start/logs` 的 workspace/session/workflowId/requestKey/debugId 由 workflow 注入；服务端校验 session 归属并从 workspace 推导扩展名。start 必须在启动后复查 live；logs 只读取启动游标后的日志，再次复查 live，并返回脱敏、有限的日志行。
 - 只有精确的 `smartx_start`、`smartx_logs` 且当前 session 存在活动 debug-stage run 时，workflow 才覆盖可信参数；没有自动 run 的手工启动和日志调用必须原样透传，其他 MCP server 的 `*_start`、`*_logs` 不得误匹配。
 - 自动 start 调用 SmartX 前必须先将稳定 `debug_request_key`、确定性 debug ID 和启动前 `debug_cursor` 写入 `workflow_runs`；三个内部字段都不得进入 HTTP/WebSocket JSON。若进程或响应在外部启动后中断，重试先用持久化 claim 检查同名扩展：已存活则补齐 `debug/running`，未存活才使用同一 debug ID/cursor 启动。首次新 claim 不得误复用此前手工启动的同名实例。
 - logs 至少分类 SyntaxError、Traceback、ImportError、ModuleNotFoundError、启动失败和异常退出。通过条件是 start 成功、live=true 且新增日志无 fatal issue。
 - 回测继续使用现有 backtest worker。workflowId 绑定后立刻对账一次终态，后续由 `backtest.updated` 推进，不能用浏览器或模型轮询维持生命周期。同一 workflow 在 `backtest/running` 且 backtest ID 相同时，重复绑定必须返回幂等成功。
 - 前端同 workflow ID 按 revision 单调合并；同 workspace/session 的不同 workflow ID 按 `updatedAt` 判断新旧，迟到 HTTP、空快照和其他 scope 事件不得覆盖较新的 Socket run。`done` 使用中性“流程”时间线类别，不得默认标成回测。
-- reviewer 原始 JSON 必须在任何可能失败的远程保存之前替换为中文摘要。保存失败可以让流水线失败，但不得把内部 JSON 留在父会话工具输出或前端视图中。
+- 自动 reviewer、结果保存和修复恢复产生的 synthetic 消息必须携带 `smartxWorkflowId` 与 action metadata。前端只隐藏 synthetic 用户消息，保留 assistant、工具和 reviewer 报告；当前 scope 已接收的 workflow 按 ID 保留快照，未知旧 ID 必须在绑定消息后显示中性历史卡，明确快照未加载且结果未知，不得隐藏或标成运行、成功、失败。阶段和终态来自持久化 `workflow.updated`，不得从聊天文本猜测；无 metadata 的手工 reviewer 保持手工审查文案。
+- workflow 状态和运行中进度必须只在右侧独立的可展开/收起悬浮面板展示：审查显示轮次和已保存结论，调试显示启动/日志检查状态与 debug ID，回测显示任务 ID 与实时进度；不暴露 prompt、MCP 参数或内部工具调用。主会话不渲染 requested/running 进度卡；直接 MCP 调试/回测没有模型消息时，只根据持久化状态补充 done/error 终态结果。
+- EventSource 初次连接和每次重连后必须重新读取 `/session/status`，避免漏掉 idle 事件后界面永久显示“正在回复”。会话打断必须立即发起 OpenCode abort，并独立调用 strategy-service 的原子取消接口；取消接口按 workspace/session 在单条持久化更新中保留执行时的真实阶段并写入 `cancelled`，前端不得先 GET 再携带可能过期的 stage PUT。strategy-service 缓慢或不可用不得延迟 abort，idle 驱动读取到 cancelled 后直接返回，不得重新调度 reviewer、调试或回测。
+- reviewer 只返回普通中文审查报告，不要求 JSON，也不由 workflow 解析 schema 或用字符串推断最终状态。workflow 把报告与可信 reviewId/session/workspace 上下文交给主 agent；主 agent 调用 `smartx_save_review` 后，workflow 只根据成功 MCP 参数和服务端结果推进状态。
+- `smartx_save_review` 成功后的 after hook 必须先按 workspace/session 重新读取同一 workflow ID 的服务端快照，再计算 reviewRound 和终态更新；进程内 Map 可能因上下文压缩、插件重启或重复 idle 落后。更新时不得降低远端 reviewRound；远端已是相同终态时按幂等成功处理，远端已被其他流程推进为不同终态时记录跳过原因，不得把已保存的审查结果改报为保存失败。
 
 ### 4. 校验与错误矩阵
 
 | 条件 | 结果 | 行为 |
 | --- | --- | --- |
 | 三个自动开关全关 | 不创建 run | 保持现有手工行为 |
+| 仅执行 Python/Bash 调试且源码未写入 | 不创建新 run | 只更新 workspace 活动/project memory，不再次审查 |
+| 终态 run 后明确源码写入 | 新 code revision | 创建新 run；其他会话运行不得接管 owner |
 | 代码写入后模型在下一次 transform 前直接 stop | idle 创建 run | 只为产生该 dirty revision 的主会话创建并继续审查 |
 | 其他主会话收到同 workspace idle | 跳过 | 不接管别的 session 产生的 dirty revision |
 | workspace/session/codeRevision 缺失或 session 错配 | `400/404` | 不创建 run，不泄露其他会话 |
@@ -160,14 +170,25 @@ const state = view({ ...input, baseline: cfg.workflow.baseline })
 | 恢复的 child session 执行 system transform | 跳过 | 不创建或推进自动 run |
 | 阶段倒退或 terminal 后继续推进 | 参数错误 | 保留原终态 |
 | 第三轮审查未通过 | `review_exhausted` | 停止，不调用 start/logs/backtest |
-| start 失败或启动后不存活 | `done/failed` | 保存脱敏原因，停止 |
+| 远端为第 3 轮、本地 fixing 缓存仍为第 1/2 轮 | `review_exhausted` | 以远端轮次聚合；不得继续 fixing 或启动第 4 轮 reviewer |
+| 旧 run 已通过、失败、耗尽或取消后再次手工审查 | 新的手工审查链 | 允许启动 reviewer；按 1、2、3 递增，第三轮失败后停止，不继承旧 run 的轮次 |
+| fixing 阶段源码写入 | 当前 run 已修复 | 设置 `changed=true` 并复审同一 workflow；不得生成新 code revision |
+| reviewer 返回普通中文或 Markdown 报告 | review pending | 不直接保存 terminal；交给主 agent 转换并调用 `smartx_save_review` |
+| reviewer 返回空报告 | review pending | 注入“未返回审查报告”，由主 agent 保存 error；不得伪造 passed |
+| reviewer 完成后插件在 MCP 保存前重启 | 恢复 review pending | 从同 workflowId 的最新 completed task 消息恢复，不把 run 直接标记失败 |
+| 上下文压缩后延迟保存第 3 轮 warning/failed 审查 | `review_exhausted` | after hook 以远端第 3 轮快照推进，不得用本地第 2 轮写回 fixing 或收到 `400` |
+| 仅启用自动调试或自动回测 | 右侧 workflow 面板 | 无 synthetic 消息时在悬浮面板渲染过程数据，主会话只在 done/error 后补终态结果 |
+| SSE 重连时服务端已 idle | 前端 idle | 重连后重新查询 session status，不保留旧 busy |
+| 用户打断活动自动流程且阶段同时推进 | abort 与原子 `cancelled` 并行 | abort 不等待 workflow HTTP；服务端保留取消时真实阶段，不因前端 stage 过期拒绝；已提交的远端回测仍按 worker 生命周期收敛 |
+| 主 agent 的 review 参数结构或 state/items 不一致 | MCP 参数错误 | pending 保留，不推进 fixing/debug/backtest |
+| start 失败或启动后不存活 | `debug/failed` | 保存脱敏原因，停止 |
 | start 已成功但响应/after hook 丢失 | `debug/running` | 服务端已绑定 debug ID；重试返回幂等结果，不重新启动 |
 | start claim 已落库但响应或进程中断 | 恢复 claim | requestKey 不同则拒绝；相同 key 先检查 live，再补绑定或启动 |
 | service 在 start 与 logs 之间重启 | 恢复 debug | 从 workflow cursor 重建，只读取启动后的增量日志 |
 | fixing 时插件重启 | 恢复审查 | 按 workspace/session 读取 failed review 并继续主 agent 修复 |
 | backtest 已 running 且 ID 相同 | 幂等成功 | 不重复更新 workflow，不把活动回测标记失败 |
 | 手工 start 缺少 name | schema/运行期错误 | 不调用 SmartX；自动 workflow 不依赖模型提供的 name |
-| logs 出现新增 fatal | `done/failed` | 保存分类和有限日志，停止 |
+| logs 出现新增 fatal | `debug/failed` | 保存分类和有限日志，停止 |
 | backtest done/failed 先于 workflow 绑定事件 | 绑定后主动对账 | 不丢最终状态 |
 | HTTP 快照晚于高 revision Socket | 忽略快照 | UI 不回退 |
 
@@ -181,9 +202,12 @@ const state = view({ ...input, baseline: cfg.workflow.baseline })
 
 - 配置/迁移：三个字段默认关闭、保存保留、旧 config 表幂等补列。
 - service：workflow 创建幂等、session 隔离、阶段单调、第三轮终态、快速 backtest 终态对账、running backtest 同 ID 重试、start 前 debug claim、requestKey/cursor 迁移与隐藏、日志游标和 fatal 分类。
-- workflow：dirty 才触发、事件已知和重启恢复的子会话都不触发、三个阶段顺序、审查后单 transform 续跑、关闭阶段跳过、baseline 关闭仍保存 review、第三轮停止、自动 MCP 参数覆盖和手工 start/logs 透传。
-- idle：无既有 run 的 dirty stop 能创建并只调度一个 reviewer；其他 session 和三个开关全关均不创建；保存 review 抛错后父会话输出仍为中文摘要且不含 `{`；fixing 重启从同 session 持久化审查恢复。
-- frontend：解析 fail-closed、scope 隔离、同 ID revision 单调、不同 ID updatedAt 单调、迟到 HTTP/空快照不覆盖 Socket、刷新恢复和 done 中性分类。
+- workflow：dirty 才触发、事件已知和重启恢复的子会话都不触发、三个阶段顺序、审查后单 transform 续跑、关闭阶段跳过、baseline 关闭仍保存 review、第三轮停止且第 4 轮 reviewer 在执行前被拒绝、fixing 写入保留当前 code revision、自动 MCP 参数覆盖和手工 start/logs 透传。
+- idle：无既有 run 的 dirty stop 能创建并只调度一个 reviewer；其他 session 和三个开关全关均不创建；reviewer 普通中文报告进入 pending，主 agent 保存成功前 run 保持 running；fixing 重启从同 session 持久化审查恢复。
+- review 恢复：本地缓存为第 2 轮、服务端为第 3 轮时保存 warning/failed，断言只发出 `review/review_exhausted/reviewRound=3` 更新且不返回 `400`。
+- frontend：解析 fail-closed、scope 隔离、同 ID revision 单调、不同 ID updatedAt 单调、迟到 HTTP/空快照不覆盖 Socket、刷新恢复、done 中性分类，以及同 workflowId 多轮消息聚合和 synthetic 提示隐藏。
+- frontend：无 synthetic 消息的 debug/backtest workflow 仍渲染右侧悬浮面板；面板展示审查轮次/摘要、debug ID、backtest ID/进度，主会话不显示 requested/running 卡且只补 done/error 终态结果；SSE 重连后重新读取 session status。
+- cancel：活动 workflow 更新为 cancelled 后发送 session idle，断言 idle 驱动不再 dispatch reviewer 或调用 MCP。
 - 从三个包目录运行 Go test/build/vet、Bun tests/typecheck/build 和触及文件 ESLint；仓库既有失败必须单独列出。
 
 ### 7. Wrong vs Correct
@@ -204,6 +228,10 @@ if (!cfg.workflow.baseline && pending.kind !== "review") return
 
 正确：`run_backtest` 只绑定持久化 run ID；strategy-service worker 先保存 backtest revision，再通过事件和终态对账推进 workflow。
 
+错误：要求 `strategy-reviewer` 严格输出 JSON，并由 workflow 解析失败后直接把流水线标记为 failed。
+
+正确：reviewer 返回普通中文报告；主 agent 理解报告并调用 `smartx_save_review`，MCP/strategy-service 只校验最终结构化参数，workflow 在保存成功后推进。
+
 错误：用 `tool.endsWith("_start")` 接管所有 MCP 启动工具，或在 SmartX start 成功响应后只靠客户端 after hook 保存 debug ID。
 
 正确：只在活动自动 run 中精确接管 `smartx_start/logs`；MCP handler 在成功响应前持久化 debug ID 和 cursor，客户端 hook 只负责继续编排。
@@ -211,6 +239,14 @@ if (!cfg.workflow.baseline && pending.kind !== "review") return
 错误：idle 只调用 `loadRun()`，查不到 run 就返回，假设代码写入后总会再执行一次 system transform。
 
 正确：idle 发现当前 session 拥有更新的 dirty revision 时先幂等创建 run，再从持久化阶段继续调度。
+
+错误：把每次成功 Bash/Python 调试都当成新代码版本，或把每次自动续跑渲染成一条新的 AI 回复。
+
+正确：运行活动与源码 revision 分离；内部续跑按 workflowId 关联到右侧由事实状态驱动的工作流面板，同时保留主会话的 assistant、工具和阶段结果输出。
+
+错误：保存审查结果时优先使用可能落后的 `fix.attempt`，或让 fixing 中的每次 `edit/write` 生成新 code revision。
+
+正确：审查轮次取 `Math.max(fix.attempt, run.reviewRound)` 后限制到 3；fixing 写入只标记 `changed` 并沿用当前 workflow revision，终态后的新写入才创建新 run。
 
 错误：先调用 SmartX start，再把随机 debug ID 写入 workflow；或把 `backtest/running` 的同 ID 重试当作非法状态。
 

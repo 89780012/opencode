@@ -26,6 +26,9 @@ describe("workbench workflow", () => {
     expect(parse(row({ state: "dispatching" }))?.state).toBe("dispatching")
     expect(parse({ ...row(), stage: "unknown" })).toBeNull()
     expect(parse({ ...row(), state: "unknown" })).toBeNull()
+    expect(
+      parse(row({ reviewEnabled: true, debugEnabled: true, backtestEnabled: false })),
+    ).toMatchObject({ reviewEnabled: true, debugEnabled: true, backtestEnabled: false })
   })
 
   test("merges revisions monotonically inside the active scope", () => {
@@ -76,6 +79,24 @@ describe("workbench workflow", () => {
       }),
     )
     expect(state.workflow).toMatchObject({ id: "workflow-b", codeRevision: "code-2", updatedAt: 20 })
+  })
+
+  test("keeps historical workflow rows for older automatic message cards", () => {
+    let state = workbenchReducer(
+      undefined,
+      setWorkflow({
+        workspacePath: "workspace-a",
+        sessionId: "session-a",
+        workflow: row({ id: "workflow-a", stage: "done", state: "passed", updatedAt: 10 }),
+      }),
+    )
+    state = workbenchReducer(
+      state,
+      upsertWorkflow(row({ id: "workflow-b", codeRevision: "code-2", revision: 1, updatedAt: 20 })),
+    )
+    expect(state.workflow).toMatchObject({ id: "workflow-b" })
+    expect(state.workflows["workflow-a"]).toMatchObject({ id: "workflow-a", state: "passed" })
+    expect(state.workflows["workflow-b"]).toMatchObject({ id: "workflow-b", state: "requested" })
   })
 
   test("labels completed pipelines as workflows instead of backtests", () => {

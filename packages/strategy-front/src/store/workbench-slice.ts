@@ -98,6 +98,7 @@ type State = {
   progressPath: string
   progressSession: string
   workflow: Workflow | null
+  workflows: Record<string, Workflow>
   workflowPath: string
   workflowSession: string
   backtests: BacktestRun[]
@@ -124,6 +125,7 @@ const initialState: State = {
   progressPath: "",
   progressSession: "",
   workflow: null,
+  workflows: {},
   workflowPath: "",
   workflowSession: "",
   backtests: [],
@@ -199,6 +201,11 @@ function merge(a: WorkbenchReview[], b: WorkbenchReview[]) {
   return Array.from(rows.values()).sort((a, b) => b.updatedAt - a.updatedAt || a.id.localeCompare(b.id))
 }
 
+function keep(state: State, row: Workflow) {
+  const old = state.workflows[row.id]
+  if (!old || old.revision <= row.revision) state.workflows[row.id] = row
+}
+
 const slice = createSlice({
   name: "workbench",
   initialState,
@@ -219,6 +226,15 @@ const slice = createSlice({
     ) {
       const same = state.workflowPath === action.payload.workspacePath && state.workflowSession === action.payload.sessionId
       if (same && state.workflow && !action.payload.workflow) return
+      if (!same) {
+        state.workflowPath = action.payload.workspacePath
+        state.workflowSession = action.payload.sessionId
+        state.workflows = {}
+        state.workflow = action.payload.workflow
+        if (action.payload.workflow) keep(state, action.payload.workflow)
+        return
+      }
+      if (action.payload.workflow) keep(state, action.payload.workflow)
       if (
         same &&
         state.workflow &&
@@ -233,13 +249,12 @@ const slice = createSlice({
         state.workflow.id !== action.payload.workflow.id &&
         state.workflow.updatedAt >= action.payload.workflow.updatedAt
       ) return
-      state.workflowPath = action.payload.workspacePath
-      state.workflowSession = action.payload.sessionId
       state.workflow = action.payload.workflow
     },
     upsertWorkflow(state, action: PayloadAction<Workflow>) {
       const row = action.payload
       if (state.workflowPath !== row.workspacePath || state.workflowSession !== row.sessionId) return
+      keep(state, row)
       if (state.workflow && state.workflow.id === row.id && state.workflow.revision > row.revision) return
       if (state.workflow && state.workflow.id !== row.id && state.workflow.updatedAt > row.updatedAt) return
       state.workflow = row

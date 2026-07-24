@@ -120,3 +120,69 @@ func TestWorkflowRejectsThirdFailedReviewContinuation(t *testing.T) {
 		t.Fatal("terminal review advanced to debug")
 	}
 }
+
+func TestWorkflowCancelUsesPersistedStage(t *testing.T) {
+	doc, err := db.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	workspace := t.TempDir()
+	session := "workflow_cancel_" + hash(workspace)
+	stamp := time.Now().UnixNano()
+	_, err = doc.ExecContext(ctx, `insert into sessions(id, workspace_path, title, body, analysis, created_at, updated_at) values (?, ?, ?, '{}', '', ?, ?)`, session, workspace, "workflow", stamp, stamp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := &Service{}
+	row, err := svc.StartWorkflow(ctx, WorkflowStart{WorkspacePath: workspace, SessionID: session, CodeRevision: "code-1", Review: true, Debug: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	row, err = svc.UpdateWorkflow(ctx, WorkflowUpdate{ID: row.ID, WorkspacePath: workspace, SessionID: session, Stage: "debug", State: "running", DebugID: "debug-cancel"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	row, err = svc.CancelWorkflow(ctx, WorkflowGet{WorkspacePath: workspace, SessionID: session})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if row.Stage != "debug" || row.State != "cancelled" || row.Revision != 3 {
+		t.Fatalf("cancelled = %#v", row)
+	}
+	again, err := svc.CancelWorkflow(ctx, WorkflowGet{WorkspacePath: workspace, SessionID: session})
+	if err != nil || again.Revision != row.Revision {
+		t.Fatalf("idempotent cancel = %#v, %v", again, err)
+	}
+}
+
+func TestWorkflowBacktestFailureKeepsStage(t *testing.T) {
+	doc, err := db.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	workspace := t.TempDir()
+	session := "workflow_backtest_failed_" + hash(workspace)
+	stamp := time.Now().UnixNano()
+	_, err = doc.ExecContext(ctx, `insert into sessions(id, workspace_path, title, body, analysis, created_at, updated_at) values (?, ?, ?, '{}', '', ?, ?)`, session, workspace, "workflow", stamp, stamp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := &Service{}
+	row, err := svc.StartWorkflow(ctx, WorkflowStart{WorkspacePath: workspace, SessionID: session, CodeRevision: "code-1", Backtest: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	row, err = svc.UpdateWorkflow(ctx, WorkflowUpdate{ID: row.ID, WorkspacePath: workspace, SessionID: session, Stage: "backtest", State: "running", BacktestID: "bt-failed"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	row, err = svc.UpdateWorkflowBacktest(ctx, workspace, session, "bt-failed", "failed", "backtest failed")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if row.Stage != "backtest" || row.State != "failed" || row.Error != "backtest failed" {
+		t.Fatalf("failed = %#v", row)
+	}
+}

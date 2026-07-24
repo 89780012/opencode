@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { parseRequirements } from "../src/components/workbench/hooks/use-workbench-session-sync"
-import { capture, settle, type Intake } from "../src/lib/intake"
+import { capture, fresh, settle, type Intake } from "../src/lib/intake"
 import { systemDefault } from "../src/types/system"
 
 describe("conversational requirement intake", () => {
@@ -25,6 +25,14 @@ describe("conversational requirement intake", () => {
 
   test("defaults intake to disabled", () => {
     expect(systemDefault.workbench.intake).toBeFalse()
+  })
+
+  test("captures only the first message of a loaded empty session", () => {
+    expect(fresh(true, [], [])).toBeTrue()
+    expect(fresh(true, [], [{ role: "assistant" }])).toBeTrue()
+    expect(fresh(false, [], [])).toBeFalse()
+    expect(fresh(true, ["requirement"], [])).toBeFalse()
+    expect(fresh(true, [], [{ role: "user" }])).toBeFalse()
   })
 
   test("parses scoped requirement events", () => {

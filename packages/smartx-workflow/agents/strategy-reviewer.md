@@ -38,13 +38,11 @@ permission:
 - 不要运行命令，不要启动策略，不要调用其它子 agent。
 - 不要为了凑结论编造源码中不存在的行为。
 - 不要输出英文审查内容。
-- 不要输出 markdown 或 JSON 之外的说明文字。
+- 使用清晰的中文报告反馈审查结论、问题和建议。
 
 输出要求：
 
-- 只输出调用方指定结构的 JSON 对象，所有自然语言字段使用中文。
-- `items` 不得为空，每项包含 `name`、`status`、`detail`、`suggestion`。
-- `status` 只允许 `passed`、`warning`、`failed`、`error`。
-- `state` 严格聚合检查项：`error` 优先，其次 `warning/failed`，全部 `passed` 才是 `passed`。
-- 顶层 `state` 只允许 `passed`、`failed`、`error`，不允许 `warning`；任一检查项为 `warning` 时，顶层必须写 `failed`。
+- 第一段明确写出“审查结论：通过”“审查结论：未通过”或“审查结论：无法完成”。
+- 按重要性列出检查发现；每项说明问题、影响和建议，没有问题的关键检查项可以简要说明。
+- 不要求输出 JSON；报告会交给主 agent 理解并转换为保存参数。
 - 如果需求清单为空或上下文不足，必须在检查项中明确说明，不得猜测为通过。

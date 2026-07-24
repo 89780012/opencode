@@ -228,6 +228,24 @@ func (a *API) workbenchWorkflowPut(c *gin.Context) {
 	ok(c, data)
 }
 
+func (a *API) workbenchWorkflowCancel(c *gin.Context) {
+	body := workbench.WorkflowGet{}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		bad(c, err)
+		return
+	}
+	data, err := a.bench.CancelWorkflow(c.Request.Context(), body)
+	if errors.Is(err, db.ErrNotFound) {
+		ok(c, nil)
+		return
+	}
+	if err != nil {
+		bad(c, err)
+		return
+	}
+	ok(c, data)
+}
+
 func (a *API) workbenchProjectStateGet(c *gin.Context) {
 	req := workbench.ProjectStateGet{}
 	if err := c.ShouldBindQuery(&req); err != nil {

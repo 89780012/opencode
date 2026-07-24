@@ -58,7 +58,9 @@ function restored(needsSave = false) {
 }
 
 function projects(hasProjectState = true) {
-  return new Map<string, Project>([[workspace(), { workspace: "f:/repo", worktree: "f:/repo", hasProjectState, updated: Date.now() }]])
+  return new Map<string, Project>([
+    [workspace(), { workspace: "f:/repo", worktree: "f:/repo", hasProjectState, updated: Date.now() }],
+  ])
 }
 
 function setup(input: ReturnType<typeof ctx>, dep: Parameters<typeof build>[1] = {}) {
@@ -69,6 +71,13 @@ function setup(input: ReturnType<typeof ctx>, dep: Parameters<typeof build>[1] =
     baseline: async () => true,
     ...dep,
   })
+}
+
+async function terminal(hooks: ReturnType<typeof setup>, input: SaveReview) {
+  const call = { args: input }
+  const ctx = { sessionID: input.sessionId, tool: "smartx_save_review", callID: `save-${input.reviewId}` }
+  await hooks["tool.execute.before"]?.(ctx, call)
+  await hooks["tool.execute.after"]?.({ ...ctx, args: call.args }, { title: "", output: "{}", metadata: {} })
 }
 
 describe("smartx workspace analysis", () => {
@@ -209,10 +218,7 @@ describe("smartx workspace analysis", () => {
       ),
     ).rejects.toThrow("disabled by system configuration")
     await expect(
-      hooks["tool.execute.before"]?.(
-        { sessionID: "s1", tool: "smartx_save_flowchart", callID: "chart" },
-        { args: {} },
-      ),
+      hooks["tool.execute.before"]?.({ sessionID: "s1", tool: "smartx_save_flowchart", callID: "chart" }, { args: {} }),
     ).rejects.toThrow("disabled by system configuration")
     await hooks["tool.execute.before"]?.(
       { sessionID: "s1", tool: "edit", callID: "edit" },
@@ -266,7 +272,17 @@ describe("smartx workspace analysis", () => {
     const id = workspace()
     const workspaces = new Map<string, Analysis>([[id, doneAnalysis("f:/repo", "f:/repo", "old", ["old"])]])
     const charts = new Map<string, Chart>([
-      [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: 1 }],
+      [
+        id,
+        {
+          workspace: "f:/repo",
+          worktree: "f:/repo",
+          state: "done",
+          mermaidCode: "flowchart TD",
+          errorText: "",
+          updated: 1,
+        },
+      ],
     ])
     const pending = new Map<string, Pending>([
       [
@@ -291,10 +307,7 @@ describe("smartx workspace analysis", () => {
       baseline: async () => on,
     })
 
-    await hooks["experimental.chat.system.transform"]?.(
-      { sessionID: "s1", model: {} as never },
-      { system: [] },
-    )
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, { system: [] })
     await hooks["tool.execute.after"]?.(
       { sessionID: "s1", tool: "edit", callID: "edit", args: {} },
       { title: "", output: "", metadata: {} },
@@ -378,7 +391,7 @@ describe("smartx workspace analysis", () => {
       },
       {
         title: "",
-        output: ['<task_result>', '["read market","enter position"]', "</task_result>"].join("\n"),
+        output: ["<task_result>", '["read market","enter position"]', "</task_result>"].join("\n"),
         metadata: {},
       },
     )
@@ -441,7 +454,14 @@ describe("smartx workspace analysis", () => {
       },
       {
         title: "",
-        output: ["<task_result>", "```mermaid", "flowchart TD", "  A[Read market] --> B[End]", "```", "</task_result>"].join("\n"),
+        output: [
+          "<task_result>",
+          "```mermaid",
+          "flowchart TD",
+          "  A[Read market] --> B[End]",
+          "```",
+          "</task_result>",
+        ].join("\n"),
         metadata: {},
       },
     )
@@ -526,7 +546,7 @@ describe("smartx workspace analysis", () => {
       },
       {
         title: "",
-        output: ['<task_result>', '["read market"]', "</task_result>"].join("\n"),
+        output: ["<task_result>", '["read market"]', "</task_result>"].join("\n"),
         metadata: {},
       },
     )
@@ -637,7 +657,17 @@ describe("smartx workspace analysis", () => {
     const dirty = new Map()
     const workspaces = new Map<string, Analysis>([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]])
     const charts = new Map<string, Chart>([
-      [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() }],
+      [
+        id,
+        {
+          workspace: "f:/repo",
+          worktree: "f:/repo",
+          state: "done",
+          mermaidCode: "flowchart TD",
+          errorText: "",
+          updated: Date.now(),
+        },
+      ],
     ])
     const hooks = build(ctx("f:/repo"), {
       baseline: async () => true,
@@ -657,10 +687,7 @@ describe("smartx workspace analysis", () => {
       },
     }
 
-    await hooks["tool.execute.before"]?.(
-      { sessionID: "s1", tool: "smartx_run_backtest", callID: "call-1" },
-      output,
-    )
+    await hooks["tool.execute.before"]?.({ sessionID: "s1", tool: "smartx_run_backtest", callID: "call-1" }, output)
 
     expect(output.args).toEqual({
       workspacePath: "f:/repo",
@@ -696,10 +723,7 @@ describe("smartx workspace analysis", () => {
             ...item.args,
           },
         }
-        await hooks["tool.execute.before"]?.(
-          { sessionID: "s1", tool: item.tool, callID: "call-read" },
-          output,
-        )
+        await hooks["tool.execute.before"]?.({ sessionID: "s1", tool: item.tool, callID: "call-read" }, output)
         expect(output.args).toEqual({ workspacePath: "f:/repo", sessionId: "s1", ...item.args })
       }),
     )
@@ -816,10 +840,7 @@ describe("smartx workspace analysis", () => {
     const args = { description: "query", code: "print(1)" }
 
     await expect(
-      hooks["tool.execute.before"]?.(
-        { sessionID: "s1", tool: "smartx_python", callID: "call-python" },
-        { args },
-      ),
+      hooks["tool.execute.before"]?.({ sessionID: "s1", tool: "smartx_python", callID: "call-python" }, { args }),
     ).resolves.toBeUndefined()
 
     expect(dirty.has(id)).toBe(false)
@@ -851,7 +872,17 @@ describe("smartx workspace analysis", () => {
     const id = key("f:/repo", "f:/repo")
     const workspaces = new Map<string, Analysis>([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]])
     const charts = new Map<string, Chart>([
-      [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() }],
+      [
+        id,
+        {
+          workspace: "f:/repo",
+          worktree: "f:/repo",
+          state: "done",
+          mermaidCode: "flowchart TD",
+          errorText: "",
+          updated: Date.now(),
+        },
+      ],
     ])
     const pending = new Map()
     const hooks = setup(ctx("f:/repo", rows), {
@@ -926,7 +957,17 @@ describe("smartx workspace analysis", () => {
     const hooks = setup(ctx("f:/repo", rows), {
       workspaces: new Map([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]]),
       charts: new Map([
-        [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() }],
+        [
+          id,
+          {
+            workspace: "f:/repo",
+            worktree: "f:/repo",
+            state: "done",
+            mermaidCode: "flowchart TD",
+            errorText: "",
+            updated: Date.now(),
+          },
+        ],
       ]),
       reviewRequests,
       reviewRuns,
@@ -984,7 +1025,17 @@ describe("smartx workspace analysis", () => {
     const hooks = setup(ctx("f:/repo"), {
       workspaces: new Map([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]]),
       charts: new Map([
-        [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() }],
+        [
+          id,
+          {
+            workspace: "f:/repo",
+            worktree: "f:/repo",
+            state: "done",
+            mermaidCode: "flowchart TD",
+            errorText: "",
+            updated: Date.now(),
+          },
+        ],
       ]),
       saveReview: async (input) => {
         saved.push(input)
@@ -1016,7 +1067,17 @@ describe("smartx workspace analysis", () => {
     const hooks = setup(ctx("f:/repo"), {
       workspaces: new Map([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]]),
       charts: new Map([
-        [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() }],
+        [
+          id,
+          {
+            workspace: "f:/repo",
+            worktree: "f:/repo",
+            state: "done",
+            mermaidCode: "flowchart TD",
+            errorText: "",
+            updated: Date.now(),
+          },
+        ],
       ]),
       reviewRequests: new Set([scope]),
       reviewRuns: runs,
@@ -1045,7 +1106,7 @@ describe("smartx workspace analysis", () => {
     expect(runs.has(scope)).toBe(true)
   })
 
-  test("turns a missing reviewer task output into a saved error", async () => {
+  test("hands a missing reviewer task output to the main agent", async () => {
     const id = workspace()
     const scope = id + "\x00s1"
     const pending = new Map()
@@ -1054,7 +1115,17 @@ describe("smartx workspace analysis", () => {
     const hooks = setup(ctx("f:/repo"), {
       workspaces: new Map([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]]),
       charts: new Map([
-        [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() }],
+        [
+          id,
+          {
+            workspace: "f:/repo",
+            worktree: "f:/repo",
+            state: "done",
+            mermaidCode: "flowchart TD",
+            errorText: "",
+            updated: Date.now(),
+          },
+        ],
       ]),
       pending,
       reviewRequests: new Set([scope]),
@@ -1074,8 +1145,13 @@ describe("smartx workspace analysis", () => {
     )
 
     expect(runs.has(scope)).toBe(false)
-    expect(pending.has(scope)).toBe(false)
-    expect(saved.at(-1)).toMatchObject({ reviewId: "review-1", sessionId: "s1", state: "error" })
+    expect(pending.get(scope)).toMatchObject({
+      kind: "review",
+      reviewId: "review-1",
+      sessionId: "s1",
+      reviewText: "审查智能体未返回审查报告。",
+    })
+    expect(saved).toHaveLength(1)
   })
 
   test("keeps a review request when the running state cannot be saved", async () => {
@@ -1144,7 +1220,7 @@ describe("smartx workspace analysis", () => {
     expect(requests.has(id + "\x00s1")).toBe(true)
   })
 
-  test("treats an empty reviewer result as an error", async () => {
+  test("hands an empty reviewer result to the main agent", async () => {
     const pending = new Map()
     const saved: SaveReview[] = []
     const hooks = setup(ctx("f:/repo"), {
@@ -1160,12 +1236,13 @@ describe("smartx workspace analysis", () => {
       { title: "", output: "", metadata: {} },
     )
 
-    expect(pending.has(scope)).toBe(false)
-    expect(saved.at(-1)).toMatchObject({
+    expect(pending.get(scope)).toMatchObject({
+      kind: "review",
       reviewId: "review-empty",
       sessionId: "s1",
-      state: "error",
+      reviewText: "审查智能体未返回审查报告。",
     })
+    expect(saved).toHaveLength(0)
   })
 
   test("rejects a terminal review save without a pending review for the session", async () => {
@@ -1199,7 +1276,6 @@ describe("smartx workspace analysis", () => {
       sessionId: "s1",
       workspacePath: "f:/repo",
       worktreePath: "f:/repo",
-      state: "passed",
       reviewText: "通过",
     })
 
@@ -1224,22 +1300,22 @@ describe("smartx workspace analysis", () => {
     await expect(call([{ name: "review", status: "unknown", detail: "invalid", suggestion: "" }])).rejects.toThrow(
       "valid statuses",
     )
-    await expect(call([{ name: "review", status: "running", detail: "still running", suggestion: "" }])).rejects.toThrow(
-      "valid statuses",
-    )
+    await expect(
+      call([{ name: "review", status: "running", detail: "still running", suggestion: "" }]),
+    ).rejects.toThrow("valid statuses")
     await expect(call([{ name: "", status: "passed", detail: "passed", suggestion: "" }])).rejects.toThrow(
       "valid statuses",
     )
     await expect(call([{ name: "review", status: "passed", detail: "", suggestion: "" }])).rejects.toThrow(
       "valid statuses",
     )
-    await expect(
-      call([{ name: "review", status: "passed", detail: "passed", suggestion: "" }], ""),
-    ).rejects.toThrow("non-empty terminal review summary")
+    await expect(call([{ name: "review", status: "passed", detail: "passed", suggestion: "" }], "")).rejects.toThrow(
+      "non-empty terminal review summary",
+    )
     expect(pending.has(workspace() + "\x00s1")).toBe(true)
   })
 
-  test("does not let terminal items weaken a failed reviewer result", async () => {
+  test("lets the main agent interpret the report while enforcing terminal item aggregation", async () => {
     const pending = new Map()
     const hooks = setup(ctx("f:/repo"), { pending })
     pending.set(workspace() + "\x00s1", {
@@ -1248,27 +1324,24 @@ describe("smartx workspace analysis", () => {
       sessionId: "s1",
       workspacePath: "f:/repo",
       worktreePath: "f:/repo",
-      state: "failed",
       reviewText: "缺少止损",
     })
 
-    await expect(
-      hooks["tool.execute.before"]?.(
-        { sessionID: "s1", tool: "smartx_save_review", callID: "save-1" },
-        {
-          args: {
-            reviewId: "review-1",
-            sessionId: "s1",
-            workspacePath: "f:/repo",
-            worktreePath: "f:/repo",
-            state: "passed",
-            summary: "passed",
-            items: [{ name: "review", status: "passed", detail: "passed", suggestion: "" }],
-            suggestions: [],
-          },
+    await hooks["tool.execute.before"]?.(
+      { sessionID: "s1", tool: "smartx_save_review", callID: "save-1" },
+      {
+        args: {
+          reviewId: "review-1",
+          sessionId: "s1",
+          workspacePath: "f:/repo",
+          worktreePath: "f:/repo",
+          state: "passed",
+          summary: "passed",
+          items: [{ name: "review", status: "passed", detail: "passed", suggestion: "" }],
+          suggestions: [],
         },
-      ),
-    ).rejects.toThrow("less severe")
+      },
+    )
     expect(pending.has(workspace() + "\x00s1")).toBe(true)
   })
 
@@ -1281,7 +1354,17 @@ describe("smartx workspace analysis", () => {
     const hooks = setup(ctx("f:/repo", rows), {
       workspaces: new Map([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]]),
       charts: new Map([
-        [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() }],
+        [
+          id,
+          {
+            workspace: "f:/repo",
+            worktree: "f:/repo",
+            state: "done",
+            mermaidCode: "flowchart TD",
+            errorText: "",
+            updated: Date.now(),
+          },
+        ],
       ]),
       pending,
       reviewFixes: fixes,
@@ -1326,20 +1409,16 @@ describe("smartx workspace analysis", () => {
     expect(rows.find((item) => item.message === "workspace review saved through mcp")?.extra?.state).toBe("error")
   })
 
-  test("isolates concurrent structured review saves by session and review id", async () => {
+  test("isolates concurrent reviewer reports by session and review id", async () => {
     const saved: SaveReview[] = []
+    const pending = new Map<string, Pending>()
     const hooks = setup(ctx("f:/repo"), {
+      pending,
       saveReview: async (input) => {
         saved.push(input)
       },
     })
-    const output = (summary: string) =>
-      JSON.stringify({
-        state: "error",
-        summary,
-        items: [{ name: "审查执行", status: "error", detail: summary, suggestion: "重新审查" }],
-        suggestions: ["重新审查"],
-      })
+    const output = (summary: string) => `审查结论：无法完成\n\n${summary}`
 
     await Promise.all([
       hooks["tool.execute.after"]?.(
@@ -1352,9 +1431,15 @@ describe("smartx workspace analysis", () => {
       ),
     ])
 
-    expect(saved).toHaveLength(2)
-    expect(saved.find((item) => item.sessionId === "s1")).toMatchObject({ reviewId: "review-1" })
-    expect(saved.find((item) => item.sessionId === "s2")).toMatchObject({ reviewId: "review-2" })
+    expect(saved).toHaveLength(0)
+    expect(pending.get(workspace() + "\x00s1")).toMatchObject({
+      reviewId: "review-1",
+      reviewText: output("第一轮审查执行失败"),
+    })
+    expect(pending.get(workspace() + "\x00s2")).toMatchObject({
+      reviewId: "review-2",
+      reviewText: output("第二轮审查执行失败"),
+    })
   })
 
   test("saves failed review before asking the main agent to fix it", async () => {
@@ -1380,7 +1465,14 @@ describe("smartx workspace analysis", () => {
       },
     })
     workspaces.set(id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"]))
-    charts.set(id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() })
+    charts.set(id, {
+      workspace: "f:/repo",
+      worktree: "f:/repo",
+      state: "done",
+      mermaidCode: "flowchart TD",
+      errorText: "",
+      updated: Date.now(),
+    })
 
     await hooks["tool.execute.before"]?.(
       { sessionID: "s1", tool: "task", callID: "c1" },
@@ -1396,18 +1488,23 @@ describe("smartx workspace analysis", () => {
       },
       {
         title: "",
-        output: JSON.stringify({
-          state: "failed",
-          summary: "缺少止损保护",
-          items: [{ name: "风险控制", status: "failed", detail: "缺少止损保护", suggestion: "增加止损规则" }],
-          suggestions: ["增加止损规则"],
-        }),
+        output: "审查结论：未通过\n\n风险控制：缺少止损保护。\n\n建议：增加止损规则。",
         metadata: {},
       },
     )
 
+    expect(pending.has(scope)).toBe(true)
+    await terminal(hooks, {
+      reviewId: "c1",
+      sessionId: "s1",
+      workspacePath: "f:/repo",
+      worktreePath: "f:/repo",
+      state: "failed",
+      summary: "缺少止损保护",
+      items: [{ name: "风险控制", status: "failed", detail: "缺少止损保护", suggestion: "增加止损规则" }],
+      suggestions: ["增加止损规则"],
+    })
     expect(pending.has(scope)).toBe(false)
-    expect(saved.at(-1)).toMatchObject({ reviewId: "c1", sessionId: "s1", state: "failed" })
     expect(fixes.get(scope)?.attempt).toBe(1)
 
     await hooks["chat.message"]?.(
@@ -1444,7 +1541,14 @@ describe("smartx workspace analysis", () => {
     expect(fixes.get(scope)?.attempt).toBe(1)
 
     workspaces.set(id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"]))
-    charts.set(id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() })
+    charts.set(id, {
+      workspace: "f:/repo",
+      worktree: "f:/repo",
+      state: "done",
+      mermaidCode: "flowchart TD",
+      errorText: "",
+      updated: Date.now(),
+    })
     dirt.set(id, { state: "clean", updated: Date.now(), reason: "" })
 
     const retry = { system: [] as string[] }
@@ -1471,7 +1575,14 @@ describe("smartx workspace analysis", () => {
     const id = key("f:/repo", "f:/repo")
     const scope = id + "\x00s1"
     workspaces.set(id, doneAnalysis("f:/repo", "f:/repo", "", ["old analysis"]))
-    charts.set(id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() })
+    charts.set(id, {
+      workspace: "f:/repo",
+      worktree: "f:/repo",
+      state: "done",
+      mermaidCode: "flowchart TD",
+      errorText: "",
+      updated: Date.now(),
+    })
 
     await hooks["tool.execute.after"]?.(
       {
@@ -1482,18 +1593,23 @@ describe("smartx workspace analysis", () => {
       },
       {
         title: "",
-        output: JSON.stringify({
-          state: "passed",
-          summary: "未发现阻断问题",
-          items: [{ name: "需求覆盖", status: "passed", detail: "实现满足需求", suggestion: "" }],
-          suggestions: [],
-        }),
+        output: "审查结论：通过\n\n需求覆盖完整，未发现阻断问题。",
         metadata: {},
       },
     )
 
+    expect(pending.has(scope)).toBe(true)
+    await terminal(hooks, {
+      reviewId: "c1",
+      sessionId: "s1",
+      workspacePath: "f:/repo",
+      worktreePath: "f:/repo",
+      state: "passed",
+      summary: "未发现阻断问题",
+      items: [{ name: "需求覆盖", status: "passed", detail: "实现满足需求", suggestion: "" }],
+      suggestions: [],
+    })
     expect(pending.has(scope)).toBe(false)
-    expect(saved.at(-1)).toMatchObject({ reviewId: "c1", sessionId: "s1", state: "passed" })
     expect(workspaces.get(id)?.state).toBe("requested")
     expect(charts.get(id)?.state).toBe("requested")
 
@@ -1504,10 +1620,7 @@ describe("smartx workspace analysis", () => {
     const project = {
       args: { workspacePath: "f:/repo", worktreePath: "f:/repo", dirty: false },
     }
-    await hooks["tool.execute.before"]?.(
-      { sessionID: "s1", tool: "smartx_save_project_state", callID: "c3" },
-      project,
-    )
+    await hooks["tool.execute.before"]?.({ sessionID: "s1", tool: "smartx_save_project_state", callID: "c3" }, project)
     await hooks["tool.execute.after"]?.(
       {
         sessionID: "s1",
@@ -1528,7 +1641,17 @@ describe("smartx workspace analysis", () => {
     const id = key("f:/repo", "f:/repo")
     const workspaces = new Map<string, Analysis>([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]])
     const charts = new Map<string, Chart>([
-      [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() }],
+      [
+        id,
+        {
+          workspace: "f:/repo",
+          worktree: "f:/repo",
+          state: "done",
+          mermaidCode: "flowchart TD",
+          errorText: "",
+          updated: Date.now(),
+        },
+      ],
     ])
     const hooks = setup(ctx("f:/repo", rows), {
       workspaces,
@@ -1558,7 +1681,17 @@ describe("smartx workspace analysis", () => {
     const id = key("f:/repo", "f:/repo")
     const workspaces = new Map<string, Analysis>([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]])
     const charts = new Map<string, Chart>([
-      [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() }],
+      [
+        id,
+        {
+          workspace: "f:/repo",
+          worktree: "f:/repo",
+          state: "done",
+          mermaidCode: "flowchart TD",
+          errorText: "",
+          updated: Date.now(),
+        },
+      ],
     ])
     const hooks = setup(ctx("f:/repo"), { workspaces, charts })
 
@@ -1587,7 +1720,17 @@ describe("smartx workspace analysis", () => {
       reviewFixes: fixes,
       workspaces: new Map([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]]),
       charts: new Map([
-        [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() }],
+        [
+          id,
+          {
+            workspace: "f:/repo",
+            worktree: "f:/repo",
+            state: "done",
+            mermaidCode: "flowchart TD",
+            errorText: "",
+            updated: Date.now(),
+          },
+        ],
       ]),
     })
     const scope = id + "\x00s1"
@@ -1601,19 +1744,25 @@ describe("smartx workspace analysis", () => {
       },
       {
         title: "",
-        output: JSON.stringify({
-          state: "failed",
-          summary: "风险控制需要加强",
-          items: [
-            { name: "需求覆盖", status: "passed", detail: "需求已覆盖", suggestion: "" },
-            { name: "风险控制", status: "warning", detail: "风险控制需要加强", suggestion: "增加风险保护" },
-          ],
-          suggestions: ["增加风险保护"],
-        }),
+        output: "审查结论：未通过\n\n需求已覆盖，但风险控制需要加强。\n\n建议：增加风险保护。",
         metadata: {},
       },
     )
 
+    expect(pending.has(scope)).toBe(true)
+    await terminal(hooks, {
+      reviewId: "c1",
+      sessionId: "s1",
+      workspacePath: "f:/repo",
+      worktreePath: "f:/repo",
+      state: "failed",
+      summary: "风险控制需要加强",
+      items: [
+        { name: "需求覆盖", status: "passed", detail: "需求已覆盖", suggestion: "" },
+        { name: "风险控制", status: "warning", detail: "风险控制需要加强", suggestion: "增加风险保护" },
+      ],
+      suggestions: ["增加风险保护"],
+    })
     expect(pending.has(scope)).toBe(false)
     expect(fixes.get(scope)?.attempt).toBe(1)
 
@@ -1626,13 +1775,18 @@ describe("smartx workspace analysis", () => {
   test("stops after the third failed review is saved", async () => {
     const pending = new Map()
     const scope = key("f:/repo", "f:/repo") + "\x00" + "s1"
-    const fixes = new Map([[scope, {
-      workspacePath: "f:/repo",
-      worktreePath: "f:/repo",
-      sessionID: "s1",
-      attempt: 3,
-      reviewText: "review conclusion: failed",
-    }]])
+    const fixes = new Map([
+      [
+        scope,
+        {
+          workspacePath: "f:/repo",
+          worktreePath: "f:/repo",
+          sessionID: "s1",
+          attempt: 3,
+          reviewText: "review conclusion: failed",
+        },
+      ],
+    ])
     let run: Run = {
       id: "workflow-third",
       workspacePath: "f:/repo",
@@ -1672,16 +1826,22 @@ describe("smartx workspace analysis", () => {
       },
       {
         title: "",
-        output: JSON.stringify({
-          state: "failed",
-          summary: "仍然缺少止损",
-          items: [{ name: "风险控制", status: "failed", detail: "仍然缺少止损", suggestion: "增加止损" }],
-          suggestions: ["增加止损"],
-        }),
+        output: "审查结论：未通过\n\n风险控制仍然缺少止损。",
         metadata: {},
       },
     )
 
+    expect(pending.has(scope)).toBe(true)
+    await terminal(hooks, {
+      reviewId: "c1",
+      sessionId: "s1",
+      workspacePath: "f:/repo",
+      worktreePath: "f:/repo",
+      state: "failed",
+      summary: "仍然缺少止损",
+      items: [{ name: "风险控制", status: "failed", detail: "仍然缺少止损", suggestion: "增加止损" }],
+      suggestions: ["增加止损"],
+    })
     expect(pending.has(scope)).toBe(false)
 
     const fix = { system: [] as string[] }
@@ -1750,15 +1910,21 @@ describe("smartx workspace analysis", () => {
       { sessionID: "s1", tool: "task", callID: "review-1", args: { subagent_type: "strategy-reviewer" } },
       {
         title: "",
-        output: JSON.stringify({
-          state: "passed",
-          summary: "审查通过",
-          items: [{ name: "语法", status: "passed", detail: "检查通过", suggestion: "" }],
-          suggestions: [],
-        }),
+        output: "审查结论：通过\n\n语法检查通过。",
         metadata: {},
       },
     )
+    expect(pending.has(scope)).toBe(true)
+    await terminal(hooks, {
+      reviewId: "review-1",
+      sessionId: "s1",
+      workspacePath: "f:/repo",
+      worktreePath: "f:/repo",
+      state: "passed",
+      summary: "审查通过",
+      items: [{ name: "语法", status: "passed", detail: "检查通过", suggestion: "" }],
+      suggestions: [],
+    })
     expect(pending.has(scope)).toBe(false)
     expect(current?.stage).toBe("debug")
 
@@ -1918,7 +2084,17 @@ describe("smartx workspace analysis", () => {
     const memory = restored()
     const workspaces = new Map<string, Analysis>([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]])
     const charts = new Map<string, Chart>([
-      [id, { workspace: "f:/repo", worktree: "f:/repo", state: "done", mermaidCode: "flowchart TD", errorText: "", updated: Date.now() }],
+      [
+        id,
+        {
+          workspace: "f:/repo",
+          worktree: "f:/repo",
+          state: "done",
+          mermaidCode: "flowchart TD",
+          errorText: "",
+          updated: Date.now(),
+        },
+      ],
     ])
     const hooks = build(ctx("f:/repo"), {
       baseline: async () => true,

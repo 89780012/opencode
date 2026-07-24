@@ -1,12 +1,4 @@
-export type {
-  Analysis,
-  Call,
-  Chart,
-  Dirt,
-  Life,
-  Mode,
-  Project,
-} from "./types.js"
+export type { Analysis, Call, Chart, Dirt, Life, Mode, Project } from "./types.js"
 
 export {
   doneAnalysis,
@@ -21,7 +13,7 @@ export {
   validProject,
 } from "./model.js"
 
-export { items, mermaid, result, reviewState, reviewText, serial, wantsFinal, wantsReview } from "./parse.js"
+export { items, mermaid, result, reviewText, serial, wantsFinal, wantsReview } from "./parse.js"
 
 export { analyze, flowchart, review } from "./tool.js"
 

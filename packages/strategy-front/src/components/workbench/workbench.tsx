@@ -2,6 +2,7 @@ import { type CSSProperties } from "react"
 import { Review } from "./features/review"
 import { Side } from "./features/side"
 import { StageView } from "./features/stage"
+import { WorkflowFloat } from "./features/workflow/workflow-float"
 import { usePanels } from "./hooks/use-panels"
 import { useWorkbenchAnalysisSync } from "./hooks/use-workbench-analysis"
 import { useWorkbenchBacktestSync } from "./hooks/use-workbench-backtest"
@@ -54,6 +55,7 @@ export function Workbench(props: { hidden?: boolean }) {
             <StageView />
           </main>
         </div>
+        <WorkflowFloat />
       </div>
       <Review
         hidden={props.hidden}

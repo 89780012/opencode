@@ -50,6 +50,9 @@ export type Workflow = {
   reviewRound: number
   debugId?: string
   backtestId?: string
+  reviewEnabled?: boolean
+  debugEnabled?: boolean
+  backtestEnabled?: boolean
   summary?: string
   error?: string
   revision: number
@@ -70,5 +73,11 @@ export const workbenchApi = {
   workflow(workspacePath: string, sessionId: string) {
     const query = new URLSearchParams({ workspacePath, sessionId })
     return request.get<Workflow | null>(`/workbench/workflow?${query.toString()}`)
+  },
+  cancelWorkflow(workspacePath: string, sessionId: string) {
+    return request.put<Workflow | null, { workspacePath: string; sessionId: string }>("/workbench/workflow/cancel", {
+      workspacePath,
+      sessionId,
+    })
   },
 }

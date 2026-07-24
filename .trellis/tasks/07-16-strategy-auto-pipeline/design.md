@@ -33,19 +33,21 @@ workflow 每次 system transform 刷新配置，tool before/after 使用本会�
 - `debug_id`、内部 `debug_request_key`、内部 `debug_cursor`、`backtest_id`
 - `summary`、`error`、`revision`、`created_at`、`updated_at`
 
-阶段为 `coding`、`review`、`debug`、`backtest`、`done`；状态使用阶段内的 requested/running/passed/failed，以及 `review_exhausted`、`cancelled`。服务端用事务和条件 revision 更新保证单调转换，并在提交后发送 `workflow.updated`。
+阶段为 `coding`、`review`、`debug`、`backtest`、`done`；状态使用阶段内的 requested/running/passed/failed，以及 `review_exhausted`、`cancelled`。成功收口使用 `done/passed`，失败终态保留实际失败阶段并写 `failed`；服务端用事务和条件 revision 更新保证单调转换，并在提交后发送 `workflow.updated`。
 
-code revision 由 workflow 在主会话首次成功写入后生成，后续同一自动修复链沿用；用户在流水线终止后再次修改代码生成新 revision。
+code revision 由 workflow 在主会话首次成功源码写入后生成，并独立记录 owner session；Python/Bash 等运行活动只更新 workspace 活动时间和 project memory，不推进 code revision，也不改变 owner。后续同一自动修复链沿用；用户在流水线终止后再次修改代码生成新 revision。
 
 ## 自动触发
 
-workflow 继续使用成功的 `write/edit/apply_patch/bash/smartx_python` 结果标记 dirty。主会话进入自然收口、项目记忆已保存且没有活动 review/fix 时：
+workflow 继续使用成功的 `write/edit/apply_patch/bash/smartx_python` 结果标记 workspace dirty，但只有 `write/edit/apply_patch/multiedit` 推进 code revision。主会话进入自然收口、项目记忆已保存且没有活动 review/fix 时：
 
 1. 查询或幂等创建当前 revision 的 workflow run。
 2. 选择第一个启用阶段。
 3. 向 system transform 注入该阶段指令。
 
 子会话、只读会话和没有 dirty revision 的会话不创建 run。每次 transform 先从服务端恢复活动 run，进程重启后可以继续未完成阶段。
+
+每次自动 `promptAsync` 在 synthetic text part 的 metadata 中写入 `smartxWorkflowId` 和 `smartxWorkflowAction`。前端只隐藏 synthetic 用户提示，保留跨 parentID 的 assistant 文本、工具结果和 reviewer 报告；workflow 状态和运行中进度移到右侧可展开收起的悬浮面板。调试和回测直接 MCP 调用没有模型消息时，主会话只根据持久化结果补充 done/error 终态结果，内部仍可多轮恢复。
 
 system prompt 只承担上下文说明，不再承担自动阶段的唯一调度职责。`smartx-workflow` 监听主会话 `session.status=idle`；若服务端仍有非终态 run，则使用已有 `promptAsync + SubtaskPart` 确定提交 reviewer，或直接调用 strategy-service `/mcp` 推进调试和回测。调度使用 run revision、稳定 requestKey 和进程内 single-flight 防重。
 
@@ -59,9 +61,9 @@ system prompt 只承担上下文说明，不再承担自动阶段的唯一调度
 
 手工审查命中当前活动 revision 时复用该 run；没有自动 run 时保持现有独立审查行为。
 
-自动 reviewer 输出内部结构化中文 JSON。workflow 必须严格校验 state、summary、items 和 suggestions，并按 items 聚合最终状态；校验通过后直接保存结构化 review，不再要求主模型转换 MCP 参数。原始 reviewer JSON 只允许作为受限诊断日志，不能写入用户可见字段或发送到前端。
+自动 reviewer 输出普通中文审查报告并反馈给主 agent，不要求 JSON，也不由 workflow 解析或判定结论。workflow 使用 reviewer tool call ID 建立 session 级 pending，并把报告和可信身份字段注入主 agent；主 agent 理解报告、生成 `state/summary/items/suggestions` 并调用 `smartx_save_review`。MCP/strategy-service 对最终参数执行结构、状态聚合、作用域和幂等校验，只有保存成功后 workflow 才进入修复或下一阶段。
 
-插件重启后若 workflow 仍为 `review/fixing`，通过 `get_review(workspacePath, sessionId)` 读取同 session 最近一次 failed review，并重建中文修复上下文；进程内 Map 不作为恢复事实来源。
+插件重启后若 workflow 为 `review/running` 且进程内 pending 丢失，从 OpenCode 持久化会话消息中筛选父 synthetic metadata 命中当前 workflowId 的最新 `strategy-reviewer` task；只有最新 task 已完成时才用 tool part ID 和普通文本 output 重建 pending。若 workflow 为 `review/fixing`，通过 `get_review(workspacePath, sessionId)` 读取同 session 最近一次 failed review并重建中文修复上下文；进程内 Map 不作为恢复事实来源。
 
 ## 调试阶段
 
@@ -89,11 +91,12 @@ backtest worker 保存 running/done/failed 时同步推进 workflow run；不通
 
 ## 前端同步
 
-在 Workbench 挂载 `useWorkbenchWorkflowSync`：进入 workspace/session 时读取快照，监听 `workflow.updated`；同 ID 按 revision、不同 ID 按 updatedAt 单调合并。时间线增加 coding/review/debug/backtest 节点，done 使用中性流程类别；审查和回测详情仍由现有面板负责。
+在 Workbench 挂载 `useWorkbenchWorkflowSync`：进入 workspace/session 时读取快照，监听 `workflow.updated`；同 ID 按 revision、不同 ID 按 updatedAt 单调合并，并在当前 scope 内保留按 ID 的历史快照供消息卡读取。刷新后无法查询的旧 ID 使用中性历史状态，不得显示为运行中。时间线增加 coding/review/debug/backtest 节点，done 使用中性流程类别；审查和回测详情仍由现有面板负责。
 
 设置页在一个“自动工作流”区块展示三个 Switch。开关独立，不在 UI 强制联动；说明文字展示固定执行顺序和失败停链规则。
 
-前端 review 契约保持 `summary/items/suggestions`，不新增原始 JSON 字段，也不在聊天、面板或时间线渲染内部传输文本。解析异常只展示中文通用错误。
+前端 review 契约保持 `summary/items/suggestions`，不新增 reviewer 报告字段；普通中文报告只在主 agent 上下文中用于 MCP 参数转换，前端面板和时间线只消费持久化后的结构化结果。
+没有 workflow metadata 的手工 reviewer 保持“策略审查”文案，不得标记为自动工作流。
 
 ## 兼容与回滚
 

@@ -4,7 +4,9 @@ import { toast } from "sonner"
 import { useSystem } from "@/components/system/system-provider"
 import { useStrategySession } from "@/hooks/use-strategy-session"
 import { useWorkspaceEntry } from "@/hooks/use-workspace-entry"
+import { workbenchApi } from "@/api/modules/workbench"
 import { log } from "@/lib/error"
+import { halt } from "@/lib/workflow-stop"
 import { useAppDispatch, useAppSelector } from "@/store"
 import { updateSessionAbortStatus } from "@/store/chat-session-slice"
 
@@ -57,11 +59,17 @@ export function useWorkbenchChat() {
   }, [chat, sys.cfg.workbench.intake, sys.load, workspace?.path])
 
   const abort = async () => {
-    dispatch(updateSessionAbortStatus({ sessionId: chat.selectedSessionId || "", status: true }))
-    await chat.abortSession().catch((err) => {
-      log("停止工作台会话失败", err)
-      toast.error("停止会话失败")
-    })
+    const session = chat.selectedSessionId
+    if (!session) return
+    dispatch(updateSessionAbortStatus({ sessionId: session, status: true }))
+    await halt(
+      () =>
+        chat.abortSession().catch((err) => {
+          log("停止工作台会话失败", err)
+          toast.error("停止会话失败")
+        }),
+      () => workbenchApi.cancelWorkflow(workspace?.path ?? "", session).catch((err) => log("停止自动工作流失败", err)),
+    )
   }
 
   return {

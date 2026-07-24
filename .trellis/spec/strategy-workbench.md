@@ -371,12 +371,14 @@ running 与 terminal 保存使用同一结构：
 
 - workflow 使用 reviewer 的 tool call ID 生成 `reviewId`，使用 hook 上下文注入 `sessionId/workspacePath/worktreePath`；不得信任模型填写的身份字段。
 - reviewer 真正启动前先持久化 `running`；远程保存成功后才消费 review request。并发启动必须先占用 session 级运行锁，保存失败时释放锁并保留 request。
+- reviewer 只需返回普通中文审查报告；主 agent 负责转换为 terminal MCP 参数。workflow 不解析 reviewer JSON、不用关键词强制判定结论，也不得在 MCP 保存成功前推进 run。
 - terminal 状态严格按所有 items 聚合：`error > failed/warning > running > passed`。terminal 不允许 `running` item；只有全部 item 为 `passed` 才能保存 `passed`。
-- `summary`、`items`、`items[].name`、`items[].detail` 必须非空；未知 item status、空 reviewer 输出和无明确结论均 fail-closed 为 `error`，不得默认通过。
+- terminal MCP 参数中的 `summary`、`items`、`items[].name`、`items[].detail` 必须非空；未知 item status 和总体 state/items 不一致必须拒绝。reviewer 空输出或无明确结论时，主 agent 必须保存为 `error`，不得猜测为通过。
 - 同一稳定 `reviewId` 只允许 `running -> terminal`。完全相同的重复请求幂等返回原记录；terminal 不得被修改，也不得回退到 running。
 - review row 与对应 progress event 必须在同一 SQLite 事务提交；提交成功后才广播。`review.start/done/error` 只写入触发审查的 `sessionId`。
 - 前端提交后立即插入带 `sessionId` 的本地 pending。真实事件或快照只能清理同 session 的 pending；双方都有 `reviewId` 时还必须匹配 `reviewId`。
 - 前端只接收当前 `workspacePath + worktreePath` 的事件；同 ID 按 `updatedAt` 单调合并，同时间戳 terminal 优先于 running。当前状态按活动 session 选择，历史仍保留 worktree 全量记录。
+- 自动流程内部的 reviewer、保存和修复续跑消息必须携带稳定 workflowId；会话区只隐藏 synthetic 用户提示，assistant、工具和 reviewer 输出仍然可见；Redux 在当前 scope 内按 workflow ID 保留已接收快照；未知旧 ID 显示中性历史状态，不得伪装成运行中。workflow 阶段与终态只读取 `workflow.updated` 并显示在右侧可展开收起悬浮面板；没有 workflow metadata 的手工 reviewer 继续显示“策略审查”。
 - `review.get` 必须携带请求关联 ID；工作区切换后到达的旧 `review.got` 不得覆盖当前数据。
 - 审查面板标题栏必须提供手动查询入口，复用同一套 `review.get -> review.got` 关联 ID 和单调合并；Socket 未连接或查询进行中时禁用，点击后切回当前审查视图，不得直接覆盖 Redux 快照。
 - WebSocket 未注册入站事件必须忽略，不能原样广播；断线后迟到 reply 必须观察 client done/cancel，不能向已关闭 channel 发送。
@@ -389,6 +391,8 @@ running 与 terminal 保存使用同一结构：
 | URL session 与 body session 不一致 | HTTP `400` | 不发送 prompt |
 | session 不存在或不属于 workspace | HTTP `404` | 不发送 prompt，不泄露其他 workspace |
 | summary/items/name/detail 为空，status 非法，或总体 state 与 items 不一致 | HTTP/MCP 参数错误 | 不写 review，不写 progress |
+| reviewer 返回普通中文报告 | 等待主 agent 保存 | 报告进入 session 级 pending，不直接写 terminal |
+| reviewer 输出为空或无明确结论 | 主 agent 保存 `error` | 不得由 workflow 猜测 passed/failed |
 | 相同 reviewId 的完全相同 running/terminal 重试 | 成功 | 返回原记录，不新增 progress |
 | terminal 后再修改或回退 running | 参数错误 | 保留原 terminal |
 | progress 写入或事务提交失败 | 内部错误 | review 与 progress 一起回滚，不广播半成功事件 |
@@ -398,14 +402,15 @@ running 与 terminal 保存使用同一结构：
 
 - Good：同一 `reviewId` 依次保存 running 和 passed；数据库只有一条 review、两条生命周期 progress，前端不会被迟到 running 回滚，随后触发 final baseline。
 - Base：两个 session 同时审查并乱序完成；各自 pending、progress 和 terminal 只更新自己的 session，worktree 历史可同时看到两轮。
-- Bad：reviewer 文本写“通过”但 item 为 `warning`，或客户端发送伪造 `review.updated`；前者必须聚合为 failed，后者不得被服务端转广播。
+- Bad：workflow 强制 reviewer 输出 JSON并在解析失败时终止流水线，或客户端发送伪造 `review.updated`；前者应改为主 agent 转换后调用 MCP，后者不得被服务端转广播。
 
 ### 6. 必需测试
 
-- workflow：覆盖 running 保存失败不消费 request、并发 reviewer 只启动一次、空输出转 error、跨 session pending 隔离、items 聚合只升不降、failed 修复后先刷新、passed 后 final 可达，以及 refreshing/finalizing 写门禁。
+- workflow：覆盖 running 保存失败不消费 request、并发 reviewer 只启动一次、普通中文/Markdown/空报告进入 pending、跨 session pending 隔离、主 agent MCP 成功后才推进、failed 修复后先刷新、passed 后 final 可达，以及 refreshing/finalizing 写门禁。
 - 服务与存储：覆盖旧表增量迁移可重复执行、稳定 ID 幂等、terminal 不可变、双会话乱序、worktree 查询隔离、session 归属、review/progress 故障回滚和提交后广播。
 - WebSocket/API/MCP：覆盖关联 ID、未知入站事件不广播、断线迟到 reply 不 panic、URL/body session 错配、workspace/session 错配和 `reviewId/sessionId` schema 映射。
 - 前端：覆盖 HTTP 返回后的防重、旧闭包与工作区切换、同 ID 乱序合并、双 session pending 配对、跨 worktree 拒绝、空/非法/聚合不一致数据 fail-closed。
+- 自动流程展示：覆盖 workflow metadata 识别、synthetic 用户消息隐藏但 assistant/reviewer 输出保留、右侧悬浮面板展开收起、手工 reviewer 不被误聚合，以及终态错误文案来自 workflow 状态。
 - 变更后从各包目录运行 `bun test`、`bun typecheck`、相关文件 ESLint、`bun run build`、`go test ./...`、`go build ./...` 和 `go vet ./...`；race 测试受当前 Go/Windows 工具链能力约束。
 
 ### 7. Wrong vs Correct
@@ -429,3 +434,7 @@ broadcast(row)
 ```
 
 正确：在同一 SQLite transaction 中写 review 与 progress，`Commit` 成功后再依次广播持久化后的事件。
+
+错误：reviewer 必须输出严格 JSON，workflow 解析并直接调用保存接口。
+
+正确：reviewer 返回普通中文报告；主 agent 生成 terminal MCP 参数，workflow 绑定可信身份并在 MCP 成功后更新状态机。

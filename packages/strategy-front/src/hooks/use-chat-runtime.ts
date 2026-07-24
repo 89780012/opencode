@@ -142,6 +142,8 @@ function useEvents(workspacePath?: string | null) {
   const dispatch = useAppDispatch()
   const list = useAppSelector((state) => (workspacePath ? (state.chatSession.sessions[workspacePath] ?? sessions) : sessions))
   const key = useRef("")
+  const ids = useRef<string[]>([])
+  ids.current = list.map((item) => item.id)
 
   useEffect(() => {
     if (!workspacePath || typeof window === "undefined") {
@@ -192,6 +194,12 @@ function useEvents(workspacePath?: string | null) {
       clear(event)
       queue.push(event)
       timer ??= window.setTimeout(flush, frame)
+    }
+    src.onopen = () => {
+      void chatApi
+        .getSessionStatus(workspacePath)
+        .then((status) => dispatch(setSessionStatus({ sessions: ids.current, status })))
+        .catch(() => undefined)
     }
     src.onmessage = (msg) => {
       // 数据格式 data: {"type":"server.heartbeat","properties":{}}

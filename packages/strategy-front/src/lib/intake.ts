@@ -4,6 +4,11 @@ export type Intake = {
   id: string
 }
 
+export function fresh(loaded: boolean, reqs: string[], msgs: { role: string }[]) {
+  if (!loaded || reqs.length > 0) return false
+  return msgs.every((item) => item.role !== "user")
+}
+
 let seq = 0
 
 export function capture(store: Map<string, Intake>, scope: string, text: string) {

@@ -17,8 +17,21 @@ export function cleanDirt(): Dirt {
   return {
     state: "clean",
     updated: 0,
+    revision: 0,
     reason: "",
   }
+}
+
+/** 读取可触发自动流水线的代码版本，并兼容旧的内存状态。 */
+export function revision(input: Dirt) {
+  if (input.revision !== undefined) return input.revision
+  if (["edit", "write", "apply_patch", "multiedit"].includes(input.reason)) return input.updated
+  return 0
+}
+
+/** 读取代码版本所属会话，并兼容只有 session 的旧内存状态。 */
+export function owner(input: Dirt) {
+  return input.owner ?? (revision(input) ? input.session : undefined)
 }
 
 /** 根据 project 是否存在，生成默认的 project memory 视图。*/

@@ -4,7 +4,7 @@ import {
   freshAnalysis,
   items,
   requestAnalysis,
-  reviewState,
+  reviewText,
   validAnalysis,
   wantsFinal,
 } from "../src/state.js"
@@ -23,14 +23,11 @@ describe("smartx workflow state", () => {
     ])
   })
 
-  test("detects review state variants", () => {
-    expect(reviewState("review conclusion: passed")).toBe("passed")
-    expect(reviewState("review result: failed")).toBe("failed")
-    expect(reviewState("review status: error")).toBe("error")
-    expect(reviewState("there are still failed checks")).toBe("failed")
-    expect(reviewState("")).toBe("error")
-    expect(reviewState("审查结果为空")).toBe("error")
-    expect(reviewState("审查已经完成")).toBe("error")
+  test("keeps reviewer reports as plain text", () => {
+    expect(reviewText("审查结论：通过\n\n- 风控规则完整")).toBe("审查结论：通过\n\n- 风控规则完整")
+    expect(reviewText("<task_result>\n审查结论：未通过\n\n缺少止损\n</task_result>")).toBe(
+      "审查结论：未通过\n\n缺少止损",
+    )
   })
 
   test("detects final intent variants", () => {

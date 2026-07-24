@@ -12,9 +12,11 @@ import {
   updateRunRemote,
 } from "./remote.js"
 import { noteReviewer } from "./note.js"
+import { reviewText } from "./parse.js"
 import type { Automation, Fix, Memory, Pending, Project, Run, RunStart, RunUpdate, SaveReview } from "./types.js"
 import { createWorkspace } from "./workspace.js"
 import { ambient, python } from "./python.js"
+import { owner, revision } from "./life.js"
 
 const pythonPolicy =
   "In a SmartX workspace, run all Python through smartx_python. Use code for inline source or file for a workspace-relative .py script; do not invoke Python, package managers, or virtual environments through Bash."
@@ -70,7 +72,8 @@ type Dep = {
   workflow?: () => Promise<Automation>
   baseline?: () => Promise<boolean>
   call?: (name: string, args: Record<string, unknown>) => Promise<Record<string, unknown>>
-  dispatch?: (session: string, action: "review" | "fix", prompt: string) => Promise<void>
+  dispatch?: (session: string, action: "review" | "fix", prompt: string, workflow?: string) => Promise<void>
+  loadReview?: (session: string, workflow: string) => Promise<{ reviewId: string; reviewText: string } | undefined>
   runtime?: NonNullable<Parameters<typeof python>[0]>
 }
 
@@ -97,9 +100,7 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
   const driving = new Set<string>()
   const active =
     dep.workflow ??
-    (dep.baseline
-      ? async () => ({ ...disabled, baseline: await dep.baseline!() })
-      : () => loadWorkflowRemote(service))
+    (dep.baseline ? async () => ({ ...disabled, baseline: await dep.baseline!() }) : () => loadWorkflowRemote(service))
   const flag = async (session: string, fresh = false) => {
     if (!fresh && flags.has(session)) return flags.get(session) ?? disabled
     const cfg = await active().catch(() => disabled)
@@ -110,12 +111,57 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
   const start = dep.startRun ?? ((input: RunStart) => startRunRemote(service, input))
   const update = dep.updateRun ?? ((input: RunUpdate) => updateRunRemote(service, input))
   const call = dep.call ?? ((name: string, args: Record<string, unknown>) => callRemote(service, name, args))
+  const loadReview =
+    dep.loadReview ??
+    (async (session: string, workflow: string) => {
+      const result = await ctx.client.session.messages({
+        path: { id: session },
+        query: { directory: workspace, limit: 200 },
+      })
+      const rows = result.data ?? []
+      const parents = new Set(
+        rows
+          .filter((row) => row.info.role === "user")
+          .filter((row) =>
+            row.parts.some(
+              (part) => part.type === "text" && part.metadata?.smartxWorkflowId === workflow,
+            ),
+          )
+          .map((row) => row.info.id),
+      )
+      const task = rows
+        .flatMap((row) => {
+          if (row.info.role !== "assistant" || !parents.has(row.info.parentID)) return []
+          return row.parts
+            .filter(
+              (part) =>
+                part.type === "tool" &&
+                part.tool === "task" &&
+                part.state.input.subagent_type === "strategy-reviewer",
+            )
+            .map((part) => ({ part, time: row.info.time.created }))
+        })
+        .sort((a, b) => a.time - b.time)
+        .at(-1)
+        ?.part
+      if (!task || task.type !== "tool" || task.state.status !== "completed") return
+      const text = reviewText(task.state.output)
+      if (!text) return
+      return { reviewId: task.id, reviewText: text }
+    })
   const dispatch =
     dep.dispatch ??
-    (async (session: string, action: "review" | "fix", prompt: string) => {
+    (async (session: string, action: "review" | "fix", prompt: string, workflow?: string) => {
       const parts =
         action === "review"
           ? [
+              {
+                type: "text" as const,
+                text: "",
+                synthetic: true,
+                ignored: true,
+                metadata: { smartxWorkflowId: workflow, smartxWorkflowAction: action },
+              },
               {
                 type: "subtask" as const,
                 prompt,
@@ -123,7 +169,14 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
                 agent: "strategy-reviewer",
               },
             ]
-          : [{ type: "text" as const, text: prompt, synthetic: true }]
+          : [
+              {
+                type: "text" as const,
+                text: prompt,
+                synthetic: true,
+                metadata: { smartxWorkflowId: workflow, smartxWorkflowAction: action },
+              },
+            ]
       const result = await ctx.client.session.promptAsync({
         path: { id: session },
         query: { directory: workspace },
@@ -202,9 +255,7 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
     if (memory.get(id)?.needsSave) return false
     if (!cfg.baseline) return true
     return (
-      dirtyStates.get(id)?.state !== "dirty" &&
-      workspaces.get(id)?.state === "done" &&
-      charts.get(id)?.state === "done"
+      dirtyStates.get(id)?.state !== "dirty" && workspaces.get(id)?.state === "done" && charts.get(id)?.state === "done"
     )
   }
   const drive = async (session: string) => {
@@ -218,16 +269,19 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
       run = await load(workspace, session).catch(() => undefined)
       const scope = id + "\x00" + session
       const dirt = dirtyStates.get(id)
+      const code = dirt ? revision(dirt) : 0
+      const own = dirt ? owner(dirt) : undefined
       if (
         (!run || done(run)) &&
         dirt?.state === "dirty" &&
-        (!dirt.session || dirt.session === session) &&
-        dirt.updated > (run?.updatedAt ?? 0)
+        !!code &&
+        (!own || own === session) &&
+        run?.codeRevision !== String(code)
       ) {
         run = await start({
           workspacePath: workspace,
           sessionId: session,
-          codeRevision: String(dirt.updated),
+          codeRevision: String(code),
           review: cfg.review,
           debug: cfg.debug,
           backtest: cfg.backtest,
@@ -237,7 +291,7 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
       runs.set(scope, run)
       if (done(run)) return
       if (!ready(cfg)) {
-        await dispatch(session, "fix", "继续执行当前未完成的自动工作流步骤。")
+        await dispatch(session, "fix", "继续执行当前未完成的自动工作流步骤。", run.id)
         return
       }
       finalRequests.delete(scope)
@@ -249,7 +303,7 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
         if (run.state === "requested") {
           run = await save(run, { stage: "review", state: "dispatching" })
           const req = await call("get_requirements", { workspacePath: workspace, sessionId: session })
-          await dispatch(session, "review", noteReviewer(req.requirements ?? []))
+          await dispatch(session, "review", noteReviewer(req.requirements ?? []), run.id)
           await write("automatic review dispatched after idle", {
             sessionID: session,
             workspace,
@@ -259,8 +313,36 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
           return
         }
         if (run.state === "running") {
+          const saved = pending.get(scope)
+          const restored =
+            saved?.kind === "review" ? undefined : await loadReview(session, run.id).catch(() => undefined)
+          if (restored) {
+            pending.set(scope, {
+              kind: "review",
+              reviewId: restored.reviewId,
+              sessionId: session,
+              workspacePath: workspace,
+              worktreePath: worktree,
+              reviewText: restored.reviewText,
+            })
+            await write("workspace review handoff restored from session", {
+              sessionID: session,
+              workspace,
+              workflowId: run.id,
+              reviewId: restored.reviewId,
+            })
+          }
+          if (pending.get(scope)?.kind === "review") {
+            await dispatch(
+              session,
+              "fix",
+              "继续处理已经返回的审查报告，并调用 smartx_save_review 保存审查结果。",
+              run.id,
+            )
+            return
+          }
           await save(run, {
-            stage: "done",
+            stage: "review",
             state: "failed",
             error: "自动审查已经结束，但结构化结果未能保存。",
           })
@@ -276,20 +358,20 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
             worktree,
           )
         if (!fix) {
-          await save(run, { stage: "done", state: "failed", error: "自动审查修复上下文已丢失。" })
+          await save(run, { stage: "review", state: "failed", error: "自动审查修复上下文已丢失。" })
           return
         }
         reviewFixes.set(scope, fix)
         if (fix.changed && ready(cfg)) {
           await save(run, { stage: "review", state: "dispatching", reviewRound: run.reviewRound })
           const req = await call("get_requirements", { workspacePath: workspace, sessionId: session })
-          await dispatch(session, "review", noteReviewer(req.requirements ?? []))
+          await dispatch(session, "review", noteReviewer(req.requirements ?? []), run.id)
           return
         }
         const resumes = fix.resumes ?? 0
         if (resumes >= 2) {
           await save(run, {
-            stage: "done",
+            stage: "review",
             state: "failed",
             reviewRound: run.reviewRound,
             error: fix.changed ? "自动修复后的收口步骤连续两次没有完成。" : "自动修复连续两次未产生代码变更。",
@@ -297,7 +379,7 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
           return
         }
         reviewFixes.set(scope, { ...fix, resumes: resumes + 1 })
-        await dispatch(session, "fix", "继续执行当前未完成的自动修复步骤。")
+        await dispatch(session, "fix", "继续执行当前未完成的自动修复步骤。", run.id)
         return
       }
       if (run.stage === "debug") {
@@ -343,7 +425,7 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
           return
         }
         await save(run, {
-          stage: "done",
+          stage: "debug",
           state: "failed",
           error: typeof out.summary === "string" ? out.summary : "自动调试未通过。",
         })
@@ -365,7 +447,7 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
         error: String(err),
       })
       if (run && !done(run))
-        await save(run, { stage: "done", state: "failed", error: "自动工作流调度失败，请查看服务日志。" }).catch(
+        await save(run, { stage: run.stage, state: "failed", error: "自动工作流调度失败，请查看服务日志。" }).catch(
           () => {},
         )
     } finally {
@@ -418,8 +500,7 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
       //识别是否是审查请求
       if (wantsReview(text)) {
         const request = id + "\x00" + input.sessionID
-        const active =
-          reviewRuns.has(request) || pending.get(request)?.kind === "review" || reviewFixes.has(request)
+        const active = reviewRuns.has(request) || pending.get(request)?.kind === "review" || reviewFixes.has(request)
         if (!active) {
           reviewRequests.add(request)
           await write("workspace review requested", {

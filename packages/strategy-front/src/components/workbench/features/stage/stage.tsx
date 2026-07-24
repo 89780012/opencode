@@ -1,6 +1,7 @@
 import { useRef, useState } from "react"
 import { useSystem } from "@/components/system/system-provider"
 import { useChatRuntime } from "@/hooks/use-chat-runtime"
+import { fresh } from "@/lib/intake"
 import { selectRequirementReview, useAppDispatch, useAppSelector } from "@/store"
 import { updateSessionAbortStatus } from "@/store/chat-session-slice"
 import { clearRequirementReview, setStage } from "@/store/workbench-slice"
@@ -36,7 +37,7 @@ export function StageView() {
   const path = real.workspace?.path ?? ""
   const revision = useAppSelector((state) => selectRequirementReview(state, path, stage.active))
   const aligned = !!path && stage.path === path && !!stage.active && real.chat.selectedSessionId === stage.active
-  const disabled = !aligned || chat.busy || chat.submitting || real.chat.creating || stage.reviewing
+  const disabled = !aligned || !real.chat.loaded || chat.busy || chat.submitting || real.chat.creating || stage.reviewing
   const session = stage.stage === "session"
   const empty = real.entry.load
     ? real.entry.phase === "init"
@@ -46,10 +47,10 @@ export function StageView() {
 
   const send = async (text: string, clear = true, intake = true) => {
     // 仅新建会话的第一条消息才自动录入需求，后续消息不再追加 TODO
-    const fresh = !real.chat.selectedSessionId
+    const first = fresh(real.chat.loaded, stage.cur.analyzedRequirements, real.chat.messages)
     dispatch(updateSessionAbortStatus({ sessionId: real.chat.selectedSessionId || "", status: false }))
     dispatch(setStage("session"))
-    return chat.submit({ text }, { clear, intake: intake && sys.cfg.workbench.intake && fresh })
+    return chat.submit({ text }, { clear, intake: intake && sys.cfg.workbench.intake && first })
   }
 
   const inspect = async (text: string) => {
@@ -117,7 +118,7 @@ export function StageView() {
       {stage.stage === "timeline" ? <TimelineStage cur={stage.cur} active={stage.active} /> : null}
       <Composer
         busy={chat.busy}
-        disabled={real.chat.creating || !aligned}
+        disabled={real.chat.creating || !real.chat.loaded || !aligned}
         submitting={chat.submitting || real.chat.creating}
         reviewing={stage.reviewing}
         value={chat.draft.text}
