@@ -29,11 +29,6 @@ export function revision(input: Dirt) {
   return 0
 }
 
-/** 读取代码版本所属会话，并兼容只有 session 的旧内存状态。 */
-export function owner(input: Dirt) {
-  return input.owner ?? (revision(input) ? input.session : undefined)
-}
-
 /** 根据 project 是否存在，生成默认的 project memory 视图。*/
 export function cleanMemory(project?: Project): Memory {
   return {

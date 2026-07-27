@@ -1,11 +1,23 @@
 import { describe, expect, test } from "bun:test"
 import { build } from "../src/hooks.js"
-import type { Pending, Run, SaveReview } from "../src/types.js"
+import type { Pending, Run, RunStart, SaveReview } from "../src/types.js"
 
-function ctx(prompts: unknown[] = [], messages: unknown[] = []) {
+type Log = {
+  body: {
+    message: string
+    extra?: Record<string, unknown>
+  }
+}
+
+function ctx(prompts: unknown[] = [], messages: unknown[] = [], logs: Log[] = []) {
   return {
     client: {
-      app: { log: async () => ({ data: true }) },
+      app: {
+        log: async (input: Log) => {
+          logs.push(input)
+          return { data: true }
+        },
+      },
       session: {
         get: async () => ({ data: { parentID: undefined } }),
         promptAsync: async (input: unknown) => {
@@ -58,6 +70,31 @@ function warning() {
 }
 
 describe("automatic workflow idle driver", () => {
+  test("prefixes logs with the current strategy, session, and workflow state", async () => {
+    const logs: Log[] = []
+    const scope = "f:/repo\x00f:/repo\x00s1"
+    const hooks = build(ctx([], [], logs), {
+      workflowRuns: new Map([[scope, run({ stage: "debug", state: "running" })]]),
+    })
+
+    await hooks["chat.message"]?.(
+      { sessionID: "s1", messageID: "m1", agent: "smartx-helper" },
+      { message: {} as never, parts: [{ type: "text", text: "continue" } as never] },
+    )
+
+    const row = logs.find((item) => item.body.message.endsWith(" chat.message"))
+    expect(row?.body.message).toBe(
+      "[smartx-workflow][session=s1][strategy=repo][workflow=workflow-1][stage=debug][state=running] chat.message",
+    )
+    expect(row?.body.extra).toMatchObject({
+      strategy: "repo",
+      sessionID: "s1",
+      workflowId: "workflow-1",
+      workflowStage: "debug",
+      workflowState: "running",
+    })
+  })
+
   test("does not resume a cancelled workflow after the abort idle event", async () => {
     const calls: string[] = []
     const dispatches: string[] = []
@@ -97,7 +134,7 @@ describe("automatic workflow idle driver", () => {
         },
       ],
     ])
-    const runs = new Map([[scope, run({ state: "running", reviewRound: 2 })]])
+    const workflowRuns = new Map([[scope, run({ state: "running", reviewRound: 2 })]])
     const fixes = new Map([
       [
         scope,
@@ -117,7 +154,7 @@ describe("automatic workflow idle driver", () => {
     const hooks = build(ctx(), {
       parent: async () => false,
       pending,
-      runs,
+      workflowRuns,
       reviewFixes: fixes,
       workflow: async () => ({ baseline: false, review: true, debug: false, backtest: false }),
       loadRun: async () => current,
@@ -475,7 +512,8 @@ describe("automatic workflow idle driver", () => {
     } as never)
 
     expect(starts).toBe(0)
-    expect(dirty.get("f:/repo\x00f:/repo")).toMatchObject({ owner: "s1", session: "s2", reason: "bash" })
+    expect(dirty.get("f:/repo\x00f:/repo")).toMatchObject({ owner: "s1", reason: "bash" })
+    expect(dirty.get("f:/repo\x00f:/repo")).not.toHaveProperty("session")
 
     await hooks.event?.(idle)
 
@@ -489,7 +527,7 @@ describe("automatic workflow idle driver", () => {
     let current = run({ codeRevision: "100", state: "fixing", reviewRound: 1, updatedAt: 200 })
     let starts = 0
     const dirty = new Map([
-      [id, { state: "dirty" as const, updated: 100, revision: 100, owner: "s1", reason: "edit", session: "s1" }],
+      [id, { state: "dirty" as const, updated: 100, revision: 100, owner: "s1", reason: "edit" }],
     ])
     const fixes = new Map([
       [
@@ -505,12 +543,12 @@ describe("automatic workflow idle driver", () => {
         },
       ],
     ])
-    const runs = new Map([[scope, current]])
+    const workflowRuns = new Map([[scope, current]])
     const hooks = build(ctx(), {
       parent: async () => false,
       dirtyStates: dirty,
       reviewFixes: fixes,
-      runs,
+      workflowRuns,
       workflow: async () => ({ baseline: false, review: true, debug: false, backtest: false }),
       loadRun: async () => current,
       startRun: async () => {
@@ -610,7 +648,7 @@ describe("automatic workflow idle driver", () => {
   test("does not create a workflow for another idle session or disabled automation", async () => {
     let starts = 0
     const dirty = new Map([
-      ["f:/repo\x00f:/repo", { state: "dirty" as const, updated: Date.now(), reason: "edit", session: "s1" }],
+      ["f:/repo\x00f:/repo", { state: "dirty" as const, updated: Date.now(), reason: "edit", owner: "s1" }],
     ])
     const other = build(ctx(), {
       parent: async () => false,
@@ -641,6 +679,143 @@ describe("automatic workflow idle driver", () => {
     } as never)
 
     expect(starts).toBe(0)
+  })
+
+  test("starts debug directly for a new Run when review is disabled", async () => {
+    const id = "f:/repo\x00f:/repo"
+    const calls: string[] = []
+    const dispatches: string[] = []
+    let started: RunStart | undefined
+    let current: Run | undefined
+    const hooks = build(ctx(), {
+      parent: async () => false,
+      dirtyStates: new Map([
+        [id, { state: "dirty" as const, updated: 100, revision: 100, owner: "s1", reason: "edit" }],
+      ]),
+      workflow: async () => ({ baseline: false, review: false, debug: true, backtest: false }),
+      loadRun: async () => current,
+      startRun: async (input) => {
+        started = input
+        current = run({
+          codeRevision: input.codeRevision,
+          stage: "debug",
+          state: "requested",
+          reviewEnabled: input.review,
+          debugEnabled: input.debug,
+          backtestEnabled: input.backtest,
+        })
+        return current
+      },
+      updateRun: async (input) => {
+        current = { ...current!, ...input, revision: current!.revision + 1, updatedAt: Date.now() }
+        return current
+      },
+      call: async (name) => {
+        calls.push(name)
+        if (name === "start") {
+          current = { ...current!, state: "running", debugId: "debug-1", revision: current!.revision + 1 }
+          return { debugId: "debug-1", live: true }
+        }
+        if (name === "logs") return { state: "passed", summary: "未发现致命问题" }
+        throw new Error(`unexpected call ${name}`)
+      },
+      dispatch: async (_session, action) => {
+        dispatches.push(action)
+      },
+    })
+
+    await hooks.event?.({
+      event: { type: "session.status", properties: { sessionID: "s1", status: { type: "idle" } } },
+    } as never)
+
+    expect(started).toMatchObject({ review: false, debug: true, backtest: false })
+    expect(calls).toEqual(["start", "logs"])
+    expect(dispatches).toEqual([])
+    expect(current).toMatchObject({ stage: "done", state: "passed" })
+  })
+
+  test("starts backtest directly for a new Run when review and debug are disabled", async () => {
+    const id = "f:/repo\x00f:/repo"
+    const calls: string[] = []
+    const dispatches: string[] = []
+    let started: RunStart | undefined
+    let current: Run | undefined
+    const hooks = build(ctx(), {
+      parent: async () => false,
+      dirtyStates: new Map([
+        [id, { state: "dirty" as const, updated: 100, revision: 100, owner: "s1", reason: "edit" }],
+      ]),
+      workflow: async () => ({ baseline: false, review: false, debug: false, backtest: true }),
+      loadRun: async () => current,
+      startRun: async (input) => {
+        started = input
+        current = run({
+          codeRevision: input.codeRevision,
+          stage: "backtest",
+          state: "requested",
+          reviewEnabled: input.review,
+          debugEnabled: input.debug,
+          backtestEnabled: input.backtest,
+        })
+        return current
+      },
+      call: async (name) => {
+        calls.push(name)
+        if (name === "run_backtest") {
+          current = { ...current!, state: "running", backtestId: "backtest-1", revision: current!.revision + 1 }
+          return { accepted: true }
+        }
+        throw new Error(`unexpected call ${name}`)
+      },
+      dispatch: async (_session, action) => {
+        dispatches.push(action)
+      },
+    })
+
+    await hooks.event?.({
+      event: { type: "session.status", properties: { sessionID: "s1", status: { type: "idle" } } },
+    } as never)
+
+    expect(started).toMatchObject({ review: false, debug: false, backtest: true })
+    expect(calls).toEqual(["run_backtest"])
+    expect(dispatches).toEqual([])
+    expect(current).toMatchObject({ stage: "backtest", state: "running", backtestId: "backtest-1" })
+  })
+
+  test("continues an existing Run after current workflow settings are disabled", async () => {
+    let current = run({
+      stage: "debug",
+      state: "requested",
+      reviewEnabled: false,
+      debugEnabled: true,
+      backtestEnabled: false,
+    })
+    const calls: string[] = []
+    const hooks = build(ctx(), {
+      parent: async () => false,
+      workflow: async () => ({ baseline: false, review: false, debug: false, backtest: false }),
+      loadRun: async () => current,
+      updateRun: async (input) => {
+        current = { ...current, ...input, revision: current.revision + 1, updatedAt: Date.now() }
+        return current
+      },
+      call: async (name) => {
+        calls.push(name)
+        if (name === "start") {
+          current = { ...current, state: "running", debugId: "debug-1", revision: current.revision + 1 }
+          return { debugId: "debug-1", live: true }
+        }
+        if (name === "logs") return { state: "passed", summary: "未发现致命问题" }
+        throw new Error(`unexpected call ${name}`)
+      },
+    })
+
+    await hooks.event?.({
+      event: { type: "session.status", properties: { sessionID: "s1", status: { type: "idle" } } },
+    } as never)
+
+    expect(calls).toEqual(["start", "logs"])
+    expect(current).toMatchObject({ stage: "done", state: "passed" })
   })
 
   test("calls start logs and backtest directly through MCP after idle", async () => {

@@ -1,7 +1,7 @@
 ﻿import { describe, expect, test } from "bun:test"
 import type { ToolContext } from "@opencode-ai/plugin"
 import { build } from "../src/hooks.js"
-import { loadBaselineRemote, loadRemote } from "../src/remote.js"
+import { disabled, loadRemote, loadWorkflowRemote } from "../src/remote.js"
 import { backtest, debug, kind, python } from "../src/tool.js"
 import {
   analyze,
@@ -22,6 +22,10 @@ import type { Memory, Pending, Project, Run, SaveReview } from "../src/types.js"
 type Row = {
   message: string
   extra?: Record<string, unknown>
+}
+
+function record(rows: Row[], message: string) {
+  return rows.find((item) => item.message.endsWith(" " + message))
 }
 
 function stub(rows: Row[]) {
@@ -68,7 +72,7 @@ function setup(input: ReturnType<typeof ctx>, dep: Parameters<typeof build>[1] =
     memory: restored(),
     projects: projects(),
     saveReview: async () => {},
-    baseline: async () => true,
+    workflow: async () => ({ ...disabled, baseline: true }),
     ...dep,
   })
 }
@@ -190,11 +194,11 @@ describe("smartx workspace analysis", () => {
     try {
       globalThis.fetch = (async () =>
         Response.json({ data: { workbench: { intake: true }, workflow: { baseline: true } } })) satisfies typeof fetch
-      expect(await loadBaselineRemote("http://localhost:4096")).toBe(true)
+      expect(await loadWorkflowRemote("http://localhost:4096")).toEqual({ ...disabled, baseline: true })
       globalThis.fetch = (async () => Response.json({ data: { workflow: {} } })) satisfies typeof fetch
-      expect(await loadBaselineRemote("http://localhost:4096")).toBe(false)
+      expect(await loadWorkflowRemote("http://localhost:4096")).toEqual(disabled)
       globalThis.fetch = (async () => new Response("", { status: 500 })) satisfies typeof fetch
-      expect(await loadBaselineRemote("http://localhost:4096")).toBe(false)
+      expect(await loadWorkflowRemote("http://localhost:4096")).toEqual(disabled)
     } finally {
       globalThis.fetch = prev
     }
@@ -203,7 +207,11 @@ describe("smartx workspace analysis", () => {
   test("skips and protects workspace baseline actions while disabled", async () => {
     const workspaces = new Map<string, Analysis>()
     const dirtyStates = new Map()
-    const hooks = setup(ctx("f:/repo"), { workspaces, dirtyStates, baseline: async () => false })
+    const hooks = setup(ctx("f:/repo"), {
+      workspaces,
+      dirtyStates,
+      workflow: async () => ({ ...disabled, baseline: false }),
+    })
     const system = { system: [] as string[] }
 
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, system)
@@ -255,7 +263,7 @@ describe("smartx workspace analysis", () => {
     const id = workspace()
     const scope = id + "\x00s1"
     const hooks = setup(ctx("f:/repo"), {
-      baseline: async () => false,
+      workflow: async () => ({ ...disabled, baseline: false }),
       dirtyStates: new Map([[id, { state: "dirty", updated: 1, reason: "edit" }]]),
       reviewRequests: new Set([scope]),
     })
@@ -304,7 +312,7 @@ describe("smartx workspace analysis", () => {
       pending,
       dirtyStates,
       baselineModes,
-      baseline: async () => on,
+      workflow: async () => ({ ...disabled, baseline: on }),
     })
 
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, { system: [] })
@@ -340,7 +348,10 @@ describe("smartx workspace analysis", () => {
   test("applies a changed baseline switch on the next system turn", async () => {
     let on = false
     const workspaces = new Map<string, Analysis>()
-    const hooks = setup(ctx("f:/repo"), { workspaces, baseline: async () => on })
+    const hooks = setup(ctx("f:/repo"), {
+      workspaces,
+      workflow: async () => ({ ...disabled, baseline: on }),
+    })
     const first = { system: [] as string[] }
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, first)
     expect(workspaces.has(workspace())).toBe(false)
@@ -418,7 +429,7 @@ describe("smartx workspace analysis", () => {
     await hooks["experimental.chat.system.transform"]?.({ sessionID: "s2", model: {} as never }, next)
 
     expect(next.system.join("\n")).toContain("strategy-flowchart-generator")
-    expect(rows.some((item) => item.message === "workspace analysis completed")).toBe(true)
+    expect(record(rows, "workspace analysis completed")).toBeDefined()
   })
 
   test("records flowchart results and asks the main agent to save through mcp", async () => {
@@ -485,7 +496,7 @@ describe("smartx workspace analysis", () => {
     )
 
     expect(pending.has(id)).toBe(false)
-    expect(rows.some((item) => item.message === "workspace flowchart completed")).toBe(true)
+    expect(record(rows, "workspace flowchart completed")).toBeDefined()
   })
 
   test("prioritizes workspace gates when baseline is missing", async () => {
@@ -670,7 +681,7 @@ describe("smartx workspace analysis", () => {
       ],
     ])
     const hooks = build(ctx("f:/repo"), {
-      baseline: async () => true,
+      workflow: async () => ({ ...disabled, baseline: true }),
       memory,
       projects: projects(),
       dirtyStates: dirty,
@@ -825,7 +836,7 @@ describe("smartx workspace analysis", () => {
       ],
     ])
     const hooks = build(ctx("f:/repo"), {
-      baseline: async () => true,
+      workflow: async () => ({ ...disabled, baseline: true }),
       memory,
       projects: projects(),
       dirtyStates: dirty,
@@ -903,7 +914,7 @@ describe("smartx workspace analysis", () => {
 
     expect(workspaces.get(id)?.state).toBe("requested")
     expect(charts.get(id)?.state).toBe("requested")
-    expect(rows.some((item) => item.message === "workspace refresh requested")).toBe(true)
+    expect(record(rows, "workspace refresh requested")).toBeDefined()
 
     await expect(
       hooks["tool.execute.before"]?.(
@@ -1016,7 +1027,7 @@ describe("smartx workspace analysis", () => {
       ),
     ).rejects.toThrow("active review")
     expect(saved).toHaveLength(1)
-    expect(rows.some((item) => item.message === "workspace review requested")).toBe(true)
+    expect(record(rows, "workspace review requested")).toBeDefined()
   })
 
   test("rejects a reviewer that has no user request or review fix", async () => {
@@ -1406,7 +1417,7 @@ describe("smartx workspace analysis", () => {
 
     expect(pending.has(scope)).toBe(false)
     expect(fixes.has(scope)).toBe(false)
-    expect(rows.find((item) => item.message === "workspace review saved through mcp")?.extra?.state).toBe("error")
+    expect(record(rows, "workspace review saved through mcp")?.extra?.state).toBe("error")
   })
 
   test("isolates concurrent reviewer reports by session and review id", async () => {
@@ -1522,7 +1533,7 @@ describe("smartx workspace analysis", () => {
     expect(fix.system.join("\n")).toContain("主 agent")
     expect(fix.system.join("\n")).toContain("strategy-reviewer")
     expect(fix.system.join("\n")).toContain("缺少止损保护")
-    expect(rows.some((item) => item.message === "workspace review needs fix")).toBe(true)
+    expect(record(rows, "workspace review needs fix")).toBeDefined()
 
     await hooks["tool.execute.after"]?.(
       {
@@ -1674,7 +1685,7 @@ describe("smartx workspace analysis", () => {
     expect(out.system.join("\n")).toContain("save_project_state")
     expect(workspaces.get(id)?.state).toBe("done")
     expect(charts.get(id)?.state).toBe("done")
-    expect(rows.some((item) => item.message === "project memory save reminder injected")).toBe(true)
+    expect(record(rows, "project memory save reminder injected")).toBeDefined()
   })
 
   test("injects automatic close reminder after dirty changes", async () => {
@@ -1806,14 +1817,14 @@ describe("smartx workspace analysis", () => {
       createdAt: 1,
       updatedAt: 3,
     }
-    const runs = new Map([[scope, run]])
+    const workflowRuns = new Map([[scope, run]])
     const hooks = setup(ctx("f:/repo"), {
       pending,
       reviewFixes: fixes,
-      runs,
+      workflowRuns,
       updateRun: async (input) => {
         run = { ...run, ...input, revision: run.revision + 1, updatedAt: run.updatedAt + 1 }
-        runs.set(scope, run)
+        workflowRuns.set(scope, run)
         return run
       },
     })
@@ -1856,14 +1867,14 @@ describe("smartx workspace analysis", () => {
     const id = workspace()
     const scope = id + "\x00s1"
     let current: Run | undefined
-    const runs = new Map<string, Run>()
+    const workflowRuns = new Map<string, Run>()
     const pending = new Map<string, Pending>()
     const update = async (input: Parameters<NonNullable<Parameters<typeof build>[1]["updateRun"]>>[0]) => {
       current = { ...current!, ...input, revision: current!.revision + 1, updatedAt: current!.updatedAt + 1 }
       return current
     }
     const hooks = build(ctx(), {
-      runs,
+      workflowRuns,
       pending,
       projects: projects(),
       memory: restored(),
@@ -1962,12 +1973,12 @@ describe("smartx workspace analysis", () => {
       backtestCall,
     )
     expect(backtestCall.args).toMatchObject({ workflowId: "workflow-1", requestKey: "pipeline:workflow-1" })
-    expect(runs.get(scope)?.id).toBe("workflow-1")
+    expect(workflowRuns.get(scope)?.id).toBe("workflow-1")
   })
 
   test("requires project memory restore before sustained work", async () => {
     const hooks = build(ctx("f:/repo"), {
-      baseline: async () => true,
+      workflow: async () => ({ ...disabled, baseline: true }),
       projects: projects(true),
       memory: new Map(),
     })
@@ -2009,7 +2020,7 @@ describe("smartx workspace analysis", () => {
     const memory = new Map<string, Memory>()
     const workspaces = new Map<string, Analysis>()
     const hooks = build(ctx("f:/repo"), {
-      baseline: async () => true,
+      workflow: async () => ({ ...disabled, baseline: true }),
       projects: projects(false),
       memory,
       workspaces,
@@ -2041,7 +2052,7 @@ describe("smartx workspace analysis", () => {
     const workspaces = new Map<string, Analysis>([[workspace(), requestAnalysis("f:/repo", "f:/repo")]])
     const charts = new Map<string, Chart>()
     const hooks = build(ctx("f:/repo"), {
-      baseline: async () => true,
+      workflow: async () => ({ ...disabled, baseline: true }),
       projects: projects(),
       memory,
       workspaces,
@@ -2079,6 +2090,43 @@ describe("smartx workspace analysis", () => {
     ).resolves.toBeUndefined()
   })
 
+  test("keeps a requested refresh ahead of a stale persisted baseline", async () => {
+    const id = workspace()
+    const workspaces = new Map<string, Analysis>([[id, requestAnalysis("f:/repo", "f:/repo")]])
+    const charts = new Map<string, Chart>([[id, requestChart("f:/repo", "f:/repo")]])
+    const baselineModes = new Map([[id, "refresh" as const]])
+    let loads = 0
+    let chartLoads = 0
+    const hooks = setup(ctx("f:/repo"), {
+      workspaces,
+      charts,
+      baselineModes,
+      load: async () => {
+        loads++
+        return doneAnalysis("f:/repo", "f:/repo", "stale", ["stale"])
+      },
+      loadChart: async () => {
+        chartLoads++
+        return {
+          workspace: "f:/repo",
+          worktree: "f:/repo",
+          state: "done",
+          mermaidCode: "flowchart TD\nA-->B",
+          errorText: "",
+          updated: Date.now(),
+        }
+      },
+    })
+
+    const out = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]?.({ sessionID: "s1", model: {} as never }, out)
+
+    expect(loads).toBe(0)
+    expect(chartLoads).toBe(0)
+    expect(workspaces.get(id)?.state).toBe("requested")
+    expect(out.system.join("\n")).toContain("workspace-analyzer")
+  })
+
   test("marks project memory stale after writes and requires save before final wrap-up", async () => {
     const id = workspace()
     const memory = restored()
@@ -2097,7 +2145,7 @@ describe("smartx workspace analysis", () => {
       ],
     ])
     const hooks = build(ctx("f:/repo"), {
-      baseline: async () => true,
+      workflow: async () => ({ ...disabled, baseline: true }),
       memory,
       projects: projects(),
       workspaces,

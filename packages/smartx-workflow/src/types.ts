@@ -31,9 +31,9 @@ export type Dirt = {
   /** 产生源码版本的主会话；普通运行活动不得接管它。 */
   owner?: string
   reason: string
-  session?: string
 }
 
+// 启动状态、刷新模式、最终模式
 export type Mode = "boot" | "refresh" | "final"
 
 export type Life = "idle" | "booting" | "ready" | "dirty" | "refreshing" | "finalizing"
@@ -121,13 +121,15 @@ export type Memory = {
   needsSave: boolean
 }
 
+// 自动化
 export type Automation = {
-  baseline: boolean
-  review: boolean
-  debug: boolean
-  backtest: boolean
+  baseline: boolean // 工作流基线
+  review: boolean // 审查
+  debug: boolean // 调试
+  backtest: boolean // 回测
 }
 
+// 工作流的一些状态
 export type Run = {
   id: string
   workspacePath: string

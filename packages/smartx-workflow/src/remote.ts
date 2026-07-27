@@ -1,5 +1,16 @@
 import { items, serial } from "./parse.js"
-import type { Analysis, Automation, Chart, Project, Run, RunStart, RunUpdate, Save, SaveChart, SaveReview } from "./types.js"
+import type {
+  Analysis,
+  Automation,
+  Chart,
+  Project,
+  Run,
+  RunStart,
+  RunUpdate,
+  Save,
+  SaveChart,
+  SaveReview,
+} from "./types.js"
 
 type Rpc = {
   result?: {
@@ -33,6 +44,7 @@ type ConfigRow = {
   }
 }
 
+// 默认系统的配置全部是不启动状态
 export const disabled: Automation = {
   baseline: false,
   review: false,
@@ -112,11 +124,6 @@ export async function callRemote(service: string, name: string, args: Record<str
   return data as Record<string, unknown>
 }
 
-/** 读取安装级工作区基线开关；缺少服务或读取失败时保持关闭。 */
-export async function loadBaselineRemote(service: string) {
-  return (await loadWorkflowRemote(service)).baseline
-}
-
 /** 把 analysis 结果保存到 strategy-service。 */
 export async function saveRemote(service: string, input: Save) {
   if (!service) return
@@ -172,7 +179,11 @@ export async function loadRemote(service: string, workspace: string, worktree: s
 }
 
 /** 从 strategy-service 读取最近一次 flowchart 快照。 */
-export async function loadChartRemote(service: string, workspace: string, worktree: string): Promise<Chart | undefined> {
+export async function loadChartRemote(
+  service: string,
+  workspace: string,
+  worktree: string,
+): Promise<Chart | undefined> {
   if (!service) return undefined
   const url = new URL("/api/workbench/flowchart", service)
   url.searchParams.set("workspacePath", workspace)
@@ -192,7 +203,11 @@ export async function loadChartRemote(service: string, workspace: string, worktr
 }
 
 /** 从 strategy-service 读取 project memory 是否存在。 */
-export async function loadProjectRemote(service: string, workspace: string, worktree: string): Promise<Project | undefined> {
+export async function loadProjectRemote(
+  service: string,
+  workspace: string,
+  worktree: string,
+): Promise<Project | undefined> {
   if (!service) return undefined
   const url = new URL("/api/workbench/project-state", service)
   url.searchParams.set("workspacePath", workspace)
