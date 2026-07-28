@@ -1,6 +1,6 @@
 ---
 name: smartx-develop
-description: 用于分析、实现、调试与验证的 SmartX 开发指引，必须严格依据本地 references 与工作区证据，不得伪造 SDK 用法。
+description: 用于分析、实现、调试与验证 SmartX 开发态 Python 组件的指引，依据本地 pythonApiDev.md 与工作区证据核对 API、事件、回调、参数、字段和类型，不得伪造 SDK 用法。用户要求编写、修改、审阅或排查 SmartX Python 组件时使用。
 ---
 
 # SmartX 开发
@@ -16,14 +16,14 @@ description: 用于分析、实现、调试与验证的 SmartX 开发指引，�
 开始前先做这些事：
 
 - 阅读 `README.md`
-- 阅读 `references/pythonApi.md`
-- 阅读 `references/pythonGetDtaApi.md`
+- 读取 `references/pythonApiDev.md` 开头的 API 全景图
+- 按本次使用的接口名、事件名或类型名搜索 `references/pythonApiDev.md`，只读取命中章节及其签名、参数、返回值和示例；不要把整份文档一次性加载到上下文
 - 确认本次实现目标、运行入口和验证方式
 
 证据优先级：
 
 1. 当前任务相关代码、配置、README 和工作区文件
-2. `references/*.md`
+2. `references/pythonApiDev.md`
 3. 工作区已有 SmartX 示例或调用方式
 4. 其他补充材料
 
@@ -31,7 +31,7 @@ description: 用于分析、实现、调试与验证的 SmartX 开发指引，�
 
 1. 任何 SmartX API、事件、回调、参数名、字段名、返回结构、调用顺序，都必须先找到本地依据。
 2. 没有明确依据时，不要假设某个 SDK API 或字段存在。
-3. 如果 `references/` 没覆盖当前需求，先查工作区已有实现；仍无证据时，明确说明“文档未覆盖”。
+3. 如果 `references/pythonApiDev.md` 没覆盖当前需求，先查工作区已有实现；仍无证据时，明确说明“文档未覆盖”。
 4. 如果文档与代码冲突，先指出冲突，再基于当前工作区约束做最小实现。
 5. 不要把其他交易框架、其他语言 SDK 或模型记忆中的接口套进当前 SmartX 工作区。
 
@@ -48,7 +48,7 @@ description: 用于分析、实现、调试与验证的 SmartX 开发指引，�
 实现要求：
 
 1. 动手前，先列出本次会用到哪些 SmartX 接口，并核对本地说明。
-2. 下单、订阅、历史数据、账户、持仓、回调相关逻辑，以本地 reference 中的名称和签名为准。
+2. 下单、订阅、历史数据、账户、持仓、回调相关逻辑，以 `references/pythonApiDev.md` 中的名称和签名为准。
 3. 如果用户需求超出文档支持范围，优先收窄实现并明确限制。
 4. 如果只能做推断，必须把推断标出来，且推断不能替代 SDK 事实。
 5. 如果任务明确涉及 JS、EJS 或 Vue 前端源码，改完后必须运行 `npm run build`。

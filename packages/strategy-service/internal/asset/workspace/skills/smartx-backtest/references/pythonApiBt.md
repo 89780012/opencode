@@ -12,8 +12,6 @@ title: Smart
 **事件回调**
 
 * [on_init](#on-init) - Python策略运行环境初始完成后回调，为了保证程序正常，组件所有代码均在此之后执行
-* [on_show](#on-show) - Python组件页面被激活展示时的回调，可以重新申请一些on_hide释放掉的资源
-* [on_hide](#on-hide) - Python组件页面被切走时的回调，可以释放一些不必要的资源
 * [on_close](#on-close) - Python组件页面被关闭时回调，彻底释放掉组件所有资源
 
 **方法**
@@ -21,30 +19,12 @@ title: Smart
 * [cancel_order](#撤单-cancel-order) 全局方法撤单
 * [subscribe](#订阅行情-subscribe) 全局方法订阅行情
 * [unsubscribe](#取消订阅行情-unsubscribe) 全局方法取消订阅
-* [subscribe_index](#订阅指数行情-subscribe-index) 全局方法订阅指数行情
-* [unsubscribe_index](#取消订阅指数行情-unsubscribe-index) 全局方法取消订阅指数行情
-* [insertAlgoOrder](#下算法单-insertalgoorder) 创建并运行策略 <Badge type="warning" text="标准版不支持" />
-* [subscribeETFProfit](#订阅etf折溢价预期利润-subscribeetfprofit) 订阅ETF折溢价预期利润
-* [unsubscribeETFProfit](#取消订阅etf折溢价预期利润-unsubscribeetfprofit) 取消订阅ETF折溢价预期利润
 * [add_timer](#添加单次定时-add-timer) 添加单次定时
 * [clear_timer](#清除单次定时-clear-timer) 清除单次定时
 * [add_time_interval](#添加轮询定时-add-time-interval) 添加轮询定时
 * [clear_time_interval](#清除轮询定时-clear-time-interval) 清除轮询定时
-* [createStrategy](#创建策略实例-createstrategy) 创建一个新的策略 <Badge type="warning" text="标准版不支持" />
-* [startStrategy](#运行策略实例-startstrategy) 开始运行策略实例 <Badge type="warning" text="标准版不支持" />
-* [submit_source_apply](#券源申请提交-submit-source-apply) 券源申请提交 <Badge type="warning" text="仅支持两融账户" />
-* [queryCreditAssets](#查询信用资产信息-querycreditassets) 查询信用资产信息 <Badge type="warning" text="仅支持两融账户" />
-* [querySelfSelectStockList](#查询自选股列表-queryselfselectstocklist) 查询自选股列表
-* [query_source_quote_list](#查询券源行情-query-source-quote-list) 查询券源行情列表 <Badge type="warning" text="仅支持两融账户" />
 * [getInstrument](#查找一个证券-getinstrument) 查找一个证券
-* [getETFList](#获取可交易的etf列表-getetflist) 获取可交易的ETF列表
-* [getETFBasket](#获取etf成分股列表-getetfbasket) 获取ETF的成分股列表
-* [getIPOList](#获取ipo列表-getipolist) 获取IPO列表
-* [getBondReverseRepoList](#获取国债逆回购列表-getbondreverserepolist) 获取国债逆回购列表
-* [getConvertableBond](#获取可转债信息-getconvertablebond) 获取可转债信息 <Badge type="warning" text="标准版不支持" />
 * [getSystemSet](#获取smart系统【设置】中参数-getsystemset) 获取smart系统【设置】中参数
-* [registCallableFunction](#注册给js调用的函数-registcallablefunction) 注册给JS调用的函数
-* [callJSFunction](#调用js的函数接口-calljsfunction) 调用JS的函数接口
 * [notice](#消息提醒-notice) 组件消息推送到全局，如告警
 * [subscribe_bar](#订阅bar行情-subscribe-bar) 全局方法订阅bar行情
 * [unsubscribe_bar](#取消订阅bar行情-unsubscribe-bar) 全局方法取消订阅bar行情
@@ -52,36 +32,25 @@ title: Smart
 * [query_bar_today](#同步-获取当天任意分钟的bar行情-query-bar-today) 全局方法同步-获取当天任意分钟的bar行情
 * [query_bar_async](#异步-获取历史bar数据-query-bar-async) 全局方法异步-查询历史bar数据
 * [query_bar](#同步-获取历史bar数据-query-bar) 全局方法同步-查询历史bar数据
-* [subscribe_indicator](#通用指标订阅-subscribe-indicator) 全局方法通用指标订阅
-* [unsubscribe_indicator](#取消通用指标订阅-unsubscribe-indicator) 全局方法取消通用指标订阅
+* [query_tick](#同步-查询历史tick数据-query-tick) 全局同步方法-查询历史tick数据
+* [query_tick_async](#异步-查询历史tick数据-query-tick-async) 全局异步方法-查询历史tick数据
 * [query_market_data_async](#异步-获取市场数据-query-market-data-async) 全局方法异步查询市场数据(ticker行情)
 * [query_market_data](#同步-获取市场数据-query-market-data) 全局方法同步查询市场数据(ticker行情)
-* [get_trading_day_async](#异步-获取当前交易日及下一交易日-get-trading-day-async) 全局方法异步获取当前交易日及下一交易日
-* [get_trading_day](#同步-获取当前交易日及下一交易日-get-trading-day) 全局方法同步获取当前交易日及下一交易日
 * [query_data_async](#异步查询数据接口-query-data-async) 全局方法异步查询数据
 * [query_data](#同步查询数据接口-query-data) 全局方法同步查询数据
 * [query_data_page_async](#异步分页查询数据接口-query-data-page-async) 全局方法异步分页查询数据
 * [query_data_page](#同步分页查询数据接口-query-data-page) 全局方法同步分页查询数据
 * [add_self_select_stock](#添加自选股-add-self-select-stock) 全局方法添加自选股
 * [del_self_select_stock](#删除自选股-del-self-select-stock) 全局方法删除自选股
-* [query_etf_purchase_redemption_top_limit](#删除自选股-query-etf-purchase-redemption-top-limit) 全局方法查询 etf 申赎上限
 * [close](#关闭当前组件-close) 关闭当前组件
-<!-- * [newStrategyInstance](#smart-newstrategyinstance) 创建策略实例 -->
-<!-- * [addStrategy](#smart-addstrategy) 登记一个策略 -->
-<!-- * modifyStrategy 修改策略 (v1.0.0 暂未实现) -->
-<!-- * removeStrategy 删除一个策略 (v1.0.0 暂未实现) -->
-<!--* [download](#smart-download) 从服务器下载资源 -->
 
 **属性**
 
 * [current_account](#当前登录的资金账号-current-account) 当前客户端登录的主资金账号
 * [account_map](#已登录的资金账号集合-account-map) 当前客户端登录的所有账户集合对象，key为资金账号，value为账号[Account](#资金账户-account)对象
-* [strategy_map](#策略集合-strategy-map) 策略集合
 * [instrument_list](#证券列表-instrument-list) 所有证券列表
 * [instrument_map](#证券索引集合-instrument-map) key为证券代码_市场，方便查找证券
 * [instrument_map_by_type](#证券类型集合-instrument-map-by-type) 按证券类型进行区分的证券map列表
-* [etf_map](#可交易etf集合-etf-map) 可交易etf集合 
-* [reverse_repo_list](#国债逆回购列表-reverse-repo-list) 国债逆回购列表 
 
 **静态对象**
 
@@ -97,41 +66,19 @@ title: Smart
 <code>
 <a href="#smart">smart</a> //smart框架对象，组件开发所需的api、事件、数据、工具等的全局入口对象
   |—— <a href="#on-init">on_init(callback)</a> //Python策略运行环境初始完成后回调，为了保证程序正常，组件所有代码均在此之后执行（如订阅行情）
-  |—— <a href="#on-show">on_show(callback)</a> //Python组件页面被激活展示时的回调，可以重新申请一些on_hide释放掉的资源
-  |—— <a href="#on-hide">on_hide(callback)</a> //Python组件页面被切走时的回调，可以释放一些不必要的资源
   |—— <a href="#on-close">on_close(callback)</a> //Python组件页面被关闭时回调，彻底释放掉组件所有资源
   |—— <a href='#下单-insert-order'>insert_order</a> //全局方法下单 <Badge type="warning" text="标准版不支持两融" />
   |—— <a href='#撤单-cancel-order'>cancel_order</a> //全局方法撤单
   |—— <a href='#订阅行情-subscribe'>subscribe</a> //全局方法订阅
   |—— <a href='#取消订阅行情-unsubscribe'>unsubscribe</a> //全局方法取消订阅
-  |—— <a href='#订阅指数行情-subscribe-index'>subscribe_index</a> //全局方法订阅指数
-  |—— <a href='#取消订阅指数行情-unsubscribe-index'>unsubscribe_index</a> //全局方法取消订阅指数
-  |—— <a href='#下算法单-insertalgoorder'>insertAlgoOrder </a> //创建并开始运行策略实例 <Badge type="warning" text="标准版不支持" /><!-- 
-  |—— <a href='#smart-download'>download</a> //从服务器下载资源 -->
-  |—— <a href='#订阅etf折溢价预期利润-subscribeetfprofit'>subscribeETFProfit</a> //订阅ETF折溢价预期利润
-  |—— <a href='#取消订阅etf折溢价预期利润-unsubscribeetfprofit'>unsubscribeETFProfit</a> //取消订阅ETF折溢价预期利润<!-- 
-  |—— <a href='#smart-newstrategyinstance'>newStrategyInstance</a> //创建策略实例 --><!-- 
-  |—— <a href='#smart-addstrategy'>addStrategy</a> //登记一个策略 --><!-- 
-  |—— //modifyStrategy //修改策略  1.0.0暂未实现 --><!-- 
-  |—— //removeStrategy //删除一个策略 1.0.0暂未实现 -->
   |—— <a href='#添加单次定时-add-timer'>add_timer</a> 添加单次定时
   |—— <a href='#清除单次定时-clear-timer'>clear_timer</a> 清除单次定时
   |—— <a href='#添加轮询定时-add-time-interval'>add_time_interval</a> 添加轮询定时
   |—— <a href='#清除轮询定时-clear-time-interval'>clear_time_interval</a> 清除轮询定时
-  |—— <a href='#创建策略实例-createstrategy'>createStrategy </a> //从头创建一个全新的策略 <Badge type="warning" text="标准版不支持" />
-  |—— <a href='#运行策略实例-startstrategy'>startStrategy </a> //开始运行策略实例 <Badge type="warning" text="标准版不支持" />
-  |—— <a href='#券源申请提交-submit-source-apply'>submit_source_apply</a> //券源申请提交 <Badge type="warning" text="仅支持两融账户" />
-  |—— <a href='#查询信用资产信息-querycreditassets'>queryCreditAssets</a> //查询信用资产信息 <Badge type="warning" text="仅支持两融账户" />
-  |—— <a href='#查询自选股列表-queryselfselectstocklist'>querySelfSelectStockList</a> //查询自选股列表
-  |—— <a href='#查询券源行情-query-source-quote-list'>query_source_quote_list</a> //查询券源行情列表 <Badge type="warning" text="仅支持两融账户" />
   |—— <a href='#查找一个证券-getinstrument'>getInstrument</a> //查找一个证券
   |—— <a href='#获取可交易的etf列表-getetflist'>getETFList</a> //获取可交易的ETF列表
   |—— <a href='#获取etf成分股列表-getetfbasket'>getETFBasket</a> //获取ETF的成分股列表
-  |—— <a href='#获取ipo列表-getipolist'>getIPOList</a> //获取IPO列表
-  |—— <a href='#获取国债逆回购列表-getbondreverserepolist'>getBondReverseRepoList</a> //获取国债逆回购列表
-  |—— <a href='#获取可转债信息-getconvertablebond'>getConvertableBond</a> //获取可转债信息 <Badge type="warning" text="标准版不支持" />
-  |—— <a href='#获取smart系统【设置】中参数-getsystemset'>getSystemSet</a> //获取smart系统【设置】中参数<!-- 
-  |—— <a href='#opensystemset'>openSystemSet</a> //打开smart系统【设置】菜单-->
+  |—— <a href='#获取smart系统【设置】中参数-getsystemset'>getSystemSet</a> //获取smart系统【设置】中参数
   |—— <a href='#消息提醒-notice'>notice</a> //推送全局消息，通知消息提醒
   |—— <a href='#订阅bar行情-subscribe-bar'>subscribe_bar</a> //全局方法订阅bar行情
   |—— <a href='#取消订阅bar行情-unsubscribe-bar'>unsubscribe_bar</a> //全局方法取消订阅bar行情
@@ -139,8 +86,8 @@ title: Smart
   |—— <a href='#同步-获取当天任意分钟的bar行情-query-bar-today'>query_bar_today</a> //全局方法同步-获取当天任意分钟的bar行情
   |—— <a href='#异步-获取历史bar数据-query-bar-async'>query_bar_async</a> //全局方法异步-获取历史bar数据
   |—— <a href='#同步-获取历史bar数据-query-bar'>query_bar</a> //全局方法同步-获取历史bar数据
-  |—— <a href='#通用指标订阅-subscribe-indicator'>subscribe_indicator</a> //全局方法全局方法通用指标订阅
-  |—— <a href='#取消通用指标订阅-unsubscribe-indicator'>unsubscribe_indicator</a> //全局方法取消通用指标订阅
+  |—— <a href='#同步-查询历史tick数据-query-tick'>query_tick</a> //全局同步方法-查询历史tick数据
+  |—— <a href='#异步-查询历史tick数据-query-tick-async'>query_tick_async</a> //全局异步方法-查询历史tick数据
   |—— <a href='#异步-获取市场数据-query-market-data-async'>query_market_data_async</a> //全局方法异步查询市场数据(ticker行情)
   |—— <a href='#同步-获取市场数据-query-market-data'>query_market_data</a> //全局方法同步查询市场数据(ticker行情)
   |—— <a href='#异步-获取当前交易日及下一交易日-get-trading-day-async'>get_trading_day_async</a> //全局方法异步获取当前交易日及下一交易日
@@ -151,7 +98,6 @@ title: Smart
   |—— <a href='#同步分页查询数据接口-query-data-page'>query_data_page</a> //
   |—— <a href='#添加自选股-add-self-select-stock'>add_self_select_stock </a> //全局方法添加自选股 <Badge type="warning" text="标准版不支持" />
   |—— <a href='#删除自选股-del-self-select-stock'>del_self_select_stock </a> //全局方法删除自选股 <Badge type="warning" text="标准版不支持" />
-  |—— <a href='#查询 etf 申赎上限-query-etf-purchase-redemption-top-limit '>query_etf_purchase_redemption_top_limit  </a> //全局方法查询 etf 申赎上限 <Badge type="warning" text="标准版不支持" />
   |—— <a href='#关闭组件-close'>close </a> //全局方法关闭组件 <Badge type="warning" text="标准版不支持" />
   |—— <a href='#资金账户-account'>current_account</a> //当前客户端登录的主资金账号
   |—— <a href="#证券列表-instrument-list">instrument_list</a> //所有证券列表（全局静态数据）
@@ -162,23 +108,14 @@ title: Smart
   |—— <a href="#可交易etf集合-etf-map">etf_map</a> //可交易etf集合（全局静态数据）
   |      |—— ETF ETF对象
   |       		|—— 各种etf属性
-  |—— <a href="#国债逆回购列表-reverse-repo-list">reverse_repo_list</a> //国债逆回购列表（全局静态数据）
   |      |—— <a href="#证券信息-instrument">Instrument</a> 证券对象
-  |       		|—— 各种instrument属性<!--
-  |—— <a href="#alphax-td-list">alphax_td_list</a> alphax的实时td列表
-  |—— <a href="#alphax-md-list">alphax_md_list</a> alphax的实时md列表  -->
-  |—— <a href="#策略集合-strategy-map">strategy_map</a> 所有当前客户端登录的账号下的策略列表的集合 <Badge type="warning" text="标准版不支持" />
+  |       		|—— 各种instrument属性
   |—— <a href='#已登录的资金账号集合-account-map'>account_map</a> 当前客户端登录的所有账户集合对象，key为资金账号，value为账号对象
   |      |—— '1090000000001':<a href="#资金账户-account">account</a> 账号对象
   |     		    |—— account_id //资金账号
   |     		    |—— nick_name //资金账号的昵称
-  |     		    |—— isLevel2 //是否是level2
-  |     		    |—— exchange_right //沪深交易权限
   |     		    |—— account_type //账户类型 AccountType
-  |     		    |—— source //账户的柜台类型<!--
-  |     		    |—— <a href='#alphax-td-status'>alphax_td_status</a> //alphax td的实时运行状态
-  |     		    |—— <a href='#alphax-md-status'>alphax_md_status</a> //alphax md的实时运行状态 
-  |     		    |—— ipo_list //该账号的打新列表 账号相关-->
+  |     		    |—— source //账户的柜台类型
   |     		    |—— <a href='#账号资产信息-assets'>assets</a>  //实时账户资产Assets对象
   |     		    |		|—— 各种assets属性
   |     		    |—— <a href='#account-position-list'>position_list</a> //实时账号持仓
@@ -194,12 +131,6 @@ title: Smart
   |     		    |—— <a href='#account-cancel-order'>cancel_order</a> //撤单
   |     		    |—— <a href='#account-subscribe'>subscribe</a>  //订阅行情
   |     		    |—— <a href='#account-unsubscribe'>unsubscribe</a> //取消订阅
-  |     		    |—— <a href='#account-subscribe-index'>subscribe_index</a>  //订阅指数行情
-  |     		    |—— <a href='#account-unsubscribe-index'>unsubscribe_index</a> //取消订阅指数行情<!-- 
-  |     		    |—— <a href='#account-newstrategyinstance'>newStrategyInstance</a> //创建策略实例
-  |     		    |—— <a href='#account-addstrategy'>addStrategy</a> //登记一个策略
-  |     		    |—— <a href='#account-modifystrategy'>modifyStrategy</a> //修改策略
-  |     		    |—— <a href='#account-removestrategy'>removeStrategy</a> //删除一个策略 -->
   |     		    |—— <a href='#account-on-quote'>on_quote</a>(<a href='#行情信息-quote'>quote</a>=>{})  //行情变化推送
   |     		    			   |—— 各种Quote对象属性
   |     		    |—— <a href='#account-on-order'>on_order</a>(<a href='#委托回报-order'>order</a>=>{})  //委托变化推送
@@ -207,115 +138,16 @@ title: Smart
   |     		    |—— <a href='#account-on-trade'>on_trade</a>(<a href='#成交回报-trade'>trade</a>=>{})  //成交推送 
   |     		    |—— <a href='#account-on-position'>on_position</a>(<a href='#持仓-position'>position</a>=>{})  //账户持仓变化的增量推送
   |     		    |—— <a href='#account-on-assets'>on_asstes</a>(<a href='#账号资产信息-assets'>assets</a>=>{})  //账户资金的推送
-  |     		    |—— <a href='#account-on-credit-ticker-assign'>on_credit_ticker_assign</a>(<a href='#信用可融券头寸信息-credittickerassigninfo'>creditTickerAssignInfo</a>=>{})  //信用可融券头寸信息的推送 <Badge type="warning" text="仅支持两融账户" />
-  |     		    |—— <a href='#account-on-credit-debt-finance'>on_credit_debt_finance</a>(<a href='#信用融资负债信息-creditdebtfinance'>creditDebtFinance</a>=>{})  //信用融资负债信息的推送 <Badge type="warning" text="仅支持两融账户" />
-  |     		    |—— <a href='#account-on-credit-debt-security'>on_credit_debt_security</a>(<a href='#信用融券负债信息-creditdebtsecurity'>creditDebtSecurity</a>=>{})  //信用融券负债信息的推送 <Badge type="warning" text="仅支持两融账户" />
-  |     		    |—— <a href='#account-submit-source-apply'>submit_source_apply</a>()  //提交券源申请 <Badge type="warning" text="仅支持两融账户" />
-  |     		    |—— <a href='#account-createstrategy'>createStrategy</a>()  // 创建一个新的策略 <Badge type="warning" text="标准版不支持" />
-  |     		    |—— <a href='#account-querycreditassets'>queryCreditAsset</a>() //查询信用资产信息 <Badge type="warning" text="仅支持两融账户" />
-  |     		    |—— <a href='#account-strategy-map'>strategy_map</a>  //代表该资金账号的策略集合 key为strategy_id+'_'+StrategyPlatformType value为strategy对象 <Badge type="warning" text="标准版不支持" />
-  |     		    	    |—— '网格交易001'+'_Algo':<a href='#策略对象-strategy'>strategy</a>
-  |     		    		    		|—— strategy_id //策略id
-  |     		    		    		|—— strategy_platform_type //策略平台类型 <a href='#策略平台类型-strategyplatformtype'>StrategyPlatformType枚举</a> 
-  |     		    		    		|—— //parent_order_id //母单编号  1.0.0暂未实现
-  |     		    		    		|—— status //策略状态 
-  |     		    		    		|—— status_name //策略状态中文
-  |     		    		    		|—— isPrivate   //是否是私有策略 
-  |     		    		    		|—— round_list 轮次列表 策略每start一次为一个round
-  |     		    		    		|          |—— <a href='#策略的轮次信息-round'>Round</a> 轮次信息
-  |     		    		    		|                 |—— 各种轮次信息的属性
-  |     		    		    		|—— last_round 最新的一个轮次<a href='#策略的轮次信息-round'>Round</a>对象
-  |     		    		    		|—— //book //实时策略账簿 目前仅对AlphaX有效
-  |     		    		    		|—— <a href='#strategy-strategy-position-list'>strategy_position_list</a> //实时策略持仓列表，元素为<a href='#持仓-position'>Position</a>对象
-  |     		    		    		|—— <a href='#strategy-strategy-order-list'>strategy_order_list</a> //实时策略委托确认列表，元素为<a href='#委托回报-order'>Order</a>对象
-  |     		    		    		|—— <a href='#strategy-strategy-trade-list'>strategy_trade_list</a> //实时策略成交回报列表，元素为<a href='#成交回报-trade'>Trade</a>对象
-  |     		    		    		|—— <a href='#strategy-relation-account-map'>relation_account_map</a> //一个策略操作多个账户时使用，value为<a href='#资金账户-account'>Account</a>对象
-  |     		    		    		|                      //可通过addAccount添加，每次策略启动都要动态添加
-  |     		    		    		|		|—— '1090000000001':<a href='#资金账户-account'>account</a> 当前登录账号对象引用
-  |     		    		    		|					|—— 该账号在策略创建时就自动挂载relation_account_map下
-  |     		    		    		|					|—— 策略与账户委托的订单互相不相关
-  |     		    		    		|					|—— 订阅行情通过account.subscribe及account.addEventListener添加一个本策略的处理函数
-  |     		    		    		|					|—— 该账号下的数据、事件、接口均可用
-  |     		    		    		|		|—— '1090000000002':account 账号对象引用
-  |     		    		    		|					|—— 需要通过addAccount添加，该账号下也有了本策略对象
-  |     		    		    		|					|—— 下账号级别单，通过该account.insert_order本策略on_order不会收到
-  |     		    		    		|					|—— 相同的柜台，如果一个账号已经订阅了行情，另一个账号无需再订阅，这里可用于不同柜台如期货
-  |     		    		    		|					|—— 该账号下的数据、事件、接口均可用 <!-- 
-  |     		    		    		|—— //<a href='#strategy-addaccount'>addAccount</a> //添加资金账号，添加后策略就能收到这个账号的订阅、order、trade，该账号也被同步加入smart.accountMap中，1.0.0暂未实现
-  |     		    		    		|—— //<a href='#strategy-removeaccount'>removeAccount</a> //解除策略与资金账号绑定关系，策略无法收到该账户的订阅、order、trade，该账号从smart.accountMap删除，1.0.0暂未实现
-  |     		    		    		|                 //并不是真的删除了物理资金账号，只是解除了与策略的关系，也解除了与当前账号的关系
-  |     		    		    		|—— //uploadFile //上传策略文件，1.0.0暂未实现 -->
-  |     		    		    		|—— <a href='#strategy-startstrategy'>startStrategy</a> //启动策略 
-  |     		    		    		|—— <a href='#strategy-stopstrategy'>stopStrategy</a> //停止策略 
-  |     		    		    		|—— <a href='#strategy-forcestopstrategy'>forceStopStrategy</a> /强制停止策略  <!-- 
-  |     		    		    		|—— <a href='#strategy-poststrategyparamsbeforestart'>postStrategyParamsBeforeStart</a> //策略启动前传参
-  |     		    		    		|—— <a href='#strategy-poststrategyparams'>postStrategyParams</a> //策略运行期间向策略透传通用参数
-  |     		    		    		|—— <a href='#strategy-download'>download</a> //将后台的策略参数下载到前台
-  |     		    		    		|—— <a href='#strategy-on-alphax-msg'>on_alphax_msg</a> //接收后端功夫策略的自定义消息推送
-  |     		    		    		|—— //modifyStrategyBook //修改某策略的book账簿数据，1.0.0暂未实现
-  |     		    		    		|—— //modifyStrategyPosition //修改某策略的持仓数据，1.0.0暂未实现
-  |     		    		    		|—— //setCommission //设置费率，1.0.0暂未实现
-  |     		    		    		|—— //subscribeStrategyLog //订阅策略日志并接受实时变动，1.0.0暂未实现
-  |     		    		    		|—— //unsubscribeStrategyLog //取消订阅策略日志并取消实时变动，1.0.0暂未实现
-  |     		    		    		|—— //getStrategyLogContent //取的日志N行内容，1.0.0暂未实现
-  |     		    		    		|—— //throwStrategyException //抛出异常通知 on_strategy_exception会被触发，仅Front前台策略使用，1.0.0暂未实现 
-  |     		    		    		|—— <a href='#strategy-starttd'>startTD</a> //启动TD进程，AlphaX专用
-  |     		    		    		|—— <a href='#strategy-startmd'>startTD</a> //启动MD进程，AlphaX专用 -->
-  |     		    		    		|—— <a href='#strategy-on-strategy-quote'>on_strategy_quote</a>(<a href='#行情信息-quote'>quote</a>=>{}) //1.0.0暂未实现，某策略订阅的行情推送，策略之间、组件之间、策略和账户直接的订阅和取消订阅不相互影响
-  |     		    		    		|—— <a href='#strategy-on-order'>on_order</a>(<a href='#委托回报-order'>order</a>=>{}) //某策略的委托变化推送 
-  |     		    		    		|—— <a href='#strategy-on-trade'>on_trade</a>(<a href='#成交回报-trade'>trade</a>=>{}) //某策略的成交回报推送<!--
-  |     		    		    		|—— <a href='#strategy-on-position'>on_position</a>(<a href='#持仓-position'>position</a>=>{}) //某策略持仓增量变化推送-->
-  |     		    		    		|—— //on_book //某策略账簿变化推送，目前仅对AlphaX有效 <!--
-  |     		    		    		|—— <a href='#strategy-on-book'>on_book</a>(<a href='#book'>book</a>=>{})   //某策略账簿变化推送 1.0.0暂未实现
-  |     		    		    		|—— <a href='#strategy-on-strategy-cancel-fail'>on_strategy_cancel_fail</a>(fail=>{}) //某策略撤单失败消息推送
-  |     		    		    		|—— <a href='#strategy-on-alphax-msg'>on_alphax_msg</a>(fail=>{}) //alphax 策略往前端推送数据 -->
-  |     		    		    		|—— <a href='#strategy-on-strategy-status-change'>on_strategy_status_change</a>(fail=>{}) //策略进程状态变化推送 <!--
-  |     		    					|—— //on_strategy_upload_result //某策略上传结果消息推送，1.0.0暂未实现
-  |     		    					|—— //on_strategy_start_result //某策略启动结果消息推送，1.0.0暂未实现
-  |     		    					|—— //on_strategy_stop_result //某策略停止结果消息推送，1.0.0暂未实现
-  |     		    					|—— //on_strategy_force_stop_result //某策略强制停止消息推送，1.0.0暂未实现
-  |     		    					|—— //on_strategy_exception //某策略运行中的异常消息，如td、md断线，程序异常等，1.0.0暂未实现
-  |     		    					|—— //on_strategy_log //某策略log日志发生变化时，1.0.0暂未实现
-  |     		    					|—— //on_strategy_pre_start //后台策略pre_start后触发或前台策略start后触发，1.0.0暂未实现
-  |     		    					|—— //on_strategy_post_start //后台策略post_start后或前台策略pre_start后触发，1.0.0暂未实现
-  |     		    					|—— //on_strategy_pre_stop //后台策略pre_stop后或前台策略stop前触发，1.0.0暂未实现 -->
-  |     		    		    		|—— //insert_order //策略级别的下单，入参要有account_id，strategy_platform_type、strategy_id选填，1.0.0暂未实现 
-  |     		    		    		|—— //cancel_order //策略级别的撤单，入参要有account_id，1.0.0暂未实现
-  |     		    		    		|—— //subscribe //策略级别订阅，入参要有account_id，1.0.0暂未实现
-  |     		    		    		|—— //unsubscribe //策略级别取消订阅，入参要有account_id，1.0.0暂未实现
   |—— <a href='#事件-event'>Event</a> 所有事件的枚举
   |      |—— ON_INIT //组件初始化
   |      |—— ON_CLOSE //组件被关闭
-  |      |—— ON_SHOW //组件被显示
-  |      |—— ON_HIDE //组件被隐藏
-  |      |—— ON_RESET //组件用户数据被清空重置 
   |      |—— ON_QUOTE //订阅行情后，行情变化推送
   |      |—— ON_ORDER //委托变化推送
   |      |—— ON_TRADE //成交变化推送
   |      |—— ON_CANCEL_FAIL //撤单失败的消息推送
   |      |—— ON_POSITION //账户持仓变化的增量推送
-  |      |—— ON_ASSETS  //账户资金的全量推送<!--
-  |      |—— ON_BOOK //某策略资金的全量推送
-  |      |—— ON_STRATEGY_CANCEL_FAIL //某策略撤单失败消息推送
-  |      |—— ON_STRATEGY_UPLOAD_RESULT  //某策略上传结果事件
-  |      |—— ON_STRATEGY_FORCE_STOP_RESULT //某策略强制停止结果消息
-  |      |—— ON_STRATEGY_EXCEPTION  //某策略运行中的异常消息，如td、md断线，程序异常等
-  |      |—— ON_STRATEGY_LOG  //某策略log日志发生变化时的增量变化消息
-  |      |—— ON_STRATEGY_PRE_START  //后台组件的策略pre_start完成后触发
-  |      |—— ON_STRATEGY_POST_START  //后台组件的策略post_start完成后触发
-  |      |—— ON_STRATEGY_PRE_STOP  //后台组件的策略pre_stop完成后触发 -->
-  |      |—— ON_STRATEGY_STATUS_CHANGE  //策略状态变化时推送 <!--
-  |      |—— ON_ALPHAX_TD_STATUS_CHANGE //alphax td状态变化时推送
-  |      |—— ON_ALPHAX_MD_STATUS_CHANGE //alphax md状态变化时推送
-  |      |—— ON_ALPHAX_MSG //alphax 策略往前端推送数据 -->
-  |      |—— ON_ETF_PROFIT //ETF 折溢价利润推送数据ETFProfit
-  |      |—— ON_ETF_RATE_UPDATE //ETF 更新ETF套利/交易费用设置通知
-  |      |—— ON_SYSTEM_SET_UPDATE //更新系统全局常用设置项通知
-  |      |—— ON_CREDIT_TICKER_ASSIGN //更新信用账户可融券头寸信息 <Badge type="warning" text="仅支持两融账户" />
-  |      |—— ON_CREDIT_DEBT_FINANCE //更新融资负债合约信息 <Badge type="warning" text="仅支持两融账户" />
-  |      |—— ON_CREDIT_DEBT_SECURITY //更新融券负债合约信息 <Badge type="warning" text="仅支持两融账户" />
+  |      |—— ON_ASSETS  //账户资金的全量推送
   |      |—— ON_BAR //订阅bar行情后，bar行情变化推送
-  |      |—— ON_INDICATOR //订阅通用指标后，数据变化推送
   |—— <a href='#数据类型-type'>Type</a> 所有数据类型的定义
   |      |—— <a href="#柜台类型-source">Source</a> 柜台类型源
   |      |—— <a href="#交易所-exchange">Exchange</a> 交易所
@@ -329,27 +161,12 @@ title: Smart
   |      |—— <a href="#成交量条件-volumecondition">VolumeCondition</a> 成交量条件
   |      |—— <a href="#成交时间条件-timecondition">TimeCondition</a> 成交时间条件
   |      |—— <a href="#账号类型-accounttype">AccountType</a> 账号类型, 现货|信用|期货|衍生品
-  |      |—— <a href="#策略平台类型-strategyplatformtype">StrategyPlatformType</a> 策略平台类型 <Badge type="warning" text="标准版不支持" />
-  |      |		|—— Front //客户端直接运行的js前端策略
-  |      |		|—— Algo  //算法平台 
-  |      |		|—— AlphaX  //AlphaX即功夫
-  |      |		|—— ProgramTrade  //程序化交易，客户自己的程序化
-  |      |		|—— Spec  //特定平台，按ProgramTrade相同的逻辑处理，1.0.0未写入文档
-  |      |		|—— FrontPy  //客户端Python策略类型
   |      |—— <a href="#etf配方表-etf">ETF</a> 某ETF配方表明细对象定义
   |      |—— <a href="#持仓-position">Position</a> 持仓对象定义
   |      |—— <a href="#委托回报-order">Order</a> 委托确认对象定义
   |      |—— <a href="#成交回报-trade">Trade</a> 成交回报对象定义
   |      |—— <a href="#行情信息-quote">Quote</a>  行情信息对象定义
-  |      |—— <a href="#证券信息-instrument">Instrument</a> 证券对象定义 <!--
-  |      |—— <a href="#策略的轮次信息-round">Round</a> 策略执行的轮次信息对象定义 --><!--
-  |      |—— <a href="#策略执行状态-strategystatus">StrategyStatus</a> 策略执行状态-->
-  |      |—— <a href="#新股信息-ipo">IPO</a> 新股信息
-  |      |—— <a href="#可转债信息-convertablebond">ConvertableBond</a> 可转债信息
-  |      |—— <a href="#信用可融券头寸信息-credittickerassigninfo">CreditTickerAssignInfo</a> 信用可融券头寸信息 <Badge type="warning" text="仅支持两融账户" />
-  |      |—— <a href="#信用融资负债信息-creditdebtfinance">CreditDebtFinance</a> 信用融资负债信息 <Badge type="warning" text="仅支持两融账户" />
-  |      |—— <a href="#信用融券负债信息-creditdebtsecurity">CreditDebtSecurity</a> 信用融券负债信息 <Badge type="warning" text="仅支持两融账户" />
-  |      |—— <a href="#券源行情信息-sourcequoteinfo">SourceQuoteInfo</a> 券源行情信息 <Badge type="warning" text="仅支持两融账户" />
+  |      |—— <a href="#证券信息-instrument">Instrument</a> 证券对象定义
   |      |—— <a href="#行情bar信息-bar">Bar</a> 行情bar信息对象定义
   |      |—— <a href="#分页信息-datapageinfo">DataPageInfo</a> 分页信息对象定义
   |      |—— <a href="#查询结构类型-outformat">OutFormat</a> 查询结构类型定义
@@ -368,16 +185,7 @@ title: Smart
   |     |—— <a href='#删除-delete'>delete</a> //删除
   |     |—— <a href='#数组添加-push'>push</a> //数组添加
   
-  <!-- 
-  |—— <a href='#logger'>logger</a> 日志工具对象
-        |—— debug
-        |—— info
-        |—— warning
-        |—— warn
-        |—— log
-        |—— error
-        |—— exception
-        |—— critical-->
+
 </code>
 </pre>
 
@@ -409,36 +217,10 @@ smart.on_close(close)
 smart.on(smart.Event.ON_CLOSE, close)
 ```
 
-### `on_show`
-
-> Python组件页面被激活展示时的回调，可以重新申请一些on_hide释放掉的资源
-
-```python
-def show():
-    logger.debug("show")
-smart.on_show(show)
-# 或者 emitter 写法
-smart.on(smart.Event.ON_SHOW, show)
-```
-
-### `on_hide`
-
-> Python组件页面被切走时的回调，可以释放一些不必要的资源
-
-```python
-def hide():
-    logger.debug("hide")
-smart.on_hide(hide)
-# 或者 emitter 写法
-smart.on(smart.Event.ON_HIDE, hide)
-```
 
 ## smart对象下的全局方法
 
 ### `下单-insert_order` <Badge type="warning" text="标准版不支持两融" />
-[普通下单示例](../example/pythonApiExample.md#委托下单)  
-[国债逆回购下单示例](../example/pythonApiExample.md#国债逆回购下单)  
-[两融下单示例](../example/pythonApiExample.md#两融业务下单)  <Badge type="warning" text="标准版不支持两融" />
 
 > 通过SDK接口向柜台委托订单。
 > 注意：通过该接口委托的订单，不被归属于任何策略。
@@ -497,8 +279,47 @@ smart.insert_order(
 )
 ```
 
+#### 下单示例
+```python
+from smart import *
+import time
+from datetime import datetime
+import logging
+from smart.type import AccountType
+logger = logging.getLogger()
+
+def init():
+    def insert_callback(order,err):
+        if(err):
+            logger.debug("get error from insert_order:%s",err)
+            # 输出：RspError({'code': '9003', 'message': KeyError('')})
+        else:
+            logger.debug("get insert_order: %s",smart.utils.toString(order))
+            # 输出：{"rcv_time": null, "order_id": "37906458003637227", "source_order_id": "37906458003637227", "insert_time": null, "update_time": null, "trading_day": null, "instrument_id": "300001", "exchange_id": "SZE", "account_id": "253191000961", "client_id": "d21562c1-3b0b-11ee-b730-3319f43f98a4", "instrument_type": 1, "limit_price": 19.18, "frozen_price": 19.18, "volume": 200, "volume_traded": 0, "volume_left": 200, "tax": null, "commission": null, "status": 1, "error_id": null, "error_msg": null, "side": 1, "offset": 100, "price_type": 1, "volume_condition": 0, "time_condition": 2, "parent_order_id": null, "code": "300001.SZ", "traffic": "frontpy", "traffic_sub_id": "PythonDemo-_dev_", "cancel_time": null, "order_cancel_client_id": null, "order_cancel_xtp_id": null, "instrument_name": "特锐德", "trade_amount": 0, "xtp_business_type": "XTP_BUSINESS_TYPE_CASH", "xtp_market_type": "XTP_MKT_SZ_A", "xtp_price_type": "XTP_PRICE_LIMIT", "xtp_position_effect_type": "XTP_POSITION_EFFECT_INIT", "xtp_side_type": "XTP_SIDE_BUY", "xtp_order_status": "XTP_ORDER_STATUS_INIT", "exchange_id_name": "深交所", "instrument_type_name": "股票", "status_name": "初始化", "side_name": "买", "offset_name": "初始值", "price_type_name": "限价", "xtp_business_type_name": "普通股票", "xtp_market_name": "深A", "xtp_price_type_name": "限价", "xtp_position_effect_type_name": "初始值", "xtp_side_type_name": "买", "xtp_order_status_name": "初始化", "volume_condition_name": "任何数量", "time_condition_name": "本节有效", "traffic_name": "Python策略", "business_type": "frontpy"}
+    smart.insert_order(
+        instrument_id='300001', 
+        exchange_id=smart.Type.Exchange.SZE, 
+        price_type=smart.Type.PriceType.Limit, 
+        limit_price=19.18, 
+        volume=200,
+        side=smart.Type.Side.Buy,
+        offset=smart.Type.Offset.Init,
+        business_type=smart.Type.BusinessType.CASH,
+        callback=insert_callback)
+
+def show():
+    print("show")
+def hide():
+    print("hide")
+def close():
+    print("close")
+smart.on_init(init)
+smart.on_show(show)
+smart.on_hide(hide)
+smart.on_close(close)
+```
+
 ### `撤单-cancel_order`
-[委托撤单示例](../example/pythonApiExample.md#委托撤单)
 
 > 通过SDK接口向柜台撤销已委托的订单。
 * `account_id` String(选填) - 交易账号（资金账号），默认为当前账号id
@@ -512,9 +333,57 @@ def cancel_callback(data,err):
         logger.debug("get cancel_insert:%s",smart.utils.toString(data))
 smart.cancel_order(account_id, order_id, callback)
 ```
+#### 撤单示例
+```python
+from smart import *
+import time
+from datetime import datetime
+import logging
+from smart.type import AccountType
+logger = logging.getLogger()
+
+def init():
+    def insert_callback(order,err):
+        if(err):
+            logger.debug("get error from insert_order:%s",err)
+            # 输出：RspError({'code': '9003', 'message': KeyError('')})
+        else:
+            logger.debug("get insert_order: %s",smart.utils.toString(order))
+            
+            def cancel_callback(data,err):
+                if(err):
+                    logger.debug("get error from cancel_insert:%s",err)
+                    # 输出：RspError({'code': '9003', 'message': KeyError('')})
+                else:
+                    logger.debug("get cancel_insert:%s",data)
+                    # 输出：{'orderXtpId': '37906458003637226', 'userName': '253191000961', 'reqID': '00000000007', 'requestID': 'cancelOrder_18'}
+        
+            smart.cancel_order(account_id=None, order_id=order.order_id, cb=cancel_callback)
+
+    smart.insert_order(
+        instrument_id='300001', 
+        exchange_id=smart.Type.Exchange.SZE, 
+        price_type=smart.Type.PriceType.Limit, 
+        limit_price=19.18, 
+        volume=200,
+        side=smart.Type.Side.Buy,
+        offset=smart.Type.Offset.Init,
+        business_type=smart.Type.BusinessType.CASH,
+        callback=insert_callback)
+
+def show():
+    print("show")
+def hide():
+    print("hide")
+def close():
+    print("close")
+smart.on_init(init)
+smart.on_show(show)
+smart.on_hide(hide)
+smart.on_close(close)
+```
 
 ### `订阅行情-subscribe`
-[订阅行情及接收行情推送示例](../example/pythonApiExample.md#订阅行情及接收行情推送)
 
 > 订阅行情。行情变化时`smart`会派发`ON_QUOTE`事件，通过smart.on(smart.Event.ON_QUOTE, on_quote_callback)监听行情变化。订阅数量限制规则如下：
 > * 总资产<=300万   可订阅证券数量<=300
@@ -546,8 +415,49 @@ def on_quote_callback(quote):
 smart.on(smart.Event.ON_QUOTE, on_quote_callback)
 ```
 
+#### 行情订阅示例
+```python
+from smart import *
+import time
+from datetime import datetime
+import logging
+from smart.type import AccountType
+logger = logging.getLogger()
+
+def init():
+    #订阅
+    def subscribe_callback(quoteList, err):
+        if err:
+            logger.debug("get error from subscribe:%s",err)
+        else:
+            for i in range(len(quoteList)):
+                logger.debug("subscribe quote:%s", smart.utils.toString(quoteList[i]))
+                # 输出：{"source_id": "xtp", "trading_day": "20230815", "rcv_time": "20230815101951000", "data_time": "20230815101951000", "instrument_id": "300252", "exchange_id": "SZE", "instrument_type": 1, "pre_close_price": 8.6, "pre_settlement_price": null, "last_price": 8.52, "volume": 3263000, "turnover": 27966700, "pre_open_interest": null, "open_interest": null, "open_price": 8.57, "high_price": 8.63, "low_price": 8.5, "upper_limit_price": 10.32, "lower_limit_price": 6.88, "close_price": 8.52, "settlement_price": null, "bid_price": [8.51, 8.5, 8.49, 8.48, 8.47, 0, 0, 0, 0, 0], "ask_price": [8.52, 8.53, 8.54, 8.55, 8.56, 0, 0, 0, 0, 0], "bid_volume": [51200, 98600, 60100, 52800, 20400, 0, 0, 0, 0, 0], "ask_volume": [10400, 3300, 1700, 3900, 5600, 0, 0, 0, 0, 0], "code": "300252.SZ", "avg_price": 8.570855041372969, "iopv": 0, "instrument_status": "T1 Ä=\b"}
+    smart.current_account.subscribe(instruments=['300252','300254'], exchange_id=smart.Type.Exchange.SZE, callback=subscribe_callback)
+
+    #接收行情
+    def on_quote_callback(quote):
+        logger.debug("get on_quote: %s",smart.utils.toString(quote))
+        # 输出：{"source_id": "xtp", "trading_day": "20230815", "rcv_time": "20230815101951000", "data_time": "20230815101951000", "instrument_id": "300252", "exchange_id": "SZE", "instrument_type": 1, "pre_close_price": 8.6, "pre_settlement_price": null, "last_price": 8.52, "volume": 3263000, "turnover": 27966700, "pre_open_interest": null, "open_interest": null, "open_price": 8.57, "high_price": 8.63, "low_price": 8.5, "upper_limit_price": 10.32, "lower_limit_price": 6.88, "close_price": 8.52, "settlement_price": null, "bid_price": [8.51, 8.5, 8.49, 8.48, 8.47, 0, 0, 0, 0, 0], "ask_price": [8.52, 8.53, 8.54, 8.55, 8.56, 0, 0, 0, 0, 0], "bid_volume": [51200, 98600, 60100, 52800, 20400, 0, 0, 0, 0, 0], "ask_volume": [10400, 3300, 1700, 3900, 5600, 0, 0, 0, 0, 0], "code": "300252.SZ", "avg_price": 8.570855041372969, "iopv": 0, "instrument_status": "T1 Ä=\b"}
+        #取消订阅
+        smart.current_account.unsubscribe([quote.instrument_id], quote.exchange_id)
+    smart.current_account.on_quote(on_quote_callback)
+
+def show():
+    print("show")
+def hide():
+    print("hide")
+def close():
+    print("close")
+
+smart.on_init(init)
+smart.on_show(show)
+smart.on_hide(hide)
+smart.on_close(close)
+```
+
+
 ### `取消订阅行情-unsubscribe`
-[取消订阅行情示例](../example/pythonApiExample.md#订阅行情及接收行情推送)  
 
 > 取消订阅行情
 * `account_id` 选填 账号id，默认为当前账号id  这里区别alphax后台的subscribe函数是后台第一个参数是source
@@ -565,78 +475,47 @@ smart.unsubscribe(codes=['600000.SH','300001.SZ'])
 smart.unsubscribe(account_id, instruments, exchange_id, is_level2, emitter)
 ```
 
-### `订阅指数行情-subscribe_index`
-[订阅指数行情及接收指数行情推送示例](../example/pythonApiExample.md#订阅指数行情及接收指数行情推送)
-
-> 订阅指数行情。指数行情变化时`smart`会派发`ON_QUOTE`事件，通过smart.on(smart.Event.ON_QUOTE, on_quote_callback)监听指数行情变化。
-> 指数行情、股票行情都从`ON_QUOTE`事件返回，可以通过返回quote对象的instrument_type属性进行两种行情的区分。
-
-* `account_id` 选填 账号id，默认为当前账号id
-* `instruments` 必填 订阅的指数列表 数组 如["000001", "CESCPD", "931646"]
-* `is_level2` 选填 是否level2 bool类型，默认为False True or False 目前暂不支持level2
-* `emitter` 选填 注册行情派发事件对象,默认为全局smart对象
-* `callback` 选填 订阅后的数据或错误返回信息参数(quoteList,[err](#接口响应错误对象-rsperror)),quoteList只是订阅成功的结果，后续行情变化将随行情事件推送，详见示例
+#### 取消订阅行情示例
 ```python
-smart.subscribe_index(instruments=["000001", "CESCPD", "931646"])
-def on_quote_callback(quote):
-    if quote.instrument_type == smart.Type.InstrumentType.Index:
-        logger.debug(f"{smart.utils.toString(quote)}")
-smart.on(smart.Event.ON_QUOTE, on_quote_callback)
+from smart import *
+import time
+from datetime import datetime
+import logging
+from smart.type import AccountType
+logger = logging.getLogger()
+
+def init():
+    #订阅
+    def subscribe_callback(quoteList, err):
+        if err:
+            logger.debug("get error from subscribe:%s",err)
+        else:
+            for i in range(len(quoteList)):
+                logger.debug("subscribe quote:%s", smart.utils.toString(quoteList[i]))
+                # 输出：{"source_id": "xtp", "trading_day": "20230815", "rcv_time": "20230815101951000", "data_time": "20230815101951000", "instrument_id": "300252", "exchange_id": "SZE", "instrument_type": 1, "pre_close_price": 8.6, "pre_settlement_price": null, "last_price": 8.52, "volume": 3263000, "turnover": 27966700, "pre_open_interest": null, "open_interest": null, "open_price": 8.57, "high_price": 8.63, "low_price": 8.5, "upper_limit_price": 10.32, "lower_limit_price": 6.88, "close_price": 8.52, "settlement_price": null, "bid_price": [8.51, 8.5, 8.49, 8.48, 8.47, 0, 0, 0, 0, 0], "ask_price": [8.52, 8.53, 8.54, 8.55, 8.56, 0, 0, 0, 0, 0], "bid_volume": [51200, 98600, 60100, 52800, 20400, 0, 0, 0, 0, 0], "ask_volume": [10400, 3300, 1700, 3900, 5600, 0, 0, 0, 0, 0], "code": "300252.SZ", "avg_price": 8.570855041372969, "iopv": 0, "instrument_status": "T1 Ä=\b"}
+    smart.current_account.subscribe(instruments=['300252','300254'], exchange_id=smart.Type.Exchange.SZE, callback=subscribe_callback)
+
+    #接收行情
+    def on_quote_callback(quote):
+        logger.debug("get on_quote: %s",smart.utils.toString(quote))
+        # 输出：{"source_id": "xtp", "trading_day": "20230815", "rcv_time": "20230815101951000", "data_time": "20230815101951000", "instrument_id": "300252", "exchange_id": "SZE", "instrument_type": 1, "pre_close_price": 8.6, "pre_settlement_price": null, "last_price": 8.52, "volume": 3263000, "turnover": 27966700, "pre_open_interest": null, "open_interest": null, "open_price": 8.57, "high_price": 8.63, "low_price": 8.5, "upper_limit_price": 10.32, "lower_limit_price": 6.88, "close_price": 8.52, "settlement_price": null, "bid_price": [8.51, 8.5, 8.49, 8.48, 8.47, 0, 0, 0, 0, 0], "ask_price": [8.52, 8.53, 8.54, 8.55, 8.56, 0, 0, 0, 0, 0], "bid_volume": [51200, 98600, 60100, 52800, 20400, 0, 0, 0, 0, 0], "ask_volume": [10400, 3300, 1700, 3900, 5600, 0, 0, 0, 0, 0], "code": "300252.SZ", "avg_price": 8.570855041372969, "iopv": 0, "instrument_status": "T1 Ä=\b"}
+        #取消订阅
+        smart.current_account.unsubscribe([quote.instrument_id], quote.exchange_id)
+    smart.current_account.on_quote(on_quote_callback)
+
+def show():
+    print("show")
+def hide():
+    print("hide")
+def close():
+    print("close")
+
+smart.on_init(init)
+smart.on_show(show)
+smart.on_hide(hide)
+smart.on_close(close)
 ```
 
-### `取消订阅指数行情-unsubscribe_index`
-[取消订阅指数行情示例](../example/pythonApiExample.md#订阅指数行情及接收指数行情推送)  
-
-> 取消订阅指数行情
-* `account_id` 选填 账号id，默认为当前账号id
-* `instruments` 必填 订阅的股票列表 数组 如["000001", "CESCPD", "931646"]
-* `is_level2` 选填 是否level2 bool类型，默认为False True or False 目前暂不支持level2
-* `emitter` 选填 注册行情派发事件对象,默认为全局smart对象
-```python
-smart.unsubscribe_index(instruments=["000001", "CESCPD", "931646"])
-```
-
-### `下算法单-insertAlgoOrder` <Badge type="warning" text="标准版不支持" />
-[快速启动算法策略示例](../example/pythonApiExample.md#快速启动算法策略)
-
->创建并开始运行策略实例
-* `account_id` String(选填) -  账号id，默认为当前账号id
-* `strategy_id` String(必填) - 策略id 
-* `config` String(必填) - 策略信息对象
-* `insertAlgoOrderCallback` Function(必填) - 返回母单信息(strategy,[err](#接口响应错误对象-rsperror))
-
-```python
-def insertAlgoOrderCallback(strategy,err):
-    if(err):
-        logger.debug("get error from insertAlgoOrder:%s",err)
-    else:
-        logger.debug("insertAlgoOrder【OK】:%s",strategy)
-smart.insertAlgoOrder(account_id, strategy_id, config, insertAlgoOrderCallback)
-```
-
-### `订阅ETF折溢价预期利润-subscribeETFProfit`
-[订阅ETF折溢价预期利润示例](../example/pythonApiExample.md#订阅及取消订阅etf折溢价预期利润)  
-
-> 订阅ETF折溢价预期利润，等待返回预期利润列表信息。此后ETF预期利润变动后，会通过事件 ON_ETF_PROFIT 派发订阅预期利润信息[ETFProfit](#etf预期利润-etfprofit)
-* `etfProfitCB` Function 必填 - 订阅ETF折溢价预期利润的回调，返回预期利润列表信息(profitList,[err](#接口响应错误对象-rsperror))
-```python
-def etfProfitCB(arr,err):
-    if(err):
-        logger.debug("get error from subscribeETFProfit:%s",err)
-    else:
-        for i in range(len(arr)):
-            if ((i+1)==len(arr)):
-                logger.debug("subscribeETFProfitTest【OK】:%s",str(arr[i]))
-smart.subscribeETFProfit(etfProfitCB)   #订阅并返回ETF预期利润等信息
-```
-
-### `取消订阅ETF折溢价预期利润-unsubscribeETFProfit`
-[取消订阅ETF折溢价预期利润示例](../example/pythonApiExample.md#订阅及取消订阅etf折溢价预期利润) 
-
-> 取消订阅ETF折溢价预期利润
-```python
-smart.unsubscribeETFProfit()
-```
 
 ### `添加单次定时-add_timer`
 >添加单次定时
@@ -691,97 +570,9 @@ def timeCallback():
 sid = smart.add_time_interval(1000,timeCallback)
 ```
 
-### `创建策略实例-createStrategy` <Badge type="warning" text="标准版不支持" />
-[创建及启动算法策略示例](../example/pythonApiExample.md#创建及启动算法策略)
-
->创建一个全新的策略实例
-* `account_id` String(选填) - 账号id，默认为当前账号id
-* `strategy_platform_type` String(必填) - 策略平台类型 [StrategyPlatformType](#策略平台类型-strategyplatformtype) 的枚举值
-* `strategy_id` String(必填) - 策略id 可以含中文，为了防止冲突，尽量特殊些，不要用"网格交易"这种很通用的命名，很容易冲突
-* `config` String(必填) - 母单下单参数，[config参数参考文档](../../../res/algox_params.xlsx)
-    - "strategyType": AlgoX算法编号，在表格 `算法类型-展示名称表`中选择，如选择 "3101"
-    - "clientStrategyId": 生成的策略ID是随机数，如str(math.floor(time.time()*1000)  + (100000 + math.floor(random.random() * 100000)))
-    - "strategyParam": JSON格式的策略参数，在表格 `算法总线参数类型`中选择，策略参数包含
-        - "quantity":数量，如1600
-        - "side":方向，如"BUY"
-        - "ticker":代码，如"000001"
-        - "market":市场，如"SZ"
-        - "limit_action":涨跌停动作，如False
-        - "start_time":开始时间，如"09:55:00"
-        - "end_time":结束时间，如"15:00:00"
-        - "expire_action":结束时间动作，如False
-        - "price":价格，如0,
-        - "buyDateTime":购买时间，如["14:55","14:55"]
-        - "loadtime":1650783403107,
-        - "business_type":下单类型，如"CASH",
-        - "task_type":任务类型，根据算法要求填写，"KFTWAP"
-* `createStrategyCallback` Function(必填) - 返回策略信息对象(strategy,[err](#接口响应错误对象-rsperror))
-```python
-def createStrategyCallback(strategy,err):
-    if(err):
-        logger.debug("get error from createStrategy:%s",err)
-    else:
-        logger.debug("createStrategyCallback:%s",strategy)
-smart.createStrategy(account_id, strategy_platform_type, strategy_id, config, createStrategyCallback)
-```
-
-### `运行策略实例-startStrategy` <Badge type="warning" text="标准版不支持" />
-[创建及启动算法策略示例](../example/pythonApiExample.md#创建及启动算法策略)
-
->开始运行策略实例
-* `account_id` String(选填) -  账号id，默认为当前账号id
-* `strategy_platform_type` String(必填) - 策略平台类型 [StrategyPlatformType](#策略平台类型-strategyplatformtype) 的枚举值
-* `clent_id` String(必填) - 策略实例的ID或客户下单唯一ID
-* `startStrategyCallback` Function(必填) - 返回母单信息(strategy,[err](#接口响应错误对象-rsperror))
-
-```python
-def startStrategyCallback(strategy,err):
-    if(err):
-        logger.debug("get error from startStrategy:%s",err)
-    else:
-        logger.debug("startStrategy【OK】:%s",strategy)
-smart.startStrategy(account_id, strategy_platform_type, clent_id, startStrategyCallback)
-```
-
-### `券源申请提交-submit_source_apply` <Badge type="warning" text="仅支持两融账户" />
-[提交券源申请示例](../example/pythonApiExample.md#提交券源申请)
-
->券源申请提交
-* `account_id` String(选填) - 资金账号，默认为当前账号id
-* `sourceQuoteApplyList` String(必填) - 券源行情申请列表
-* `submitSourceApplyCB(suclist<SourceQuoteInfo>,err )` Function(必填) - 券源申请提交的回调，suclist为券源申请成功的列表信息，若[err](#接口响应错误对象-rsperror)有值，则券源申请失败的列表信息在err.value
-```python  
-def submitSourceApplyCB(suclist,err):
-    if err: #券源申请推送:存在失败
-        errList =  [] if type(err)!= dict or not 'value' in err.keys() else err["value"]
-        if errList: #券源申请推送：失败数据
-            for i in range(len(errList)):
-                logger.debug("submitSourceApplyCB【error】:%s",smart.utils.toString(errList[i]))  
-        if suclist:#券源申请推送：成功数据
-            for i in range(len(suclist)):
-                logger.debug("submitSourceApplyCB【success】:%s",smart.utils.toString(suclist[i]))                
-    else: #券源申请推送全部成功
-        if suclist:#券源申请推送：成功数据
-            for i in range(len(suclist)):
-                logger.debug("submitSourceApplyCB【success】:%s",smart.utils.toString(suclist[i]))
-smart.submit_source_apply(account_id,sourceQuoteApplyList,submitSourceApplyCB)
-```
-
-### `查询信用资产信息-queryCreditAssets` <Badge type="warning" text="仅支持两融账户" />
-[查询信用资产信息示例](../example/pythonApiExample.md#查询信用资产信息)
-
->查询信用资产信息
-* `account_id` String(选填) - 账号id，默认为当前账号id
-* `queryCreditAssetsCB` Function(必填) - 查询信用资产信息的回调，返回信用资产信息(data,[err](#接口响应错误对象-rsperror))
-```python
-def queryCreditAssetsCB(data,err):
-    if(data):logger.debug("get queryCreditAssets:%s",smart.utils.toString(data))
-    if(not data):logger.debug("get queryCreditAssets FAIL:%s",err.message)
-smart.queryCreditAssets(account_id, queryCreditAssetsCB)
-```
 
 ### `查询自选股列表-querySelfSelectStockList`
-[查询自选股列表示例](../example/pythonApiExample.md#查询自选股列表)
+
 >查询自选股列表。添加自选股在客户端【行情】-【自选股】页面
 * `groupName` String(必填) - 板块名称 
 * `source` String(必填) - 柜台id，可填 None，等价于"xtp"，目前只支持 "xtp"
@@ -794,22 +585,37 @@ def querySelfSelectStockListCB(instrumentList,err):
 smart.querySelfSelectStockList(groupName, source, account_id, querySelfSelectStockListCB)
 ```
 
-### `查询券源行情-query_source_quote_list` <Badge type="warning" text="仅支持两融账户" />
-[查询券源行情示例](../example/pythonApiExample.md#查询券源行情)
+#### 查询自选股列表示例：
+```python
+from smart import *
+import time
+from datetime import datetime
+import logging
+from smart.type import AccountType
+logger = logging.getLogger()
 
->查询券源行情
-* `querySourceQuoteListCB(list<SourceQuoteInfo>,err)` Function(必填) - 查询券源行情列表的回调，获取券源行情列表信息，获取失败会返回[err](#接口响应错误对象-rsperror)
-```python  
-def querySourceQuoteListCB(sourceQuoteList,err):
-    if(err):
-        logger.debug("get error from sourceQuoteList:%s",err)
-    else:
-        logger.debug("sourceQuoteList【OK】:%d",len(sourceQuoteList))
-smart.query_source_quote_list( querySourceQuoteListCB)
+def init():
+    def querySelfSelectStockListCB(instrumentList,err):
+        if(instrumentList):logger.debug("get querySelfSelectStockList:%s",instrumentList)
+        # 输出：['002708.SZ', '002209.SZ', '300922.SZ', '003022.SZ', '000301.SZ', '002881.SZ', '002599.SZ', '002532.SZ', '002665.SZ', '000547.SZ']
+        if(not instrumentList):logger.debug("get querySelfSelectStockList FAIL:%s",err)
+    smart.querySelfSelectStockList(groupName="selfSelect", source="xtp", account_id=smart.current_account.account_id, cb=querySelfSelectStockListCB)
+
+def show():
+    print("show")
+def hide():
+    print("hide")
+def close():
+    print("close")
+
+smart.on_init(init)
+smart.on_show(show)
+smart.on_hide(hide)
+smart.on_close(close)
 ```
 
 ### `查找一个证券-getInstrument`
-[查询证券信息示例](../example/pythonApiExample.md#查询证券信息根据证券代码和交易所)
+
 > 查找一个证券
 * `instrumentId` String(必填) - 证券代码 如'600000'(该参数与code参数必填其一)
 * `exchangeId` String(必填) - 交易所 如'SSE'(该参数与code参数必填其一)
@@ -823,185 +629,33 @@ smart.getInstrument(instrumentId, exchangeId)
 smart.getInstrument(code='600000.SH')
 ```
 
-### `获取可交易的ETF列表-getETFList`
-[查询可交易的etf列表示例](../example/pythonApiExample.md#查询可交易的etf列表)
-> 获取可交易的ETF列表
-* `getETFListCB` Function(必填) - 获取ETF列表的回调，返回ETF列表信息(arr,[err](#接口响应错误对象-rsperror))
+#### 查找证券信息示例
 ```python
-def getETFListCB(arr,err):
-    if(err):
-        logger.debug("get error from getETFList:%s",err)
-    else:
-        logger.debug("get getETFList:%s",smart.utils.toString(arr))
-smart.getETFList(getETFListCB) 
+from smart import *
+import logging
+logger = logging.getLogger()
+
+def init():
+    #根据证券代码和交易所查找一个instrument
+    getInstrument = smart.getInstrument("600000",smart.Type.Exchange.SSE)
+    logger.debug("get getInstrument:%s",smart.utils.toString(getInstrument))
+    # 输出：{"instrument_id": "600000", "instrument_name": "浦发银行", "instrument_type": "Stock", "instrument_type_ext": "XTP_SECURITY_MAIN_BOARD", "exchange_id": "SSE", "exchange_id_name": "上交所", "xtp_market_type": "XTP_MKT_SH_A", "name_py": "pfyh", "price_tick": 0.01, "precision": 2, "buy_volume_unit": 100, "sell_volume_unit": 1, "bid_volume_unit": 100, "ask_volume_unit": 1, "bid_upper_limit_volume": 1000000, "bid_lower_limit_volume": 100, "ask_upper_limit_volume": 1000000, "ask_lower_limit_volume": 1, "market_bid_volume_unit": 100, "market_ask_volume_unit": 1, "market_bid_upper_limit_volume": 1000000, "market_bid_lower_limit_volume": 100, "market_ask_upper_limit_volume": 1000000, "market_ask_lower_limit_volume": 1, "pre_close_price": 7.1, "upper_limit_price": 7.8100000000000005, "lower_limit_price": 6.390000000000001, "is_registration": false, "kw": "浦发银行", "code": "600000.SH"}
+def show():
+    print("show")
+def hide():
+    print("hide")
+def close():
+    print("close")
+smart.on_init(init)
+smart.on_show(show)
+smart.on_hide(hide)
+smart.on_close(close)
 ```
 
-### `获取ETF成分股列表-getETFBasket`
-[查询etf成分股列表示例](../example/pythonApiExample.md#查询etf成分股列表)
-> 获取ETF成分股列表
-* `instrument_id` String(必填) - ETF代码
-* `getETFBasketCB(list<ETFCompoment>,err )` Function(必填) - 获取ETF成分股列表的回调，返回ETF成分股列表信息(instrumentList,[err](#rsperror))
-      
-```python
-def getETFBasketCB(instrumentList,err):
-    if(err):
-        logger.debug("get error from getETFBasket:%s",err)
-    else:
-        logger.debug("get getETFBasket: %d",len(instrumentList))
-smart.getETFBasket(instrument_id,getETFBasketCB)
-```
 
-### `获取IPO列表-getIPOList`
-[查询可交易的ipo列表示例](../example/pythonApiExample.md#查询可交易的ipo列表)
-> 获取IPO列表
-* `getIPOListCB` Function(必填) - 获取IPO列表的回调，返回IPO列表信息(instrumentList,[err](#接口响应错误对象-rsperror))
-```python
-def getIPOListCB(instrumentList,err):
-    if(err):
-        logger.debug("get error from getIPOList:%s",err)
-    else:   
-        logger.debug("get getIPOListCB: %d",len(instrumentList))
-smart.getIPOList(getIPOListCB)
-```
-
-### `获取国债逆回购列表-getBondReverseRepoList`
-[查询国债逆回购列表示例](../example/pythonApiExample.md#查询国债逆回购列表)
-> 获取国债逆回购列表
-* `getBondReverseRepoListCB` Function(必填) - 获取国债逆回购列表回调，国债逆回购列表(instrumentList,[err](#接口响应错误对象-rsperror))
-```python
-def getBondReverseRepoListCB(instrumentList,err):
-    if(err):
-        logger.debug("get getBondReverseRepoList error:%d,%s",err.code,err.message)
-    else:   
-        logger.debug("get getBondReverseRepoList:%s",smart.utils.toString(instrumentList))
-smart.getBondReverseRepoList(getBondReverseRepoListCB)
-```
-
-### `获取可转债信息-getConvertableBond` <Badge type="warning" text="标准版不支持" />
-[查询可转债信息示例](../example/pythonApiExample.md#查询可转债信息)
-> 查询可转债信息
-* `code` String(必填) - 证券代码.交易所标识 如 '113658.SH'
-* `getConvertableBondCB` Function(必填) - 获取可转债信息回调，可转债信息([convertableBond](#可转债信息-convertablebond),[err](#接口响应错误对象-rsperror))
-```python
-def getConvertableBondCB(convertableBond, error):
-        if error:
-            logger.error(f"getConvertableBond error:{error}")
-        else:
-            logger.debug(f"getConvertableBond:{smart.utils.toString(convertableBond)}")
-smart.getConvertableBond(code, getConvertableBondCB)
-```
-
-### `获取smart系统【设置】中参数-getSystemSet`
-[查询设置中的设置项示例](../example/pythonApiExample.md#查询设置中的设置项)
-> 获取smart系统【设置】中参数
-
-```python
-'''
- * 获取smart系统【设置】中参数
- *system:{
-    *常用设置
-    *isModal: True //交易确认框
-    *isClearData: True //交易清空项
-    *isDbWithdrawal: False //双击撤单项
-    *isHideMarketCompo: False //隐藏分时/k线
-    *isSystemModalCLose: True //系统关闭提示框
-    *(isGeneralMaxValue: True //启用普通交易委托最大市值提示，
-            generalMaxValue: 10000)//--一起使用
-    *自动拆单规则设置：
-    *splitUnitType: 
-        // 可选值列表
-        *0:按交易所单笔最大委托数量固定拆单;
-        *1:(按用户设置上限固定拆单;
-                splitMaxSplitQty: 50000-拆单上限);
-        *2:按交易所规定的单笔委托上下限范围随机拆单;
-        *3:(按单笔委托市值范围随机拆单
-                splitMinMarketValue: 10000:请输入最小市值,
-                splitMaxMarketValue: 50000:请输入最大市值)
-        *4:(按自定义股数范围随机拆单;
-                splitMinRandomQty: 10000:请输入最小拆分数量,
-                splitMaxRandomQty: 50000:请输入最大拆分数量)
-    *ETF套利/交易费用设置
-    *(etfPreStockPK: "S1"//溢价股票盘口：
-                //可选值列表
-                { label: "最新价", value: "P" },
-                { label: "卖一价", value: "S1" },
-                { label: "卖二价", value: "S2" },
-                { label: "卖三价", value: "S3" },
-                { label: "卖四价", value: "S4" },
-                { label: "卖五价", value: "S5" },
-                { label: "买一价", value: "B1" },
-                { label: "涨停价", value: "H" },
-                { label: "跌停价", value: "L" })
-    *etfUpperBuy: False //溢价涨停挂单：开、关
-    *etfPreAuto: False // 溢价自动申购：开、关
-    *etfCancel: False //撤单即可补单：开、关
-    *etfDisSingleAuto: False // 折价单市场自动赎回：开关
-    *etfDisCrossAuto: False //折价跨市场自动赎回：开关
-    *etfMonitor: False // 监控列表停靠-左、右
-    *(etfRate:
-        {
-        //（sh-沪市，sz-深市）
-        is_del_fee: True    //预期利润-减去交易费用
-        is_use: False       //实现利润-减去交易费用
-        is_iopv_fee:False   //ETF iopv计算是否减掉费用
-        sell_yh: 0.001      //卖出印花税
-        buy_yh: 0           //买入印花税
-        sh_etf_gh: 100      //申赎过户费（sh-沪市，sz-深市）
-        sh_etf_min_sx: 100  //ETF最低手续费
-        sh_etf_sx: 100      //ETF买卖手续费
-        sh_stock_gh: 100    //股票过户费
-        sh_stock_min_sx: 100//股票最低手续费
-        sh_stock_sx: 100    //股票手续费
-        sz_etf_gh: 100      //申赎过户费
-        sz_etf_min_sx: 100  //ETF最低手续费
-        sz_etf_sx: 100      //ETF买卖手续费
-        sz_stock_gh: 100    //股票过户费
-        sz_stock_min_sx: 100//股票最低手续费
-        sz_stock_sx: 100    //股票手续费
-        }
-    * 基金公司费用对象
-* fundFee:
-    159732: 0.001
-    516020: 0.001
-    516100: 0.001
-    561350: 0.001
-    561500: 0.001
-    561800: 0.001
-    561900: 0.001
-}
-'''
-def getSysCB(data,err):
-    if(err):
-        logger.debug("get error from getSystemSet:%s",err)
-    else:
-        logger.debug("get getSystemSet:%s",smart.utils.toString(data))
-smart.getSystemSet(getSysCB)
-```
-
-### `注册给JS调用的函数-registCallableFunction`
-[python和js双向通信示例](../example/pythonApiExample.md#python和js双向通信)
-
->注册给JS调用的函数
-* `functionName` String(必填) - 函数的名称
-* `func` String(必填) - 函数返回信息
-
-```python
-smart.registCallableFunction(functionName,func)
-```
-
-### `调用JS的函数接口-callJSFunction`
-[python和js双向通信示例](../example/pythonApiExample.md#python和js双向通信)
-
->调用JS的函数接口
-* `functionName` String(必填) - js函数的名称
-* `params` String(必填) - 参数
-* `callback` Function(选填) - 连接js函数，返回信息 
-```js
-smart.callJSFunction(functionName,params,callback)
-```
 
 ### `消息提醒-notice`
-[消息通知弹窗示例](../example/pythonApiExample.md#消息通知弹窗)
+
 
 > 组件消息推送到全局
 * `level` 消息状态：open、info、success、warning、error
@@ -1020,8 +674,41 @@ params = {
 smart.notice(params)
 ```
 
+#### 消息通知弹窗示例
+```python
+from smart import *
+import time
+from datetime import datetime
+import logging
+from smart.type import AccountType
+logger = logging.getLogger()
+
+def init():
+    #全局消息弹窗
+    params1 = {
+    'level': 'success',#open、info、success、warning、error
+    'title': '标题',
+    'msg': 'noticeTest',
+    'duration': 4500,
+    'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+    smart.notice(params1)
+
+def show():
+    print("show")
+def hide():
+    print("hide")
+def close():
+    print("close")
+
+smart.on_init(init)
+smart.on_show(show)
+smart.on_hide(hide)
+smart.on_close(close)
+```
+
 ### `订阅bar行情-subscribe_bar`
-[订阅bar行情及接收行情推送示例](../example/pythonApiExample.md#订阅bar行情及接收行情推送)
+
 > 订阅bar行情。监听bar行情变化有三种方式:1、订阅时传on_bar_callback,例如smart.subscribe_bar(codes, period, on_bar_callback)；2、smart.on(smart.Event.ON_BAR,bar_callback)；3、smart.on_bar(bar_callback),且优先级1>2>3
 > * 订阅分钟数>=1的整数，且<=60，单位是分钟
 > * 只允许股票类型的订阅
@@ -1034,8 +721,89 @@ smart.notice(params)
 smart.subscribe_bar(codes, period, on_bar_callback, emitter)
 ```
 
+#### 订阅bar行情及接收行情推送示例
+
+```python
+from smart import *
+import logging
+from smart.utils import *
+logger = logging.getLogger()
+
+def methodOne():
+    codes = ['000001.SZ','600000.SH']
+    period = "1m"
+    #方式一：订阅
+    failList = smart.subscribe_bar(codes, period)
+    if failList:
+        logger.debug("存在订阅bar行情失败的code:%s",failList)
+        # 可以重新发起订阅
+    else:
+        logger.debug("订阅bar行情全部成功")
+
+    def on_bar_callback(quote):
+        logger.debug("bar行情:%s", smart.utils.toString(quote))
+        # {"type": "bar_1min", "code": "600000.SH", "instrument_id": "600000", "exchange_id": "SSE", "trading_day": "2024-01-19", "source_id": "xtp", "start_time": "2024-01-19 13:25:00", "end_time": "2024-01-19 13:26:00", "time_interval": 1, "period": "1m", "high": 6.56, "low": 6.55, "open": 6.55, "close": 6.56, "volume": 51700, "start_volume": 39126164, "turnover": 339138, "start_turnover": 256328611}
+        
+        #取消订阅
+        smart.unsubscribe_bar([quote.code], period )
+        
+    #监听行情
+    smart.on(smart.Event.ON_BAR, on_bar_callback)
+
+def methodTwo():
+    #方式二：订阅
+    codes = ['000002.SZ','600004.SH']
+    period = "1m"
+    def on_bar_callback(quote):
+        logger.debug("bar行情:%s", smart.utils.toString(quote))
+        # {"type": "bar_1min", "code": "600004.SH", "instrument_id": "600004", "exchange_id": "SSE", "trading_day": "2024-01-19", "source_id": "xtp", "start_time": "2024-01-19 13:25:00", "end_time": "2024-01-19 13:26:00", "time_interval": 1, "period": "1m", "high": 9.6, "low": 9.58, "open": 9.58, "close": 9.58, "volume": 14000, "start_volume": 10113100, "turnover": 134144, "start_turnover": 97570700}
+        
+        #取消订阅
+        smart.unsubscribe_bar([quote.code], period)
+    failList = smart.subscribe_bar(codes, period, on_bar_callback)
+    if failList:
+        logger.debug("存在订阅bar行情失败的code:%s",failList)
+        # 可以重新发起订阅
+    else:
+        logger.debug("订阅bar行情全部成功")
+
+def methodThree():
+    #方式三：订阅
+    codes = ['000004.SZ','600006.SH']
+    period = "1m"
+    def on_bar_callback(quote):
+        logger.debug("bar行情:%s", smart.utils.toString(quote))
+        # {"type": "bar_1min", "code": "600006.SH", "instrument_id": "600006", "exchange_id": "SSE", "trading_day": "2024-01-19", "source_id": "xtp", "start_time": "2024-01-19 13:25:00", "end_time": "2024-01-19 13:26:00", "time_interval": 1,"period": "1m",  "high": 5.38, "low": 5.37, "open": 5.38, "close": 5.37, "volume": 5400, "start_volume": 5989572, "turnover": 29033, "start_turnover": 32280044}
+        
+        #取消订阅
+        smart.unsubscribe_bar([quote.code], period)
+    smart.on_bar = on_bar_callback
+    failList = smart.subscribe_bar(codes, period)
+    if failList:
+        logger.debug("存在订阅bar行情失败的code:%s",failList)
+        # 可以重新发起订阅
+    else:
+        logger.debug("订阅bar行情全部成功")
+def init():
+    methodOne()
+    methodTwo()
+    methodThree()
+    
+def show():
+   logger.debug("show")
+def hide():
+    logger.debug("hide")
+def close():
+    logger.debug("close")
+
+smart.on_init(init)
+smart.on_show(show)
+smart.on_hide(hide)
+smart.on_close(close)
+```
+
 ### `取消订阅bar行情-unsubscribe_bar`
-[取消订阅bar行情示例](../example/pythonApiExample.md#订阅bar行情及接收行情推送)
+
 > 取消订阅bar行情
 * `codes` 必填 订阅的股票列表 数组 如['600000.SH', '000001.SZ']
 * `period` 选填 周期 默认1m，最大60m（m代表分钟）
@@ -1045,8 +813,91 @@ smart.subscribe_bar(codes, period, on_bar_callback, emitter)
 smart.unsubscribe_bar(codes, period, emitter)
 ```
 
+#### 取消订阅bar行情示例
+
+```python
+from smart import *
+import logging
+from smart.utils import *
+logger = logging.getLogger()
+
+def methodOne():
+    codes = ['000001.SZ','600000.SH']
+    period = "1m"
+    #方式一：订阅
+    failList = smart.subscribe_bar(codes, period)
+    if failList:
+        logger.debug("存在订阅bar行情失败的code:%s",failList)
+        # 可以重新发起订阅
+    else:
+        logger.debug("订阅bar行情全部成功")
+
+    def on_bar_callback(quote):
+        logger.debug("bar行情:%s", smart.utils.toString(quote))
+        # {"type": "bar_1min", "code": "600000.SH", "instrument_id": "600000", "exchange_id": "SSE", "trading_day": "2024-01-19", "source_id": "xtp", "start_time": "2024-01-19 13:25:00", "end_time": "2024-01-19 13:26:00", "time_interval": 1, "period": "1m", "high": 6.56, "low": 6.55, "open": 6.55, "close": 6.56, "volume": 51700, "start_volume": 39126164, "turnover": 339138, "start_turnover": 256328611}
+        
+        #取消订阅
+        smart.unsubscribe_bar([quote.code], period )
+        
+    #监听行情
+    smart.on(smart.Event.ON_BAR, on_bar_callback)
+
+def methodTwo():
+    #方式二：订阅
+    codes = ['000002.SZ','600004.SH']
+    period = "1m"
+    def on_bar_callback(quote):
+        logger.debug("bar行情:%s", smart.utils.toString(quote))
+        # {"type": "bar_1min", "code": "600004.SH", "instrument_id": "600004", "exchange_id": "SSE", "trading_day": "2024-01-19", "source_id": "xtp", "start_time": "2024-01-19 13:25:00", "end_time": "2024-01-19 13:26:00", "time_interval": 1, "period": "1m", "high": 9.6, "low": 9.58, "open": 9.58, "close": 9.58, "volume": 14000, "start_volume": 10113100, "turnover": 134144, "start_turnover": 97570700}
+        
+        #取消订阅
+        smart.unsubscribe_bar([quote.code], period)
+    failList = smart.subscribe_bar(codes, period, on_bar_callback)
+    if failList:
+        logger.debug("存在订阅bar行情失败的code:%s",failList)
+        # 可以重新发起订阅
+    else:
+        logger.debug("订阅bar行情全部成功")
+
+def methodThree():
+    #方式三：订阅
+    codes = ['000004.SZ','600006.SH']
+    period = "1m"
+    def on_bar_callback(quote):
+        logger.debug("bar行情:%s", smart.utils.toString(quote))
+        # {"type": "bar_1min", "code": "600006.SH", "instrument_id": "600006", "exchange_id": "SSE", "trading_day": "2024-01-19", "source_id": "xtp", "start_time": "2024-01-19 13:25:00", "end_time": "2024-01-19 13:26:00", "time_interval": 1,"period": "1m",  "high": 5.38, "low": 5.37, "open": 5.38, "close": 5.37, "volume": 5400, "start_volume": 5989572, "turnover": 29033, "start_turnover": 32280044}
+        
+        #取消订阅
+        smart.unsubscribe_bar([quote.code], period)
+    smart.on_bar = on_bar_callback
+    failList = smart.subscribe_bar(codes, period)
+    if failList:
+        logger.debug("存在订阅bar行情失败的code:%s",failList)
+        # 可以重新发起订阅
+    else:
+        logger.debug("订阅bar行情全部成功")
+def init():
+    methodOne()
+    methodTwo()
+    methodThree()
+    
+def show():
+   logger.debug("show")
+def hide():
+    logger.debug("hide")
+def close():
+    logger.debug("close")
+
+smart.on_init(init)
+smart.on_show(show)
+smart.on_hide(hide)
+smart.on_close(close)
+```
+
+
+
 ### `异步-获取当天任意分钟的bar行情-query_bar_today_async`
-[获取当天任意分钟的bar行情示例](../example/pythonApiExample.md#异步-获取当天任意分钟的bar行情)
+
 > 获取当天任意分钟的bar行情。
 
 * `codes`  必填 订阅的股票列表 数组 如['600000.SH', '000001.SZ']
@@ -1056,8 +907,44 @@ smart.unsubscribe_bar(codes, period, emitter)
 smart.query_bar_today_async(codes, query_bar_today_callback, period)
 ```
 
+#### 获取当天任意分钟的bar行情示例
+
+```python
+from smart import *
+import logging
+from smart.utils import *
+logger = logging.getLogger()
+
+def init():
+    def query_bar_today_callback(datalist,err:RspError):
+        if err:
+           logger.debug("查询失败:%s", smart.utils.toString(err))
+        else:
+            for k,v in datalist.items():
+                logger.debug("query_bar_today_async【OK】:%s", k)
+                # query_bar_today_async【OK】:000001.SZ
+                for i in range(len(v)):
+                    if i < 5:   
+                        logger.debug("query_bar_today_async【OK】前5个:%s",smart.utils.toString(v[i]))
+                        # query_bar_today_async【OK】前5个:{"type": "bar_5m", "code": "000001.SZ", "instrument_id": "000001", "exchange_id": "SZE", "trading_day": "2024-02-07", "source_id": "xtp", "start_time": "2024-02-07 09:30:00", "end_time": "2024-02-07 09:35:00", "time_interval": 5, "period": "5m", "high": 9.66, "low": 9.59, "open": 9.62, "close": 9.65, "volume": 16184108, "start_volume": 0, "turnover": 155773027.72, "start_turnover": 0}
+    codes = ['000001.SZ','600000.SH']
+    period = "5m"
+    smart.query_bar_today_async(codes, query_bar_today_callback, period) # 正常传值
+def show():
+   logger.debug("show")
+def hide():
+    logger.debug("hide")
+def close():
+    logger.debug("close")
+
+smart.on_init(init)
+smart.on_show(show)
+smart.on_hide(hide)
+smart.on_close(close)
+```
+
 ### `同步-获取当天任意分钟的bar行情-query_bar_today`
-[获取当天任意分钟的bar行情示例](../example/pythonApiExample.md#同步-获取当天任意分钟的bar行情)
+
 > 获取当天任意分钟的bar行情。
 
 * `codes`  必填 订阅的股票列表 数组 如['600000.SH', '000001.SZ']
@@ -1067,8 +954,40 @@ smart.query_bar_today_async(codes, query_bar_today_callback, period)
 smart.query_bar_today(codes, period)
 ```
 
+#### 获取当天任意分钟的bar行情示例
+
+```python
+from smart import *
+import logging
+from smart.utils import *
+logger = logging.getLogger()
+
+def init():
+    codes = ['000001.SZ','600000.SH']
+    period = "5m"
+    datalist = smart.query_bar_today(codes, period) # 正常传值
+    for k,v in datalist.items():
+                logger.debug("query_bar_today【OK】:%s", k)
+                # query_bar_today【OK】:000001.SZ
+                for i in range(len(v)):
+                    if i < 5:   
+                        logger.debug("query_bar_today【OK】前5个:%s",smart.utils.toString(v[i]))
+                        # query_bar_today【OK】前5个:{"type": "bar_5min", "code": "000001.SZ", "instrument_id": "000001", "exchange_id": "SZE", "trading_day": "2024-01-18", "source_id": "xtp", "start_time": "2024-01-18 09:30:00", "end_time": "2024-01-18 09:35:00", "time_interval": 5,"period": "5m",  "high": 9.24, "low": 9.12, "open": 9.21, "close": 9.13, "volume": 14017000, "start_volume": 0, "turnover": 128664195, "start_turnover": 0}
+def show():
+   logger.debug("show")
+def hide():
+    logger.debug("hide")
+def close():
+    logger.debug("close")
+
+smart.on_init(init)
+smart.on_show(show)
+smart.on_hide(hide)
+smart.on_close(close)
+```
+
 ### `异步-获取历史bar数据-query_bar_async`
-[获取历史bar数据示例](../example/pythonApiExample.md#异步-获取历史bar数据-query-bar-async)
+
 -   获取一个时间范围内的 bar 数据, 数据量较大, 请输入合适的开始结束日期
 -   返回数据默认为前复权
 -   当前不支持分页, 数据均存储在第一页
@@ -1096,10 +1015,56 @@ inParams = {
 }
 smart.query_bar_async(inParams, query_bar_callback) # 正常传值
 ```
+
+#### 获取历史bar数据示例
+
+```python
+from smart import *
+import logging
+from smart.type import *
+logger = logging.getLogger()
+
+def query():
+    def query_bar_callback(datalist,err):
+        if(err):
+            logger.debug("get error from query_bar_async:%s",err)
+        else:
+            for i in range(len(datalist)):
+                if i < 5:   
+                    logger.debug("query_bar_async【OK】前5个:%s",smart.utils.toString(datalist[i]))
+                    #query_bar_async【OK】前5个:{"type": "bar_5min", "code": "000001.SZ", "instrument_id": "000001", "exchange_id": "SZE", "trading_day": "2024-01-12", "source_id": "xtp", "start_time": "2024-01-12 09:55:00", "end_time": "2024-01-12 10:00:00", "time_interval": "5m", "period": "5m","high": 9.2, "low": 9.17, "open": 9.19, "close": 9.19, "volume": 2380100, "start_volume": 13549009, "turnover": 21865172, "start_turnover": 123997543}
+            logger.debug("query_bar_async【OK】:%d",len(datalist))
+            #query_bar_async【OK】:43 
+    param = {
+        "code": "000001.SZ",  # 000001.SZ 600000.SH  String(必填) 证券代码  SZ:深证 SH:上海
+        "start_date": "2024-01-12 10:00:00", #String(必填) 开始日期 格式yyyy-MM-dd hh:mm:ss
+        "end_date": "2024-01-12 15:00:00", #String(必填) 结束日期 格式yyyy-MM-dd hh:mm:ss
+        "period": "5m", #String(选填) 频次 仅支持1m 5m 15m 30m 60m 1d 1w 默认1d,(m代表分钟，d代表天，w代表周)
+        "adjust_type": "pre" #String(选填) 复权方式 none:不复权 pre:前复权 post:后复权 默认前复权
+    }
+    smart.query_bar_async(param, query_bar_callback) # 正常传值
+def init():
+    query()
+def show():
+   logger.debug("show")
+   logger.debug("show")
+def hide():
+    logger.debug("hide")
+def close():
+    logger.debug("close")
+
+smart.on_init(init)
+smart.on_show(show)
+smart.on_hide(hide)
+smart.on_close(close)
+```
+
+
+
 // 方式二:通过调用query_data_async接口，详情见[数据查询](#method为bar-异步查询历史bar数据)
 
 ### `同步-获取历史bar数据-query_bar`
-[获取历史bar数据示例](../example/pythonApiExample.md#同步-获取历史bar数据-query-bar)
+
 -   获取一个时间范围内的 bar 数据, 数据量较大, 请输入合适的开始结束日期
 -   返回数据默认为前复权
 -   当前不支持分页, 数据均存储在第一页
@@ -1121,35 +1086,84 @@ for i in range(len(datalist)):
         logger.debug("query_bar【OK】前5个:%s",smart.utils.toString(datalist[i]))
 logger.debug("query_bar【OK】:%d",len(datalist))
 ```
+
+#### 获取历史bar数据示例
+
+```python
+from smart import *
+import logging
+from smart.type import *
+logger = logging.getLogger()
+
+def query():
+    def query_bar_callback(datalist,err):
+        if(err):
+            logger.debug("get error from query_bar_async:%s",err)
+        else:
+            for i in range(len(datalist)):
+                if i < 5:   
+                    logger.debug("query_bar_async【OK】前5个:%s",smart.utils.toString(datalist[i]))
+                    #query_bar_async【OK】前5个:{"type": "bar_5min", "code": "000001.SZ", "instrument_id": "000001", "exchange_id": "SZE", "trading_day": "2024-01-12", "source_id": "xtp", "start_time": "2024-01-12 09:55:00", "end_time": "2024-01-12 10:00:00", "time_interval": "5m", "period": "5m","high": 9.2, "low": 9.17, "open": 9.19, "close": 9.19, "volume": 2380100, "start_volume": 13549009, "turnover": 21865172, "start_turnover": 123997543}
+            logger.debug("query_bar_async【OK】:%d",len(datalist))
+            #query_bar_async【OK】:43 
+    param = {
+        "code": "000001.SZ",  # 000001.SZ 600000.SH  String(必填) 证券代码  SZ:深证 SH:上海
+        "start_date": "2024-01-12 10:00:00", #String(必填) 开始日期 格式yyyy-MM-dd hh:mm:ss
+        "end_date": "2024-01-12 15:00:00", #String(必填) 结束日期 格式yyyy-MM-dd hh:mm:ss
+        "period": "5m", #String(选填) 频次 仅支持1m 5m 15m 30m 60m 1d 1w 默认1d,(m代表分钟，d代表天，w代表周)
+        "adjust_type": "pre" #String(选填) 复权方式 none:不复权 pre:前复权 post:后复权 默认前复权
+    }
+    smart.query_bar_async(param, query_bar_callback) # 正常传值
+def init():
+    query()
+def show():
+   logger.debug("show")
+   logger.debug("show")
+def hide():
+    logger.debug("hide")
+def close():
+    logger.debug("close")
+
+smart.on_init(init)
+smart.on_show(show)
+smart.on_hide(hide)
+smart.on_close(close)
+```
+
 方式二:通过调用query_data_async接口，详情见[数据查询](#method为bar-同步查询历史bar数据)
 <!-- // 方式二:通过调用query_data_async接口，详情见<a href="#query_data-bar">数据查询</a> -->
 
-### `通用指标订阅-subscribe_indicator`
-[通用指标订阅及接收数据推送示例](../example/pythonApiExample.md#通用指标订阅及接收数据推送)
-> 通用指标订阅。监听指标数据变化有三种方式:1、订阅时传on_indicator_callback,例如subscribe_indicator(type, codes, on_indicator_callback)；2、smart.on(smart.Event.ON_INDICATOR,indicator_callback)；3、smart.on_bar(indicator_callback),且优先级1>2>3
-* `type` 必填 指标类型参数，例如'etf'等字符串 该参数识别大小写
-* `codes`  选填 订阅的指标代码列表 数组 如['159732.SZ','561800.SH']
-* `on_indicator_callback` 选填 接收行情推送的回调函数，支持三种定义，且优先级为：on_indicator > smart.on()> 默认
-* `emitter` 选填 注册数据派发事件对象, 默认为全局smart对象
-* 返回值 字符串数组，表示订阅失败的指标代码列表，例如['561800.SH']
+### `同步-查询历史tick数据-query_tick`
+
+> 异步查询历史tick数据
+
+* `codes`  必填 要查询的股票列表数组 如['600000.SH', '000001.SZ']
+* `start_datetime` 必填 开始时间，如 "2025-01-16 09:59:35"
+* `end_datetime` 必填 开始时间，如 "2025-01-16 10:01:42"
+* 返回值 类型为dict, key 为股票代码, value 为对应的 Quote 结构体数组
 ```python
-smart.subscribe_indicator(type, codes, on_indicator_callback, emitter)
+smart.query_tick(codes, start_datetime, end_datetime)
 ```
 
-### `取消通用指标订阅-unsubscribe_indicator`
-[取消通用指标订阅示例](../example/pythonApiExample.md#通用指标订阅及接收数据推送)
-> 取消通用指标订阅
+### `异步-查询历史tick数据-query-tick-async`
 
-* `type` 必填 指标类型参数，例如'etf'等字符串，该参数识别大小写
-* `codes` 选填 订阅的指标代码列表 数组 如['159732.SZ','561800.SH']
-* `emitter` 选填 注册数据派发事件对象, 默认为全局smart对象
-* 返回值 字符串数组，表示取消订阅失败的指标代码列表，例如['561800.SH']
+> 异步查询历史tick数据
+
+* `codes`  必填 要查询的股票列表数组 如['600000.SH', '000001.SZ']
+* `start_datetime` 必填 开始时间，如 "2025-01-16 09:59:35"
+* `end_datetime` 必填 开始时间，如 "2025-01-16 10:01:42"
+* `callback` 必填 接收数据的回调函数
+
 ```python
-smart.unsubscribe_indicator(type, codes, emitter)
+def callback(result, err) :
+    # result类型为dict, key 为股票代码, value 为对应的 Quote 结构体数组
+
+smart.query_tick_async(codes, start_datetime, end_datetime, callback)
 ```
+
 
 ### `异步-获取市场数据-query_market_data_async`
-[获取市场数据示例示例](../example/pythonApiExample.md#异步-获取市场数据-query-market-data-async)
+
 -   获取一个时间范围内的 市场行情数据(ticker行情), 数据量较大, 请输入合适的开始结束日期
 -   当前不支持分页, 数据均存储在第一页
 
@@ -1172,10 +1186,54 @@ inParams = {
         }
 smart.query_market_data_async(inParams, query_market_data_callback) # 正常传值
 ```
+
+#### 获取市场数据示例示例
+```python
+from smart import *
+import logging
+from smart.type import *
+logger = logging.getLogger()
+
+def query():
+    def query_market_data_callback(datalist,err:RspError):
+        if err:
+            logger.debug("查询失败:%s", smart.utils.toString(err))
+        else:
+            # 返回结果为Quote实体的数组
+            for i in range(len(datalist)):
+                if i < 5:   
+                    logger.debug("query_market_data_async【OK】前5个:%s",smart.utils.toString(datalist[i]))
+                    # query_market_data_async【OK】前5个:{"source_id": "xtp", "trading_day": "20240112", "rcv_time": "20240112", "data_time": "20240112100000000", "instrument_id": "000001", "exchange_id": "SZE", "instrument_type": 1, "pre_close_price": 9.17, "pre_settlement_price": null, "last_price": 9.19, "volume": 15929909, "turnover": 145870062, "pre_open_interest": null, "open_interest": null, "open_price": 9.13, "high_price": 9.2, "low_price": 9.11, "upper_limit_price": 10.09, "lower_limit_price": 8.25, "close_price": 0, "settlement_price": null, "bid_price": [9.18, 9.17, 9.16, 9.15, 9.14, 0, 0, 0, 0, 0], "ask_price": [9.19, 9.2, 9.21, 9.22, 9.23, 0, 0, 0, 0, 0], "bid_volume": [363900, 606900, 757200, 1069400, 441500, 0, 0, 0, 0, 0], "ask_volume": [368100, 904500, 463100, 719900, 483500, 0, 0, 0, 0, 0], "code": "000001.SZ", "avg_price": null, "iopv": null, "instrument_status": null}
+            logger.debug("query_market_data_async【OK】:%d",len(datalist))
+            # query_market_data_async【OK】:4149
+    inParams = {
+            "code": "000001.SZ", # 证券代码  SZ:深证 SH:上海 String(必填)
+            "start_date": "2024-01-12 10:00:00", # 开始日期 String(必填) 开始日期 格式yyyy-MM-dd hh:mm:ss
+            "end_date": "2024-01-12 15:00:00" # 结束日期 String(必填) 结束日期 格式yyyy-MM-dd hh:mm:ss
+            }
+    smart.query_market_data_async(inParams, query_market_data_callback) # 正常传值
+def init():
+    query()
+def show():
+   logger.debug("show")
+   logger.debug("show")
+def hide():
+    logger.debug("hide")
+def close():
+    logger.debug("close")
+
+smart.on_init(init)
+smart.on_show(show)
+smart.on_hide(hide)
+smart.on_close(close)
+```
+
+
+
 // 方式二:通过调用query_data_async接口，详情见 [数据查询](#method为market-data-异步查询市场数据)
 
 ### `同步-获取市场数据-query-market-data`
-[获取市场数据示例](../example/pythonApiExample.md#同步-获取市场数据-query-market-data)
+
 -   获取一个时间范围内的 市场数据(ticker行情), 数据量较大, 请输入合适的开始结束日期
 -   当前不支持分页, 数据均存储在第一页
 
@@ -1194,36 +1252,45 @@ for i in range(len(datalist)):
         logger.debug("query_market_data【OK】前5个:%s",smart.utils.toString(datalist[i]))
 logger.debug("query_market_data【OK】:%d",len(datalist))
 ```
+
+#### 同步获取市场数据示例
+```python
+from smart import *
+import logging
+from smart.type import *
+logger = logging.getLogger()
+def query():
+    inParams = {
+        "code": "000001.SZ",  # 000001.SZ 600000.SH  String(必填) 证券代码  SZ:深证 SH:上海
+        "start_date": "2024-01-12 10:00:00", #String(必填) 开始日期 格式yyyy-MM-dd hh:mm:ss
+        "end_date": "2024-01-12 15:00:00", #String(必填) 结束日期 格式yyyy-MM-dd hh:mm:ss
+    }
+    datalist = smart.query_market_data(inParams) # 正常传值
+    for i in range(len(datalist)):
+        if i < 5:   
+            logger.debug("query_market_data【OK】前5个:%s",smart.utils.toString(datalist[i]))
+            #query_market_data【OK】前5个:{"source_id": "xtp", "trading_day": "20240112", "rcv_time": "20240112", "data_time": "20240112100000000", "instrument_id": "000001", "exchange_id": "SZE", "instrument_type": 1, "pre_close_price": 9.17, "pre_settlement_price": null, "last_price": 9.19, "volume": 15929909, "turnover": 145870062, "pre_open_interest": null, "open_interest": null, "open_price": 9.13, "high_price": 9.2, "low_price": 9.11, "upper_limit_price": 10.09, "lower_limit_price": 8.25, "close_price": 0, "settlement_price": null, "bid_price": [9.18, 9.17, 9.16, 9.15, 9.14, 0, 0, 0, 0, 0], "ask_price": [9.19, 9.2, 9.21, 9.22, 9.23, 0, 0, 0, 0, 0], "bid_volume": [363900, 606900, 757200, 1069400, 441500, 0, 0, 0, 0, 0], "ask_volume": [368100, 904500, 463100, 719900, 483500, 0, 0, 0, 0, 0], "code": "000001.SZ", "avg_price": null, "iopv": null, "instrument_status": null}
+    logger.debug("query_market_data【OK】:%d",len(datalist))
+    # query_market_data【OK】:4149
+def init():
+    query()
+def show():
+   logger.debug("show")
+   logger.debug("show")
+def hide():
+    logger.debug("hide")
+def close():
+    logger.debug("close")
+
+smart.on_init(init)
+smart.on_show(show)
+smart.on_hide(hide)
+smart.on_close(close)
+```
+
 // 方式二:通过调用query_data_async接口，详情见 [数据查询](#method为market-data-同步查询市场数据)
 
-### `异步-获取当前交易日及下一交易日-get_trading_day_async`
-[获取当前交易日及下一交易日示例](../example/pythonApiExample.md#异步-获取当前交易日及下一交易日-get-trading-day-async)
--   获取当前交易日及下一交易日，如果当前日期不是交易日，则当前交易日返回空""
 
-// 方式一：通过调用get_trading_day_async接口
-```python
-def query_callback(tradingDayMap,err:RspError):
-    if err:
-        logger.debug("查询失败:%s", smart.utils.toString(err))
-    else:
-        logger.debug("get_trading_day_async【OK】:%s",tradingDayMap)
-        for k,v in tradingDayMap.items():
-            logger.debug("get_trading_day_async【OK】:%s,%s", k, v)
-smart.get_trading_day_async(query_callback)
-```
-// 方式二:通过调用query_data_async接口，详情见 [数据查询](#method为current-next-trading-day-异步获取当前交易日及下一交易日)
-
-### `同步-获取当前交易日及下一交易日-get_trading_day`
-[获取当前交易日及下一交易日示例](../example/pythonApiExample.md#同步-获取当前交易日及下一交易日-get-trading-day)
--   获取当前交易日及下一交易日，如果当前日期不是交易日，则当前交易日返回空""
-
-// 方式一：通过调用get_trading_day接口
-```python
-tradingDayMap = smart.get_trading_day()
-logger.debug("get_trading_day【OK】:%s", tradingDayMap)
-for k,v in tradingDayMap.items():
-    logger.debug("get_trading_day【OK】:%s, %s", k, v)
-```
 // 方式二:通过调用query_data_async接口，详情见 [数据查询](#method为current-next-trading-day-同步获取当前交易日及下一交易日)
 
 ### `异步查询数据接口-query_data_async`
@@ -1232,7 +1299,7 @@ for k,v in tradingDayMap.items():
 
 method 目前支持的参数有<br/>
 #### `method为bar-异步查询历史Bar数据`
->* [异步查询数据-获取历史bar行情示例](../example/pythonApiExample.md#异步查询数据-获取历史bar行情)
+
 >-   获取一个时间范围内的 bar 数据, 数据量较大, 请输入合适的开始结束日期
 >-   返回数据默认为前复权
 >* `method`  必填 该值为"bar"
@@ -1325,9 +1392,57 @@ smart.query_data_async(
     outFormat=OutFormat.Ndarray #查询结果的转出类型：OutFormat.List(默认) 、OutFormat.DataFrame、OutFormat.Ndarray。选填，不填时默认为OutFormat.List
 )
 ```
+
+#### 异步查询数据-获取历史bar行情示例
+
+```python
+from smart import *
+import logging
+from smart.type import *
+logger = logging.getLogger()
+
+def query():
+    def query_bar_callback(datalist,err):
+        if(err):
+            logger.debug("get error from query_data_async:%s",err)
+        else:
+            for i in range(len(datalist)):
+                if i < 5:   
+                    logger.debug("query_data_async【OK】前5个:%s",smart.utils.toString(datalist[i]))
+                    #query_data_async【OK】前5个:{"code": "000001.SZ", "end_time": "2024-01-12 10:00:00", "start_volume": 13549009, "trading_day": "2024-01-12", "type": "bar_5min", "instrument_id": "000001", "time_interval": "5m","period": "5m", "start_turnover": 123997543, "volume": 2380100, "start_time": "2024-01-12 09:55:00", "high": 9.2, "exchange_id": "SZE", "low": 9.17, "source_id": "xtp", "close": 9.19, "turnover": 21865172, "open": 9.19}
+            logger.debug("query_data_async【OK】:%d",len(datalist))
+            #query_data_async【OK】:43
+    smart.query_data_async(
+        method="bar", # method方法：固定值
+        inParams={
+            "code": "000001.SZ", # 证券代码  SZ:深证 SH:上海
+            "start_date": "2024-01-12 10:00:00", #String(必填) 开始日期 格式yyyy-MM-dd hh:mm:ss
+            "end_date": "2024-01-12 15:00:00", #String(必填) 结束日期 格式yyyy-MM-dd hh:mm:ss
+            "period": "5m", #String(选填) 频次 仅支持1m 5m 15m 30m 60m 1d 1w 默认1d,(m代表分钟，d代表天，w代表周)
+            "adjust_type": "pre" # 复权方式 none:不复权 pre:前复权 post:后复权 默认前复权
+        },
+        query_data_callback=query_bar_callback, # 回调函数
+        #参数outFormat(查询结果的转出类型):OutFormat.List(默认) 、OutFormat.DataFrame、OutFormat.Ndarray。选填，不填时默认为OutFormat.List。此样例未填，其他转出类型样例参见API文档
+    )
+
+def init():
+    query()
+def show():
+   logger.debug("show")
+   logger.debug("show")
+def hide():
+    logger.debug("hide")
+def close():
+    logger.debug("close")
+
+smart.on_init(init)
+smart.on_show(show)
+smart.on_hide(hide)
+smart.on_close(close)
+```
 <!-- <a id="test2">测试2</a> -->
 #### `method为market_data-异步查询市场数据`
->* [异步查询数据-获取市场数据示例](../example/pythonApiExample.md#异步查询数据-获取市场数据)
+
 >-   获取一个时间范围内的 市场数据(ticker行情), 数据量较大, 请输入合适的开始结束日期
 >* `method`  必填 该值为"bar"
 >* `inParams`  必填 查询参数，具体要素如下列举
@@ -1412,8 +1527,55 @@ smart.query_data_async(
     outFormat=OutFormat.Ndarray #查询结果的转出类型：OutFormat.List(默认) 、OutFormat.DataFrame、OutFormat.Ndarray。选填，不填时默认为OutFormat.List
 )
 ```
+
+#### 异步查询数据-获取市场数据示例
+
+```python
+from smart import *
+import logging
+from smart.type import *
+logger = logging.getLogger()
+def query():
+    def queryMarketData_callback(datalist,err):
+        if(err):
+            logger.debug("get error from query_data_async:%s",err)
+        else:
+            logger.debug(datalist)
+            for i in range(len(datalist)):
+                if i < 5:   
+                    logger.debug("query_data_async【OK】前5个:%s",smart.utils.toString(datalist[i]))
+                    # query_data_async【OK】前5个:{"source_id": "xtp", "trading_day": "20240112", "date_time": "20240112100000000", "instrument_id": "000001", "exchange_id": "SZE", "pre_close_price": 9.17, "last_price": 9.19, "volume": 15929909, "turnover": 145870062, "open_price": 9.13, "high_price": 9.2, "low_price": 9.11, "upper_limit_price": 10.09, "lower_limit_price": 8.25, "bid_price": [9.18, 9.17, 9.16, 9.15, 9.14, 0, 0, 0, 0, 0], "ask_price": [9.19, 9.2, 9.21, 9.22, 9.23, 0, 0, 0, 0, 0], "bid_volume": [363900, 606900, 757200, 1069400, 441500, 0, 0, 0, 0, 0], "ask_volume": [368100, 904500, 463100, 719900, 483500, 0, 0, 0, 0, 0], "code": "000001.SZ"}
+            logger.debug("query_data_async【OK】:%d",len(datalist))
+            # query_data_async【OK】:4149
+    
+    smart.query_data_async(
+        method="market_data", # String(必填) method方法：固定值
+        inParams={
+            "code": "000001.SZ", # String(必填) 证券代码  SZ:深证 SH:上海
+            "start_date": "2024-01-12 10:00:00", # String(必填) 开始日期 格式yyyy-MM-dd hh:mm:ss
+            "end_date": "2024-01-12 15:00:00", # String(必填) 结束日期 格式yyyy-MM-dd hh:mm:ss
+        },
+        query_data_callback=queryMarketData_callback, # 回调函数
+        outFormat=OutFormat.List #查询结果的转出类型：OutFormat.List(默认) 、OutFormat.DataFrame、OutFormat.Ndarray。选填，不填时默认为OutFormat.List
+    )
+def init():
+    query()
+def show():
+   logger.debug("show")
+   logger.debug("show")
+def hide():
+    logger.debug("hide")
+def close():
+    logger.debug("close")
+
+smart.on_init(init)
+smart.on_show(show)
+smart.on_hide(hide)
+smart.on_close(close)
+```
+
 #### `method为current_next_trading_day-异步获取当前交易日及下一交易日`
->* [异步查询数据-获取当前交易日及下一交易日示例](../example/pythonApiExample.md#异步查询数据-获取当前交易日及下一交易日)
+
 >-   获取当前交易日及下一交易日，如果当前日期不是交易日，则当前交易日返回空""
 >* `method`  必填 该值为"current_next_trading_day"
 >* `inParams`  必填 查询参数，{}
@@ -1428,13 +1590,47 @@ def query_callback(datalist,err:RspError):
         logger.debug("get_trading_day_async query_data_async【OK】:%d",len(datalist))
 smart.query_data_async("current_next_trading_day", None, query_callback)
 ```
+
+#### 异步查询数据-获取当前交易日及下一交易日示例
+
+```python
+from smart import *
+import logging
+from smart.type import *
+logger = logging.getLogger()
+def query():
+    def query_callback(datalist,err:RspError):
+        if err:
+           logger.debug("查询失败:%s", smart.utils.toString(err))
+        else:
+            for i in range(len(datalist)):
+                if i < 5:   
+                    logger.debug("get_trading_day_async query_data_async【OK】前5个:%s",smart.utils.toString(datalist[i]))
+            logger.debug("get_trading_day_async query_data_async【OK】:%d",len(datalist))
+    smart.query_data_async("current_next_trading_day", None, query_callback)
+def init():
+    query()
+def show():
+   logger.debug("show")
+   logger.debug("show")
+def hide():
+    logger.debug("hide")
+def close():
+    logger.debug("close")
+
+smart.on_init(init)
+smart.on_show(show)
+smart.on_hide(hide)
+smart.on_close(close)
+```
+
 ### `同步查询数据接口-query_data`
 * `method`  必填 查询使用的方法名 该值为"bar"、"market_data"
 * `inParams`  必填 查询参数（该参数因method而变）
 
 method 目前支持的参数有<br/>
 #### `method为bar-同步查询历史Bar数据`
->* [同步查询数据-获取历史bar行情示例](../example/pythonApiExample.md#同步查询数据-获取历史bar行情)
+
 >-   获取一个时间范围内的 bar 数据, 数据量较大, 请输入合适的开始结束日期
 >-   返回数据默认为前复权
 >* `method`  必填 该值为"bar"
@@ -1508,8 +1704,50 @@ logger.debug("query_data【OK】:%s",datalist.dtype)
 logger.debug("query_data【OK】:%s",datalist.itemsize)
 ```
 
+#### 同步查询数据-获取历史bar行情示例
+
+```python
+from smart import *
+import logging
+from smart.type import *
+logger = logging.getLogger()
+def query():
+    datalist = smart.query_data(
+        method="bar", # method方法：固定值
+        inParams={
+            "code": "000001.SZ", # 证券代码  SZ:深证 SH:上海
+            "start_date": "2024-01-12 10:00:00", #String(必填) 开始日期 格式yyyy-MM-dd hh:mm:ss
+            "end_date": "2024-01-12 15:00:00", #String(必填) 结束日期 格式yyyy-MM-dd hh:mm:ss
+            "period": "5m", #String(选填) 频次 仅支持1m 5m 15m 30m 60m 1d 1w 默认1d,(m代表分钟，d代表天，w代表周)
+            "adjust_type": "pre" # 复权方式 none:不复权 pre:前复权 post:后复权 默认前复权
+        },
+        #参数outFormat(查询结果的转出类型):OutFormat.List(默认) 、OutFormat.DataFrame、OutFormat.Ndarray。选填，不填时默认为OutFormat.List。此样例未填，其他转出类型样例参见API文
+    )
+    for i in range(len(datalist)):
+        if i < 5:   
+            logger.debug("query_data【OK】前5个:%s",smart.utils.toString(datalist[i]))
+            #query_data【OK】前5个:{"code": "000001.SZ", "end_time": "2024-01-12 10:00:00", "start_volume": 13549009, "trading_day": "2024-01-12", "type": "bar_5min", "instrument_id": "000001", "time_interval": "5m","period": "5m", "start_turnover": 123997543, "volume": 2380100, "start_time": "2024-01-12 09:55:00", "high": 9.2, "exchange_id": "SZE", "low": 9.17, "source_id": "xtp", "close": 9.19, "turnover": 21865172, "open": 9.19}
+    logger.debug("query_data【OK】:%d",len(datalist))
+    #query_data【OK】:43    
+
+def init():
+    query()
+def show():
+   logger.debug("show")
+   logger.debug("show")
+def hide():
+    logger.debug("hide")
+def close():
+    logger.debug("close")
+
+smart.on_init(init)
+smart.on_show(show)
+smart.on_hide(hide)
+smart.on_close(close)
+```
+
 #### `method为market_data-同步查询市场数据`
->* [同步查询数据-获取市场数据示例](../example/pythonApiExample.md#同步查询数据-获取市场数据)
+
 >-   获取一个时间范围内的 市场数据(ticker行情), 数据量较大, 请输入合适的开始结束日期
 >* `method`  必填 该值为"market_data"
 >* `inParams`  必填 查询参数，具体要素如下列举
@@ -1575,8 +1813,51 @@ logger.debug("query_data【OK】:%s",datalist.size)
 logger.debug("query_data【OK】:%s",datalist.dtype)
 logger.debug("query_data【OK】:%s",datalist.itemsize)
 ```
+
+#### 同步查询数据-获取市场数据示例
+
+```python
+from smart import *
+import logging
+from smart.type import *
+logger = logging.getLogger()
+
+def query():
+    datalist = smart.query_data(
+        method="market_data", # String(必填) method方法：固定值
+        inParams={
+            "code": "000001.SZ",  # 000001.SZ 600000.SH  String(必填) 证券代码  SZ:深证 SH:上海
+            "start_date": "2024-01-12 10:00:00", #String(必填) 开始日期 格式yyyy-MM-dd hh:mm:ss
+            "end_date": "2024-01-12 15:00:00", #String(必填) 结束日期 格式yyyy-MM-dd hh:mm:ss
+        },
+        outFormat=OutFormat.List #查询结果的转出类型：OutFormat.List(默认) 、OutFormat.DataFrame、OutFormat.Ndarray。选填，不填时默认为OutFormat.List
+    )
+    #返回结果为Dict类型的数组
+    logger.debug(datalist)
+    for i in range(len(datalist)):
+        if i < 5:   
+            logger.debug("query_data【OK】前5个:%s",smart.utils.toString(datalist[i]))
+            #query_data【OK】前5个:{"source_id": "xtp", "trading_day": "20240112", "date_time": "20240112100000000", "instrument_id": "000001", "exchange_id": "SZE", "pre_close_price": 9.17, "last_price": 9.19, "volume": 15929909, "turnover": 145870062, "open_price": 9.13, "high_price": 9.2, "low_price": 9.11, "upper_limit_price": 10.09, "lower_limit_price": 8.25, "bid_price": [9.18, 9.17, 9.16, 9.15, 9.14, 0, 0, 0, 0, 0], "ask_price": [9.19, 9.2, 9.21, 9.22, 9.23, 0, 0, 0, 0, 0], "bid_volume": [363900, 606900, 757200, 1069400, 441500, 0, 0, 0, 0, 0], "ask_volume": [368100, 904500, 463100, 719900, 483500, 0, 0, 0, 0, 0], "code": "000001.SZ"}
+    logger.debug("query_data【OK】:%d",len(datalist))
+    #query_data【OK】:4149
+def init():
+    query()
+def show():
+   logger.debug("show")
+   logger.debug("show")
+def hide():
+    logger.debug("hide")
+def close():
+    logger.debug("close")
+
+smart.on_init(init)
+smart.on_show(show)
+smart.on_hide(hide)
+smart.on_close(close)
+```
+
 #### `method为current_next_trading_day-同步获取当前交易日及下一交易日`
->* [同步查询数据-获取当前交易日及下一交易日示例](../example/pythonApiExample.md#同步查询数据-获取当前交易日及下一交易日)
+
 >-   获取当前交易日及下一交易日，如果当前日期不是交易日，则当前交易日返回空""
 >* `method`  必填 该值为"current_next_trading_day"
 >* `inParams`  必填 查询参数，{}
@@ -1587,13 +1868,44 @@ for i in range(len(tradingDayList)):
         logger.debug("get_trading_day query_data【OK】前5个:%s",smart.utils.toString(tradingDayList[i]))
 logger.debug("get_trading_day query_data【OK】:%d",len(tradingDayList))
 ```
+
+#### 同步查询数据-获取当前交易日及下一交易日示例
+
+```python
+from smart import *
+import logging
+from smart.type import *
+logger = logging.getLogger()
+def query():
+    tradingDayList = smart.query_data("current_next_trading_day")
+    for i in range(len(tradingDayList)):
+        if i < 5:   
+            logger.debug("get_trading_day query_data【OK】前5个:%s",smart.utils.toString(tradingDayList[i]))
+    logger.debug("get_trading_day query_data【OK】:%d",len(tradingDayList))
+def init():
+    query()
+def show():
+   logger.debug("show")
+   logger.debug("show")
+def hide():
+    logger.debug("hide")
+def close():
+    logger.debug("close")
+
+smart.on_init(init)
+smart.on_show(show)
+smart.on_hide(hide)
+smart.on_close(close)
+```
+
+
 ### `异步分页查询数据接口-query_data_page_async`
 * `method`  必填 查询使用的方法名 该值为"bar"、"market_data"
 * `inParams`  必填 查询参数（该参数因method而变）
 
 method 目前支持的参数有
 #### `method为bar-异步分页查询历史bar数据`
->* [异步分页获取历史bar数据示例](../example/pythonApiExample.md#异步分页查询数据-获取历史bar数据)
+
 >-   获取一个时间范围内的 bar 数据, 数据量较大, 请输入合适的开始结束日期
 >-   返回数据默认为前复权
 >* `method`  必填 该值为"bar"
@@ -1695,8 +2007,65 @@ smart.query_data_page_async(
     outFormat=OutFormat.Ndarray #查询结果的转出类型：OutFormat.List(默认) 、OutFormat.DataFrame、OutFormat.Ndarray。选填，不填时默认为OutFormat.List
 )
 ```
+
+#### 异步分页获取历史bar数据示例
+
+```python
+from smart import *
+import logging
+from smart.type import *
+logger = logging.getLogger()
+
+# 回测 获取数据
+def query_data_page_async():
+    def queryBar_callback(result:DataPageInfo,err):
+        if(err):
+            logger.debug("get error from query_data_page_async:%s",err)
+        else:
+            #返回结果为DataPageInfo类型数据，其中DataPageInfo.data要素是dict类型的数组
+            logger.debug("query_data_page_async:当前页：%d,每页记录数：%d,总记录数：%d,总页数：%d"%(result.currentPage,result.pageSize,result.totalCount,result.totalPage))
+            #query_data_page_async:当前页：1,每页记录数：10000,总记录数：240,总页数：1
+            datalist = result.data
+            for i in range(len(datalist)):
+                if i < 5:   
+                    logger.debug("query_data_page_async【OK】前5个:%s",smart.utils.toString(datalist[i]))
+                    #query_data_page_async【OK】前5个:{"code": "000001.SZ", "end_time": "2013-01-04 15:00:00", "start_volume": 0, "trading_day": "2013-01-04", "type": "bar_1d", "instrument_id": "000001", "time_interval": "1d", "period": "5m","start_turnover": 0, "volume": 44385137, "start_time": "2013-01-04 09:30:00", "high": 5.1003, "exchange_id": "SZE", "low": 4.936, "source_id": "xtp", "close": 4.9577, "turnover": 717567546.58, "open": 5.06}
+            logger.debug("query_data_page_async【OK】:%d",len(datalist))
+            #query_data_page_async【OK】:240
+  
+    smart.query_data_page_async(
+        method="bar", # String(必填) method方法：固定值
+        inParams={
+            "code": "000001.SZ", # String(必填) 证券代码  SZ:深证 SH:上海
+            "start_date": "2024-01-12 10:00:00", # String(必填) 开始日期 格式yyyy-MM-dd hh:mm:ss
+            "end_date": "2024-01-12 15:00:00", # String(必填) 结束日期 格式yyyy-MM-dd hh:mm:ss
+            "period": "5m", #String(选填) 频次 仅支持1m 5m 15m 30m 60m 1d 1w 默认1d,(m代表分钟，d代表天，w代表周)
+            "adjust_type": "pre", #String(选填) 复权方式 none:不复权 pre:前复权 post:后复权 默认前复权
+            "current_page": 1, #  当前页，不传 默认当前页 为1
+            "page_size": 10000 # 分页数量，最大为10000
+        },
+        query_data_page_callback=queryBar_callback, # 回调函数
+        outFormat=OutFormat.List #查询结果的转出类型：OutFormat.List(默认) 、OutFormat.DataFrame、OutFormat.Ndarray。选填，不填时默认为OutFormat.List
+    )
+
+def init():
+    query_data_page_async()
+def show():
+   logger.debug("show")
+   logger.debug("show")
+def hide():
+    logger.debug("hide")
+def close():
+    logger.debug("close")
+
+smart.on_init(init)
+smart.on_show(show)
+smart.on_hide(hide)
+smart.on_close(close)
+```
+
 #### `method为market_data-异步分页查询市场数据`
->* [异步分页获取市场数据示例](../example/pythonApiExample.md#异步分页查询数据-获取市场数据)
+
 >-   获取一个时间范围内的 市场数据(ticker行情), 数据量较大, 请输入合适的开始结束日期
 >* `method`  必填 该值为"market_data"
 >* `inParams`  必填 查询参数，具体要素如下列举
@@ -1704,6 +2073,7 @@ smart.query_data_page_async(
 >* `outFormat` 选填 值域为OutFormat.List(默认) 、OutFormat.DataFrame、OutFormat.Ndarray
 >> 第一种入参
 >>* `outFormat` 本例不传outFormat或outFormat=OutFormat.List时：
+
 ```python
 def queryMarketData_callback(result:DataPageInfo,err):
     if(err):
@@ -1791,13 +2161,67 @@ smart.query_data_page_async(
     outFormat=OutFormat.Ndarray #查询结果的转出类型：OutFormat.List(默认) 、OutFormat.DataFrame、OutFormat.Ndarray。选填，不填时默认为OutFormat.List
 )
 ```
+
+#### 异步分页获取市场数据示例
+
+```python
+from smart import *
+import logging
+from smart.type import *
+logger = logging.getLogger()
+
+# 回测 获取数据
+def query_data_page_async():
+    def queryMarketData_callback(result:DataPageInfo,err):
+        if(err):
+            logger.debug("get error from query_data_page_async:%s",err)
+        else:
+            #返回结果为DataPageInfo类型数据，其中DataPageInfo.data要素是dict类型的数组
+            logger.debug("query_data_page_async:当前页：%d,每页记录数：%d,总记录数：%d,总页数：%d"%(result.currentPage,result.pageSize,result.totalCount,result.totalPage))
+            #query_data_page_async:当前页：1,每页记录数：1000,总记录数：4150,总页数：5
+            datalist = result.data
+            for i in range(len(datalist)):
+                if i < 5:   
+                    logger.debug("query_data_page_async【OK】前5个:%s",smart.utils.toString(datalist[i]))
+                    #query_data_page_async【OK】前5个:{"source_id": "xtp", "trading_day": "20240112", "date_time": "20240112100000000", "instrument_id": "000001", "exchange_id": "SZE", "pre_close_price": 9.17, "last_price": 9.19, "volume": 15929909, "turnover": 145870062, "open_price": 9.13, "high_price": 9.2, "low_price": 9.11, "upper_limit_price": 10.09, "lower_limit_price": 8.25, "bid_price": [9.18, 9.17, 9.16, 9.15, 9.14, 0, 0, 0, 0, 0], "ask_price": [9.19, 9.2, 9.21, 9.22, 9.23, 0, 0, 0, 0, 0], "bid_volume": [363900, 606900, 757200, 1069400, 441500, 0, 0, 0, 0, 0], "ask_volume": [368100, 904500, 463100, 719900, 483500, 0, 0, 0, 0, 0], "code": "000001.SZ"}
+            logger.debug("query_data_page_async【OK】:%d",len(datalist))
+            #query_data_page_async【OK】:1000
+    smart.query_data_page_async(
+        method="market_data", # String(必填) method方法：固定值
+        inParams = {
+            "code": "000001.SZ", # String(必填) 证券代码  SZ:深证 SH:上海
+            "start_date": "2024-01-12 10:00:00", # String(必填) 开始日期 格式yyyy-MM-dd hh:mm:ss
+            "end_date": "2024-01-12 15:00:00", # String(必填) 结束日期 格式yyyy-MM-dd hh:mm:ss
+            "current_page": 1, #  当前页，不传 默认当前页 为1
+            "page_size": 1000 # 分页数量，最大为10000
+        },
+        query_data_page_callback=queryMarketData_callback, # 回调函数
+        outFormat=OutFormat.List #查询结果的转出类型：OutFormat.List(默认) 、OutFormat.DataFrame、OutFormat.Ndarray。选填，不填时默认为OutFormat.List
+    )
+
+def init():
+    query_data_page_async()
+def show():
+   logger.debug("show")
+   logger.debug("show")
+def hide():
+    logger.debug("hide")
+def close():
+    logger.debug("close")
+
+smart.on_init(init)
+smart.on_show(show)
+smart.on_hide(hide)
+smart.on_close(close)
+```
+
 ### `同步分页查询数据接口-query_data_page`
 * `method`  必填 查询使用的方法名 该值为"bar"、"market_data"
 * `inParams`  必填 查询参数（该参数因method而变）
 
 method 目前支持的参数有
 #### `method为bar-同步分页查询历史bar数据`
->* [同步分页获取历史bar数据示例](../example/pythonApiExample.md#同步分页查询数据-获取历史bar数据)
+
 >-   获取一个时间范围内的 bar 数据, 数据量较大, 请输入合适的开始结束日期
 >-   返回数据默认为前复权
 >* `method`  必填 该值为"bar"
@@ -1881,8 +2305,55 @@ logger.debug("query_data_page【OK】:%s",datalist.dtype)
 logger.debug("query_data_page【OK】:%s",datalist.itemsize)
 ```
 
+#### 同步分页获取历史bar数据示例
+
+```python
+from smart import *
+import logging
+from smart.type import *
+logger = logging.getLogger()
+
+
+def init():
+    result = smart.query_data_page(
+        method="bar", # String(必填) method方法：固定值
+        inParams={
+            "code": "000001.SZ",  # 000001.SZ 600000.SH  String(必填) 证券代码  SZ:深证 SH:上海
+            "start_date": "2024-01-12 10:00:00", #String(必填) 开始日期 格式yyyy-MM-dd hh:mm:ss
+            "end_date": "2024-01-12 15:00:00", #String(必填) 结束日期 格式yyyy-MM-dd hh:mm:ss
+            "period": "5m", #String(选填) 频次 仅支持1m 5m 15m 30m 60m 1d 1w 默认1d,(m代表分钟，d代表天，w代表周)
+            "adjust_type": "pre", #String(选填) 复权方式 none:不复权 pre:前复权 post:后复权 默认前复权
+            "current_page": 1, #  当前页，不传 默认当前页 为1
+            "page_size": 10000 # 分页数量，最大为10000
+        },
+        outFormat=OutFormat.List #查询结果的转出类型：OutFormat.List(默认) 、OutFormat.DataFrame、OutFormat.Ndarray。选填，不填时默认为OutFormat.List
+    )
+    #返回结果为DataPageInfo类型数据，其中DataPageInfo.data要素是dict类型数组
+    logger.debug("query_data_page:当前页：%d,每页记录数：%d,总记录数：%d,总页数：%d"%(result.currentPage,result.pageSize,result.totalCount,result.totalPage))
+    # query_data_page:当前页：1,每页记录数：10000,总记录数：43,总页数：1
+    datalist = result.data
+    for i in range(len(datalist)):
+        if i < 5:   
+            logger.debug("query_data_page【OK】前5个:%s",smart.utils.toString(datalist[i]))
+            # query_data_page【OK】前5个:{"code": "000001.SZ", "end_time": "2024-01-12 10:00:00", "start_volume": 13549009, "trading_day": "2024-01-12", "type": "bar_5min", "instrument_id": "000001", "time_interval": "5m","period": "5m", "start_turnover": 123997543, "volume": 2380100, "start_time": "2024-01-12 09:55:00", "high": 9.2, "exchange_id": "SZE", "low": 9.17, "source_id": "xtp", "close": 9.19, "turnover": 21865172, "open": 9.19}
+    logger.debug("query_data_page【OK】:%d",len(datalist))
+    # query_data_page【OK】:43
+def show():
+   logger.debug("show")
+   logger.debug("show")
+def hide():
+    logger.debug("hide")
+def close():
+    logger.debug("close")
+
+smart.on_init(init)
+smart.on_show(show)
+smart.on_hide(hide)
+smart.on_close(close)
+```
+
 #### `method为market_data-同步分页查询市场数据`
->* [同步分页获取市场数据示例](../example/pythonApiExample.md#同步分页查询数据-获取市场数据)
+
 >-   获取一个时间范围内的 市场数据(ticker行情), 数据量较大, 请输入合适的开始结束日期
 >* `method`  必填 该值为"market_data"
 >* `inParams`  必填 查询参数，具体要素如下列举
@@ -1959,6 +2430,54 @@ logger.debug("query_data_page【OK】:%s",datalist.dtype)
 logger.debug("query_data_page【OK】:%s",datalist.itemsize)
 ```
 
+#### 同步分页获取市场数据示例
+
+```python
+from smart import *
+import logging
+from smart.type import *
+logger = logging.getLogger()
+
+# 回测 获取数据
+def query_data_page():
+    result = smart.query_data_page(
+        method="market_data", # String(必填) method方法：固定值
+        inParams={
+            "code": "000001.SZ",  # 000001.SZ 600000.SH  String(必填) 证券代码  SZ:深证 SH:上海
+            "start_date": "2024-01-12 10:00:00", #String(必填) 开始日期 格式yyyy-MM-dd hh:mm:ss
+            "end_date": "2024-01-12 15:00:00", #String(必填) 结束日期 格式yyyy-MM-dd hh:mm:ss
+            "current_page": 1, #  当前页，不传 默认当前页 为1
+            "page_size": 10000 # 分页数量，最大为10000
+        },
+        outFormat=OutFormat.List #查询结果的转出类型：OutFormat.List(默认) 、OutFormat.DataFrame、OutFormat.Ndarray。选填，不填时默认为OutFormat.List
+    )
+    #返回结果为DataPageInfo类型数据，其中DataPageInfo.data要素是dict类型数组
+    logger.debug("query_data_page:当前页：%d,每页记录数：%d,总记录数：%d,总页数：%d"%(result.currentPage,result.pageSize,result.totalCount,result.totalPage))
+    #query_data_page:当前页：1,每页记录数：10000,总记录数：4149,总页数：1
+    datalist = result.data
+    for i in range(len(datalist)):
+        if i < 5:   
+            logger.debug("query_data_page【OK】前5个:%s",smart.utils.toString(datalist[i]))
+            # query_data_page【OK】前5个:{"source_id": "xtp", "trading_day": "20240112", "date_time": "20240112100000000", "instrument_id": "000001", "exchange_id": "SZE", "pre_close_price": 9.17, "last_price": 9.19, "volume": 15929909, "turnover": 145870062, "open_price": 9.13, "high_price": 9.2, "low_price": 9.11, "upper_limit_price": 10.09, "lower_limit_price": 8.25, "bid_price": [9.18, 9.17, 9.16, 9.15, 9.14, 0, 0, 0, 0, 0], "ask_price": [9.19, 9.2, 9.21, 9.22, 9.23, 0, 0, 0, 0, 0], "bid_volume": [363900, 606900, 757200, 1069400, 441500, 0, 0, 0, 0, 0], "ask_volume": [368100, 904500, 463100, 719900, 483500, 0, 0, 0, 0, 0], "code": "000001.SZ"}
+    logger.debug("query_data_page【OK】:%d",len(datalist))
+    #query_data_page【OK】:4149
+
+def init():
+    query_data_page()
+def show():
+   logger.debug("show")
+   logger.debug("show")
+def hide():
+    logger.debug("hide")
+def close():
+    logger.debug("close")
+
+smart.on_init(init)
+smart.on_show(show)
+smart.on_hide(hide)
+smart.on_close(close)
+```
+
 ### `添加自选股-add_self_select_stock`
 * `group_name`  String(必填) 板块名称
 * `stock`  String(必填) 股票代码
@@ -2009,89 +2528,6 @@ except Exception as exp:
     logger.error(exp, exc_info=True, stack_info=True)
 ```
 
-### `查询 etf 申赎上限-query_etf_purchase_redemption_top_limit`
-* `code`  String(必填) etf 代码, 格式如 159300.SZ
-  
-```python
-try :
-    etf_data = smart.query_etf_purchase_redemption_top_limit("159300.SZ")
-    logger.info("query_etf_purchase_redemption_top_limitn result: %s", etf_data)
-    '''
-    result 类似如下 json
-    {
-        "code":"159300",
-        "redemption_top":35000000,  # 赎回上限
-        "purchase_top":35000000     # 申赎上限
-    }
-    '''
-except Exception as exp:
-    logger.error(exp, exc_info=True, stack_info=True)
-```
-
-### `关闭当前组件-close`
-```python
-smart.close()
-```
-
-
-<!-- ### `smart.newStrategyInstance`
-创建策略实例
-```js
-/**
- * 创建策略实例 不论是哪种策略  都需要创建策略实例，拿到一个js的Strategy对象，才能操作该策略的方法，注意这里只是语言级别的，并非启动策略
- * @param account_id 必填 账号id
- * @param strategy_platform_type  策略平台类型  StrategyPlatformType的枚举值
- * @param strategy_id
- *
- * 返回一个Strategy对象  然后调用strategy.startStrategy()等方法
- */
-smart.newStrategyInstance(account_id, strategy_platform_type, strategy_id);
-``` -->
-
-<!-- ### `smart.addStrategy`
-登记一个策略
-```js
-/**
- * 向本账号登记一个策略
- * @param account_id String必填 账号id
- * @param strategy_platform_type String必填 策略平台类型  StrategyPlatformType的枚举值  不同的策略有不同的行为：
- *              AlphaX类型的登记后smart server形成一条记录  客户端策略列表中会出现，需要进一步调用newStrategyInstance拿到实例后进行uploadFile后再startStrategy
- *              Algo类型的不允许客户主动登记策略
- *              ProgramTrade类型和Spec类型的可由客户主动登记策略，记录在smartserver  提供的信息比AlphaX的多一些
- *              Front类型的实际就是客户向组件库登记一个私有策略，记录在smartserver，如果之后uploadFile则为向组件库上传一个纯前端的私有策略，如果是不调用uploadFile直接startStrategy则直接启动本地组件目录中的该策略（只能是.smart包格式），如果本地不存在该策略则菜单中不显示
- * @param strategy_id String可选 策略id  可以含中文，为了防止冲突，尽量特殊些，不要用"网格交易"这种很通用的命名，很容易冲突
- * @param config 策略信息对象  记录在smartserver
- *              {
- *                  strategy_path:'',//String(可选)  对Front为.smart包的文件名   对AlphaX不需要传，自动取strategy_id作为策略存放相对路径   对Algo不需要传    对ProgramTrade和Spec类型的为策略所在文件夹在托管机器的全路径（removeStrategy时会删除该文件夹）
- *                  strategy_configfile_path_list: [''],//Array< String >(可选)  策略配置文件路径列表  对AlphaX和ProgramTrade和Spec类型的需要传递  可以多个路径
- *                  strategy_log_path_list: [''],//Array< String >(可选) 策略日志文件的路径列表  仅ProgramTrade和Spec类型的需要传递  可以多个，里面的路径都会被smart的logstash收集  Front类型的日志自动被smart收集无需传递
- *                  startStrategyCMD: '',//String(可选) 策略启动的cmd命令字符串  仅ProgramTrade和Spec类型的需要传递
- *                  template_code: '',//String(可选) 策略模板代码  AlphaX平台创建公共策略时必填
- *              }
- *
- * @return Promise形式返回Strategy对象
- * 
- * 不同的策略有不同的行为：
- * AlphaX类型的登记后smart server形成一条记录 客户端策略列表中会出现，需要进一步调用newStrategyInstance拿到实例后进行uploadFile后再startStrategy
- * Algo类型的不允许客户主动登记策略
- * ProgramTrade类型和Spec类型的可由客户主动登记策略，记录在smartserver 提供的信息比AlphaX的多一些
- * Front类型的实际就是客户向组件库登记一个私有策略，记录在smartserver，如果之后uploadFile则为向组件库上传一个纯前端的私有策略， 如果是不调用uploadFile直接startStrategy则直接启动本地组件目录中的该策略（只能是.smart包格式），如果本地不存在该策略则菜单中不显示
- *
- */
-let strategy = await smart.addStrategy(account_id, strategy_platform_type, strategy_id, config);
-``` -->
-
-<!-- ### `smart.modifyStrategy`
-修改策略
-```js
-待实现 ？？？
-```
-
-### `smart.removeStrategy`
-删除策略
-```js
-待实现 ？？？
-``` -->
 
 ## SmartX数据详情
 组件SDK提供query_data_async（异步查询数据）、query_data（同步查询数据）、query_data_page_async（异步分页查询数据）、query_data_page_async（同步分页查询数据）接口。客户需要仅需要传递method及请求入参inParams，即可获取对应查询数据
@@ -2129,12 +2565,6 @@ let strategy = await smart.addStrategy(account_id, strategy_platform_type, strat
 * `method` 必填 该值为"market_data"
 *  `inParams`  必填 查询参数对象，具体要素详情见[异步数据查询](#method为market-data-异步查询市场数据)或是[同步数据查询](#method为market-data-同步查询市场数据)或是[异步分页数据查询](#method为market-data-异步分页查询市场数据)或是[同步分页数据查询](#method为market-data-同步分页查询市场数据)
 -   返回数据默认为前复权
-### `通用指标etf行情数据订阅`
-- 通过通用指标订阅etf行情数据
-* 具体要素详情见[通用指标订阅-subscribe_indicator](#通用指标订阅-subscribe-indicator)
-### `获取当前交易日及下一交易日`
-* `method` 必填 该值为"current_next_trading_day"
-*  `inParams`  必填 查询参数对象，具体要素详情见[异步数据查询](#method为current-next-trading-day-异步获取当前交易日及下一交易日)或是[同步数据查询](#method为current-next-trading-day-同步获取当前交易日及下一交易日)
 
 ## smart对象下的全局实时静态数据
 
@@ -2152,22 +2582,6 @@ smart.current_account
 smart.account_map
 ```
 
-### `策略集合-strategy_map`
-所有本客户端登录的资金账号下的策略集合     Object key为`${策略id}_${平台类型}`  value为[Strategy](#策略-strategy)对象
-```python
-smart.strategy_map[strategy.clent_id + "_" + StrategyPlatformType.Algo]
-```
-### `可交易etf集合-etf_map`
-可交易etf集合（全局静态数据）
-```python
-smart.etf_map
-```
-
-### `国债逆回购列表-reverse_repo_list`
-国债逆回购列表（全局静态数据）
-```python
-smart.reverse_repo_list
-```
 
 ### `证券列表-instrument_list`
 所有证券列表 Array 元素为[Instrument](#证券信息-instrument)对象
@@ -2257,32 +2671,6 @@ def callback(data):
 smart.current_account.on_cancel_fail(callback)
 ```
 
-#### `account.on_credit_ticker_assign` <Badge type="warning" text="仅支持两融账户" />
-账户收到信用可融券头寸更新
-* `callback`  Function (必填) - 更新信用可融券头寸，返回为[CreditTickerAssignInfo](#信用可融券头寸信息-credittickerassigninfo)对象
-```python
-def callback(creditTickerAssignInfo):
-    logger.debug("get on_credit_ticker_assign:%s",smart.utils.toString(creditTickerAssignInfo))
-smart.current_account.on_credit_ticker_assign(callback)
-```
-
-#### `account.on_credit_debt_finance` <Badge type="warning" text="仅支持两融账户" />
-账户收到信用融资负债合约更新
-* `callback` Function (必填) - 更新信用融资负债合约，返回为[CreditDebtFinance](#信用融资负债信息-creditdebtfinance)对象
-```python
-def callback(creditDebtFinance):
-    logger.debug("get on_credit_debt_finance:%s",smart.utils.toString(creditDebtFinance))
-smart.current_account.on_credit_debt_finance(callback)
-```
-
-#### `account.on_credit_debt_security` <Badge type="warning" text="仅支持两融账户" />
-账户收到信用融券负债合约更新
-* `callback` Function (必填) - 更新信用融券负债合约，返回为[CreditDebtSecurity](#信用融券负债信息-creditdebtsecurity)对象
-```python
-def callback(creditDebtSecurity):
-    logger.debug("get on_credit_debt_security:%s",smart.utils.toString(creditDebtSecurity))
-smart.current_account.on_credit_debt_security(callback)
-```
 
 ### 静态方法
 无
@@ -2328,22 +2716,6 @@ smart.current_account.on_credit_debt_security(callback)
 
 该账户的实时成交回报列表  Array 元素是[Trade](#成交回报-trade)对象
 
-#### `account.strategy_map` <Badge type="warning" text="标准版不支持" />
-
-该资金账号的策略集合 key为strategy_id+'_'+StrategyPlatformType value为strategy对象
-
-
-#### `credit_ticker_assign_list` <Badge type="warning" text="仅支持两融账户" />
-
-该账号的信用实时可融券头寸信息 Array 元素是[CreditTickerAssignInfo](#信用可融券头寸信息-credittickerassigninfo)对象
-
-#### `credit_debt_finance_list` <Badge type="warning" text="仅支持两融账户" />
-
-该账号的信用融资负债合约列表 Array 元素是[CreditDebtFinance](#信用融资负债信息-creditdebtfinance)对象
-
-#### `credit_debt_security_list` <Badge type="warning" text="仅支持两融账户" />
-
-该账号的信用融券负债合约列表 Array 元素是[CreditDebtSecurity](#信用融券负债信息-creditdebtsecurity)对象
 
 #### `book`
 
@@ -2400,28 +2772,6 @@ smart.current_account.unsubscribe(codes=['600000.SH','300001.SZ'])
 smart.current_account.unsubscribe(instruments, exchange_id, is_level2)
 ```
 
-#### `account.subscribe_index`
-
-订阅指数行情 注意无account_id参数 通过smart.current_account.on_quote(on_quote_callback)监听指数行情变化  
-
-* `instruments` 必填 订阅的指数列表 数组 如["000001", "CESCPD", "931646"]
-* `is_level2` 选填 是否level2 bool类型，默认为False True or False 目前暂不支持level2
-* `callback` 选填 订阅后的数据或错误返回信息参数(quoteList,[err](#接口响应错误对象-rsperror))，quoteList只是订阅成功的结果，后续行情变化将随行情事件推送，详见示例
-```python
-smart.current_account.subscribe_index(instruments=["000001", "CESCPD", "931646"])
-def on_quote_callback(quote):
-    if quote.instrument_type == smart.Type.InstrumentType.Index: 
-        logger.debug(f"{smart.utils.toString(quote)}")
-smart.current_account.on_quote(on_quote_callback)
-```
-
-#### `account.unsubscribe_index`
-取消订阅指数行情
-* `instruments` 必填 取消订阅的指数列表 数组 如["000001", "CESCPD", "931646"]
-* `is_level2` 选填 是否level2 bool类型，默认为False True or False 目前暂不支持level2
-```python
-smart.current_account.unsubscribe_index(instruments=["000001", "CESCPD", "931646"])
-```
 
 #### `account.insert_order` <Badge type="warning" text="标准版不支持两融" />
 
@@ -2471,15 +2821,6 @@ def cancel_callback(data,err):
 smart.current_account.cancel_order(order_id, callback)
 ```
 
-#### `account.queryCreditAssets` <Badge type="warning" text="仅支持两融账户" />
->查询信用资产信息
-* `queryCreditAssetsCB` Function(必填) - 获取信用资产回调，返回信用资产信息(assets,[err](#接口响应错误对象-rsperror))
-```python
-def queryCreditAssetsCB(assets,err):
-    if(assets):logger.debug("get queryCreditAssets: %s",smart.utils.toString(assets))
-    if(not assets):logger.debug("get queryCreditAssets FAIL: %s",err.message)
-smart.current_account.queryCreditAssets(queryCreditAssetsCB)
-```
 
 #### `account.refreshPositionList`
 >刷新持仓信息
@@ -2502,398 +2843,6 @@ smart.current_account.get_position(instrument_id, exchange_id, direction)
 # 方式二：
 smart.current_account.get_position(code="600000.SH")
 ```
-
-#### `account.submit_source_apply` <Badge type="warning" text="仅支持两融账户" />
->账户提交券源申请
-* `sourceQuoteApplyList` String(必填) - 券源行情申请列表
-* `callback(suclist<SourceQuoteInfo>,err )` Function(必填) - 券源申请提交的回调，suclist为券源申请成功的列表信息，若[err](#接口响应错误对象-rsperror)有值，则券源申请失败的列表信息在err.value
-```python
-def callback(suclist,err):
-    if err: #券源申请推送:存在失败
-        errList =  [] if type(err)!= dict or not 'value' in err.keys() else err["value"]
-        if errList: #券源申请推送：失败数据
-            for i in range(len(errList)):
-                logger.debug("submitSourceApplyCB【error】:%s",smart.utils.toString(errList[i]))  
-        if suclist:#券源申请推送：成功数据
-            for i in range(len(suclist)):
-                logger.debug("submitSourceApplyCB【success】:%s",smart.utils.toString(suclist[i]))                
-    else: #券源申请推送全部成功
-        if suclist:#券源申请推送：成功数据
-            for i in range(len(suclist)):
-                logger.debug("submitSourceApplyCB【success】:%s",smart.utils.toString(suclist[i]))
-smart.current_account.submit_source_apply(sourceQuoteApplyList,callback)
-```
-
-#### `account.createStrategy` <Badge type="warning" text="标准版不支持" />
->创建一个全新的策略实例
-* `strategy_platform_type` String(必填) - 策略平台类型 [StrategyPlatformType](#策略平台类型-strategyplatformtype) 的枚举值
-* `strategy_id` String(必填) - 策略id 可以含中文，为了防止冲突，尽量特殊些，不要用"网格交易"这种很通用的命名，很容易冲突
-* `config` String(必填) - 策略信息对象 记录在smartserver
-* `createStrategyCallback` Function(必填) - 返回策略信息对象(strategy,[err](#接口响应错误对象-rsperror))
-
-```python
-def createStrategyCallback(strategy,err):
-    if(err):
-        logger.debug("get error from createStrategy:%s",err)
-    else:
-        logger.debug("get createStrategyCallback: %s",strategy)    
-smart.current_account.createStrategy(strategy_platform_type, strategy_id, config ,createStrategyCallback)
-```
-#### `account.startStrategy` <Badge type="warning" text="标准版不支持" />
->开始运行策略实例
-* `strategy_platform_type` String(必填) - 策略平台类型 [StrategyPlatformType](#策略平台类型-strategyplatformtype) 的枚举值
-* `clent_id` String(必填) - 策略实例的ID
-* `startStrategyCallback` Function(必填) - 返回母单信息(strategy,[err](#接口响应错误对象-rsperror))
-
-```python
-def startStrategyCallback(strategy,err):
-    if(err):
-        logger.debug("get error from startStrategy:%s",err)
-    else:
-        logger.debug("get startStrategy: %s",strategy)
-smart.current_account.startStrategy(strategy_platform_type, clent_id,startStrategyCallback)
-```
-
-#### `account.insertAlgoOrder` <Badge type="warning" text="标准版不支持" />
->创建并开始运行策略实例
-* `strategy_id` String(必填) - 策略id 
-* `config` String(必填) - 策略信息对象
-* `insertAlgoOrderCallback` Function(必填) - 返回母单信息(strategy,[err](#接口响应错误对象-rsperror))
-
-```python
-def insertAlgoOrderCallback(strategy,err):
-    if(err):
-        logger.debug("get error from insertAlgoOrder:%s",err)
-    else:
-        logger.debug("get insertAlgoOrder: %s",strategy)
-smart.current_account.insertAlgoOrder(strategy_id, config, insertAlgoOrderCallback)
-```
-
-
-## `策略-Strategy` <Badge type="warning" text="标准版不支持" />
-
-> 获取策略相关数据、控制策略的行为
-
-### 实例事件
-
-`Strategy` 是一个EventEmitter。可以监听的事件详见[Event](#事件-event)
-
-
-#### `strategy.on_strategy_quote`
-> 某策略订阅的行情推送
-* `callback` Function
-    - `quote` Object - 事件发生时返回一个[Quote](#行情信息-quote)对象
-```python
-def callback(quote):
-    logger.debug("get on_strategy_quote:%s",smart.utils.toString(quote))
-strategy.on_strategy_quote(callback)
-#  或者 emitter 写法
-strategy.on(smart.Event.ON_QUOTE, callback)
-```
-
-#### `strategy.on_order`
-
-> 接收策略的委托推送 
-
-* `callback` Function
-    - `order` Object - 事件发生时返回一个[Order](#委托回报-order)对象
-
-```python
-def callback(order):
-    logger.debug("get on_order:%s",smart.utils.toString(order))
-strategy.on_order(callback)
-#  或者 emitter 写法
-strategy.on(smart.Event.ON_ORDER, callback)
-```
-
-#### `strategy.on_trade`
-
-> 接收策略的成交回报推送
-
-* `callback` Function
-    - `trade` Object - 事件发生时返回一个[Trade](#成交回报-trade)对象
-
-```python
-def callback(trade):
-    logger.debug("get on_trade:%s",smart.utils.toString(trade))
-strategy.on_trade(callback)
-# 或者 emitter 写法
-strategy.on(smart.Event.ON_TRADE, callback)
-```
-
-#### `strategy.on_strategy_status_change`
-
-策略进程状态变化推送
-
-* `callback` Function
-    - `status` Object - 事件发生时返回一个[进程状态](#策略状态对象)对象
-
-```python
-def callback(position):
-    logger.debug("get on_strategy_status_change:%s",smart.utils.toString(position))
-strategy.on_strategy_status_change(callback)
-#  或者 emitter 写法
-strategy.on(smart.Event.ON_STRATEGY_STATUS_CHANGE, callback)
-```
-<!--
-#### 策略状态对象
-
-一个包含当前策略状态，策略名等信息的js对象
-
-* `process_type` String - 固定值 `"strategy"`
-* `process_name` String - 进程名
-* `strategy_id` String - 策略id
-* `status` String - 进程状态 [StrategyStatus](#策略执行状态-strategystatus)枚举
-* `status_name` String - 进程状态中文名
-* `strategy_platform_type` String - 策略所属平台类型  [StrategyPlatformType](#策略平台类型-strategyplatformtype)枚举
-
-#### `on_alphax_msg`
-
-接收服务端功夫策略的自定义消息推送  <Badge text="AlphaX" type="warning"/>
-
-```js
-'''
- *  接收服务端功夫策略的自定义消息推送
- *  @param message String 功夫策略推送过来的自定义内容，可以以json字符串形式存放更多复杂信息，前台通过JSON.parseJSON处理
-'''
-strategy.on_alphax_msg(message => {});
-// 或者 emitter 写法
-strategy.on(smart.Event.ON_ALPHAX_MSG, message => {});
-```
-tegy.on_strategy_cancel_fail(fail);
-```-->
-
-### 静态方法
-
-### 实例属性
-
-#### `strategy_platform_type` 
-策略平台类型       [StrategyPlatformType](#策略平台类型-strategyplatformtype)枚举
-
-#### `strategy_id`
-策略id           String  对于功夫即策略名称
-
-#### `parent_order_id`
-母单编号          String
-
-#### `status`
-策略状态          [StrategyStatus](#策略执行状态-strategystatus)枚举
-
-#### `status_name`
-策略状态中文       String
-
-<!--#### `isPrivate`
-
-`Boolean` 类型。True 表示是客户自有的策略。相反的则是有其他策略平台提供的公共策略。
-
-#### `round_list`
-
-当天策略启动的轮次信息  Round对象Array集合 元素[Round对象](#round)
-
-#### `last_round`
-最后执行的轮次对象     [Round对象](#round)
-```
-#### `book`
-
-策略的账簿信息
-
-* `avail`          可用资金       Number
-* `margin`         保证金         Number
-* `market_value`   市值          Number 
-* `initial_equity` 初始权益       Number
-* `dynamic_equity` 动态权益       Number
-* `static_equity`  静态权益       Number
-* `realized_pnl`   已实现盈亏     Number
-* `unrealized_pnl` 未实现盈亏     Number
--->
-#### `strategy.strategy_position_list`
-该策略的实时持仓    Position对象Array集合  元素[Position对象](#持仓-position)
-
-#### `strategy.strategy_order_list`
-该策略实时委托列表   Order对象Array集合  元素[Order对象](#委托回报-order)
-
-#### `strategy.strategy_trade_list`
-该策略的实时成交回报 Trade对象Array集合  元素[Trade对象](#成交回报-trade)
-
-#### `strategy.relation_account_map`
-该策略涉及的资金账号map集合 key为资金账号 value为[Account对象](#资金账户-account)
-
-### 实例方法
-<!--
-#### `strategy.loadData()` <Badge text="AlphaX" type="warning"/>
-> 加载策略相关交易数据并注册相关事件监听
-
-返回 `Promise<void>` - 
-
-当strategy对象刚刚创建成功后，其实并没有历史交易数据，也没有和后台的策略平台建立链路，所以后台系统的策略更新并不会推送到策略中。
-
-需要调用一下loadData方法，加载历史数据，并和后台建立逻辑链路。之后的交易信息变动会以事件的形式触发。
-
-```js
-await strategy.loadData();
-```-->
-<!--
-#### `strategy.startStrategy`
-> 启动当前策略
-* `account_id` 账号id
-* `strategy_platform_type` String(必填) - 策略平台类型 [StrategyPlatformType](#策略平台类型-strategyplatformtype) 的枚举值
-* `clent_id` String(必填) - 策略实例的ID
-* `startStrategyCallback` Function(必填) - 返回母单信息(strategy,[err](#接口响应错误对象-rsperror))
-```python
-def startStrategyCallback(strategy,err):
-    if(err):
-        logger.debug("get error from startStrategyr:%s",err)
-    else:
-        logger.debug("get startStrategyr: %s",strategy)
-strategy.startStrategy(account_id, strategy_platform_type, clent_id, startStrategyCallback)
-```
--->
-
-#### `strategy.stopStrategy`
-> 停止当前策略
-* `stopStrategyCallback` Function(必填)停止当前策略的返回信息(stg,[err](#接口响应错误对象-rsperror))
-```python
-def stopStrategyCallback(stg,err):
-    if(err):
-        logger.debug("get error from stopStrategy:%s",err)
-    else:
-        logger.debug("get stopStrategyCallback: %s",stg)
-strategy.stopStrategy(stopStrategyCallback)
-```
-
-#### `strategy.forceStopStrategy`
-> 强制停止当前策略
-* `forceStopStrategy` Function(必填) 强制停止当前策略的返回信息(stg,[err](#接口响应错误对象-rsperror))
-```python
-def forceStopStrategyCallback(stg,err):
-    if(err):
-        logger.debug("get error from forceStopStrategy:%s",err)
-    else:
-        logger.debug("get forceStopStrategy: %s",stg)
-strategy.forceStopStrategy(forceStopStrategyCallback)
-```
-<!--
-#### `strategy.postStrategyParamsBeforeStart` <Badge text="AlphaX" type="warning"/>
-
-> 策略启动前传参
-
-* `param` String | Object - 参数对象，类型是字符串|JSON对象均可 特别是作为字符串传递时其内容可以是json字符串、csv字符串、xml字符串均可，但要注意里面的'和"进行转义以防止破坏字符串表达
-* `filePath` String - 策略平台落地的参数文件的相对本策略根目录的相对路径
-
-返回 `Promise<void>` -
-
-```js
-await strategy.postStrategyParamsBeforeStart({ aaa: "bbb" }, "/lib/config.json");
-```
-
-#### `postStrategyParams`  <Badge text="AlphaX" type="warning"/>
-
-> 策略启动后（运行期间）向策略发送消息
-
-* `message` Object - 消息对象，必须是对象类型
-
-返回 `Promise<void>` -
-
-```js
-await strategy.postStrategyParams({ aaa: "bbb" });
-```
-
-#### `startTD` <Badge text="AlphaX" type="warning"/>
-启动td  
-```js
-    /**
-     *  启动td 仅对AlphaX有效
-     *  @param account_id 资金账号 String
-     *  @param source smart.Type.Source枚举  默认为xtp
-     *  @param pwd 资金账号的密码 可选 String 当不传时前台自动弹出对话框让用户输入密码
-     *
-     *  @return Promise形式返回的TD状态JSON对象:  
-     *            {
-     *                 account_id: "15003941",//资金账号 String
-     *                 process_name: "td_xtp_15003941",//td进程名称 String
-     *                 process_type: "td",//进程类型 String
-     *                 source: "xtp",//柜台源类型 smart.Type.Source的枚举值 String类型 
-     *                 status: "Stopped",//目前进程状态
-     *                 status_name: "已停止",//进程状态中文名
-     *            }
-     *          注意catch Promise的reject的err对象
-     */
-    strategy.startTD(account_id, source, pwd);
-```
-
-#### `startMD`
-启动md  <Badge text="AlphaX" type="warning"/>
-```js
-/**
- *  启动md 仅对AlphaX有效
- *  @param account_id 资金账号 String 必填
- *  @param source smart.Type.Source枚举  默认为xtp  必填
- *  @param pwd 资金账号的密码 可选 String 当不传时前台自动弹出对话框让用户输入密码
- *  
- *  @return Promise形式返回的MD状态JSON对象:  
- *            {
- *                 account_id: "15003941",//资金账号 String
- *                 process_name: "md_xtp_15003941",//td进程名称 String
- *                 process_type: "md",//进程类型 String
- *                 source: "xtp",//柜台源类型 smart.Type.Source的枚举值 String类型 
- *                 status: "Stopped",//目前进程状态
- *                 status_name: "已停止",//进程状态中文名
- *            }
- *          注意catch Promise的reject的err对象
- */
-strategy.startMD(account_id, source, pwd);
-```
-
-
-#### `download`
-
-> 将后台的策略目录下的文件下载到前台，比如策略参数的配置文件，严禁下载大文件
-
-* `filePath` String - 策略中，文件相对路径
-* `raw` Boolean(可选) - 是否使用原始编码，默认为False，SDK会尝试文件内容转为字符串。如果希望得到二进制的文件内容，可以设置为True
-
-返回 `String` 或者 `TypedArray` - Promise形式的文件内容  当raw不传或传False时，返回String 或者 当raw传True是返回TypedArray代表文件的二进制
-
-如果获取出错，会抛出异常。
-
-```js
-const content = await strategy.download("/lib/config.json");
-```
--->
-### Strategy方法的支持情况
-
-| 方法 | Front | Algo |
-| ---- | ----- | ---- ||
-| uploadFile                    |       | x    |
-| startStrategy                 |       | ○    |
-| stopStrategy                  |       | ○    |
-| forceStopStrategy             |       | ○    |
-| postStrategyParamsBeforeStart |       | x    |
-| postStrategyParams            |       | x    |
-| download                      |       | x    |
-| modifyStrategyBook            |       | x    |
-| modifyStrategyPosition        |       | x    |
-| setCommission                 |       | x    |
-| subscribeStrategyLog          |       | x    |
-| unsubscribeStrategyLog        |       | x    |
-| getStrategyLogContent         |       | x    |
-| throwStrategyException        |       | x    |
-| addAccount                    |       | x    |
-| removeAccount                 |       | x    |
-| startTD                       |       | x    |
-| startMD                       |       | x    |
-| insert_order                  |       | x    |
-| cancel_order                  |       | x    |
-| subscribe                     |       | x    |
-| unsubscribe                   |       | x    |
-| on_strategy_quote             |       | ○    |
-| on_book                       |       | x    |
-| on_order                      |       | ○    |
-| on_trade                      |       | ○    |
-| on_position                   |       | x    |
-| on_alphax_msg                 |       | x    |
-| on_strategy_status_change     |       | ○    |
-| on_strategy_cancel_fail       |       | x    |
 
 ## `事件-Event`
 
@@ -2920,35 +2869,11 @@ smart.on(Event.ON_INIT, callbackFunction)
 
 * `ON_INIT` 组件初始化 类似domReady事件，组件所有代码都必须在该事件之后
 * `ON_CLOSE` 组件被关闭
-* `ON_SHOW` 组件被显示
-* `ON_HIDE` 组件被隐藏
-* `ON_RESET` 组件用户数据被清空重置
 * `ON_QUOTE` 订阅行情后，行情变化推送 策略之间、组件之间、策略和账户直接的订阅和取消订阅不相互影响
-* `ON_ETF_PROFIT` ETF折溢价利润推送数据
 * `ON_ASSETS` **账户**资金的全量推送
-<!--* `ON_BOOK` **策略**资金的全量推送-->
-* `ON_POSITION` 持仓变化的增量推送
 * `ON_ORDER` 委托变化推送
 * `ON_TRADE` 成交变化推送
 * `ON_CANCEL_FAIL` 撤单失败的消息推送
-<!--* `ON_ALPHAX_TD_STATUS_CHANGE` alphax td状态变化时推送-->
-<!--* `ON_ALPHAX_MD_STATUS_CHANGE` alphax md状态变化时推送-->
-* `ON_STRATEGY_STATUS_CHANGE`  策略状态变化时推送 <Badge type="warning" text="标准版不支持" />
-<!--* `ON_ALPHAX_MSG` alphax 策略往前端推送数据 -->
-* `ON_CREDIT_TICKER_ASSIGN` 更新信用账户可融券头寸信息 <Badge type="warning" text="仅支持两融账户" />
-* `ON_CREDIT_DEBT_FINANCE` 更新融资负债合约信息 <Badge type="warning" text="仅支持两融账户" />
-* `ON_CREDIT_DEBT_SECURITY` 更新融券负债合约信息 <Badge type="warning" text="仅支持两融账户" />
-
-<!-- * `ON_STRATEGY_CANCEL_FAIL` 某策略撤单失败消息推送 -->
-<!-- * `ON_STRATEGY_UPLOAD_RESULT` 某策略上传结果事件 -->
-<!-- * `ON_STRATEGY_START_RESULT` 某策略启动结果消息 -->
-<!-- * `ON_STRATEGY_STOP_RESULT` 某策略停止结果消息 -->
-<!-- * `ON_STRATEGY_FORCE_STOP_RESULT` 某策略强制停止结果消息 -->
-<!-- * `ON_STRATEGY_EXCEPTION` 某策略运行中的异常消息  如td md断线  程序异常等 -->
-<!-- * `ON_STRATEGY_LOG` 某策略log日志发生变化时的增量变化消息 -->
-<!-- * `ON_STRATEGY_PRE_START` 后台组件的策略pre_start完成后触发 -->
-<!-- * `ON_STRATEGY_POST_START` 后台组件的策略post_start完成后触发 -->
-<!-- * `ON_STRATEGY_PRE_STOP` 后台组件的策略pre_stop完成后触发 -->
 
 不同对象派发出的事件不同(表格中标明了等效事件监听方法)
 
@@ -2956,30 +2881,13 @@ smart.on(Event.ON_INIT, callbackFunction)
 | ------------------------- | ------------------- | ------------------------------------ | -------- | ------------------------------------------------------------------------------------- |
 | `ON_INIT`                 | ○<br>smart.on_init  | -                                    | -        | 组件初始化 类似domReady事件，组件所有代码都必须在该事件之后                           |
 | `ON_CLOSE`                | ○<br>smart.on_close | -                                    | -        | 组件被关闭                                                                            |
-| `ON_SHOW`                 | ○<br>smart.on_show  | -                                    | -        | 组件被显示                                                                            |
-| `ON_HIDE`                 | ○<br>smart.on_hide  | -                                    | -        | 组件被隐藏                                                                            |
 | `ON_RESET`                | ○                   | -                                    | -        | 组件用户数据被清空重置                                                                |
 | `ON_QUOTE`                | ○                   | ○<br>account.on_quote                | -        | 订阅行情后，行情变化推送 策略之间、组件之间、策略和账户直接的订阅和取消订阅不相互影响 |
-| `ON_ETF_PROFIT`           | ○                   | -                                    | -        | ETF折溢价利润推送数据                                                                 |
 | `ON_ASSETS`               | -                   | ○<br>account.on_assets               | -        | **账户**资金的全量推送                                                                |
 | `ON_POSITION`             | -                   | ○<br>account.on_position             | -        | 持仓变化的增量推送                                                                    |
 | `ON_ORDER`                | -                   | ○<br>account.on_order                | -        | 委托变化推送                                                                          |
 | `ON_TRADE`                | -                   | ○<br>account.on_trade                | -        | 成交变化推送                                                                          |
 | `ON_CANCEL_FAIL`          | -                   | ○<br>account.on_cancel_fail          | -        | 撤单失败的消息推送                                                                    |
-| `ON_CREDIT_TICKER_ASSIGN` | ○                   | ○<br>account.on_credit_ticker_assign | -        | 更新信用账户可融券头寸信息 <Badge type="warning" text="仅支持两融账户" />             |
-| `ON_CREDIT_DEBT_FINANCE`  | ○                   | ○<br>account.on_credit_debt_finance  | -        | 更新融资负债合约信息 <Badge type="warning" text="仅支持两融账户" />                   |
-| `ON_CREDIT_DEBT_SECURITY` | ○                   | ○<br>account.on_credit_debt_security | -        | 更新融券负债合约信息 <Badge type="warning" text="仅支持两融账户" />                   |
-
-<!-- `ON_STRATEGY_CANCEL_FAIL`||||某策略撤单失败消息推送
-`ON_STRATEGY_UPLOAD_RESULT`||||某策略上传结果事件
-`ON_STRATEGY_START_RESULT`||||某策略启动结果消息
-`ON_STRATEGY_STOP_RESULT`||||某策略停止结果消息
-`ON_STRATEGY_FORCE_STOP_RESULT`||||某策略强制停止结果消息
-`ON_STRATEGY_EXCEPTION`||||某策略运行中的异常消息  如td md断线  程序异常等
-`ON_STRATEGY_LOG`||||某策略log日志发生变化时的增量变化消息
-`ON_STRATEGY_PRE_START`||||后台组件的策略pre_start完成后触发
-`ON_STRATEGY_POST_START`||||后台组件的策略post_start完成后触发
-`ON_STRATEGY_PRE_STOP`||||后台组件的策略pre_stop完成后触发 -->
 
 ---
 ## `数据类型-Type`
@@ -3042,34 +2950,6 @@ class PriceType():
     # 限价,通用  xtp:1 XTP_PRICE_LIMIT限价单-沪 / 深 / 沪期权（除普通股票业务外，其余业务均使用此种类型）
     Limit = 1
 
-    #  市价，通用，
-    #  对于股票上海为最优五档剩余撤销，深圳为即时成交剩余撤销
-    #  xtp:4 XTP_PRICE_BEST5_OR_CANCEL最优5档即时成交剩余转撤销，市价单-沪
-    #  或
-    #  xtp:2 XTP_PRICE_BEST_OR_CANCEL即时成交剩余转撤销，市价单-深 / 沪期权
-    Any = 2
-
-    #  上海深圳最优五档即时成交剩余撤销，上交所的市价需要报价，深交所的市价不需要报价  xtp:4 XTP_PRICE_BEST5_OR_CANCEL最优5档即时成交剩余转撤销，市价单-沪深
-    FakBest5 = 4
-
-    #  仅深圳本方最优价格申报, 不需要报价  xtp:6 XTP_PRICE_FORWARD_BEST本方最优，市价单-深
-    ForwardBest = 6
-
-    #  上海最优五档即时成交剩余转限价，需要报价；深圳对手方最优价格申报，不需要报价
-    #  xtp:3 XTP_PRICE_BEST5_OR_LIMIT最优五档即时成交剩余转限价，市价单-沪
-    #  或
-    #   7 XTP_PRICE_REVERSE_BEST_LIMIT对方最优剩余转限价，市价单-深 / 沪期权
-    ReverseBest = 3
-
-    #  股票（仅深圳）即时成交剩余撤销，不需要报价；期货即时成交剩余撤销，需要报价
-    #  xtp:2 XTP_PRICE_BEST_OR_CANCEL即时成交剩余转撤销，市价单-深 / 沪期权
-    Fak = 2
-
-    #  股票（仅深圳）市价全额成交或者撤销，不需要报价；期货全部或撤销，需要报价
-    #  xtp:5 XTP_PRICE_ALL_OR_CANCEL全部成交或撤销,市价单-深 / 沪期权
-    #  或
-    #  8 XTP_PRICE_LIMIT_OR_CANCEL期权限价申报FOK
-    Fok = 5
 ```
 ### `买卖方向-Side`
 买卖方向
@@ -3078,21 +2958,6 @@ class Side():
     Unknown = 0  # 无效
     Buy = 1  # 买
     Sell = 2  # 卖
-    Lock = 12  # 锁仓  对应xtp的XTP_SIDE_FREEZE 12
-    # 以下是alphax缺少的
-    Purchase = 7  # 申购
-    Pedemption = 8  # 赎回
-    Split = 9  # 拆分
-    Merge = 10  # 合并
-    Cover = 11  # 备兑
-    MarginTrade = 21  # 融资买入
-    ShortSell = 22  # 融券卖出
-    RepayMargin = 23  # 卖券还款
-    RepayStock = 24  # 买券还券
-    StockRepayStock = 26  # 现券还券
-    SurstkTrans = 27  # 余券划转
-    GrtstkTransin = 28  # 担保品转入
-    GrtstkTransout = 29  # 担保品转出
 ```
 
 ### `委托业务类型-BusinessType`
@@ -3100,10 +2965,6 @@ class Side():
 ```python
 class BusinessType():
     CASH = 0  # 普通股票
-    REPO = 2  # 国债逆回购
-    ETF = 3  # ETF申赎
-    MARGIN= 4 # 融资融券
-    BOND_SWAP_STOCK = 15  # 债转股
     Unknown= 13
 ```
 
@@ -3149,28 +3010,7 @@ class OrderStatus():
     PartialFilledNotActive = 6  # 部成部撤（xtp:3 XTP_ORDER_STATUS_PARTTRADEDNOTQUEUEING部分撤单）
     PartialFilledActive = 7  # 部分成交（对应xtp:2 XTP_ORDER_STATUS_PARTTRADEDQUEUEING部分成交）
 ```
-<!--
-### `成交量条件-VolumeCondition`
-成交量条件
-```python
-class VolumeCondition():
-    Any = 0  # 任何数量 == 对成交数量不做要求  对应ctp:'1' THOST_FTDC_VC_AV
-    Min = 1  # 最小数量 == 要求本次委托须成交的数量的最小值 对应ctp:'2' THOST_FTDC_VC_NV
-    All = 2  # 全部数量 == 要求本次委托须全部成交 对应ctp:'3' THOST_FTDC_VC_CV
-```
-### `成交时间条件-TimeCondition`
-成交时间条件
-```python
-class TimeCondition():
-    IOC = 0  # 立即完成，否则撤销 对应ctp:'1' THOST_FTDC_VC_IOC
-    GFS = 1  # 本节有效 对应ctp:'2' THOST_FTDC_VC_GFS
-    GFD = 2  # 当日有效 对应ctp:'3' THOST_FTDC_VC_GFD
-    # 以下为alphax缺少但ctp有的
-    GTD = 3  # 指定日期前有效  对应ctp:'4' THOST_FTDC_VC_GTD
-    GTC = 4  # 撤销前有效  对应ctp:'5' THOST_FTDC_VC_GTC
-    GFA = 5  # 集合竞价有效  对应ctp:'6' THOST_FTDC_VC_GFA
-```
--->
+
 ### `账号类型-AccountType`
 账号类型 对应XTP_ACCOUNT_TYPE
 ```python
@@ -3182,124 +3022,9 @@ class AccountType():
     Derive = 3  # 期权衍生品账户 xtp:2 XTP_ACCOUNT_DERIVE衍生品账户
     Unknown = 4  # 未知  xtp:4 XTP_ACCOUNT_UNKNOWN
 ```
-### `策略平台类型-StrategyPlatformType` <Badge type="warning" text="标准版不支持" />
-策略平台类型
-```python
-# 策略平台类型
-class StrategyPlatformType():
-    Front = "front"  # 客户端直接运行的js前端策略
-    AlphaX = "alphax"  # AlphaX即功夫
-    Algo = "algo"  # 算法平台
-    ProgramTrade = "programTrade"  # 程序化交易
-    Spec = "spec"  # 特定平台 按ProgramTrade相同的逻辑处理  1.0.0未写入文档
-    FrontPy = "frontpy" # 客户端python策略类型
-```
-<!-- ### `ETFReplaceType`
-ETF替代类型
-```python
-   //ETF替代类型
-   const ETFReplaceType = {
-        ERT_CASH_FORBIDDEN: {
-            name: '禁止现金替代',
-            i: 0
-        },
-        ERT_CASH_OPTIONAL: {
-            name: '可以现金替代',
-            i: 1
-        },
-        ERT_CASH_MUST: {
-            name: '必须现金替代',
-            i: 2
-        },
-        ERT_CASH_RECOMPUTE_INTER_SZ: {
-            name: '深市退补现金替代',
-            i: 3
-        },
-        ERT_CASH_MUST_INTER_SZ: {
-            name: '深市必须现金替代',
-            i: 4
-        },
-        ERT_CASH_RECOMPUTE_INTER_OTHER: {
-            name: '非沪深市场成分证券退补现金替代',
-            i: 5
-        },
-        ERT_CASH_MUST_INTER_OTHER: {
-            name: '表示非沪深市场成份证券必须现金替代',
-            i: 6
-        },
-        EPT_INVALID: {
-            name: '无效值',
-            i: 7
-        }
-    };
-``` -->
-
-### `策略执行状态-StrategyStatus` <Badge type="warning" text="标准版不支持" />
-策略执行状态
-```python
-class StrategyStatus():
-    Unknown = "Unknown"  # 未知
-    Starting = "Starting"  # 启动中  预留暂时无用
-    Started = "Started"  # 启动完毕运行中
-    Pause = "Pause"  # 暂停  预留暂时无用
-    Stopping = "Stopping"  # 停止中  预留暂时无用
-    Stopped = "Stopped"  # 已停止
-    Errored = "Errored"  # 错误
-```
 
 **结构体**
 
-### `ETF配方表-ETF`
-ETF配方表对象
-```python
-#ETF配方表对象
-class ETF(Instrument):
-    def __init__(self):
-        # 证券基础字段参见Instrument
-        super().__init__()
-        self.cash_component = None  # T-1日现金差额
-        self.estimate_amount = None  # T日预估现金余额
-        self.max_cash_ratio = None  # 现金替代比率上限
-        self.net_value = None  # T-1日基金份额净值
-        self.redemption_status = None  # 基金当天赎回状态：1可以，0不可以
-        self.total_amount = None  # 最小申赎单位净值
-        self.unit = None  # 最小申购赎回单位
-        self.basket = []  # 成分股篮子列表
-```
-### `ETF成分股-ETFCompoment`
-ETF成分股对象
-```python
-#ETF成分股对象
-class ETFCompoment(Instrument):
-    def __init__(self):
-        # 证券基础字段参见Instrument
-        super().__init__()
-        self.amount = None  # 替代金额
-        self.creation_amount = None  # 溢价替代金额
-        self.creation_premium_ratio = None  # 溢价比例
-        self.premium_ratio = None  # 溢价比例
-        self.quantity = None  # 股票数量
-        self.redemption_amount = None  # 折价替代金额
-        self.redemption_discount_ratio = None  # 折价比例
-        self.replace_type = None  # 现金替代类型 参考ETFReplaceType
-        self.ticker = None  # 申赎代码如：510501
-        self.creation_amount = None  # 申购现金替代金额
-        self.redemption_amount = None  # 赎回现金替代金额
-```
-
-### `ETF预期利润-ETFProfit`
-ETF预期利润
-```python
-class ETFProfit:
-    def __init__(self):
-        self.instrument_id = None  # ETF的证券代码
-        self.iopv = 0  # ETF的模拟净值
-        self.iopv_buy = 0  # ETF的买模拟净值
-        self.iopv_sale = 0  # ETF的卖模拟净值
-        self.diopv = 0  # ETF的动态模拟净值
-        self.dis_profit = 0  # ETF折价预期利润
-        self.pre_profit = 0  # ETF溢价预期利润
-```
 
 ### `持仓-Position`
 持仓对象定义
@@ -3505,41 +3230,9 @@ V=波段性中断
 0=未上市，
 1=已上市；
 （深交所忽略该字段） 
-如图所示：
-
-![股票](../../../.vuepress/public/gupiao.png)
 
 
-对于期权，具体值如下
-第 0 位：
-S=启动(开市前)
-C=集合竞价
-T=连续交易
-B=休市
-E=闭市 V=波动性中断
-P=临时停牌
-U=收盘集合竞价
-M=可恢复交易的熔断(盘中集合竞价)
-N=不可恢复交易的熔断(暂停交易至闭市)
-第1位：
-0=未连续停牌；
-1=连续停牌；
-(预留，暂填空格)
-第2位：
-0=不限制开仓
-1=限制备兑开仓
-2=限制卖出开仓
-3=限制卖出开仓、备兑开仓
-4=限制买入开仓
-5=限制买入开仓、备兑 开仓
-6=限制买入开仓、卖出开仓
-7=限制买入开仓、卖出开仓、备兑开仓
-第3位：
-0=在当前时段不接受进行新订单申报
-1=在当前时段可接受进行新订单申报 
-如图所示：
 
-![期权](../../../.vuepress/public/qiquan.png)
 
 ### `账号资产信息-Assets`
 账号资产信息
@@ -3617,124 +3310,7 @@ class Instrument:
         self.code = None  # 证券代码.交易所标识 "600000.SH"
 ```
 
-### `新股信息-IPO`
->新股信息
-```python  
-class IPO(Instrument):
-    def __init__(self):
-        # 证券基础字段参见Instrument
-        super().__init__()
-        self.market_type = None
-        self.price = None  # 价格
-        self.qty_upper_limit = None  # 持仓数量
-        self.instrument_id = None  # 股票代码
-        self.instrument_name = None  # 股票名称
-        self.instrument_type = None  # 股票类型
-        self.unit = None  # 最小申购赎回单位
-```
 
-### `可转债信息-ConvertableBond`
->可转债信息
-```python  
-class ConvertableBond(Instrument):
-    def __init__(self):
-        # 证券基础字段参见Instrument
-        super().__init__()
-        self.qtyMax = None # 最大可转数量
-        self.qtyMin = None # 最小可转数量
-        self.swapFlag = None # 是否可转
-        self.swapPrice = None # 转换价格
-        self.underlyingTicker = None # 正股代码
-        self.unit = None # 转换单位
-```
-
-### `信用可融券头寸信息-CreditTickerAssignInfo` <Badge type="warning" text="仅支持两融账户" />
-
->信用可融券头寸信息
-```python  
-class CreditTickerAssignInfo():
-    def __init__(self):
-        self.instrument_id  # 证券代码
-        self.instrument_name  # 证券名称
-        self.exchange_id = Exchange.Unknown  # 交易所id
-        self.exchange_id_name = "未知"  # 交易所名称
-        self.name_py = ""  # 拼音首字母  如"安诺其"为"anq"  alphax缺少
-        self.left_volume = 0  # 剩余可融券数量
-        self.frozen_volume = 0  # 冻结融券数量
-        self.yesterday_volume = 0 #昨日日融券数量
-        self.xtp_market_type = "XTP_EXCHANGE_UNKNOWN"  # xtp交易市场
-        self.code = None  # 证券代码.交易所标识 如"600000.SH"
-```
-### `信用融资负债信息-CreditDebtFinance` <Badge type="warning" text="仅支持两融账户" />
->信用融资负债信息
-```python  
-class CreditDebtFinance():
-    def __init__(self):
-        self.debt_id  # 负债合约编号
-        self.instrument_id  # 证券代码
-        self.instrument_name  # 证券名称
-        self.exchange_id = Exchange.Unknown  # 交易所id
-        self.exchange_id_name = "未知"  # 交易所名称
-        self.name_py = ""  # 拼音首字母  如"安诺其"为"anq"  alphax缺少
-        self.xtp_market_type  #  xtp交易市场
-        self.remain_amt = 0  # 未偿还金额
-        self.remain_principal = 0  # 未偿还本金
-        self.remain_interest = 0  # 未偿还利息
-        self.debt_status = 0 #合约状态:0未了结，1已了结，2过期未平仓
-        self.end_date #负债截止日期
-        self.orig_end_date #负债原始截止日期
-        self.order_xtp_id #负债订单编号
-        self.order_date #委托日期
-        self.extended #是否接收到展期
-        self.code = None  # 证券代码.交易所标识 如"600000.SH"
-```
-### `信用融券负债信息-CreditDebtSecurity` <Badge type="warning" text="仅支持两融账户" />
->信用融券负债信息
-```python  
-class CreditDebtSecurity():
-    def __init__(self):
-        self.debt_id  # 负债合约编号
-        self.instrument_id  # 证券代码
-        self.instrument_name  # 证券名称
-        self.exchange_id = Exchange.Unknown  # 交易所id
-        self.exchange_id_name = "未知"  # 交易所名称
-        self.name_py = ""  # 拼音首字母  如"安诺其"为"anq"  alphax缺少
-        self.xtp_market_type  #  xtp交易市场
-        self.remain_interest = 0  # 未偿还利息
-        self.remain_volume = 0 #未偿还融券数量
-        self.due_right_volume = 0 #应偿还权益数量
-        self.debt_status = 0 #合约状态:0未了结，1已了结，2过期未平仓
-        self.end_date #负债截止日期
-        self.orig_end_date #负债原始截止日期
-        self.order_xtp_id #负债订单编号
-        self.order_date #委托日期
-        self.extended #是否接收到展期
-        self.code = None  # 证券代码.交易所标识 如"600000.SH"
-```
-### `券源行情信息-SourceQuoteInfo` <Badge type="warning" text="仅支持两融账户" />
->券源行情信息
-```python  
-class SourceQuoteInfo():
-    def __init__(self):
-        self.sno = None # 行情序号
-        self.stk_code = None# 证券代码
-        self.stk_name = None # 证券名称
-        self.quotation_type = '0' # 行情类型 0：库存券源 1：意向券源 2：准库存券
-        self.end_date = None # 到期日期
-        self.term_rate = 0 # 费率 券源申请时：若为意向券需维护该字段,注：0.1即为10%
-        self.lend_qty = 0 # 可出借数量
-        self.reallend_qty = 0 # 发布出借数量
-        self.match_qty = 0 # 已成交数量
-        self.market = None # 交易市场
-        self.term_code = None # 期限(天)
-        self.lend_qty_des = None # 出借数量描述
-        self.remark = None # 备注
-        self.sys_date = None # 系统日期
-        self.req_qty = 0 # 数量：券源申请时使用字段
-        self.prepare_date = ""  # 筹券开始日期：券源申请时使用字段
-        self.prepare_date_end = "" # 筹券结束日期：券源申请时使用字段
-        self.error_msg = None # 错误信息
-```
 ### `行情bar信息-Bar`
 行情bar信息
 ```python 
@@ -3779,42 +3355,7 @@ class OutFormat():
     DataFrame = "DataFrame"  # DataFrame类型
     Ndarray = "Ndarray" #  Ndarray类型
 ```
-### `策略对象-Strategy` <Badge type="warning" text="标准版不支持" />
->策略对象
-```python  
-class Strategy(Emitter):
-    # 策略对象  strategy_platform_type为smart.Type.StrategyPlatformType的某一种  返回一个Strategy对象  然后调用strategy.startStrategy()等方法
-    def __init__(self,context,strategyPlatformYype, strategyId):
-        super().__init__()
-        self.smart = context
-        self.strategy_platform_type = strategyPlatformYype # StrategyPlatformType枚举 
-        self.strategy_id = strategyId
-        self.status = StrategyStatus.Unknown
-        self.isPrivate = False # 是否是私有策略
-        self.status_name = "未知"
-        self.round_list = [] # 当天策略启动的轮次信息   一个策略对象，alphax同时只能start一次，形成一个round对象，round_list是该策略当天历次启动的列表；对algo一个策略对象可同时start多次，形成多个round对象，round_list也是当天历次启动的列表，每个round_id对algo就是parent_order_id
-        self.last_round = None # 最后执行的轮次对象
-        self.strategy_position_list = [] # 该策略的实时持仓 StrategyPosition对象集合
-        self.strategy_order_list = [] # 该策略实时委托列表 Order对象集合
-        self.strategy_trade_list = [] # 该策略的实时成交回报 Trade对象集合
-        self.relation_account_map = {} # 该策略涉及的资金账号
-        self.data = {} # 策略的详细数据
-        self.runtime_id = ""
-```
-### `算法平台策略-AlgoXStrategy` <Badge type="warning" text="标准版不支持" />
->算法平台策略
-```python  
-class AlgoXStrategy(Strategy):
-    def __init__(self,context, strategy_id):
-        super().__init__(context,StrategyPlatformType.Algo, strategy_id)
-        self.orderMap = {}
-        self.tradeMap = {}
-        self.account = self.smart.current_account
-        self.configdata = {}
-        self.mclientStrategyId = ""
-        self.mxtpStrategyId = ""
-        self.started = False
-```
+
 ### `接口响应错误对象-RspError`
 >接口响应错误对象
 ```python  
@@ -3955,12 +3496,12 @@ smart.utils.getNowFormatDate() # retrun "2021-03-01"
 
 > 获取买盘或者卖盘的盘口最优价格，往最新价格靠近，取有效价格
 
-* `marketData` String(必填) - 行情对象
+* `quote` Object(必填) - 行情对象，参考[Quote](#行情信息-quote)对象
 * `flag` String(必填) - 盘口。涨停:H；跌停:L；现价:P；买一到买五分别为：B1、B2、B3、B4、B5；卖一到卖五分别为：S1、S2、S3、S4、S5。
 返回价格，类型是数字
 
 ```python
-smart.utils.getBestPrice(marketData, flag)
+smart.utils.getBestPrice(quote, flag)
 ```
 
 ### `获取有效申报价格范围-get_limit_price`
