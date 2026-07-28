@@ -795,11 +795,9 @@ func (s *Service) SaveReview(ctx context.Context, req ReviewReq) (ReviewRow, err
 	if req.WorkspacePath == "" {
 		return ReviewRow{}, fmt.Errorf("workspacePath is required")
 	}
-	// if req.WorktreePath == "" {
-	// 	req.WorktreePath = req.WorkspacePath
-	// }
-	//TODO 将worktreepath 保持和workspacepath一致
-	req.WorktreePath = req.WorkspacePath
+	if req.WorktreePath == "" {
+		req.WorktreePath = req.WorkspacePath
+	}
 	if req.Summary == "" {
 		return ReviewRow{}, fmt.Errorf("%w: summary is required", ErrInput)
 	}

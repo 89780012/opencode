@@ -136,7 +136,16 @@ export type Run = {
   sessionId: string
   codeRevision: string
   stage: "review" | "debug" | "backtest" | "done"
-  state: "requested" | "dispatching" | "running" | "fixing" | "passed" | "failed" | "review_exhausted" | "cancelled"
+  state:
+    | "requested"
+    | "dispatching"
+    | "running"
+    | "fixing"
+    | "passed"
+    | "failed"
+    | "review_exhausted"
+    | "cancelled"
+    | "paused"
   reviewRound: number
   debugId: string
   backtestId: string
@@ -148,6 +157,13 @@ export type Run = {
   revision: number
   createdAt: number
   updatedAt: number
+}
+
+export type StageRequest = {
+  review: boolean
+  debug: boolean
+  backtest: boolean
+  revision: string
 }
 
 export type RunStart = {

@@ -271,6 +271,67 @@ func TestMCPClaimDebugPersistsBeforeStart(t *testing.T) {
 	if strings.Contains(string(body), "debug_request") || strings.Contains(string(body), "pipeline:debug:start") {
 		t.Fatalf("workflow response leaked debug request key: %s", body)
 	}
+	row, err = bench.CancelWorkflow(t.Context(), workbench.WorkflowGet{WorkspacePath: workspace, SessionID: session})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, action := range []string{"start", "logs"} {
+		_, _, err := api.mcpDebug(t.Context(), map[string]any{
+			"workflowId": row.ID, "workspacePath": workspace, "sessionId": session,
+		}, action)
+		if err == nil {
+			t.Fatalf("paused workflow accepted %s", action)
+		}
+	}
+}
+
+func TestMCPBacktestRejectsPausedWorkflowBeforeCreatingRun(t *testing.T) {
+	doc, err := db.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	workspace := filepath.Join(t.TempDir(), "mcp-backtest-paused")
+	session := fmt.Sprintf("ses_mcp_backtest_paused_%d", time.Now().UnixNano())
+	now := time.Now().UnixMilli()
+	_, err = doc.ExecContext(t.Context(), `insert into sessions(id, workspace_path, title, body, analysis, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?)`, session, workspace, "paused backtest", "{}", "", now, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bench := workbench.NewService(nil, nil, nil, "")
+	row, err := bench.StartWorkflow(t.Context(), workbench.WorkflowStart{
+		WorkspacePath: workspace, SessionID: session, CodeRevision: "manual:paused", Backtest: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	row, err = bench.CancelWorkflow(t.Context(), workbench.WorkflowGet{WorkspacePath: workspace, SessionID: session})
+	if err != nil {
+		t.Fatal(err)
+	}
+	back := backtest.NewService(backtestClient{})
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		_ = back.Close(ctx)
+		_, _ = doc.ExecContext(context.Background(), "delete from workflow_runs where workspace_path = ?", workspace)
+		_, _ = doc.ExecContext(context.Background(), "delete from backtest_runs where session_id = ?", session)
+		_, _ = doc.ExecContext(context.Background(), "delete from sessions where id = ?", session)
+	})
+	rec := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(rec)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	(&API{bench: bench, back: back}).mcpBacktest(ctx, 1, "run_backtest", map[string]any{
+		"workflowId": row.ID, "workspacePath": workspace, "sessionId": session,
+		"requestKey": "pipeline:" + row.ID,
+		"config":     map[string]any{"startTime": "2026-01-01", "endTime": "2026-02-01"},
+	})
+	list, err := back.Briefs(t.Context(), backtest.ListReq{WorkspacePath: workspace, SessionID: session})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list.Runs) != 0 {
+		t.Fatalf("paused workflow created backtest runs: %#v", list.Runs)
+	}
 }
 
 func TestMCPBindBacktestAcceptsMatchingRunningRetry(t *testing.T) {
@@ -364,11 +425,13 @@ func TestMCPRunBacktestReturnsPendingAndIdempotentV1Result(t *testing.T) {
 			t.Error(err)
 		}
 		for _, id := range sessions {
+			_, _ = doc.ExecContext(context.Background(), "delete from workflow_runs where session_id = ?", id)
 			_, _ = doc.ExecContext(context.Background(), "delete from backtest_runs where session_id = ?", id)
 			_, _ = doc.ExecContext(context.Background(), "delete from sessions where id = ?", id)
 		}
 	})
-	api := &API{back: svc}
+	bench := workbench.NewService(nil, nil, nil, "")
+	api := &API{back: svc, bench: bench}
 	request := map[string]any{
 		"jsonrpc": "2.0",
 		"id":      1,
@@ -489,11 +552,21 @@ func TestMCPRunBacktestReturnsPendingAndIdempotentV1Result(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	flow, err := bench.StartWorkflow(t.Context(), workbench.WorkflowStart{
+		WorkspacePath: workspace2,
+		SessionID:     session2,
+		CodeRevision:  "manual:busy",
+		Backtest:      true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	params["name"] = "run_backtest"
 	params["arguments"] = map[string]any{
 		"workspacePath": workspace2,
 		"sessionId":     session2,
 		"requestKey":    "ai:busy-call",
+		"workflowId":    flow.ID,
 		"config": map[string]any{
 			"startTime": "2026-01-01",
 			"endTime":   "2026-02-01",
@@ -505,6 +578,10 @@ func TestMCPRunBacktestReturnsPendingAndIdempotentV1Result(t *testing.T) {
 	}
 	if _, ok := busy["run"]; ok {
 		t.Fatalf("busy conflict leaked run = %#v", busy)
+	}
+	flow, err = bench.GetWorkflow(t.Context(), workbench.WorkflowGet{WorkspacePath: workspace2, SessionID: session2})
+	if err != nil || flow.State != "failed" {
+		t.Fatalf("busy workflow = %#v, %v", flow, err)
 	}
 
 	params["name"] = "get_backtest_config"

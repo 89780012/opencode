@@ -70,6 +70,84 @@ function warning() {
 }
 
 describe("automatic workflow idle driver", () => {
+  test("creates exact manual debug and backtest runs while automation is disabled", async () => {
+    const starts: RunStart[] = []
+    const calls: string[] = []
+    const hooks = build(ctx(), {
+      parent: async () => false,
+      workflow: async () => ({ baseline: false, review: false, debug: false, backtest: false }),
+      loadRun: async () => undefined,
+      startRun: async (input) => {
+        starts.push(input)
+        return run({
+          codeRevision: input.codeRevision,
+          stage: input.debug ? "debug" : "backtest",
+          reviewEnabled: input.review,
+          debugEnabled: input.debug,
+          backtestEnabled: input.backtest,
+        })
+      },
+      call: async (name) => {
+        calls.push(name)
+        return {}
+      },
+    })
+
+    await hooks["chat.message"]?.(
+      { sessionID: "s1", messageID: "manual-1", agent: "smartx-helper" },
+      { message: {} as never, parts: [{ type: "text", text: "先调试一下，再跑一次回测" } as never] },
+    )
+    await hooks.event?.({
+      event: { type: "session.status", properties: { sessionID: "s1", status: { type: "idle" } } },
+    } as never)
+
+    expect(starts).toEqual([
+      {
+        workspacePath: "f:/repo",
+        sessionId: "s1",
+        codeRevision: "manual:manual-1",
+        review: false,
+        debug: true,
+        backtest: true,
+      },
+    ])
+    expect(calls).toEqual(["start"])
+  })
+
+  test("resumes a paused workflow only after an explicit continue message", async () => {
+    const calls: string[] = []
+    let current = run({ stage: "debug", state: "paused" })
+    const hooks = build(ctx(), {
+      parent: async () => false,
+      workflow: async () => ({ baseline: false, review: false, debug: false, backtest: false }),
+      loadRun: async () => current,
+      resumeRun: async () => {
+        calls.push("resume")
+        current = run({ stage: "debug", state: "requested" })
+        return current
+      },
+      call: async (name) => {
+        calls.push(name)
+        return {}
+      },
+    })
+
+    await hooks["chat.message"]?.(
+      { sessionID: "s1", messageID: "m1", agent: "smartx-helper" },
+      { message: {} as never, parts: [{ type: "text", text: "继续修改策略" } as never] },
+    )
+    expect(calls).toEqual([])
+
+    await hooks["chat.message"]?.(
+      { sessionID: "s1", messageID: "m2", agent: "smartx-helper" },
+      { message: {} as never, parts: [{ type: "text", text: "继续" } as never] },
+    )
+    await hooks.event?.({
+      event: { type: "session.status", properties: { sessionID: "s1", status: { type: "idle" } } },
+    } as never)
+    expect(calls).toEqual(["resume", "start"])
+  })
+
   test("prefixes logs with the current strategy, session, and workflow state", async () => {
     const logs: Log[] = []
     const scope = "f:/repo\x00f:/repo\x00s1"
@@ -210,13 +288,30 @@ describe("automatic workflow idle driver", () => {
     const reviews: SaveReview[] = []
     const pending = new Map<string, Pending>()
     const fixes = new Map()
-    const current = run({ state: "review_exhausted", reviewRound: 3 })
+    let current = run({ state: "review_exhausted", reviewRound: 3 })
     const hooks = build(ctx(), {
       parent: async () => false,
       pending,
       reviewFixes: fixes,
       workflow: async () => ({ baseline: false, review: true, debug: false, backtest: false }),
       loadRun: async () => current,
+      startRun: async (input) => {
+        current = run({
+          id: `workflow-${input.codeRevision}`,
+          codeRevision: input.codeRevision,
+          stage: input.review ? "review" : input.debug ? "debug" : "backtest",
+          state: "requested",
+          reviewRound: 0,
+          reviewEnabled: input.review,
+          debugEnabled: input.debug,
+          backtestEnabled: input.backtest,
+        })
+        return current
+      },
+      updateRun: async (input) => {
+        current = { ...current, ...input, revision: current.revision + 1, updatedAt: Date.now() }
+        return current
+      },
       saveReview: async (input) => {
         reviews.push(input)
       },
@@ -224,6 +319,10 @@ describe("automatic workflow idle driver", () => {
 
     const audit = async (round: number) => {
       const id = `manual-review-${round}`
+      await hooks["chat.message"]?.(
+        { sessionID: "s1", messageID: `request-${round}`, agent: "smartx-helper" },
+        { message: {} as never, parts: [{ type: "text", text: "请做代码审查" } as never] },
+      )
       await hooks["tool.execute.before"]?.(
         { sessionID: "s1", tool: "task", callID: id },
         { args: { subagent_type: "strategy-reviewer" } },

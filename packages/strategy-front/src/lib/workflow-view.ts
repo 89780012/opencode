@@ -3,7 +3,7 @@ import type { WorkbenchReview } from "@/store/workbench-slice"
 import type { BacktestRun } from "@/types/backtest"
 
 export type WorkflowStage = "review" | "debug" | "backtest"
-export type WorkflowStageState = "pending" | "running" | "done" | "error"
+export type WorkflowStageState = "pending" | "running" | "paused" | "done" | "error"
 
 export function fallback(row?: Workflow | null) {
   if (row) return
@@ -45,6 +45,7 @@ export function view(row: Workflow, review?: WorkbenchReview, backtest?: Backtes
     if (done || rank[stage] < current) return "done"
     if (rank[stage] > current) return "pending"
     if (row.state === "passed") return "done"
+    if (row.state === "paused") return "paused"
     return "running"
   }
   return {

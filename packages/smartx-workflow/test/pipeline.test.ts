@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { enabledStages, nextStage } from "../src/pipeline.js"
+import { enabledStages, nextStage, planned } from "../src/pipeline.js"
 import type { Run } from "../src/types.js"
 
 const run = (input: Partial<Run> = {}): Run => ({
@@ -55,5 +55,13 @@ describe("workflow stage plan", () => {
     })
     expect(nextStage(run({ stage: "debug" }))).toEqual({ stage: "backtest", state: "requested" })
     expect(nextStage(run({ stage: "debug", backtestEnabled: false }))).toEqual({ stage: "done", state: "passed" })
+  })
+
+  test("consumes only manual requests still covered by an active run", () => {
+    const request = { review: false, debug: false, backtest: true, revision: "manual:m1" }
+    expect(planned(run({ stage: "review", state: "running" }), request)).toBe(true)
+    expect(planned(run({ stage: "backtest", state: "running" }), request)).toBe(true)
+    expect(planned(run({ stage: "backtest", state: "passed" }), request)).toBe(false)
+    expect(planned(run({ stage: "backtest", backtestEnabled: false }), request)).toBe(false)
   })
 })

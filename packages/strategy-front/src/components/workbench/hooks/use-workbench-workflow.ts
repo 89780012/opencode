@@ -14,7 +14,7 @@ export function parse(value: unknown): Workflow | null {
     return null
   if (typeof value.revision !== "number" || typeof value.updatedAt !== "number") return null
   if (!["review", "debug", "backtest", "done"].includes(String(value.stage))) return null
-  if (!["requested", "dispatching", "running", "fixing", "passed", "failed", "review_exhausted", "cancelled"].includes(String(value.state)))
+  if (!["requested", "dispatching", "running", "fixing", "passed", "failed", "review_exhausted", "cancelled", "paused"].includes(String(value.state)))
     return null
   return value as Workflow
 }

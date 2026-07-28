@@ -103,6 +103,18 @@ export async function updateRunRemote(service: string, input: RunUpdate) {
   return body.data
 }
 
+export async function resumeRunRemote(service: string, workspacePath: string, sessionId: string) {
+  if (!service) throw new Error("strategy service URL is required")
+  const resp = await fetch(new URL("/api/workbench/workflow/resume", service), {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ workspacePath, sessionId }),
+  })
+  if (!resp.ok) throw new Error(`resume workflow failed: ${resp.status}`)
+  const body = (await resp.json()) as { data?: Run | null }
+  return body.data ?? undefined
+}
+
 /** 通过 strategy-service 的现有 MCP HTTP 入口执行确定性流水线动作。 */
 export async function callRemote(service: string, name: string, args: Record<string, unknown>) {
   if (!service) throw new Error("strategy service URL is required")

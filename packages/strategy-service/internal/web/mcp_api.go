@@ -318,7 +318,7 @@ func (a *API) mcpPost(c *gin.Context) {
 		)
 		switch name {
 		case "start":
-			name, row, err := a.mcpDebug(c.Request.Context(), args)
+			name, row, err := a.mcpDebug(c.Request.Context(), args, "start")
 			if err != nil {
 				mcpToolResult(c, req.ID, err.Error(), nil, true)
 				return
@@ -388,7 +388,7 @@ func (a *API) mcpPost(c *gin.Context) {
 			}
 			mcpToolResult(c, req.ID, jsonText(body), body, false)
 		case "logs":
-			name, row, check := a.mcpDebug(c.Request.Context(), args)
+			name, row, check := a.mcpDebug(c.Request.Context(), args, "logs")
 			if check != nil {
 				mcpToolResult(c, req.ID, check.Error(), nil, true)
 				return
@@ -576,7 +576,7 @@ func (a *API) mcpPost(c *gin.Context) {
 	}
 }
 
-func (a *API) mcpDebug(ctx context.Context, args map[string]any) (string, workbench.WorkflowRow, error) {
+func (a *API) mcpDebug(ctx context.Context, args map[string]any, action string) (string, workbench.WorkflowRow, error) {
 	id := text(args["workflowId"])
 	if id == "" {
 		return text(args["name"]), workbench.WorkflowRow{}, nil
@@ -585,7 +585,10 @@ func (a *API) mcpDebug(ctx context.Context, args map[string]any) (string, workbe
 	if err != nil {
 		return "", workbench.WorkflowRow{}, err
 	}
-	if row.ID != id || row.Stage != "debug" || row.State == "failed" || row.State == "review_exhausted" {
+	// start 在 requested 时用于首次启动或确认前重试，在 running 时用于返回已绑定调试任务的幂等结果。
+	// logs 依赖已经启动的调试上下文，因此只允许 running；paused 必须先显式恢复，其他终态不得再读取。
+	valid := action == "start" && (row.State == "requested" || row.State == "running") || action == "logs" && row.State == "running"
+	if row.ID != id || row.Stage != "debug" || !valid {
 		return "", workbench.WorkflowRow{}, fmt.Errorf("invalid automatic debug workflow")
 	}
 	if debug := text(args["debugId"]); debug != "" && row.DebugID != debug {

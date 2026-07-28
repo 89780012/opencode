@@ -6,6 +6,9 @@ import {
   requestAnalysis,
   reviewText,
   validAnalysis,
+  wantsBacktest,
+  wantsContinue,
+  wantsDebug,
   wantsFinal,
 } from "../src/state.js"
 
@@ -36,5 +39,15 @@ describe("smartx workflow state", () => {
     expect(wantsFinal("can we finish now")).toBe(true)
     expect(wantsFinal("keep coding")).toBe(false)
     expect(wantsFinal("不要结束")).toBe(false)
+  })
+
+  test("detects explicit manual workflow stages", () => {
+    expect(wantsDebug("帮我调试一下")).toBe(true)
+    expect(wantsDebug("不要调试")).toBe(false)
+    expect(wantsBacktest("跑一下回测")).toBe(true)
+    expect(wantsBacktest("跳过回测")).toBe(false)
+    expect(wantsContinue("继续")).toBe(true)
+    expect(wantsContinue("继续修改策略")).toBe(false)
+    expect(wantsContinue("不要继续")).toBe(false)
   })
 })

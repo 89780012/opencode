@@ -1,4 +1,4 @@
-import { Activity, CheckCircle2, Circle, CircleAlert, LoaderCircle, PanelRightOpen, X } from "lucide-react"
+import { Activity, CheckCircle2, Circle, CircleAlert, LoaderCircle, PanelRightOpen, PauseCircle, X } from "lucide-react"
 import { useMemo, useState } from "react"
 import { bind } from "@/lib/session-workflow"
 import { view } from "@/lib/workflow-view"
@@ -6,10 +6,11 @@ import { useAppSelector } from "@/store"
 import common from "../../styles/session/session-common.module.css"
 import css from "../../styles/workflow/workflow-float.module.css"
 
-type State = "pending" | "running" | "done" | "error"
+type State = "pending" | "running" | "paused" | "done" | "error"
 
 function Icon(props: { state: State }) {
   if (props.state === "running") return <LoaderCircle size={15} className={common.spin} />
+  if (props.state === "paused") return <PauseCircle size={15} />
   if (props.state === "done") return <CheckCircle2 size={15} />
   if (props.state === "error") return <CircleAlert size={15} />
   return <Circle size={15} />
@@ -38,10 +39,13 @@ export function WorkflowFloat() {
   if (!row) return null
 
   const failed = row.state === "failed" || row.state === "review_exhausted" || row.state === "cancelled"
+  const paused = row.state === "paused"
   const done = row.stage === "done" && !failed
-  const active = !done && !failed
+  const active = !done && !failed && !paused
   const flow = view(row, review, backtest)
-  const label = failed
+  const label = paused
+    ? "流程已暂停"
+    : failed
     ? "流程已停止"
     : done
       ? "流程已完成"
@@ -50,7 +54,9 @@ export function WorkflowFloat() {
         : row.stage === "debug"
           ? "正在调试"
           : "正在回测"
-  const detail = row.error || row.summary || (active ? "自动工作流正在按顺序执行。" : "自动工作流已经结束。")
+  const detail = paused
+    ? "当前阶段已保留，等待继续。"
+    : row.error || row.summary || (active ? "策略工作流正在按顺序执行。" : "策略工作流已经结束。")
   const steps = [
     row.reviewEnabled
       ? {
@@ -60,6 +66,8 @@ export function WorkflowFloat() {
             review?.summary ||
             (flow.review === "done"
               ? "审查已通过。"
+              : flow.review === "paused"
+                ? "审查已暂停，等待继续。"
               : flow.review === "pending"
                 ? "等待自动审查启动。"
                 : row.summary || row.error || "正在核对需求、策略实现和风险控制。"),
@@ -70,10 +78,12 @@ export function WorkflowFloat() {
     row.debugEnabled
       ? {
           key: "debug",
-          title: "自动调试",
+          title: "策略调试",
           detail:
             flow.debug === "pending"
               ? "等待审查通过后启动。"
+              : flow.debug === "paused"
+                ? "调试已暂停，等待继续。"
               : flow.debug === "done"
                 ? "启动、存活状态和增量日志检查已通过。"
                 : row.summary || row.error || "正在启动策略并检查新增运行日志。",
@@ -84,7 +94,7 @@ export function WorkflowFloat() {
     row.backtestEnabled
       ? {
           key: "backtest",
-          title: "自动回测",
+          title: "策略回测",
           detail: backtest
             ? backtest.status === "failed"
               ? backtest.error || "回测执行失败。"
@@ -93,6 +103,8 @@ export function WorkflowFloat() {
                 : `后台任务正在运行，当前进度 ${Math.round(backtest.progress)}%。`
             : flow.backtest === "pending"
               ? "等待前序阶段通过后启动。"
+              : flow.backtest === "paused"
+                ? "回测已暂停，等待继续。"
               : row.summary || row.error || "正在创建回测任务。",
           meta: backtest?.btId || row.backtestId,
           state: flow.backtest,
@@ -103,12 +115,12 @@ export function WorkflowFloat() {
   return (
     <aside className={css.root} data-open={open}>
       {open ? (
-        <section className={css.panel} aria-label="自动工作流状态">
+        <section className={css.panel} aria-label="策略工作流状态">
           <div className={css.head}>
             <span className={css.title}>
               <Activity size={16} />
-              <strong>自动工作流</strong>
-              <em data-state={failed ? "error" : done ? "done" : "running"}>{label}</em>
+              <strong>策略工作流</strong>
+              <em data-state={paused ? "paused" : failed ? "error" : done ? "done" : "running"}>{label}</em>
             </span>
             <button type="button" className={css.action} onClick={() => setOpen(false)} aria-label="收起自动工作流">
               <X size={15} />
@@ -147,13 +159,19 @@ export function WorkflowFloat() {
         <button
           type="button"
           className={css.trigger}
-          data-state={failed ? "error" : done ? "done" : "running"}
+          data-state={paused ? "paused" : failed ? "error" : done ? "done" : "running"}
           onClick={() => setOpen(true)}
-          aria-label="展开自动工作流"
+          aria-label="展开策略工作流"
           aria-expanded={false}
           title={`${label}，点击展开`}
         >
-          {active ? <LoaderCircle size={17} className={common.spin} style={{margin: "auto"}} /> : <PanelRightOpen size={17} />}
+          {active ? (
+            <LoaderCircle size={17} className={common.spin} style={{ margin: "auto" }} />
+          ) : paused ? (
+            <PauseCircle size={17} />
+          ) : (
+            <PanelRightOpen size={17} />
+          )}
           <span>流程</span>
         </button>
       )}

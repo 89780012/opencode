@@ -13,7 +13,18 @@ export {
   validProject,
 } from "./model.js"
 
-export { items, mermaid, result, reviewText, serial, wantsFinal, wantsReview } from "./parse.js"
+export {
+  items,
+  mermaid,
+  result,
+  reviewText,
+  serial,
+  wantsBacktest,
+  wantsContinue,
+  wantsDebug,
+  wantsFinal,
+  wantsReview,
+} from "./parse.js"
 
 export { analyze, flowchart, review } from "./tool.js"
 

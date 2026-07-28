@@ -46,7 +46,16 @@ export type Workflow = {
   sessionId: string
   codeRevision: string
   stage: "review" | "debug" | "backtest" | "done"
-  state: "requested" | "dispatching" | "running" | "fixing" | "passed" | "failed" | "review_exhausted" | "cancelled"
+  state:
+    | "requested"
+    | "dispatching"
+    | "running"
+    | "fixing"
+    | "passed"
+    | "failed"
+    | "review_exhausted"
+    | "cancelled"
+    | "paused"
   reviewRound: number
   debugId?: string
   backtestId?: string

@@ -328,6 +328,7 @@ type WorkflowRow struct {
 	CodeRevision    string           `json:"codeRevision"`
 	Stage           string           `json:"stage"`
 	State           string           `json:"state"`
+	ResumeState     string           `json:"-"`
 	ReviewRound     int              `json:"reviewRound"`
 	DebugID         string           `json:"debugId,omitempty"`
 	DebugCursor     map[string]int64 `json:"-"`

@@ -110,7 +110,7 @@ function map(event: ReturnType<typeof selectWorkbenchProgress>[number]): Timelin
 export function workflow(row: NonNullable<ReturnType<typeof selectWorkbench>["workflow"]>): TimelineEvent {
   const type =
     row.stage === "review" ? "review" : row.stage === "debug" ? "debug" : row.stage === "backtest" ? "backtest" : "workflow"
-  const labels = { review: "自动审查", debug: "自动调试", backtest: "自动回测", done: "自动流程" }
+  const labels = { review: "策略审查", debug: "策略调试", backtest: "策略回测", done: "策略流程" }
   const states = {
     requested: "等待执行",
     dispatching: "正在调度审查智能体",
@@ -120,6 +120,7 @@ export function workflow(row: NonNullable<ReturnType<typeof selectWorkbench>["wo
     failed: "执行失败",
     review_exhausted: "审查达到轮次上限",
     cancelled: "已取消",
+    paused: "已暂停",
   }
   return {
     id: `${row.id}-${row.revision}`,

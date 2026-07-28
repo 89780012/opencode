@@ -41,18 +41,16 @@ describe("smartx lifecycle view", () => {
     expect(view({ baseline: false, dirtyState: cleanDirt() }).life).toBe("ready")
   })
 
-  test("allows backtests only after project memory and baseline are ready", () => {
+  test("does not hard gate backtests while lifecycle prompts are pending", () => {
     const memory = { hasProjectState: true, hasRestoredState: true, needsSave: false }
     const analysis = doneAnalysis("f:/repo")
     const chart = doneChart("f:/repo")
 
-    expect(gate(view({ projectMemory: memory }), "backtest")).toContain("initial workspace baseline")
-    expect(gate(view({ analysis: freshAnalysis("f:/repo"), projectMemory: memory }), "backtest")).toContain(
-      "initial workspace baseline",
-    )
-    expect(gate(view({ baselineMode: "refresh", projectMemory: memory }), "backtest")).toContain("baseline refresh")
-    expect(gate(view({ baselineMode: "final", projectMemory: memory }), "backtest")).toContain("final workspace snapshot")
-    expect(gate(view({ analysis, chart }), "backtest")).toContain("initializing project memory")
+    expect(gate(view({ projectMemory: memory }), "backtest")).toBe("")
+    expect(gate(view({ analysis: freshAnalysis("f:/repo"), projectMemory: memory }), "backtest")).toBe("")
+    expect(gate(view({ baselineMode: "refresh", projectMemory: memory }), "backtest")).toBe("")
+    expect(gate(view({ baselineMode: "final", projectMemory: memory }), "backtest")).toBe("")
+    expect(gate(view({ analysis, chart }), "backtest")).toBe("")
     expect(gate(view({ analysis, chart, projectMemory: memory }), "backtest")).toBe("")
     expect(
       gate(

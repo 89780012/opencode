@@ -53,6 +53,12 @@ type Conflict struct {
 	Run Run
 }
 
+// job 保存单条回测的本地 worker 控制句柄；cancel 发出停止信号，done 表示 goroutine 已完成清理。
+type job struct {
+	cancel context.CancelFunc
+	done   chan struct{}
+}
+
 func (e *Conflict) Error() string {
 	return "an active backtest already exists"
 }
@@ -66,7 +72,7 @@ type Service struct {
 	life   sync.RWMutex
 	mu     sync.Mutex
 	wg     sync.WaitGroup
-	jobs   map[string]struct{}
+	jobs   map[string]*job
 	event  func(context.Context, string, json.RawMessage)
 	done   chan struct{}
 	start  bool
@@ -87,7 +93,7 @@ func NewService(sx Client) *Service {
 		sx:     sx,
 		ctx:    ctx,
 		cancel: cancel,
-		jobs:   map[string]struct{}{},
+		jobs:   map[string]*job{},
 		done:   make(chan struct{}),
 		poll:   2 * time.Second,
 		stable: 5 * time.Second,
@@ -103,6 +109,7 @@ func (s *Service) SetEvent(fn func(context.Context, string, json.RawMessage)) {
 	s.mu.Unlock()
 }
 
+// Start 在服务启动时恢复未完成的回测：已有远端 btId 的任务只恢复轮询，没有 btId 的不确定任务直接失败，避免重复提交。
 func (s *Service) Start() error {
 	s.mu.Lock()
 	if s.stop {
@@ -139,6 +146,7 @@ func (s *Service) Start() error {
 	return nil
 }
 
+// Close 关闭整个回测服务，取消所有本地 worker，并等待它们退出或调用方的 context 超时。
 func (s *Service) Close(ctx context.Context) error {
 	s.life.Lock()
 	s.mu.Lock()
@@ -526,6 +534,8 @@ func (s *Service) alive() error {
 	return nil
 }
 
+// launch 为指定回测启动一个本地后台 worker。
+// jobs 以回测 ID 做 single-flight：服务已关闭或同 ID worker 已存在时直接返回，保证重复 Run/Resume 不会并发轮询。
 func (s *Service) launch(id string) {
 	s.mu.Lock()
 	if s.stop {
@@ -536,23 +546,67 @@ func (s *Service) launch(id string) {
 		s.mu.Unlock()
 		return
 	}
-	s.jobs[id] = struct{}{}
+	// 每条任务使用服务根 context 的独立子 context，Cancel 可以只停止当前任务，Close 则可以停止全部任务。
+	ctx, cancel := context.WithCancel(s.ctx)
+	run := &job{cancel: cancel, done: make(chan struct{})}
+	// 先登记 job 和 WaitGroup 再启动 goroutine，避免并发 Resume 或 Close 漏掉这个 worker。
+	s.jobs[id] = run
 	s.wg.Add(1)
 	s.mu.Unlock()
 
 	go func() {
 		defer func() {
+			// 只删除自己登记的句柄，防止较旧 worker 退出时误删后来启动的新 worker。
 			s.mu.Lock()
-			delete(s.jobs, id)
+			if s.jobs[id] == run {
+				delete(s.jobs, id)
+			}
 			s.mu.Unlock()
+			close(run.done)
 			s.wg.Done()
 		}()
-		s.work(id)
+		s.work(ctx, id)
 	}()
 }
 
-func (s *Service) work(id string) {
-	row, err := s.doc.Get(s.ctx, id)
+// Cancel 只停止并等待指定回测的本地提交/轮询 worker，不把数据库任务写成 failed，也不会取消 SmartX 远端任务。
+// 上层 Workflow 负责写入 paused；由于 SmartX 没有按任务取消接口，已提交的远端回测可能仍会继续运行。
+func (s *Service) Cancel(ctx context.Context, id string) error {
+	s.mu.Lock()
+	run := s.jobs[strings.TrimSpace(id)]
+	s.mu.Unlock()
+	if run == nil {
+		return nil
+	}
+	run.cancel()
+	select {
+	case <-run.done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// Resume 从数据库读取指定任务；终态直接返回，活动任务只有已持久化远端 btId 时才允许重新启动本地轮询。
+// 活动任务没有 btId 表示提交结果不确定，此时返回错误而不调用 launch，避免向 SmartX 重复提交回测。
+func (s *Service) Resume(ctx context.Context, id string) (Run, error) {
+	row, err := s.doc.Get(ctx, strings.TrimSpace(id))
+	if err != nil {
+		return Run{}, err
+	}
+	if !active(row) {
+		return row, nil
+	}
+	if strings.TrimSpace(row.BtID) == "" {
+		return row, errors.New("backtest submission result is unknown")
+	}
+	s.launch(row.ID)
+	return row, nil
+}
+
+// work 执行一条回测的完整后台生命周期：首次任务提交 SmartX 并保存 btId，恢复任务跳过提交，然后统一进入进度轮询。
+func (s *Service) work(parent context.Context, id string) {
+	row, err := s.doc.Get(parent, id)
 	if err != nil || !active(row) {
 		return
 	}
@@ -560,7 +614,7 @@ func (s *Service) work(id string) {
 	if row.StartedAt == 0 {
 		end = time.Now().Add(s.max)
 	}
-	ctx, cancel := context.WithDeadline(s.ctx, end)
+	ctx, cancel := context.WithDeadline(parent, end)
 	defer cancel()
 
 	if row.BtID == "" {
@@ -598,6 +652,7 @@ func (s *Service) work(id string) {
 	s.polling(ctx, row)
 }
 
+// polling 按固定/退避间隔读取远端进度，持久化单调进度和终态；连续稳定后降低轮询频率。
 func (s *Service) polling(ctx context.Context, row Run) {
 	delay := s.poll
 	errs := 0
@@ -665,6 +720,7 @@ func (s *Service) polling(ctx context.Context, row Run) {
 	}
 }
 
+// failed 只处理真实失败和超时；Cancel/Close 导致的主动 context 取消不会把仍可恢复的任务误写成 failed。
 func (s *Service) failed(ctx context.Context, row Run, msg string) {
 	if s.ctx.Err() != nil {
 		return
@@ -677,6 +733,7 @@ func (s *Service) failed(ctx context.Context, row Run, msg string) {
 	}
 }
 
+// fail 将任务持久化为 failed，并通过 change 递增 revision、更新时间及广播事件。
 func (s *Service) fail(row Run, msg string) (Run, error) {
 	row.Status = "failed"
 	row.Error = strings.TrimSpace(msg)
@@ -684,6 +741,7 @@ func (s *Service) fail(row Run, msg string) (Run, error) {
 	return s.change(row)
 }
 
+// change 保存一次回测状态变更并广播 backtest.updated，是 worker 状态推进的统一出口。
 func (s *Service) change(row Run) (Run, error) {
 	row.Progress = clamp(row.Progress)
 	row.Revision++
@@ -696,6 +754,7 @@ func (s *Service) change(row Run) (Run, error) {
 	return out, nil
 }
 
+// emit 发送轻量状态事件；完整结果仍由持久化查询读取，避免事件中携带大结果或内部路径。
 func (s *Service) emit(row Run) {
 	s.mu.Lock()
 	fn := s.event

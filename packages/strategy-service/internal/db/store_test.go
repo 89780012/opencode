@@ -212,7 +212,7 @@ func TestWorkflowMigrationAddsDebugIdentity(t *testing.T) {
 	if err := migrate(ctx, doc); err != nil {
 		t.Fatalf("second migration failed: %v", err)
 	}
-	for _, name := range []string{"debug_cursor", "debug_request_key"} {
+	for _, name := range []string{"debug_cursor", "debug_request_key", "resume_state"} {
 		var count int
 		if err := doc.QueryRowContext(ctx, `select count(*) from pragma_table_info('workflow_runs') where name = ?`, name).Scan(&count); err != nil {
 			t.Fatal(err)

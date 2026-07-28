@@ -104,9 +104,17 @@ func (a *API) mcpBacktest(c *gin.Context, id any, name string, args map[string]a
 			RequestKey:    text(args["requestKey"]),
 			Config:        patch,
 		}
+		// 先占用 Workflow 回测阶段，再创建本地任务和启动 worker，确保暂停或越序请求不会产生真实回测副作用。
+		claim, err := a.claimBacktest(c, args)
+		if err != nil {
+			mcpBacktestError(c, id, err)
+			return
+		}
 		row, reason, err := a.back.RunPatch(c.Request.Context(), req)
 		if err == nil {
 			if err := a.bindBacktest(c, args, row.ID); err != nil {
+				_ = a.back.Cancel(c.Request.Context(), row.ID)
+				a.failBacktest(c, claim, err.Error())
 				mcpBacktestError(c, id, err)
 				return
 			}
@@ -115,17 +123,20 @@ func (a *API) mcpBacktest(c *gin.Context, id any, name string, args map[string]a
 		}
 		var conflict *backtest.Conflict
 		if !errors.As(err, &conflict) {
+			a.failBacktest(c, claim, err.Error())
 			mcpBacktestError(c, id, err)
 			return
 		}
 		if conflict.Run.WorkspacePath == req.WorkspacePath && conflict.Run.SessionID == req.SessionID {
 			if err := a.bindBacktest(c, args, conflict.Run.ID); err != nil {
+				a.failBacktest(c, claim, err.Error())
 				mcpBacktestError(c, id, err)
 				return
 			}
 			mcpBacktestOK(c, id, map[string]any{"version": 1, "accepted": true, "reason": "active", "run": conflict.Run.Brief()})
 			return
 		}
+		a.failBacktest(c, claim, "已有其他工作区的回测任务正在运行。")
 		mcpBacktestOK(c, id, map[string]any{"version": 1, "accepted": false, "reason": "busy"})
 	case "list_backtests":
 		list, err := a.back.Briefs(c.Request.Context(), backtest.ListReq{
@@ -164,6 +175,57 @@ func (a *API) mcpBacktest(c *gin.Context, id any, name string, args map[string]a
 	}
 }
 
+// claimBacktest 校验请求绑定的 Workflow，并在创建回测任务前将 backtest/requested 原子推进到 dispatching。
+// 没有 workflowId 的旧手工调用保持兼容；已有 dispatching 或已绑定任务的 running 调用按幂等重试处理。
+func (a *API) claimBacktest(c *gin.Context, args map[string]any) (workbench.WorkflowRow, error) {
+	id := text(args["workflowId"])
+	if id == "" {
+		return workbench.WorkflowRow{}, nil
+	}
+	row, err := a.bench.GetWorkflow(c.Request.Context(), workbench.WorkflowGet{
+		WorkspacePath: text(args["workspacePath"]),
+		SessionID:     text(args["sessionId"]),
+	})
+	if err != nil {
+		return workbench.WorkflowRow{}, err
+	}
+	if row.ID != id || row.Stage != "backtest" {
+		return workbench.WorkflowRow{}, errors.New("invalid automatic backtest workflow")
+	}
+	// dispatching 表示本次提交已经占位；running 且已有 backtestId 表示任务已经绑定，二者都可安全重试。
+	if (row.State == "running" && row.BacktestID != "") || row.State == "dispatching" {
+		return row, nil
+	}
+	// 只有尚未绑定任务的 requested 状态可以首次 claim；paused 和所有终态都在副作用前拒绝。
+	if row.State != "requested" || row.BacktestID != "" {
+		return workbench.WorkflowRow{}, errors.New("invalid automatic backtest workflow")
+	}
+	return a.bench.UpdateWorkflow(c.Request.Context(), workbench.WorkflowUpdate{
+		ID:            row.ID,
+		WorkspacePath: row.WorkspacePath,
+		SessionID:     row.SessionID,
+		Stage:         "backtest",
+		State:         "dispatching",
+		Summary:       "回测任务已声明，准备提交。",
+	})
+}
+
+// failBacktest 只收敛尚未绑定任务的 claim；running 阶段由回测 worker 的持久化事件负责推进。
+func (a *API) failBacktest(c *gin.Context, row workbench.WorkflowRow, msg string) {
+	if row.ID == "" || row.State == "running" {
+		return
+	}
+	_, _ = a.bench.UpdateWorkflow(c.Request.Context(), workbench.WorkflowUpdate{
+		ID:            row.ID,
+		WorkspacePath: row.WorkspacePath,
+		SessionID:     row.SessionID,
+		Stage:         "backtest",
+		State:         "failed",
+		Error:         msg,
+	})
+}
+
+// bindBacktest 将本地回测任务 ID 绑定到已 claim 的 Workflow，并在绑定后立即对账可能已经结束的快速任务。
 func (a *API) bindBacktest(c *gin.Context, args map[string]any, id string) error {
 	flow := text(args["workflowId"])
 	if flow == "" {
@@ -179,10 +241,11 @@ func (a *API) bindBacktest(c *gin.Context, args map[string]any, id string) error
 	if row.ID != flow {
 		return errors.New("invalid automatic backtest workflow")
 	}
+	// MCP 响应丢失后的相同 ID 重试直接成功，不重复推进 revision，也不重复创建任务。
 	if row.Stage == "backtest" && row.State == "running" && row.BacktestID == id {
 		return nil
 	}
-	if row.Stage != "backtest" || row.State != "requested" || (row.BacktestID != "" && row.BacktestID != id) {
+	if row.Stage != "backtest" || row.State != "dispatching" || row.BacktestID != "" {
 		return errors.New("invalid automatic backtest workflow")
 	}
 	_, err = a.bench.UpdateWorkflow(c.Request.Context(), workbench.WorkflowUpdate{

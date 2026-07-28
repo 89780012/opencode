@@ -67,6 +67,32 @@ export function wantsReview(text: string) {
   return /((代码|提交)?\s*审查|code\s+review|\breview\b)/i.test(out)
 }
 
+function skipped(text: string, action: string) {
+  return new RegExp(`(不要|不用|无需|取消|停止|跳过)\\s*(做|进行|启动|执行)?\\s*(${action})`, "i").test(text)
+}
+
+/** 识别用户明确发起调试或启动检查。 */
+export function wantsDebug(text: string) {
+  const out = text.trim().toLowerCase()
+  if (!out || skipped(out, "调试|debug|启动检查")) return false
+  return /(调试(一下|看看|试试)|开始调试|执行调试|启动检查|请.*调试|\bdebug\b)/i.test(out)
+}
+
+/** 识别用户明确发起回测。 */
+export function wantsBacktest(text: string) {
+  const out = text.trim().toLowerCase()
+  if (!out || skipped(out, "回测|backtest")) return false
+  return /(跑(一下|一?次)?回测|回测(一下|看看|试试)|开始回测|执行回测|请.*回测|\bbacktest\b)/i.test(out)
+}
+
+/** 识别用户要求恢复刚才人工暂停的流程。 */
+export function wantsContinue(text: string) {
+  const out = text.trim().toLowerCase()
+  if (!out) return false
+  if (/(不要|不用|无需|取消|停止|暂停)\s*(继续|恢复|接着)/i.test(out)) return false
+  return /^(继续|接着|恢复|resume)(吧|流程|执行|运行|刚才的流程|未完成的流程)?[。！!\s]*$/i.test(out)
+}
+
 /** 识别用户是否在请求最终收口，而不是要求继续做事。 */
 export function wantsFinal(text: string) {
   const out = text.trim().toLowerCase()

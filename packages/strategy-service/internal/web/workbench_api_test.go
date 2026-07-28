@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"strategy-service/internal/backtest"
 	"strategy-service/internal/db"
 	"strategy-service/internal/workbench"
 
@@ -109,5 +110,95 @@ func TestWorkbenchRequirementsPut(t *testing.T) {
 	rec = call(ctx, string(body))
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestWorkbenchWorkflowResumeReconcilesBacktest(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, test := range []struct {
+		name   string
+		status string
+		bt     string
+		stage  string
+		state  string
+		err    string
+	}{
+		{name: "terminal", status: "done", bt: "remote", stage: "done", state: "passed"},
+		{name: "unknown submission", status: "pending", stage: "backtest", state: "failed", err: "无法安全恢复"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			doc, err := db.Open()
+			if err != nil {
+				t.Fatal(err)
+			}
+			workspace := t.TempDir()
+			session := fmt.Sprintf("ses_web_resume_%d", time.Now().UnixNano())
+			run := fmt.Sprintf("bt_web_resume_%d", time.Now().UnixNano())
+			now := time.Now().UnixMilli()
+			_, err = doc.ExecContext(t.Context(), `insert into sessions(id, workspace_path, title, body, analysis, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?)`, session, workspace, "resume", "{}", "", now, now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = doc.ExecContext(t.Context(), `insert into backtest_runs(id, workspace_path, session_id, plugin_id, bt_id, status, config_json, started_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)`, run, workspace, session, "plugin", test.bt, test.status, "{}", now, now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			bench := workbench.NewService(nil, nil, nil, "")
+			row, err := bench.StartWorkflow(t.Context(), workbench.WorkflowStart{
+				WorkspacePath: workspace,
+				SessionID:     session,
+				CodeRevision:  "manual:resume",
+				Backtest:      true,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			row, err = bench.UpdateWorkflow(t.Context(), workbench.WorkflowUpdate{
+				ID:            row.ID,
+				WorkspacePath: workspace,
+				SessionID:     session,
+				Stage:         "backtest",
+				State:         "running",
+				BacktestID:    run,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			row, err = bench.CancelWorkflow(t.Context(), workbench.WorkflowGet{WorkspacePath: workspace, SessionID: session})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if row.State != "paused" || row.ResumeState != "running" {
+				t.Fatalf("paused workflow = %#v", row)
+			}
+
+			back := backtest.NewService(nil)
+			api := &API{bench: bench, back: back}
+			t.Cleanup(func() {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+				defer cancel()
+				_ = back.Close(ctx)
+				_, _ = doc.ExecContext(context.Background(), "delete from workflow_runs where session_id = ?", session)
+				_, _ = doc.ExecContext(context.Background(), "delete from backtest_runs where session_id = ?", session)
+				_, _ = doc.ExecContext(context.Background(), "delete from sessions where id = ?", session)
+			})
+			body := fmt.Sprintf(`{"workspacePath":%q,"sessionId":%q}`, workspace, session)
+			rec := httptest.NewRecorder()
+			ctx, _ := gin.CreateTestContext(rec)
+			ctx.Request = httptest.NewRequest(http.MethodPut, "/api/workbench/workflow/resume", strings.NewReader(body))
+			ctx.Request.Header.Set("Content-Type", "application/json")
+			api.workbenchWorkflowResume(ctx)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+			}
+
+			got, err := bench.GetWorkflow(t.Context(), workbench.WorkflowGet{WorkspacePath: workspace, SessionID: session})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.Stage != test.stage || got.State != test.state || !strings.Contains(got.Error, test.err) {
+				t.Fatalf("resumed workflow = %#v", got)
+			}
+		})
 	}
 }

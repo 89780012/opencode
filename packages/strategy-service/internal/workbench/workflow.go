@@ -50,8 +50,8 @@ func (s *Service) StartWorkflow(ctx context.Context, req WorkflowStart) (Workflo
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	}
-	_, err = doc.ExecContext(ctx, `insert into workflow_runs(id, workspace_path, session_id, code_revision, stage, state, review_round, debug_id, debug_cursor, debug_request_key, backtest_id, review_enabled, debug_enabled, backtest_enabled, summary, error, revision, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		row.ID, row.WorkspacePath, row.SessionID, row.CodeRevision, row.Stage, row.State, row.ReviewRound, row.DebugID, workflowCursor(row.DebugCursor), row.DebugRequestKey, row.BacktestID, row.ReviewEnabled, row.DebugEnabled, row.BacktestEnabled, row.Summary, row.Error, row.Revision, row.CreatedAt, row.UpdatedAt)
+	_, err = doc.ExecContext(ctx, `insert into workflow_runs(id, workspace_path, session_id, code_revision, stage, state, resume_state, review_round, debug_id, debug_cursor, debug_request_key, backtest_id, review_enabled, debug_enabled, backtest_enabled, summary, error, revision, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		row.ID, row.WorkspacePath, row.SessionID, row.CodeRevision, row.Stage, row.State, row.ResumeState, row.ReviewRound, row.DebugID, workflowCursor(row.DebugCursor), row.DebugRequestKey, row.BacktestID, row.ReviewEnabled, row.DebugEnabled, row.BacktestEnabled, row.Summary, row.Error, row.Revision, row.CreatedAt, row.UpdatedAt)
 	if err != nil {
 		existing, load := scanWorkflow(doc.QueryRowContext(ctx, workflowSelect+" where workspace_path = ? and session_id = ? and code_revision = ?", req.WorkspacePath, req.SessionID, req.CodeRevision))
 		if load == nil {
@@ -80,7 +80,7 @@ func (s *Service) GetWorkflow(ctx context.Context, req WorkflowGet) (WorkflowRow
 	return row, err
 }
 
-// CancelWorkflow 按当前持久化阶段原子取消最新流程，避免客户端读写之间的阶段竞态。
+// CancelWorkflow 暂停最新流程并保存安全恢复点；保留旧方法名兼容现有客户端。
 func (s *Service) CancelWorkflow(ctx context.Context, req WorkflowGet) (WorkflowRow, error) {
 	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
 	req.SessionID = strings.TrimSpace(req.SessionID)
@@ -92,7 +92,13 @@ func (s *Service) CancelWorkflow(ctx context.Context, req WorkflowGet) (Workflow
 		return WorkflowRow{}, err
 	}
 	row, err := scanWorkflow(doc.QueryRowContext(ctx, `update workflow_runs
-set state = 'cancelled', error = ?, revision = revision + 1, updated_at = ?
+set state = 'paused',
+resume_state = case
+	when stage = 'review' and state in ('dispatching', 'running') then 'requested'
+	when stage = 'backtest' and state = 'dispatching' then 'requested'
+	else state
+end,
+error = ?, revision = revision + 1, updated_at = ?
 where id = (
 	select id from workflow_runs
 	where workspace_path = ? and session_id = ?
@@ -100,8 +106,45 @@ where id = (
 	limit 1
 )
 and stage <> 'done'
-and state not in ('failed', 'review_exhausted', 'cancelled')
-returning `+fields, "用户已停止自动工作流。", time.Now().UnixMilli(), req.WorkspacePath, req.SessionID))
+and state not in ('failed', 'review_exhausted', 'cancelled', 'paused')
+returning `+fields, "用户已暂停工作流。", time.Now().UnixMilli(), req.WorkspacePath, req.SessionID))
+	if err == sql.ErrNoRows {
+		return s.GetWorkflow(ctx, req)
+	}
+	if err != nil {
+		return WorkflowRow{}, err
+	}
+	s.emitWorkflow(ctx, row)
+	return row, nil
+}
+
+// ResumeWorkflow 恢复最近一次人工暂停；历史 cancelled 记录按已有阶段标识回到安全重试点。
+func (s *Service) ResumeWorkflow(ctx context.Context, req WorkflowGet) (WorkflowRow, error) {
+	req.WorkspacePath = strings.TrimSpace(req.WorkspacePath)
+	req.SessionID = strings.TrimSpace(req.SessionID)
+	if req.WorkspacePath == "" || req.SessionID == "" {
+		return WorkflowRow{}, fmt.Errorf("%w: workflow scope is required", ErrInput)
+	}
+	doc, err := db.Open()
+	if err != nil {
+		return WorkflowRow{}, err
+	}
+	row, err := scanWorkflow(doc.QueryRowContext(ctx, `update workflow_runs
+set state = case
+	when resume_state <> '' then resume_state
+	when stage = 'debug' and debug_id <> '' then 'running'
+	when stage = 'backtest' and backtest_id <> '' then 'running'
+	else 'requested'
+end,
+resume_state = '', error = '', revision = revision + 1, updated_at = ?
+where id = (
+	select id from workflow_runs
+	where workspace_path = ? and session_id = ?
+	order by updated_at desc, created_at desc
+	limit 1
+)
+and state in ('paused', 'cancelled')
+returning `+fields, time.Now().UnixMilli(), req.WorkspacePath, req.SessionID))
 	if err == sql.ErrNoRows {
 		return s.GetWorkflow(ctx, req)
 	}
@@ -135,14 +178,14 @@ func (s *Service) UpdateWorkflow(ctx context.Context, req WorkflowUpdate) (Workf
 	if err != nil {
 		return WorkflowRow{}, err
 	}
-	if workflowRank(req.Stage) < workflowRank(row.Stage) {
-		return WorkflowRow{}, fmt.Errorf("%w: workflow stage cannot move backwards", ErrInput)
-	}
 	if workflowTerminal(row) {
 		if row.Stage == req.Stage && row.State == req.State {
 			return row, nil
 		}
 		return WorkflowRow{}, fmt.Errorf("%w: workflow is terminal", ErrInput)
+	}
+	if !workflowMove(row, req.Stage, req.State) {
+		return WorkflowRow{}, fmt.Errorf("%w: invalid workflow transition", ErrInput)
 	}
 	if req.ReviewRound > 0 {
 		if req.ReviewRound < row.ReviewRound {
@@ -222,13 +265,13 @@ func (s *Service) emitWorkflow(ctx context.Context, row WorkflowRow) {
 	}
 }
 
-const fields = `id, workspace_path, session_id, code_revision, stage, state, review_round, debug_id, debug_cursor, debug_request_key, backtest_id, review_enabled, debug_enabled, backtest_enabled, summary, error, revision, created_at, updated_at`
+const fields = `id, workspace_path, session_id, code_revision, stage, state, resume_state, review_round, debug_id, debug_cursor, debug_request_key, backtest_id, review_enabled, debug_enabled, backtest_enabled, summary, error, revision, created_at, updated_at`
 const workflowSelect = `select ` + fields + ` from workflow_runs`
 
 func scanWorkflow(row scanner) (WorkflowRow, error) {
 	out := WorkflowRow{}
 	var cursor string
-	err := row.Scan(&out.ID, &out.WorkspacePath, &out.SessionID, &out.CodeRevision, &out.Stage, &out.State, &out.ReviewRound, &out.DebugID, &cursor, &out.DebugRequestKey, &out.BacktestID, &out.ReviewEnabled, &out.DebugEnabled, &out.BacktestEnabled, &out.Summary, &out.Error, &out.Revision, &out.CreatedAt, &out.UpdatedAt)
+	err := row.Scan(&out.ID, &out.WorkspacePath, &out.SessionID, &out.CodeRevision, &out.Stage, &out.State, &out.ResumeState, &out.ReviewRound, &out.DebugID, &cursor, &out.DebugRequestKey, &out.BacktestID, &out.ReviewEnabled, &out.DebugEnabled, &out.BacktestEnabled, &out.Summary, &out.Error, &out.Revision, &out.CreatedAt, &out.UpdatedAt)
 	if err == nil {
 		err = json.Unmarshal([]byte(cursor), &out.DebugCursor)
 	}
@@ -267,7 +310,7 @@ func workflowStage(req WorkflowStart) string {
 
 func validWorkflow(stage string, state string) bool {
 	stages := map[string]bool{"review": true, "debug": true, "backtest": true, "done": true}
-	states := map[string]bool{"requested": true, "dispatching": true, "running": true, "fixing": true, "passed": true, "failed": true, "review_exhausted": true, "cancelled": true}
+	states := map[string]bool{"requested": true, "dispatching": true, "running": true, "fixing": true, "passed": true, "failed": true, "review_exhausted": true, "cancelled": true, "paused": true}
 	return stages[stage] && states[state]
 }
 
@@ -275,6 +318,50 @@ func workflowRank(stage string) int {
 	return map[string]int{"review": 1, "debug": 2, "backtest": 3, "done": 4}[stage]
 }
 
+func workflowMove(row WorkflowRow, stage string, state string) bool {
+	if row.Stage == stage {
+		if row.State == state {
+			return true
+		}
+		moves := map[string]map[string]bool{
+			"review": {
+				"requested:dispatching": true, "requested:running": true, "dispatching:requested": true, "dispatching:running": true,
+				"running:passed": true, "running:fixing": true, "fixing:dispatching": true,
+			},
+			"debug": {
+				"requested:running": true, "running:passed": true,
+			},
+			"backtest": {
+				"requested:dispatching": true, "requested:running": true, "dispatching:requested": true,
+				"dispatching:running": true,
+			},
+		}
+		if moves[row.Stage][row.State+":"+state] {
+			return true
+		}
+		return state == "failed" || row.Stage == "review" && state == "review_exhausted"
+	}
+	if row.State != "passed" && !(row.Stage == "backtest" && row.State == "running") {
+		return false
+	}
+	if stage == "done" {
+		return state == "passed" && workflowNext(row) == "done"
+	}
+	return state == "requested" && stage == workflowNext(row)
+}
+
+func workflowNext(row WorkflowRow) string {
+	for _, stage := range []string{"review", "debug", "backtest"} {
+		if workflowRank(stage) <= workflowRank(row.Stage) {
+			continue
+		}
+		if stage == "review" && row.ReviewEnabled || stage == "debug" && row.DebugEnabled || stage == "backtest" && row.BacktestEnabled {
+			return stage
+		}
+	}
+	return "done"
+}
+
 func workflowTerminal(row WorkflowRow) bool {
-	return row.Stage == "done" || row.State == "failed" || row.State == "review_exhausted" || row.State == "cancelled"
+	return row.Stage == "done" || row.State == "failed" || row.State == "review_exhausted" || row.State == "cancelled" || row.State == "paused"
 }

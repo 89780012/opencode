@@ -29,7 +29,7 @@ import {
   limit,
 } from "./note.js"
 import { items, mermaid, reviewText, serial } from "./parse.js"
-import { nextStage } from "./pipeline.js"
+import { nextStage, planned } from "./pipeline.js"
 import { analyze, backtest, baseline, debug, flowchart, kind, mcp, python, review } from "./tool.js"
 import type {
   Analysis,
@@ -45,6 +45,7 @@ import type {
   RunStart,
   RunUpdate,
   SaveReview,
+  StageRequest,
 } from "./types.js"
 import { flow, step } from "./workflow.js"
 
@@ -96,6 +97,7 @@ type Opt = {
   // 表示某会话已经请求审查，但 reviewer 还没有真正启动。
   // 来源包括用户明确要求审查，以及自动 workflow 进入 review/requested。
   reviewRequests: Set<string>
+  stageRequests: Map<string, StageRequest>
   // value: `${Opt.id}\0${sessionID}`
   // 表示 strategy-reviewer 当前正在运行。
   // 用作进程内并发锁，防止同一会话同时启动多个 reviewer。
@@ -238,7 +240,13 @@ function requestKey(id: string, session: string) {
 }
 
 function stopped(run: Run) {
-  return run.stage === "done" || run.state === "failed" || run.state === "review_exhausted" || run.state === "cancelled"
+  return (
+    run.stage === "done" ||
+    run.state === "failed" ||
+    run.state === "review_exhausted" ||
+    run.state === "cancelled" ||
+    run.state === "paused"
+  )
 }
 
 async function change(opt: Opt, run: Run, input: Omit<RunUpdate, "id" | "workspacePath" | "sessionId">) {
@@ -266,6 +274,26 @@ async function change(opt: Opt, run: Run, input: Omit<RunUpdate, "id" | "workspa
   })
   opt.workflowRuns.set(requestKey(opt.id, current.sessionId), row)
   return row
+}
+
+/** 为实际发生的人工阶段调用补建持久化 Run，避免自然语言识别遗漏。 */
+async function manual(opt: Opt, session: string, call: string, stage: "review" | "debug" | "backtest") {
+  const id = requestKey(opt.id, session)
+  const loaded = await opt.loadRun(opt.workspace, session).catch(() => undefined)
+  const current = loaded ?? opt.workflowRuns.get(id)
+  if (current && !stopped(current)) return current
+  const request = opt.stageRequests.get(id)
+  const run = await opt.startRun({
+    workspacePath: opt.workspace,
+    sessionId: session,
+    codeRevision: request?.revision ?? `manual:${call}`,
+    review: request?.review === true || stage === "review",
+    debug: request?.debug === true || stage === "debug",
+    backtest: request?.backtest === true || stage === "backtest",
+  })
+  opt.stageRequests.delete(id)
+  opt.workflowRuns.set(id, run)
+  return run
 }
 
 /** 当前会话优先读取自己的审查 pending，基线 pending 仍保持 workspace 级。 */
@@ -497,7 +525,7 @@ function reset(opt: Opt, mode?: Mode) {
   if (pendingSave?.kind === "analysis" || pendingSave?.kind === "flowchart") opt.pending.delete(opt.id)
 }
 
-/** workspace 级编排器，负责 system 注入、before 门禁和 after 状态推进。*/
+/** workspace 级编排器，负责 system 注入、before 上下文绑定和 after 状态推进。*/
 export function createWorkspace(opt: Opt) {
   return {
     /** idle 驱动复用主会话校验，恢复后的子 session 也不得推进自动流程。 */
@@ -621,12 +649,14 @@ export function createWorkspace(opt: Opt) {
           return true
         }),
         step("pipeline", async () => {
-          // 没有主会话 ID，或 review/debug/backtest 全关时，不创建和推进自动 Run。
-          if (!sessionID || (!cfg.review && !cfg.debug && !cfg.backtest)) return false
+          if (!sessionID) return false
           // 子会话不能拥有工作区级自动流水线；parent 查询覆盖插件重启后的恢复场景。
           if (await sub(opt, sessionID, "pipeline")) return false
           // 自动 Run、review pending 和 review request 共用 workspace + worktree + session 键。
           const id = requestKey(opt.id, sessionID)
+          const manual = opt.stageRequests.get(id)
+          // 人工审查、调试和回测都进入同一阶段计划；没有任何请求时不创建 Run。
+          if (!manual && !cfg.review && !cfg.debug && !cfg.backtest) return false
           // 每次 transform 先从 strategy-service 恢复 Run，远端状态优先于进程内缓存。
           const loaded = await opt.loadRun(opt.workspace, sessionID).catch(() => undefined)
           // 恢复成功后同步内存，tool before/after 可以复用同一份 Run。
@@ -639,18 +669,21 @@ export function createWorkspace(opt: Opt) {
           const own = dirty.owner
           // 优先复用当前 session 已缓存或刚从远端恢复的 Run。
           let run = opt.workflowRuns.get(id)
+          if (run && !stopped(run) && manual && planned(run, manual)) opt.stageRequests.delete(id)
+          const rev =
+            manual && run?.codeRevision === String(code) ? manual.revision : code ? String(code) : manual?.revision
+          const fresh = !!code && rev !== manual?.revision
           // 只有 Run 缺失或已终止时，才可能为新 revision 创建下一条 Run。
           if (!run || stopped(run)) {
             // 下列任一条件成立都说明当前 transform 还不能创建新自动 Run。
             if (
-              // 工作区不脏，没有需要审查的新变化。
-              dirty.state !== "dirty" ||
-              // 没有源码 revision，说明只是 Bash/Python 等运行活动。
-              !code ||
+              // 自动流程需要 dirty revision，人工请求可以使用 manual revision。
+              !rev ||
+              (!manual && dirty.state !== "dirty") ||
               // revision 属于另一个主会话，当前 session 不得接管。
-              (own && own !== sessionID) ||
+              (code && own && own !== sessionID) ||
               // 相同 revision 已经有过 Run，避免重复创建。
-              run?.codeRevision === String(code) ||
+              run?.codeRevision === rev ||
               // 项目记忆必须先保存，保证审查前的交接状态一致。
               state.projectMemory.needsSave ||
               // analysis/flowchart/review 有待保存结果时，必须先完成保存。
@@ -661,15 +694,16 @@ export function createWorkspace(opt: Opt) {
             run = await opt.startRun({
               workspacePath: opt.workspace,
               sessionId: sessionID,
-              codeRevision: String(code),
-              review: cfg.review,
-              debug: cfg.debug,
-              backtest: cfg.backtest,
+              codeRevision: rev,
+              review: fresh ? cfg.review || manual?.review === true : manual?.review === true,
+              debug: fresh ? cfg.debug || manual?.debug === true : manual?.debug === true,
+              backtest: fresh ? cfg.backtest || manual?.backtest === true : manual?.backtest === true,
             })
+            opt.stageRequests.delete(id)
             // 缓存服务端返回的最新 Run，供本轮后续步骤读取。
             opt.workflowRuns.set(id, run)
           }
-          // failed/review_exhausted/cancelled/done 都不得继续推进。
+          // failed/review_exhausted/cancelled/paused/done 都不得自动推进。
           if (stopped(run)) return false
           // final 请求只有在 baseline ready 后才能消费，避免绕过最终快照。
           if (opt.finalRequests.has(id)) {
@@ -839,13 +873,19 @@ export function createWorkspace(opt: Opt) {
         }),
       ])
     },
-    /** 工具执行前做硬门禁，并记录 analysis / review / chart 的启动状态。*/
+    /** 工具执行前绑定可信上下文，并记录 analysis / review / chart 的启动状态。*/
     before: async (input: Parameters<Before>[0], output: Parameters<Before>[1], cfg: Automation) => {
       if (!opt.workspace || !opt.id) return false
       const enabled = cfg.baseline
       if (python(input)) await main(opt, input, "python")
       if (debug(input)) {
-        const run = opt.workflowRuns.get(requestKey(opt.id, input.sessionID))
+        const id = requestKey(opt.id, input.sessionID)
+        let run = opt.workflowRuns.get(id)
+        if (mcp(input, "start")) {
+          if (!run || stopped(run)) run = await manual(opt, input.sessionID, input.callID, "debug")
+          if (run.stage !== "debug")
+            throw new Error(`SmartX workflow must finish the ${run.stage} stage before debug starts.`)
+        }
         if (run?.stage === "debug" && !stopped(run)) {
           await main(opt, input, "debug")
           const args =
@@ -874,7 +914,11 @@ export function createWorkspace(opt: Opt) {
         delete args.requestKey
         delete args.workflowId
         if (mcp(input, "run_backtest")) {
-          const run = opt.workflowRuns.get(requestKey(opt.id, input.sessionID))
+          const id = requestKey(opt.id, input.sessionID)
+          let run = opt.workflowRuns.get(id)
+          if (!run || stopped(run)) run = await manual(opt, input.sessionID, input.callID, "backtest")
+          if (run.stage !== "backtest")
+            throw new Error(`SmartX workflow must finish the ${run.stage} stage before backtest starts.`)
           args.requestKey = run?.stage === "backtest" ? `pipeline:${run.id}` : "ai:" + input.callID
           if (run?.stage === "backtest") args.workflowId = run.id
         }
@@ -967,7 +1011,13 @@ export function createWorkspace(opt: Opt) {
           // 恢复成功后供 after hook 和 idle drive 继续使用。
           if (loaded) opt.workflowRuns.set(id, loaded)
           // loaded 可能为空，手工审查仍可继续；只有绑定自动 Run 时才推进 reviewRound。
-          const run = loaded
+          let run = loaded
+          const asked = opt.reviewRequests.has(id) || opt.reviewFixes.has(id)
+          if ((!run || run.stage !== "review" || stopped(run)) && !asked)
+            throw new Error("SmartX workflow review was not requested for this session.")
+          if (!run || stopped(run)) run = await manual(opt, input.sessionID, input.callID, "review")
+          if (run.stage !== "review")
+            throw new Error(`SmartX workflow must finish the ${run.stage} stage before review starts.`)
           // 自动 Run 的 reviewer 启动前必须检查轮次和当前阶段。
           if (run?.stage === "review" && !stopped(run)) {
             // limit=3，执行前拒绝第 4 轮，而不是事后再修正状态。
@@ -1069,7 +1119,12 @@ export function createWorkspace(opt: Opt) {
             return true
           }
           if (body.state === "passed") {
-            await change(opt, run, { ...nextStage(run), summary: "自动调试通过。" })
+            const passed = await change(opt, run, {
+              stage: "debug",
+              state: "passed",
+              summary: "策略启动烟测通过。",
+            })
+            await change(opt, passed, nextStage(passed))
             return true
           }
           await change(opt, run, {

@@ -243,6 +243,50 @@ func (a *API) workbenchWorkflowCancel(c *gin.Context) {
 		bad(c, err)
 		return
 	}
+	if a.back != nil && data.BacktestID != "" {
+		if err := a.back.Cancel(c.Request.Context(), data.BacktestID); err != nil {
+			bad(c, err)
+			return
+		}
+	}
+	ok(c, data)
+}
+
+func (a *API) workbenchWorkflowResume(c *gin.Context) {
+	body := workbench.WorkflowGet{}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		bad(c, err)
+		return
+	}
+	data, err := a.bench.ResumeWorkflow(c.Request.Context(), body)
+	if errors.Is(err, db.ErrNotFound) {
+		ok(c, nil)
+		return
+	}
+	if err != nil {
+		bad(c, err)
+		return
+	}
+	if a.back != nil && data.Stage == "backtest" && data.State == "running" && data.BacktestID != "" {
+		row, resume := a.back.Resume(c.Request.Context(), data.BacktestID)
+		if resume != nil {
+			data, err = a.bench.UpdateWorkflow(c.Request.Context(), workbench.WorkflowUpdate{
+				ID:            data.ID,
+				WorkspacePath: data.WorkspacePath,
+				SessionID:     data.SessionID,
+				Stage:         "backtest",
+				State:         "failed",
+				Error:         "回测提交结果不确定，无法安全恢复，请重新发起回测。",
+			})
+		}
+		if resume == nil && (row.Status == "done" || row.Status == "failed") {
+			data, err = a.bench.UpdateWorkflowBacktest(c.Request.Context(), data.WorkspacePath, data.SessionID, row.ID, row.Status, row.Error)
+		}
+		if err != nil {
+			bad(c, err)
+			return
+		}
+	}
 	ok(c, data)
 }
 

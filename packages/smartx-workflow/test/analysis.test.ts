@@ -17,7 +17,7 @@ import {
   type Analysis,
   type Chart,
 } from "../src/state.js"
-import type { Memory, Pending, Project, Run, SaveReview } from "../src/types.js"
+import type { Memory, Pending, Project, Run, RunStart, SaveReview } from "../src/types.js"
 
 type Row = {
   message: string
@@ -68,11 +68,41 @@ function projects(hasProjectState = true) {
 }
 
 function setup(input: ReturnType<typeof ctx>, dep: Parameters<typeof build>[1] = {}) {
+  let run: Run | undefined
   return build(input, {
     memory: restored(),
     projects: projects(),
     saveReview: async () => {},
     workflow: async () => ({ ...disabled, baseline: true }),
+    loadRun: async () => run,
+    startRun: async (row: RunStart) => {
+      const now = Date.now()
+      run = {
+        id: `workflow-${row.codeRevision}`,
+        workspacePath: row.workspacePath,
+        sessionId: row.sessionId,
+        codeRevision: row.codeRevision,
+        stage: row.review ? "review" : row.debug ? "debug" : "backtest",
+        state: "requested",
+        reviewRound: 0,
+        debugId: "",
+        backtestId: "",
+        reviewEnabled: row.review,
+        debugEnabled: row.debug,
+        backtestEnabled: row.backtest,
+        summary: "",
+        error: "",
+        revision: 1,
+        createdAt: now,
+        updatedAt: now,
+      }
+      return run
+    },
+    updateRun: async (input) => {
+      if (!run) throw new Error("workflow not started")
+      run = { ...run, ...input, revision: run.revision + 1, updatedAt: Date.now() }
+      return run
+    },
     ...dep,
   })
 }
@@ -125,7 +155,7 @@ describe("smartx workspace analysis", () => {
     expect(debug({ tool: "start" })).toBe(false)
   })
 
-  test("preserves manual SmartX debug arguments without an automatic run", async () => {
+  test("binds manual SmartX debug calls to a persisted workflow run", async () => {
     const hooks = setup(ctx("f:/repo"))
     const start = { args: { name: "manual", extra: "keep" } }
     const logs = { args: { name: "manual", seconds: 2 } }
@@ -133,8 +163,21 @@ describe("smartx workspace analysis", () => {
     await hooks["tool.execute.before"]?.({ sessionID: "s1", tool: "smartx_start", callID: "manual-start" }, start)
     await hooks["tool.execute.before"]?.({ sessionID: "s1", tool: "smartx_logs", callID: "manual-logs" }, logs)
 
-    expect(start.args).toEqual({ name: "manual", extra: "keep" })
-    expect(logs.args).toEqual({ name: "manual", seconds: 2 })
+    expect(start.args).toEqual({
+      extra: "keep",
+      workspacePath: "f:/repo",
+      sessionId: "s1",
+      workflowId: "workflow-manual:manual-start",
+      requestKey: "pipeline:workflow-manual:manual-start:start",
+    })
+    expect(logs.args).toEqual({
+      seconds: 2,
+      workspacePath: "f:/repo",
+      sessionId: "s1",
+      workflowId: "workflow-manual:manual-start",
+      requestKey: "pipeline:workflow-manual:manual-start:logs",
+      debugId: "",
+    })
   })
 
   test("registers and classifies the SmartX Python tool", () => {
@@ -510,7 +553,7 @@ describe("smartx workspace analysis", () => {
     expect(first.system.some((item) => item.includes("workspace-analyzer"))).toBe(true)
   })
 
-  test("allows read tools before analysis starts but blocks writes", async () => {
+  test("does not hard block tools before analysis starts", async () => {
     const hooks = setup(ctx("f:/repo"))
 
     await expect(
@@ -520,12 +563,12 @@ describe("smartx workspace analysis", () => {
       ),
     ).resolves.toBeUndefined()
 
-    expect(
+    await expect(
       hooks["tool.execute.before"]?.(
         { sessionID: "s1", tool: "edit", callID: "c2" },
         { args: { filePath: "f:/repo/a.ts", oldString: "a", newString: "b" } },
       ),
-    ).rejects.toThrow("initial workspace analysis")
+    ).resolves.toBeUndefined()
 
     await expect(
       hooks["tool.execute.before"]?.(
@@ -535,7 +578,7 @@ describe("smartx workspace analysis", () => {
     ).resolves.toBeUndefined()
   })
 
-  test("allows reads during baseline save phases and unblocks writes after flowchart save", async () => {
+  test("does not hard block tools during baseline save phases", async () => {
     const workspaces = new Map<string, Analysis>()
     const pending = new Map()
     const hooks = setup(ctx("f:/repo"), {
@@ -569,12 +612,12 @@ describe("smartx workspace analysis", () => {
       ),
     ).resolves.toBeUndefined()
 
-    expect(
+    await expect(
       hooks["tool.execute.before"]?.(
         { sessionID: "s1", tool: "write", callID: "c2w" },
         { args: { filePath: "f:/repo/a.ts", content: "next" } },
       ),
-    ).rejects.toThrow("initial workspace baseline")
+    ).resolves.toBeUndefined()
 
     await hooks["tool.execute.after"]?.(
       {
@@ -680,7 +723,7 @@ describe("smartx workspace analysis", () => {
         },
       ],
     ])
-    const hooks = build(ctx("f:/repo"), {
+    const hooks = setup(ctx("f:/repo"), {
       workflow: async () => ({ ...disabled, baseline: true }),
       memory,
       projects: projects(),
@@ -703,7 +746,8 @@ describe("smartx workspace analysis", () => {
     expect(output.args).toEqual({
       workspacePath: "f:/repo",
       sessionId: "s1",
-      requestKey: "ai:call-1",
+      requestKey: "pipeline:workflow-manual:call-1",
+      workflowId: "workflow-manual:call-1",
       config: { cash: 100000 },
     })
 
@@ -809,14 +853,14 @@ describe("smartx workspace analysis", () => {
     ).rejects.toThrow("SmartX Python is only available in the main session")
   })
 
-  test("applies baseline gates and preserves dirt after a failed Python execution", async () => {
+  test("keeps baseline prompts non-blocking and preserves dirt after a failed Python execution", async () => {
     const blocked = setup(ctx("f:/repo"), { parent: async () => false })
     await expect(
       blocked["tool.execute.before"]?.(
         { sessionID: "s1", tool: "smartx_python", callID: "call-python-blocked" },
         { args: { description: "blocked", code: "print(1)" } },
       ),
-    ).rejects.toThrow("initial workspace")
+    ).resolves.toBeUndefined()
 
     const id = workspace()
     const memory = restored()
@@ -878,7 +922,7 @@ describe("smartx workspace analysis", () => {
     expect(memory.get(id)?.needsSave).toBe(true)
   })
 
-  test("refresh tool allows reads and blocks writes until refreshed baseline is rebuilt", async () => {
+  test("refresh prompts remain non-blocking while baseline is rebuilt", async () => {
     const rows: Row[] = []
     const id = key("f:/repo", "f:/repo")
     const workspaces = new Map<string, Analysis>([[id, doneAnalysis("f:/repo", "f:/repo", "", ["read market"])]])
@@ -923,12 +967,12 @@ describe("smartx workspace analysis", () => {
       ),
     ).resolves.toBeUndefined()
 
-    expect(
+    await expect(
       hooks["tool.execute.before"]?.(
         { sessionID: "s1", tool: "write", callID: "c2" },
         { args: { filePath: "f:/repo/a.ts", content: "next" } },
       ),
-    ).rejects.toThrow("refreshing the workspace baseline")
+    ).resolves.toBeUndefined()
   })
 
   test("refresh tool clears pending analysis and flowchart saves", async () => {
@@ -1976,7 +2020,7 @@ describe("smartx workspace analysis", () => {
     expect(workflowRuns.get(scope)?.id).toBe("workflow-1")
   })
 
-  test("requires project memory restore before sustained work", async () => {
+  test("prompts for project memory restore without hard blocking work", async () => {
     const hooks = build(ctx("f:/repo"), {
       workflow: async () => ({ ...disabled, baseline: true }),
       projects: projects(true),
@@ -1994,26 +2038,26 @@ describe("smartx workspace analysis", () => {
       ),
     ).resolves.toBeUndefined()
 
-    expect(
+    await expect(
       hooks["tool.execute.before"]?.(
         { sessionID: "s1", tool: "edit", callID: "c2" },
         { args: { filePath: "f:/repo/a.ts", oldString: "a", newString: "b" } },
       ),
-    ).rejects.toThrow("restoring project memory")
+    ).resolves.toBeUndefined()
 
-    expect(
+    await expect(
       hooks["tool.execute.before"]?.(
         { sessionID: "s1", tool: "skill", callID: "c3" },
         { args: { name: "smartx-develop" } },
       ),
-    ).rejects.toThrow("restoring project memory")
+    ).resolves.toBeUndefined()
 
     await expect(
       hooks["tool.execute.before"]?.(
         { sessionID: "s1", tool: "smartx_save_project_state", callID: "c4" },
         { args: { workspacePath: "f:/repo", worktreePath: "f:/repo", dirty: false } },
       ),
-    ).rejects.toThrow("restoring project memory")
+    ).resolves.toBeUndefined()
   })
 
   test("initializes missing project memory and then enters baseline flow", async () => {

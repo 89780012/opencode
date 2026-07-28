@@ -35,6 +35,10 @@
   color: #dc2626;
 }
 
+.trigger[data-state="paused"] {
+  color: #64748b;
+}
+
 .panel {
   width: calc(100vw - 2rem);
   max-width: 23rem;
@@ -89,6 +93,11 @@
 .title em[data-state="error"] {
   background: #fee2e2;
   color: #b91c1c;
+}
+
+.title em[data-state="paused"] {
+  background: #f1f5f9;
+  color: #475569;
 }
 
 .action {
@@ -158,6 +167,10 @@
 
 .step[data-state="error"] .icon {
   color: #dc2626;
+}
+
+.step[data-state="paused"] .icon {
+  color: #64748b;
 }
 
 .copy {

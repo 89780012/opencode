@@ -102,6 +102,7 @@ func migrate(ctx context.Context, db *sql.DB) error {
 		{table: "config", name: "workbench_intake", sql: "alter table config add column workbench_intake integer not null default 0"},
 		{table: "workflow_runs", name: "debug_cursor", sql: "alter table workflow_runs add column debug_cursor text not null default '{}'"},
 		{table: "workflow_runs", name: "debug_request_key", sql: "alter table workflow_runs add column debug_request_key text not null default ''"},
+		{table: "workflow_runs", name: "resume_state", sql: "alter table workflow_runs add column resume_state text not null default ''"},
 	} {
 		var exists int
 		if err := tx.QueryRowContext(ctx, `select count(*) from sqlite_master where type = 'table' and name = ?`, col.table).Scan(&exists); err != nil {
@@ -271,6 +272,7 @@ var schema = []string{
 	code_revision text not null,
 	stage text not null,
 	state text not null,
+	resume_state text not null default '',
 	review_round integer not null default 0,
 	debug_id text not null default '',
 	debug_cursor text not null default '{}',

@@ -99,6 +99,7 @@ export const Conversation = ({
         if (dist <= 4) {
           node.scrollTop = node.scrollHeight
           top.current = node.scrollTop
+          requestAnimationFrame(sync)
           return
         }
         const span = Math.min(320, Math.max(160, dist * 0.18))
@@ -122,6 +123,7 @@ export const Conversation = ({
       }
       node.scrollTop = node.scrollHeight
       top.current = node.scrollTop
+      requestAnimationFrame(sync)
     },
     [stop, sync],
   )
@@ -135,8 +137,8 @@ export const Conversation = ({
     if (root.current) {
       top.current = root.current.scrollTop
     }
-    sync()
-  }, [jump, sync])
+    requestAnimationFrame(sync)
+  }, [autoScroll, jump, sync])
 
   useEffect(() => {
     return () => {
@@ -205,7 +207,7 @@ export const Conversation = ({
               last.current = false
             }
             if (free.current) {
-              if (next && dir > 0) {
+              if (next && dir >= 0) {
                 free.current = false
                 last.current = true
                 setBot(true)

@@ -245,6 +245,97 @@ func TestRunReturnsPendingAndUsesSingleWorker(t *testing.T) {
 	}
 }
 
+func TestCancelAndResumeRestartOneLocalWorker(t *testing.T) {
+	_, store := memory(t)
+	sx := &client{start: smartx.BacktestResult{BtID: "remote"}}
+	svc := service(store, sx)
+	svc.poll = time.Millisecond
+	t.Cleanup(func() { shutdown(t, svc) })
+
+	row, err := svc.Run(context.Background(), request("pause"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wait := func(starts int, polls int) {
+		t.Helper()
+		end := time.Now().Add(time.Second)
+		for time.Now().Before(end) {
+			sx.mu.Lock()
+			start := sx.starts
+			poll := sx.polls
+			sx.mu.Unlock()
+			if start == starts && poll >= polls {
+				return
+			}
+			time.Sleep(time.Millisecond)
+		}
+		t.Fatalf("calls did not reach start:%d poll:%d", starts, polls)
+	}
+	wait(1, 1)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err := svc.Cancel(ctx, row.ID); err != nil {
+		t.Fatal(err)
+	}
+	stored, err := store.Get(context.Background(), row.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.Status != "running" || stored.BtID != "remote" || stored.FinishedAt != 0 {
+		t.Fatalf("paused run = %#v", stored)
+	}
+	if _, err := svc.Resume(context.Background(), row.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Resume(context.Background(), row.ID); err != nil {
+		t.Fatal(err)
+	}
+	wait(1, 2)
+	svc.mu.Lock()
+	jobs := len(svc.jobs)
+	svc.mu.Unlock()
+	if jobs != 1 {
+		t.Fatalf("jobs = %d, want 1", jobs)
+	}
+}
+
+func TestResumeDoesNotRepeatUncertainSubmission(t *testing.T) {
+	_, store := memory(t)
+	sx := &client{block: true}
+	svc := service(store, sx)
+	t.Cleanup(func() { shutdown(t, svc) })
+
+	row, err := svc.Run(context.Background(), request("uncertain-resume"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	end := time.Now().Add(time.Second)
+	for time.Now().Before(end) {
+		sx.mu.Lock()
+		starts := sx.starts
+		sx.mu.Unlock()
+		if starts == 1 {
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err := svc.Cancel(ctx, row.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Resume(context.Background(), row.ID); err == nil {
+		t.Fatal("uncertain backtest submission resumed")
+	}
+	time.Sleep(10 * time.Millisecond)
+	sx.mu.Lock()
+	starts := sx.starts
+	sx.mu.Unlock()
+	if starts != 1 {
+		t.Fatalf("starts = %d, want 1", starts)
+	}
+}
+
 func TestRunDoesNotRestartIdempotentPendingWithoutRemoteID(t *testing.T) {
 	_, store := memory(t)
 	sx := &client{block: true}
