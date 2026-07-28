@@ -438,3 +438,61 @@ broadcast(row)
 错误：reviewer 必须输出严格 JSON，workflow 解析并直接调用保存接口。
 
 正确：reviewer 返回普通中文报告；主 agent 生成 terminal MCP 参数，workflow 绑定可信身份并在 MCP 成功后更新状态机。
+
+## 场景：模型非标准终止原因回退
+
+### 1. 范围与触发条件
+
+- 修改 `strategy-service/internal/modelchain` 的 OpenCode 事件处理、模型切换或 prompt 跟踪时，必须遵守本契约。
+- OpenAI-compatible provider 返回 `finish: "other"` 表示当前模型没有以正常停止或工具调用结束；不能把它直接呈现为成功完成。
+
+### 2. 签名
+
+- 输入事件：`message.updated`，其中 `properties.info.role = "assistant"`、`sessionID` 为当前会话、`finish = "other"`。
+- 活跃状态：对应 prompt 已收到 `session.status(type = "busy")`。
+- 回退请求：`POST /session/:sessionId/prompt_async?directory=<workspacePath>`，使用模型链中的下一个未使用模型。
+
+### 3. 契约
+
+- 只有已跟踪且已进入 busy 的当前 prompt 才能因 `finish: "other"` 触发回退；prompt 启动前迟到的旧事件必须忽略。
+- 第一个异常事件必须在异步发送回退请求前原子设置 `swap` 并登记下一个模型；重复的 `message.updated` 不得重复发送。
+- 回退期间到达的旧 `session.status(type = "idle")` 不得清除 prompt 跟踪；替代模型进入 busy 后才能重新允许异常判断。
+- `finish: "stop"` 保持正常完成；`session.error`、retry 和用户主动 abort 继续使用既有分支。
+- 模型链耗尽时不得重用已失败模型形成无限循环；记录告警并允许后续 idle 清理状态。
+- project-memory 的失败日志只允许由实际 `init_project_state` / `resume_project_state` 调用产生，普通 `read`、`skill` 等工具不得产生误报。
+
+### 4. 校验与错误矩阵
+
+| 条件 | 结果 | 行为 |
+| --- | --- | --- |
+| 活跃 assistant 返回 `finish: other` 且存在备用模型 | 回退 | 发送一次 continuation prompt，切换到下一个未使用模型 |
+| 相同异常结束事件重复到达 | 忽略重复 | 不发送第二次回退请求 |
+| prompt 进入 busy 前收到 `finish: other` | 忽略 | 保留当前 prompt，不切模型 |
+| assistant 返回 `finish: stop` | 正常完成 | 不切模型，等待 idle 清理 |
+| 用户主动 abort | 正常中止 | 不把 aborted 错误转换成模型回退 |
+| 模型链已耗尽 | 保守结束 | 不循环重试，记录告警并等待清理 |
+
+### 5. Good / Base / Bad Cases
+
+- Good：首模型在声明将调用工具后返回 `other`；模型链只发送一次续接请求，并由第二模型继续任务。
+- Base：模型返回 `stop`，会话正常进入 idle，模型链没有额外请求。
+- Bad：把 `other` 当成功完成，或同一个 finish 事件触发多次回退；前者造成“自己断了”，后者造成重复执行和潜在写入冲突。
+
+### 6. 必需测试
+
+- `strategy-service/internal/modelchain`：覆盖 `other` 切换到第二模型、重复事件只切一次、busy 前迟到事件被忽略、正常 stop 不切换。
+- `smartx-workflow`：覆盖普通工具不记录 project-memory 失败，真实 init 失败仍记录错误。
+- 从包目录运行 `go test ./internal/modelchain`、`go build ./...`、`go vet ./...`、`bun test`、`bun typecheck` 和 `bun run build`。
+
+### 7. Wrong vs Correct
+
+错误：
+
+```go
+if event.Type == "session.status" {
+    handleStatus(event)
+}
+// message.updated(finish=other) 被当成正常 idle。
+```
+
+正确：先校验 assistant、`finish: other`、session 归属和 active 状态，再复用模型链的单次回退与去重状态；正常 stop 和用户 abort 不进入该分支。

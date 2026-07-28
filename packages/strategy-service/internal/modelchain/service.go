@@ -149,6 +149,21 @@ func (s *Service) handle(ctx context.Context, evt event) {
 		return
 	}
 	//slog.Info("event session", "event", evt)
+	if evt.Type == "message.updated" {
+		info, ok := evt.Properties["info"].(map[string]any)
+		if !ok || val(info["role"]) != "assistant" || strings.ToLower(val(info["finish"])) != "other" {
+			return
+		}
+		id := sid(info)
+		s.mu.Lock()
+		active := s.active[id]
+		s.mu.Unlock()
+		if !active {
+			return
+		}
+		s.fail(ctx, id, "model ended with finish reason other", false)
+		return
+	}
 
 	if evt.Type == "session.status" {
 		state, ok := evt.Properties["status"].(map[string]any)

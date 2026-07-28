@@ -1136,12 +1136,9 @@ export function createWorkspace(opt: Opt) {
         }),
         step("project_init", async () => {
           // 只有 init_project_state 成功返回，才说明记忆是“新建成功”。
-          if (
-            !mcp(input, "init_project_state") ||
-            !sameWorkspace(input.args, opt.workspace, opt.worktree, opt.write) ||
-            !ok(output)
-          ) {
-            opt.write("project memory initialization failed", {
+          if (!mcp(input, "init_project_state")) return false
+          if (!sameWorkspace(input.args, opt.workspace, opt.worktree, opt.write) || !ok(output)) {
+            await opt.write("project memory initialization failed", {
               sessionID: input.sessionID,
               workspace: opt.workspace,
               worktree: opt.worktree,
@@ -1167,12 +1164,9 @@ export function createWorkspace(opt: Opt) {
         }),
         step("project_resume", async () => {
           // resume_project_state 成功后，才算把历史记忆真正接回来了。
-          if (
-            !mcp(input, "resume_project_state") ||
-            !sameWorkspace(input.args, opt.workspace, opt.worktree, opt.write) ||
-            !ok(output)
-          ) {
-            opt.write("project memory resume failed", {
+          if (!mcp(input, "resume_project_state")) return false
+          if (!sameWorkspace(input.args, opt.workspace, opt.worktree, opt.write) || !ok(output)) {
+            await opt.write("project memory resume failed", {
               sessionID: input.sessionID,
               workspace: opt.workspace,
               worktree: opt.worktree,

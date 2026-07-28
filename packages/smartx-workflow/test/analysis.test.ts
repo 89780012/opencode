@@ -2091,6 +2091,37 @@ describe("smartx workspace analysis", () => {
     expect(workspaces.get(workspace())?.state).toBe("requested")
   })
 
+  test("does not report project memory failures for unrelated tools", async () => {
+    const rows: Row[] = []
+    const hooks = setup(ctx("f:/repo", rows))
+
+    await hooks["tool.execute.after"]?.(
+      { sessionID: "s1", tool: "read", callID: "c1", args: { filePath: "f:/repo/start.py" } },
+      { title: "", output: "content", metadata: {} },
+    )
+
+    expect(record(rows, "project memory initialization failed")).toBeUndefined()
+    expect(record(rows, "project memory resume failed")).toBeUndefined()
+  })
+
+  test("reports a failed project memory initialization", async () => {
+    const rows: Row[] = []
+    const hooks = setup(ctx("f:/repo", rows))
+
+    await hooks["tool.execute.after"]?.(
+      {
+        sessionID: "s1",
+        tool: "smartx_init_project_state",
+        callID: "c1",
+        args: { workspacePath: "f:/repo", worktreePath: "f:/repo" },
+      },
+      { title: "", output: "failed", metadata: {}, isError: true } as never,
+    )
+
+    expect(record(rows, "project memory initialization failed")).toBeDefined()
+    expect(record(rows, "project memory resume failed")).toBeUndefined()
+  })
+
   test("loads persisted baseline after project memory restore", async () => {
     const memory = new Map<string, Memory>()
     const workspaces = new Map<string, Analysis>([[workspace(), requestAnalysis("f:/repo", "f:/repo")]])
