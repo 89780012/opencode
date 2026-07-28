@@ -123,7 +123,7 @@ export function WorkflowFloat() {
               <em data-state={paused ? "paused" : failed ? "error" : done ? "done" : "running"}>{label}</em>
             </span>
             <button type="button" className={css.action} onClick={() => setOpen(false)} aria-label="收起自动工作流">
-              <X size={15} />
+              <X size={15} style={{ margin: "auto" }} />
             </button>
           </div>
           <div className={css.body}>
@@ -168,9 +168,9 @@ export function WorkflowFloat() {
           {active ? (
             <LoaderCircle size={17} className={common.spin} style={{ margin: "auto" }} />
           ) : paused ? (
-            <PauseCircle size={17} />
+            <PauseCircle size={17} style={{ margin: "auto" }} />
           ) : (
-            <PanelRightOpen size={17} />
+            <PanelRightOpen size={17} style={{ margin: "auto" }} />
           )}
           <span>流程</span>
         </button>
