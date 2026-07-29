@@ -1766,7 +1766,7 @@ describe("smartx workspace analysis", () => {
     expect(out.system.join("\n")).toContain("save_project_state")
   })
 
-  test("fixes saved review when any item is not passed", async () => {
+  test("fixes a saved review when any item fails", async () => {
     const pending = new Map()
     const fixes = new Map()
     const id = key("f:/repo", "f:/repo")
@@ -1814,7 +1814,7 @@ describe("smartx workspace analysis", () => {
       summary: "风险控制需要加强",
       items: [
         { name: "需求覆盖", status: "passed", detail: "需求已覆盖", suggestion: "" },
-        { name: "风险控制", status: "warning", detail: "风险控制需要加强", suggestion: "增加风险保护" },
+        { name: "风险控制", status: "failed", detail: "风险控制需要加强", suggestion: "增加风险保护" },
       ],
       suggestions: ["增加风险保护"],
     })

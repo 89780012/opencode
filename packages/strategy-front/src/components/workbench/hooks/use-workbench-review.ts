@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 import { socket, type SocketEvent } from "@/lib/socket-bus"
-import { useAppDispatch } from "@/store"
+import { useAppDispatch, useAppSelector } from "@/store"
 import {
   setReviewScope,
   setReviews,
@@ -44,9 +44,9 @@ function item(value: unknown): WorkbenchReviewItem | null {
 function aggregate(items: WorkbenchReviewItem[]): WorkbenchReview["state"] {
   if (!items.length) return "error"
   if (items.some((item) => item.status === "error")) return "error"
-  if (items.some((item) => item.status === "failed" || item.status === "warning")) return "failed"
+  if (items.some((item) => item.status === "failed")) return "failed"
   if (items.some((item) => item.status === "running")) return "running"
-  if (items.every((item) => item.status === "passed")) return "passed"
+  if (items.every((item) => item.status === "passed" || item.status === "warning")) return "passed"
   return "error"
 }
 
@@ -83,30 +83,42 @@ export function parse(value: unknown): WorkbenchReview | null {
   }
 }
 
+export function scoped(items: WorkbenchReview[], path: string, session: string) {
+  if (!path || !session) return []
+  return items.filter((item) => item.workspacePath === path && item.sessionId === session)
+}
+
 export function useWorkbenchReviewSync() {
   const dispatch = useAppDispatch()
   const [search] = useSearchParams()
   const path = search.get("path")?.trim() ?? ""
+  const active = useAppSelector((state) =>
+    state.workbench.sessionPath === path ? state.workbench.active : "",
+  )
   const request = useRef("")
   const [ready, setReady] = useState(socket.ready())
   const [loading, setLoading] = useState(false)
 
   const query = useCallback(() => {
-    if (!path || !socket.ready() || request.current) return false
+    if (!path || !active || !socket.ready() || request.current) return false
     const id = key()
     request.current = id
     setLoading(true)
-    if (socket.emit("review.get", { workspacePath: path, worktreePath: path }, id)) return true
+    if (socket.emit("review.get", { workspacePath: path, worktreePath: path, sessionId: active }, id)) return true
     request.current = ""
     setLoading(false)
     return false
-  }, [path])
+  }, [active, path])
 
   useEffect(() => {
     request.current = ""
     dispatch(setReviewScope({ workspacePath: path }))
     const open = () => {
       setReady(true)
+      if (!path || !active) {
+        setLoading(false)
+        return
+      }
       query()
     }
     const close = () => {
@@ -120,7 +132,7 @@ export function useWorkbenchReviewSync() {
       window.clearTimeout(timer)
       off.forEach((item) => item())
     }
-  }, [dispatch, path, query])
+  }, [active, dispatch, path, query])
 
   useEffect(() => {
     const got = (event: SocketEvent) => {
@@ -133,19 +145,28 @@ export function useWorkbenchReviewSync() {
       dispatch(
         setReviews({
           workspacePath: path,
-          reviews: list.filter((item) => item.workspacePath === path && item.worktreePath === path),
+          reviews: scoped(list, path, active),
         }),
       )
+    }
+    const failed = (event: SocketEvent) => {
+      if (!event.id || event.id !== request.current) return
+      request.current = ""
+      setLoading(false)
     }
     const updated = (event: SocketEvent) => {
       const data = parse(event.payload)
       if (!data) return
-      if (data.workspacePath !== path || data.worktreePath !== path) return
+      if (data.workspacePath !== path || data.sessionId !== active) return
       dispatch(upsertReview({ workspacePath: data.workspacePath, review: data }))
     }
-    const off = [socket.on("review.got", got), socket.on("review.updated", updated)]
+    const off = [
+      socket.on("review.got", got),
+      socket.on("review.get.error", failed),
+      socket.on("review.updated", updated),
+    ]
     return () => off.forEach((item) => item())
-  }, [dispatch, path])
+  }, [active, dispatch, path])
 
-  return { query, loading, ready: ready && !!path }
+  return { query, loading, ready: ready && !!path && !!active }
 }

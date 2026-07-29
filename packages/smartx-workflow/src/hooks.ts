@@ -303,6 +303,7 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
     loadRun: loadWorkflowRun,
     startRun: startWorkflowRun,
     updateRun: updateWorkflowRun,
+    resumeRun: resumeWorkflowRun,
     write,
   })
 

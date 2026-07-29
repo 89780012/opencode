@@ -142,7 +142,7 @@ const state = view({ ...input, baseline: cfg.workflow.baseline })
 - dirty 状态必须分别记录最近活动时间和源码 revision；revision 必须绑定产生写入的 owner session，另一个主会话的运行活动和 idle 事件不得接管。创建 run 以 codeRevision 是否变化判断，不得用 run.updatedAt 与本地活动时间比较。review/fixing 中的源码写入只设置当前修复上下文的 `changed=true`，必须保留当前触发 revision；只有终态后的新源码写入才能生成下一条 revision 和 workflow。三个自动开关全关时，idle 驱动不得创建 run 或调用 reviewer/debug/backtest。
 - system transform 创建或恢复自动 run 前必须查询 session parent；`session.created` 内存集合只做快速缓存，OpenCode/plugin 重启后的子会话仍不得触发流水线。
 - review 调度使用 `requested -> dispatching -> running`。`dispatching` 与进程内 single-flight 共同阻止重复 idle 启动多个 reviewer；超时的 `dispatching` 可恢复为 `requested` 后重试。
-- review 轮次以服务端同 workflow ID 的 `reviewRound` 为事实来源；保存结果时必须使用远端轮次与本地 fixing 缓存轮次的较大值并限制到 3。本地缓存落后不得把第 3 轮降回第 1/2 轮；同一非终态 run 的 `reviewRound >= 3` 时必须在执行前拒绝再次启动 reviewer。终态后的新手工审查链不受旧 run 限制，首次从第 1 轮开始，后续失败复审按本地 fixing 轮次递增到 2、3，第三轮失败后停止；终态后产生新源码 revision 时创建新 workflow，并从第 1 轮重新计数。
+- review 轮次以服务端同 workflow ID 的 `reviewRound` 为事实来源；保存结果时必须使用远端轮次与本地 fixing 缓存轮次的较大值并限制到 3。本地缓存落后不得把第 3 轮降回第 1/2 轮；同一非终态 run 的 `reviewRound >= 3` 时必须在执行前拒绝再次启动 reviewer。`paused/cancelled` 的手工阶段调用先恢复同一 run 并继承轮次；`failed/review_exhausted/done` 等终态后的新手工审查链从第 1 轮开始。
 - review 进入 `fixing` 后若插件重启，idle 驱动必须用 workspace/session 查询最近一次 `failed` 审查，重建中文修复上下文；不得因为进程内 `reviewFixes` 为空而终止仍可恢复的 run。
 - review 为 `running` 且 pending 丢失时，idle 驱动必须从 OpenCode 持久化会话消息恢复：父 synthetic metadata 必须命中当前 workflowId，选择时间最新的 `strategy-reviewer` task，且只有 completed output 才能用 tool part ID 和普通文本报告重建 pending。不得误用上一轮或其他 workflow 报告。
 - fixing 阶段只有明确源码写入才能设置 `changed` 并触发复审；运行测试、Python 调试或 Bash 执行不得伪装成代码修复，无源码进展时继续受有界恢复次数约束。
@@ -175,12 +175,14 @@ const state = view({ ...input, baseline: cfg.workflow.baseline })
 | 阶段倒退或 terminal 后继续推进 | 参数错误 | 保留原终态 |
 | 第三轮审查未通过 | `review_exhausted` | 停止，不调用 start/logs/backtest |
 | 远端为第 3 轮、本地 fixing 缓存仍为第 1/2 轮 | `review_exhausted` | 以远端轮次聚合；不得继续 fixing 或启动第 4 轮 reviewer |
-| 旧 run 已通过、失败、耗尽或取消后再次手工审查 | 新的手工审查链 | 允许启动 reviewer；按 1、2、3 递增，第三轮失败后停止，不继承旧 run 的轮次 |
+| 旧 run 已通过、失败或耗尽后再次手工审查 | 新的手工审查链 | 按 1、2、3 递增，第三轮失败后停止，不继承旧 run 的轮次 |
+| paused/cancelled run 再次调用人工阶段 | 恢复同一 run | 保留 workflow ID、阶段和 reviewRound，不重置三轮限制 |
 | fixing 阶段源码写入 | 当前 run 已修复 | 设置 `changed=true` 并复审同一 workflow；不得生成新 code revision |
 | reviewer 返回普通中文或 Markdown 报告 | review pending | 不直接保存 terminal；交给主 agent 转换并调用 `smartx_save_review` |
 | reviewer 返回空报告 | review pending | 注入“未返回审查报告”，由主 agent 保存 error；不得伪造 passed |
 | reviewer 完成后插件在 MCP 保存前重启 | 恢复 review pending | 从同 workflowId 的最新 completed task 消息恢复，不把 run 直接标记失败 |
-| 上下文压缩后延迟保存第 3 轮 warning/failed 审查 | `review_exhausted` | after hook 以远端第 3 轮快照推进，不得用本地第 2 轮写回 fixing 或收到 `400` |
+| 上下文压缩后延迟保存第 3 轮 failed 审查 | `review_exhausted` | after hook 以远端第 3 轮快照推进，不得用本地第 2 轮写回 fixing 或收到 `400` |
+| 第 3 轮仅含 passed/warning | 进入下一阶段或 done/passed | 保留建议，不进入 fixing/review_exhausted |
 | 仅启用自动调试或自动回测 | 右侧 workflow 面板 | 无 synthetic 消息时在悬浮面板渲染过程数据，主会话只在 done/error 后补终态结果 |
 | SSE 重连时服务端已 idle | 前端 idle | 重连后重新查询 session status，不保留旧 busy |
 | 用户打断活动流程且阶段同时推进 | abort 与原子 `paused` 并行 | abort 不等待 workflow HTTP；服务端保留真实阶段和恢复点；停止本地回测 worker，已提交的远端回测可能继续运行 |
@@ -209,10 +211,10 @@ const state = view({ ...input, baseline: cfg.workflow.baseline })
 - service：workflow 创建幂等、session 隔离、阶段单调、第三轮终态、快速 backtest 终态对账、running backtest 同 ID 重试、start 前 debug claim、requestKey/cursor 迁移与隐藏、日志游标和 fatal 分类。
 - workflow：dirty 才触发、事件已知和重启恢复的子会话都不触发、三个阶段顺序、审查后单 transform 续跑、关闭阶段跳过、baseline 关闭仍保存 review、第三轮停止且第 4 轮 reviewer 在执行前被拒绝、fixing 写入保留当前 code revision、自动 MCP 参数覆盖和手工 start/logs 透传。
 - idle：无既有 run 的 dirty stop 能创建并只调度一个 reviewer；其他 session 和三个开关全关均不创建；reviewer 普通中文报告进入 pending，主 agent 保存成功前 run 保持 running；fixing 重启从同 session 持久化审查恢复。
-- review 恢复：本地缓存为第 2 轮、服务端为第 3 轮时保存 warning/failed，断言只发出 `review/review_exhausted/reviewRound=3` 更新且不返回 `400`。
+- review 恢复：本地缓存为第 2 轮、服务端为第 3 轮时保存 failed，断言只发出 `review/review_exhausted/reviewRound=3`；另测 warning-only 保存为 passed 并继续下一阶段。
 - frontend：解析 fail-closed、scope 隔离、同 ID revision 单调、不同 ID updatedAt 单调、迟到 HTTP/空快照不覆盖 Socket、刷新恢复、done 中性分类，以及同 workflowId 多轮消息聚合和 synthetic 提示隐藏。
 - frontend：无 synthetic 消息的 debug/backtest workflow 仍渲染右侧悬浮面板；面板展示审查轮次/摘要、debug ID、backtest ID/进度，主会话不显示 requested/running 卡且只补 done/error 终态结果；SSE 重连后重新读取 session status。
-- pause/resume：活动 workflow 更新为 paused 后发送 session idle，断言不再 dispatch 或调用 MCP；精确“继续”恢复同一 Run，非精确继续文案不恢复；回测暂停不落 failed，恢复后保持 single-flight。
+- pause/resume：活动 workflow 更新为 paused 后发送 session idle，断言不再 dispatch 或调用 MCP；精确“继续”和暂停后重新调用当前人工阶段均恢复同一 Run，非精确继续文案不恢复；兼容 cancelled 恢复，回测暂停不落 failed，恢复后保持 single-flight。
 - 从三个包目录运行 Go test/build/vet、Bun tests/typecheck/build 和触及文件 ESLint；仓库既有失败必须单独列出。
 
 ### 7. Wrong vs Correct

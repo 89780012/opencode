@@ -149,6 +149,8 @@ type Opt = {
   // 持久化 workflow 的阶段和状态变化。
   // 例如 requested → running、running → fixing、review → debug。
   updateRun: (input: RunUpdate) => Promise<Run>
+  // 恢复当前 session 最近一次暂停或兼容旧版本的取消 Run。
+  resumeRun: (workspace: string, session: string) => Promise<Run | undefined>
   // 向 OpenCode 应用日志写入 smartx-workflow 诊断信息。
   // 这里只写日志，不修改工作区文件。
   write: Log
@@ -218,7 +220,7 @@ function aggregate(input: unknown) {
   })
   if (list.some((status) => !["passed", "warning", "failed", "error"].includes(status))) return "" as const
   if (list.includes("error")) return "error" as const
-  if (list.some((status) => status === "failed" || status === "warning")) return "failed" as const
+  if (list.includes("failed")) return "failed" as const
   return "passed" as const
 }
 
@@ -282,6 +284,14 @@ async function manual(opt: Opt, session: string, call: string, stage: "review" |
   const loaded = await opt.loadRun(opt.workspace, session).catch(() => undefined)
   const current = loaded ?? opt.workflowRuns.get(id)
   if (current && !stopped(current)) return current
+  if (current?.state === "paused" || current?.state === "cancelled") {
+    const run = await opt.resumeRun(opt.workspace, session)
+    if (run) {
+      opt.stageRequests.delete(id)
+      opt.workflowRuns.set(id, run)
+      return run
+    }
+  }
   const request = opt.stageRequests.get(id)
   const run = await opt.startRun({
     workspacePath: opt.workspace,

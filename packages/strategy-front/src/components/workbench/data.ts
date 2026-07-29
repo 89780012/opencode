@@ -6,7 +6,7 @@ export type SidebarTab = "requirements" | "sessions"
 export type ReviewStatus = "idle" | "running" | "passed" | "failed"
 export type FlowStatus = "idle" | "generating" | "done"
 export type BacktestStatus = "idle" | BacktestRun["status"]
-export type StepStatus = "pending" | "running" | "done" | "error"
+export type StepStatus = "pending" | "running" | "done" | "warning" | "error"
 export type EventType = "requirement" | "code" | "git" | "review" | "debug" | "flowchart" | "backtest" | "workflow"
 
 export interface Msg {

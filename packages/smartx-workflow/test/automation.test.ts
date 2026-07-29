@@ -66,7 +66,7 @@ function result(state: "passed" | "failed" = "passed") {
 }
 
 function warning() {
-  return "审查结论：未通过\n\n历史数据窗口存在边界风险，查询范围可能超过需求窗口。\n\n建议限制回看天数。"
+  return "审查结论：通过\n\n历史数据窗口存在改进建议，查询范围可以进一步收紧。\n\n建议限制回看天数。"
 }
 
 describe("automatic workflow idle driver", () => {
@@ -197,7 +197,7 @@ describe("automatic workflow idle driver", () => {
     expect(dispatches).toEqual([])
   })
 
-  test("uses the restored third review round when saving a delayed warning report", async () => {
+  test("passes a delayed third-round report containing only warnings", async () => {
     const scope = "f:/repo\x00f:/repo\x00s1"
     const pending = new Map<string, Pending>([
       [
@@ -212,7 +212,9 @@ describe("automatic workflow idle driver", () => {
         },
       ],
     ])
-    const workflowRuns = new Map([[scope, run({ state: "running", reviewRound: 2 })]])
+    const workflowRuns = new Map([
+      [scope, run({ state: "running", reviewRound: 2, debugEnabled: false, backtestEnabled: false })],
+    ])
     const fixes = new Map([
       [
         scope,
@@ -227,7 +229,7 @@ describe("automatic workflow idle driver", () => {
         },
       ],
     ])
-    let current = run({ state: "running", reviewRound: 3 })
+    let current = run({ state: "running", reviewRound: 3, debugEnabled: false, backtestEnabled: false })
     const updates: Partial<Run>[] = []
     const hooks = build(ctx(), {
       parent: async () => false,
@@ -248,8 +250,8 @@ describe("automatic workflow idle driver", () => {
         sessionId: "s1",
         workspacePath: "f:/repo",
         worktreePath: "f:/repo",
-        state: "failed",
-        summary: "第三轮仍存在边界风险",
+        state: "passed",
+        summary: "第三轮通过，但保留边界建议",
         items: [{ name: "历史窗口", status: "warning", detail: "范围超出需求", suggestion: "限制窗口" }],
         suggestions: ["限制窗口后重新审查"],
       },
@@ -262,8 +264,8 @@ describe("automatic workflow idle driver", () => {
     )
 
     expect(updates).toHaveLength(1)
-    expect(updates[0]).toMatchObject({ stage: "review", state: "review_exhausted", reviewRound: 3 })
-    expect(current).toMatchObject({ stage: "review", state: "review_exhausted", reviewRound: 3 })
+    expect(updates[0]).toMatchObject({ stage: "done", state: "passed", reviewRound: 3 })
+    expect(current).toMatchObject({ stage: "done", state: "passed", reviewRound: 3 })
     expect(fixes.has(scope)).toBe(false)
   })
 
@@ -362,8 +364,52 @@ describe("automatic workflow idle driver", () => {
     expect(current).toMatchObject({ state: "review_exhausted", reviewRound: 3 })
   })
 
-  test("waits for the main agent to save a failed reviewer report before fixing", async () => {
-    let current = run({ state: "dispatching" })
+  test("resumes paused and cancelled review runs without resetting their round", async () => {
+    for (const state of ["paused", "cancelled"] as const) {
+      const reviews: SaveReview[] = []
+      let starts = 0
+      let resumes = 0
+      let current = run({ state, reviewRound: 1 })
+      const hooks = build(ctx(), {
+        parent: async () => false,
+        workflow: async () => ({ baseline: false, review: true, debug: false, backtest: false }),
+        loadRun: async () => current,
+        startRun: async () => {
+          starts++
+          return current
+        },
+        resumeRun: async () => {
+          resumes++
+          current = { ...current, state: "requested", revision: current.revision + 1 }
+          return current
+        },
+        updateRun: async (input) => {
+          current = { ...current, ...input, revision: current.revision + 1, updatedAt: Date.now() }
+          return current
+        },
+        saveReview: async (input) => {
+          reviews.push(input)
+        },
+      })
+
+      await hooks["chat.message"]?.(
+        { sessionID: "s1", messageID: `request-${state}`, agent: "smartx-helper" },
+        { message: {} as never, parts: [{ type: "text", text: "请做代码审查" } as never] },
+      )
+      await hooks["tool.execute.before"]?.(
+        { sessionID: "s1", tool: "task", callID: `review-${state}` },
+        { args: { subagent_type: "strategy-reviewer" } },
+      )
+
+      expect(resumes).toBe(1)
+      expect(starts).toBe(0)
+      expect(reviews).toHaveLength(1)
+      expect(current).toMatchObject({ id: "workflow-1", state: "running", reviewRound: 2 })
+    }
+  })
+
+  test("passes a warning-only reviewer report after the main agent saves it", async () => {
+    let current = run({ state: "dispatching", debugEnabled: false, backtestEnabled: false })
     const calls: string[] = []
     const dispatches: string[] = []
     const pending = new Map<string, Pending>()
@@ -411,12 +457,12 @@ describe("automatic workflow idle driver", () => {
         sessionId: "s1",
         workspacePath: "f:/repo",
         worktreePath: "f:/repo",
-        state: "failed",
-        summary: "策略存在边界风险",
+        state: "passed",
+        summary: "策略通过，但存在边界建议",
         items: [
           { name: "历史数据窗口", status: "warning", detail: "查询范围可能超过需求窗口", suggestion: "限制回看天数" },
         ],
-        suggestions: ["修复后重新审查"],
+        suggestions: ["后续可限制回看天数"],
       },
     }
     await hooks["tool.execute.before"]?.({ sessionID: "s1", tool: "smartx_save_review", callID: "save-1" }, save)
@@ -425,14 +471,14 @@ describe("automatic workflow idle driver", () => {
       { title: "", output: "{}", metadata: {} },
     )
 
-    expect(current).toMatchObject({ stage: "review", state: "fixing", reviewRound: 1 })
+    expect(current).toMatchObject({ stage: "done", state: "passed", reviewRound: 1 })
     expect(pending.has("f:/repo\x00f:/repo\x00s1")).toBe(false)
 
     await hooks.event?.({
       event: { type: "session.status", properties: { sessionID: "s1", status: { type: "idle" } } },
     } as never)
 
-    expect(dispatches).toEqual(["fix"])
+    expect(dispatches).toEqual([])
   })
 
   test("dispatches one reviewer and lets the main agent save its plain text report", async () => {

@@ -333,14 +333,14 @@ row, err := service.Run(c.Request.Context(), req) // 请求 context 驱动完整
 ### 1. 范围与触发条件
 
 - 修改 `packages/strategy-front` 的审查入口、审查面板或 Redux 同步，修改 `packages/smartx-workflow` 的 reviewer 编排，或修改 `packages/strategy-service` 的审查持久化、MCP 与 WebSocket 时，必须遵守本契约。
-- 审查历史按 `workspacePath + worktreePath` 展示；每轮运行态、终态和进度必须额外绑定稳定 `reviewId` 与可信 `sessionId`，避免并发会话串轮次。
+- 当前审查和历史按 `workspacePath + sessionId` 展示；`worktreePath` 只用于无 session 的兼容查询和持久化唯一键，不得因为 workflow 写入 `/` 而丢弃同 workspace/session 的记录。
 
 ### 2. 签名
 
 - 提交意图：`POST /api/model-chain/session/:sessionId/prompt`
 - HTTP 保存：`POST /api/workbench/review`
 - MCP 保存：`save_review`
-- WebSocket 查询：`review.get -> review.got`
+- WebSocket 查询：`review.get -> review.got|review.get.error`，payload 为 `ReviewGet{workspacePath, worktreePath, sessionId}`。
 - WebSocket 增量：`review.updated`、`progress.updated`
 - 服务：`SaveReview(context.Context, ReviewReq) (ReviewRow, error)`
 - 存储：`workspace_reviews.review_id`、`workspace_reviews.session_id`；唯一索引作用域为 `(workspace_path, worktree_path, review_id)` 且忽略空 `review_id`。
@@ -372,17 +372,18 @@ running 与 terminal 保存使用同一结构：
 - workflow 使用 reviewer 的 tool call ID 生成 `reviewId`，使用 hook 上下文注入 `sessionId/workspacePath/worktreePath`；不得信任模型填写的身份字段。
 - reviewer 真正启动前先持久化 `running`；远程保存成功后才消费 review request。并发启动必须先占用 session 级运行锁，保存失败时释放锁并保留 request。
 - reviewer 只需返回普通中文审查报告；主 agent 负责转换为 terminal MCP 参数。workflow 不解析 reviewer JSON、不用关键词强制判定结论，也不得在 MCP 保存成功前推进 run。
-- terminal 状态严格按所有 items 聚合：`error > failed/warning > running > passed`。terminal 不允许 `running` item；只有全部 item 为 `passed` 才能保存 `passed`。
+- terminal 状态严格按所有 items 聚合：`error > failed > running > passed`。terminal 不允许 `running` item；其余 `passed + warning` 组合保存为 `passed`，但 warning 条目、detail、suggestion 和 suggestions 必须完整保留。
 - terminal MCP 参数中的 `summary`、`items`、`items[].name`、`items[].detail` 必须非空；未知 item status 和总体 state/items 不一致必须拒绝。reviewer 空输出或无明确结论时，主 agent 必须保存为 `error`，不得猜测为通过。
 - 同一稳定 `reviewId` 只允许 `running -> terminal`。完全相同的重复请求幂等返回原记录；terminal 不得被修改，也不得回退到 running。
 - review row 与对应 progress event 必须在同一 SQLite 事务提交；提交成功后才广播。`review.start/done/error` 只写入触发审查的 `sessionId`。
 - 前端提交后立即插入带 `sessionId` 的本地 pending。真实事件或快照只能清理同 session 的 pending；双方都有 `reviewId` 时还必须匹配 `reviewId`。
-- 前端只接收当前 `workspacePath + worktreePath` 的事件；同 ID 按 `updatedAt` 单调合并，同时间戳 terminal 优先于 running。当前状态按活动 session 选择，历史仍保留 worktree 全量记录。
+- Redux 可缓存同 workspace 的多 session 记录，但前端查询、增量接收、当前状态和历史列表必须按活动 `workspacePath + sessionId` 隔离；不得用 `worktreePath === workspacePath` 判断归属。同 ID 按 `updatedAt` 单调合并，同时间戳 terminal 优先于 running。
 - 自动流程内部的 reviewer、保存和修复续跑消息必须携带稳定 workflowId；会话区只隐藏 synthetic 用户提示，assistant、工具和 reviewer 输出仍然可见；Redux 在当前 scope 内按 workflow ID 保留已接收快照；未知旧 ID 显示中性历史状态，不得伪装成运行中。workflow 阶段与终态只读取 `workflow.updated` 并显示在右侧可展开收起悬浮面板；没有 workflow metadata 的手工 reviewer 继续显示“策略审查”。
-- `review.get` 必须携带请求关联 ID；工作区切换后到达的旧 `review.got` 不得覆盖当前数据。
+- `review.get` 必须携带请求关联 ID 和活动 `sessionId`；session/workspace 切换后到达的旧 `review.got` 不得覆盖当前数据。匹配关联 ID 的 `review.get.error` 必须清理 request/loading，允许立即重试。
 - 审查面板标题栏必须提供手动查询入口，复用同一套 `review.get -> review.got` 关联 ID 和单调合并；Socket 未连接或查询进行中时禁用，点击后切回当前审查视图，不得直接覆盖 Redux 快照。
 - WebSocket 未注册入站事件必须忽略，不能原样广播；断线后迟到 reply 必须观察 client done/cancel，不能向已关闭 channel 发送。
 - passed terminal 保存成功后 workflow 进入 final baseline；dirty 审查和失败修复后的复审必须先刷新 baseline。`refreshing/finalizing` 期间继续阻止写操作。
+- 人工阶段调用发现最新 Run 为 `paused` 或兼容旧版本的 `cancelled` 时，必须调用 workflow resume 并复用原 ID、reviewRound 和阶段；`failed`、`review_exhausted`、`done` 等终态才创建新的手工链并从第 1 轮计数。
 
 ### 4. 校验与错误矩阵
 
@@ -393,6 +394,10 @@ running 与 terminal 保存使用同一结构：
 | summary/items/name/detail 为空，status 非法，或总体 state 与 items 不一致 | HTTP/MCP 参数错误 | 不写 review，不写 progress |
 | reviewer 返回普通中文报告 | 等待主 agent 保存 | 报告进入 session 级 pending，不直接写 terminal |
 | reviewer 输出为空或无明确结论 | 主 agent 保存 `error` | 不得由 workflow 猜测 passed/failed |
+| `review.get` 携带 sessionId | workspace/session 列表 | 忽略 worktree 差异，只返回目标 session |
+| `review.get.error` 匹配当前关联 ID | 查询结束 | 清理 loading/request，允许重试 |
+| items 仅含 passed/warning | terminal `passed` | warning 与建议继续展示，不进入 fixing |
+| paused/cancelled Run 再次提交审查 | 恢复同一 Run | 保留 workflow ID 和 reviewRound，下一轮继续递增 |
 | 相同 reviewId 的完全相同 running/terminal 重试 | 成功 | 返回原记录，不新增 progress |
 | terminal 后再修改或回退 running | 参数错误 | 保留原 terminal |
 | progress 写入或事务提交失败 | 内部错误 | review 与 progress 一起回滚，不广播半成功事件 |
@@ -400,16 +405,16 @@ running 与 terminal 保存使用同一结构：
 
 ### 5. Good / Base / Bad Cases
 
-- Good：同一 `reviewId` 依次保存 running 和 passed；数据库只有一条 review、两条生命周期 progress，前端不会被迟到 running 回滚，随后触发 final baseline。
-- Base：两个 session 同时审查并乱序完成；各自 pending、progress 和 terminal 只更新自己的 session，worktree 历史可同时看到两轮。
-- Bad：workflow 强制 reviewer 输出 JSON并在解析失败时终止流水线，或客户端发送伪造 `review.updated`；前者应改为主 agent 转换后调用 MCP，后者不得被服务端转广播。
+- Good：同一 `reviewId` 依次保存 running 和含 warning 的 passed；数据库只有一条 review、两条生命周期 progress，前端保留建议且随后触发 final baseline。
+- Base：两个 session 同时审查并乱序完成；各自 pending、progress、当前记录和历史只更新自己的 session，即使某条记录的 worktree 为 `/` 仍可见。
+- Bad：前端要求 `worktreePath === workspacePath`、切换 session 后继续展示其他 session 历史，或暂停后创建新 Run；这些行为会分别造成空面板、串轮次和三轮限制重置。
 
 ### 6. 必需测试
 
-- workflow：覆盖 running 保存失败不消费 request、并发 reviewer 只启动一次、普通中文/Markdown/空报告进入 pending、跨 session pending 隔离、主 agent MCP 成功后才推进、failed 修复后先刷新、passed 后 final 可达，以及 refreshing/finalizing 写门禁。
-- 服务与存储：覆盖旧表增量迁移可重复执行、稳定 ID 幂等、terminal 不可变、双会话乱序、worktree 查询隔离、session 归属、review/progress 故障回滚和提交后广播。
+- workflow：覆盖 running 保存失败不消费 request、并发 reviewer 只启动一次、普通中文/Markdown/空报告进入 pending、跨 session pending 隔离、paused/cancelled 恢复同 Run 且轮次递增、warning-only 通过、failed 修复、第三轮限制和 passed 后 final 可达。
+- 服务与存储：覆盖旧表增量迁移可重复执行、稳定 ID 幂等、terminal 不可变、双会话乱序、session 优先查询、无 session 的 worktree 兼容查询、warning-only 聚合、session 归属、review/progress 故障回滚和提交后广播。
 - WebSocket/API/MCP：覆盖关联 ID、未知入站事件不广播、断线迟到 reply 不 panic、URL/body session 错配、workspace/session 错配和 `reviewId/sessionId` schema 映射。
-- 前端：覆盖 HTTP 返回后的防重、旧闭包与工作区切换、同 ID 乱序合并、双 session pending 配对、跨 worktree 拒绝、空/非法/聚合不一致数据 fail-closed。
+- 前端：覆盖 HTTP 返回后的防重、旧闭包与 workspace/session 切换、同 ID 乱序合并、双 session pending 配对、`worktreePath="/"` 接收、活动 session 历史隔离、查询错误收口、warning-only 通过和非法数据 fail-closed。
 - 自动流程展示：覆盖 workflow metadata 识别、synthetic 用户消息隐藏但 assistant/reviewer 输出保留、右侧悬浮面板展开收起、手工 reviewer 不被误聚合，以及终态错误文案来自 workflow 状态。
 - 变更后从各包目录运行 `bun test`、`bun typecheck`、相关文件 ESLint、`bun run build`、`go test ./...`、`go build ./...` 和 `go vet ./...`；race 测试受当前 Go/Windows 工具链能力约束。
 

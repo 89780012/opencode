@@ -177,7 +177,7 @@ function match(a: WorkbenchReview, b: WorkbenchReview) {
 }
 
 function scoped(item: WorkbenchReview, path: string) {
-  return item.workspacePath === path && item.worktreePath === path
+  return item.workspacePath === path
 }
 
 function rank(state: WorkbenchReview["state"]) {

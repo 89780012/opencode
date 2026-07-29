@@ -596,6 +596,31 @@ func TestSaveReviewScopesSessionAndWorktree(t *testing.T) {
 	}
 }
 
+func TestSaveReviewTreatsWarningsAsPassed(t *testing.T) {
+	svc := NewService(nil, nil, nil, "")
+	dir := t.TempDir()
+	ses := seed(t, dir)
+	row, err := svc.SaveReview(t.Context(), ReviewReq{
+		WorkspacePath: dir,
+		WorktreePath:  "/",
+		ReviewID:      "warning-review",
+		SessionID:     ses,
+		State:         "passed",
+		Summary:       "审查通过，但保留改进建议",
+		Items: []ReviewItem{
+			{Name: "语法", Status: "passed", Detail: "语法检查通过"},
+			{Name: "边界", Status: "warning", Detail: "可进一步收紧边界", Suggestion: "限制回看范围"},
+		},
+		Suggestions: []string{"限制回看范围"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if row.State != "passed" || row.Items[1].Status != "warning" || len(row.Suggestions) != 1 {
+		t.Fatalf("review = %#v", row)
+	}
+}
+
 func seed(t *testing.T, workspace string) string {
 	t.Helper()
 	doc, err := db.Open()

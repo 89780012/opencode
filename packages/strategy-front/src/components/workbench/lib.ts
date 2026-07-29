@@ -20,6 +20,7 @@ export function text(status: ReviewStatus) {
 export function stepText(status: StepStatus) {
   if (status === "running") return "进行中"
   if (status === "done") return "完成"
+  if (status === "warning") return "建议"
   if (status === "error") return "异常"
   return "等待中"
 }
@@ -27,6 +28,7 @@ export function stepText(status: StepStatus) {
 export function tone(status: StepStatus) {
   if (status === "running") return "run"
   if (status === "done") return "done"
+  if (status === "warning") return "warn"
   if (status === "error") return "warn"
   return "idle"
 }
@@ -46,7 +48,7 @@ export function status(status: ReviewStatus) {
 
 export function badge(status: StepStatus, props: LucideProps) {
   if (status === "done") return createElement(CircleCheck, props)
-  if (status === "error") return createElement(CircleAlert, props)
+  if (status === "warning" || status === "error") return createElement(CircleAlert, props)
   if (status === "running") return createElement(LoaderCircle, props)
   return createElement(CircleDot, props)
 }

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { parse } from "../src/components/workbench/hooks/use-workbench-review"
+import { parse, scoped } from "../src/components/workbench/hooks/use-workbench-review"
 import {
   rollbackReview,
   setReviewScope,
@@ -138,7 +138,7 @@ describe("workbench review", () => {
     expect(next.reviews.map((item) => item.id)).toEqual(["review-b", "pending_a"])
   })
 
-  test("rejects realtime reviews and snapshots from another worktree", () => {
+  test("accepts same-session reviews from another worktree", () => {
     const state = workbenchReducer(
       scope(),
       startReview({ workspacePath: "workspace-a", sessionId: "session-a", id: "pending_a", updatedAt: 100 }),
@@ -152,8 +152,21 @@ describe("workbench review", () => {
       }),
     )
 
-    expect(event).toBe(state)
-    expect(snapshot.reviews.map((item) => item.id)).toEqual(["pending_a"])
+    expect(event.reviews.map((item) => item.id)).toEqual(["review-1"])
+    expect(snapshot.reviews.map((item) => item.id)).toEqual(["review-1"])
+  })
+
+  test("selects current and historical reviews by session regardless of worktree", () => {
+    const rows = scoped(
+      [
+        review({ id: "review-a", worktreePath: "/", sessionId: "session-a" }),
+        review({ id: "review-b", worktreePath: "workspace-a", sessionId: "session-b" }),
+      ],
+      "workspace-a",
+      "session-a",
+    )
+
+    expect(rows.map((item) => item.id)).toEqual(["review-a"])
   })
 
   test("allows a new request when only an older historical review is running", () => {
@@ -212,8 +225,8 @@ describe("workbench review", () => {
       worktreePath: "workspace-a",
       reviewId: "review-a",
       sessionId: "session-a",
-      state: "failed",
-      summary: "needs changes",
+      state: "passed",
+      summary: "passed with suggestions",
       items: [{ name: "risk", status: "warning", detail: "risk found" }],
       suggestions: [],
       updatedAt: 100,
@@ -225,8 +238,8 @@ describe("workbench review", () => {
     })
     const mismatch = parse({
       workspacePath: "workspace-a",
-      state: "passed",
-      summary: "passed",
+      state: "failed",
+      summary: "mismatch",
       items: [{ name: "risk", status: "warning", detail: "risk found" }],
     })
     const blank = parse({
@@ -244,7 +257,7 @@ describe("workbench review", () => {
 
     expect(valid?.reviewId).toBe("review-a")
     expect(valid?.sessionId).toBe("session-a")
-    expect(valid?.state).toBe("failed")
+    expect(valid?.state).toBe("passed")
     expect(empty?.state).toBe("error")
     expect(mismatch?.state).toBe("error")
     expect(blank?.state).toBe("error")

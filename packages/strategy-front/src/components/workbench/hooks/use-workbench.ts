@@ -24,6 +24,7 @@ import {
 } from "@/store/workbench-slice"
 import { code, createTimeline, type FlowStatus, type ReviewStatus, type SessionItem, type StepStatus, type TimelineEvent } from "../data"
 import { useWorkbenchProgressSync } from "./use-workbench-progress"
+import { scoped } from "./use-workbench-review"
 import type { BacktestConfig } from "@/types/backtest"
 
 const locks = new Set<string>()
@@ -39,7 +40,8 @@ function status(state?: string): ReviewStatus {
 function step(state: string): StepStatus {
   if (state === "running") return "running"
   if (state === "passed") return "done"
-  if (state === "failed" || state === "warning" || state === "error") return "error"
+  if (state === "warning") return "warning"
+  if (state === "failed" || state === "error") return "error"
   return "pending"
 }
 
@@ -150,10 +152,17 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
   const gate = useRef(false)
   const flow = state.flowchart?.workspacePath === state.sessionPath ? state.flowchart : null
   const rows = useMemo(
-    () => (state.reviewPath === state.sessionPath ? state.reviews : []).slice().sort((a, b) => b.updatedAt - a.updatedAt),
-    [state.reviewPath, state.reviews, state.sessionPath],
+    () =>
+      scoped(
+        state.reviewPath === state.sessionPath ? state.reviews : [],
+        state.sessionPath,
+        state.active,
+      )
+        .slice()
+        .sort((a, b) => b.updatedAt - a.updatedAt),
+    [state.active, state.reviewPath, state.reviews, state.sessionPath],
   )
-  const row = rows.find((item) => item.sessionId === state.active) ?? rows.find((item) => !item.sessionId) ?? null
+  const row = rows[0] ?? null
   const reviewing = row?.state === "running"
   const cur = useMemo<SessionItem>(() => {
     const session = state.sessions.find((item) => item.id === state.active) ?? state.sessions[0]
