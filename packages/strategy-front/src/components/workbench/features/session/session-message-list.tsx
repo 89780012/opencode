@@ -15,6 +15,7 @@ import { Conversation, ConversationContent, ConversationScrollButton } from "@/c
 import { Response } from "@/components/ai-elements/response"
 import { backtestTool, partition } from "@/lib/backtest-tool"
 import { hidden, task } from "@/lib/session-review"
+import { retry } from "@/lib/session-status"
 import { bind } from "@/lib/session-workflow"
 import { ext, output, payload } from "@/lib/session-tool"
 import { fallback, terminal, view } from "@/lib/workflow-view"
@@ -27,7 +28,6 @@ import { SessionBacktestTool } from "./session-backtest-tool"
 
 const empty: ChatPart[] = []
 const ansi = new RegExp(String.fromCharCode(27) + "(?:[@-Z\\\\-_]|\\[[0-?]*[ -/]*[@-~])", "g")
-type Retry = Extract<ChatStatus, { type: "retry" }>
 type Entry =
   | {
       type: "item"
@@ -685,25 +685,9 @@ export function SessionMessageList(props: {
   status: ChatStatus
   onOpenDiff?: (file: string) => void
 }) {
-  const [retry, setRetry] = useState<Retry | null>(null)
   const parts = useAppSelector((state) => state.chatSession.parts)
   const workflows = useAppSelector((state) => state.workbench.workflows)
-
-  useEffect(() => {
-    setRetry(null)
-  }, [props.messages[0]?.sessionID])
-
-  useEffect(() => {
-    if (props.status.type === "retry") {
-      setRetry(props.status)
-      return
-    }
-    if (props.status.type === "idle") {
-      setRetry(null)
-    }
-  }, [props.status])
-
-  const note = props.status.type === "retry" ? props.status : retry
+  const note = retry(props.status)
   const ids = useMemo(
     () =>
       Object.values(workflows)

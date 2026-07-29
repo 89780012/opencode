@@ -439,7 +439,7 @@ broadcast(row)
 
 正确：reviewer 返回普通中文报告；主 agent 生成 terminal MCP 参数，workflow 绑定可信身份并在 MCP 成功后更新状态机。
 
-## 场景：模型非标准终止原因回退
+## 场景：模型非标准终止原因恢复
 
 ### 1. 范围与触发条件
 
@@ -450,37 +450,42 @@ broadcast(row)
 
 - 输入事件：`message.updated`，其中 `properties.info.role = "assistant"`、`sessionID` 为当前会话、`finish = "other"`。
 - 活跃状态：对应 prompt 已收到 `session.status(type = "busy")`。
-- 回退请求：`POST /session/:sessionId/prompt_async?directory=<workspacePath>`，使用模型链中的下一个未使用模型。
+- 恢复请求：`POST /session/:sessionId/prompt_async?directory=<workspacePath>`；第一次使用当前模型，连续第二次异常才使用模型链中的下一个未使用模型。
 
 ### 3. 契约
 
-- 只有已跟踪且已进入 busy 的当前 prompt 才能因 `finish: "other"` 触发回退；prompt 启动前迟到的旧事件必须忽略。
-- 第一个异常事件必须在异步发送回退请求前原子设置 `swap` 并登记下一个模型；重复的 `message.updated` 不得重复发送。
-- 回退期间到达的旧 `session.status(type = "idle")` 不得清除 prompt 跟踪；替代模型进入 busy 后才能重新允许异常判断。
-- `finish: "stop"` 保持正常完成；`session.error`、retry 和用户主动 abort 继续使用既有分支。
-- 模型链耗尽时不得重用已失败模型形成无限循环；记录告警并允许后续 idle 清理状态。
+- 只有已跟踪、模型身份匹配且已进入 busy 的当前 prompt 才能因 `finish: "other"` 触发恢复；prompt 启动前和旧模型迟到的事件必须忽略。
+- 当前模型第一次返回 `other` 时发送一次同模型 continuation，不得重放原始用户请求，也不得消耗下一个模型。
+- 同一 assistant `messageID` 必须原子去重；多个 SSE 连接重复转发同一事件时不得重复发送 continuation。
+- 同一模型 continuation 后再次由不同 assistant message 返回 `other` 时，才切换到下一个未使用模型。
+- 恢复期间到达的旧 `session.status(type = "idle")` 不得清除 prompt 跟踪；恢复模型进入 busy 后才能重新允许异常判断。
+- 当前模型返回 `finish: "stop"` 时重置其异常恢复计数；旧模型迟到的 stop 不得影响当前模型。
+- provider retry 从第 3 次起允许触发模型 fallback，`swap` 保证同一轮至多发送一次；模型链耗尽时中止当前 retry，不能继续无限退避。
+- `session.error` 和用户主动 abort 继续使用既有分支；aborted 错误不得触发恢复。
 - project-memory 的失败日志只允许由实际 `init_project_state` / `resume_project_state` 调用产生，普通 `read`、`skill` 等工具不得产生误报。
 
 ### 4. 校验与错误矩阵
 
 | 条件 | 结果 | 行为 |
 | --- | --- | --- |
-| 活跃 assistant 返回 `finish: other` 且存在备用模型 | 回退 | 发送一次 continuation prompt，切换到下一个未使用模型 |
-| 相同异常结束事件重复到达 | 忽略重复 | 不发送第二次回退请求 |
+| 当前模型第一次返回 `finish: other` | 同模型恢复 | 发送一次 continuation prompt，模型保持不变 |
+| 同模型恢复后再次返回 `finish: other` | 模型回退 | 切换到下一个未使用模型 |
+| 相同 messageID 的异常事件重复到达 | 忽略重复 | 不发送第二次恢复请求 |
 | prompt 进入 busy 前收到 `finish: other` | 忽略 | 保留当前 prompt，不切模型 |
-| assistant 返回 `finish: stop` | 正常完成 | 不切模型，等待 idle 清理 |
+| 当前 assistant 返回 `finish: stop` | 正常完成 | 重置恢复计数，等待 idle 清理 |
+| provider retry attempt >= 3 | 模型回退 | 至多切换一次；链耗尽则 abort 当前 retry |
 | 用户主动 abort | 正常中止 | 不把 aborted 错误转换成模型回退 |
-| 模型链已耗尽 | 保守结束 | 不循环重试，记录告警并等待清理 |
+| 模型链已耗尽 | 保守结束 | abort 当前会话，不循环重试，记录告警并清理跟踪状态 |
 
 ### 5. Good / Base / Bad Cases
 
-- Good：首模型在声明将调用工具后返回 `other`；模型链只发送一次续接请求，并由第二模型继续任务。
+- Good：首模型在声明将调用工具后返回 `other`；系统只发送一次同模型续接，若该模型再次异常才由第二模型继续任务。
 - Base：模型返回 `stop`，会话正常进入 idle，模型链没有额外请求。
 - Bad：把 `other` 当成功完成，或同一个 finish 事件触发多次回退；前者造成“自己断了”，后者造成重复执行和潜在写入冲突。
 
 ### 6. 必需测试
 
-- `strategy-service/internal/modelchain`：覆盖 `other` 切换到第二模型、重复事件只切一次、busy 前迟到事件被忽略、正常 stop 不切换。
+- `strategy-service/internal/modelchain`：覆盖第一次 `other` 同模型续接、第二次切换、重复 messageID 去重、busy 前和旧模型迟到事件忽略、正常 stop 重置，以及 retry 阈值幂等。
 - `smartx-workflow`：覆盖普通工具不记录 project-memory 失败，真实 init 失败仍记录错误。
 - 从包目录运行 `go test ./internal/modelchain`、`go build ./...`、`go vet ./...`、`bun test`、`bun typecheck` 和 `bun run build`。
 
@@ -495,4 +500,4 @@ if event.Type == "session.status" {
 // message.updated(finish=other) 被当成正常 idle。
 ```
 
-正确：先校验 assistant、`finish: other`、session 归属和 active 状态，再复用模型链的单次回退与去重状态；正常 stop 和用户 abort 不进入该分支。
+正确：先校验 assistant、模型身份、`finish: other`、session 归属和 active 状态；第一次同模型续接，第二次才回退，并按 messageID 去重；正常 stop 只重置当前模型的恢复状态。

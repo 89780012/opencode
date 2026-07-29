@@ -7,8 +7,6 @@ import { log } from "@/lib/error"
 import { capture, settle, type Intake } from "@/lib/intake"
 import { load, save } from "@/lib/store"
 import {
-  selectPermissionLoaded,
-  selectQuestionLoaded,
   selectSessionPermissionRequest,
   selectSessionQuestionRequest,
   selectSessionTodoData,
@@ -271,44 +269,31 @@ function useDraft(workspacePath?: string | null, sessionId?: string | null) {
 function usePermission(workspacePath?: string | null, sessionId?: string | null) {
   const dispatch = useAppDispatch()
   const [sending, setSending] = useState(false)
-  const loaded = useAppSelector(selectPermissionLoaded)
   const req = useAppSelector((state) => selectSessionPermissionRequest(state, workspacePath, sessionId))
 
   const refresh = useCallback(async () => {
     if (!workspacePath) return
-    const items = await permissionApi.list().catch(() => [] as PermissionRequest[])
+    const items = await permissionApi.list(workspacePath)
     dispatch(setPendingPermissions({ items }))
   }, [dispatch, workspacePath])
 
   useEffect(() => {
-    if (!workspacePath || loaded) return
-    void refresh()
-  }, [loaded, refresh, workspacePath])
+    if (!workspacePath) return
+    void refresh().catch(() => undefined)
+  }, [refresh, workspacePath])
 
   const reply = useCallback(
     async (item: PermissionRequest, value: "once" | "always" | "reject") => {
       if (!workspacePath || sending) return
       setSending(true)
       try {
-        await permissionApi.respond(item.id, { reply: value })
-        dispatch(
-          applyWorkspaceEvent({
-            workspace: workspacePath,
-            event: {
-              type: "permission.replied",
-              properties: {
-                sessionID: item.sessionID,
-                requestID: item.id,
-                reply: value,
-              },
-            },
-          }),
-        )
+        await permissionApi.respond(workspacePath, item.id, { reply: value })
+        await refresh()
       } finally {
         setSending(false)
       }
     },
-    [dispatch, sending, workspacePath],
+    [refresh, sending, workspacePath],
   )
 
   const allow = useCallback(
@@ -333,26 +318,25 @@ function usePermission(workspacePath?: string | null, sessionId?: string | null)
 function useQuestion(workspacePath?: string | null, sessionId?: string | null) {
   const dispatch = useAppDispatch()
   const [sending, setSending] = useState(false)
-  const loaded = useAppSelector(selectQuestionLoaded)
   const req = useAppSelector((state) => selectSessionQuestionRequest(state, workspacePath, sessionId))
 
   const refresh = useCallback(async () => {
     if (!workspacePath) return
-    const items = await questionApi.list().catch(() => [])
+    const items = await questionApi.list(workspacePath)
     dispatch(setPendingQuestions({ items }))
   }, [dispatch, workspacePath])
 
   useEffect(() => {
-    if (!workspacePath || loaded) return
-    void refresh()
-  }, [loaded, refresh, workspacePath])
+    if (!workspacePath) return
+    void refresh().catch(() => undefined)
+  }, [refresh, workspacePath])
 
   const reply = useCallback(
     async (answers: ChatQuestionAnswer[]) => {
       if (!req || !workspacePath || sending) return
       setSending(true)
       try {
-        await questionApi.reply(req.id, answers)
+        await questionApi.reply(workspacePath, req.id, answers)
         await refresh()
       } finally {
         setSending(false)
@@ -365,7 +349,7 @@ function useQuestion(workspacePath?: string | null, sessionId?: string | null) {
     if (!req || !workspacePath || sending) return
     setSending(true)
     try {
-      await questionApi.reject(req.id)
+      await questionApi.reject(workspacePath, req.id)
       await refresh()
     } finally {
       setSending(false)

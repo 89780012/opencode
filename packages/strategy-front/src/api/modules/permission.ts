@@ -2,14 +2,17 @@ import { opencode } from "@/api/opencode";
 import type { PermissionRequest } from "@/types/chat";
 
 export const permissionApi = {
-  list() {
-    return opencode.get<PermissionRequest[]>("/permission");
+  list(workspacePath: string) {
+    return opencode.get<PermissionRequest[]>("/permission", {
+      params: { directory: workspacePath },
+    });
   },
 
-  respond(requestID: string, body: { reply: "once" | "always" | "reject" }) {
+  respond(workspacePath: string, requestID: string, body: { reply: "once" | "always" | "reject" }) {
     return opencode.post<boolean, { reply: "once" | "always" | "reject" }>(
       `/permission/${encodeURIComponent(requestID)}/reply`,
       body,
+      { params: { directory: workspacePath } },
     );
   },
 };

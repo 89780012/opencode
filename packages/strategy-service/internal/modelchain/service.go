@@ -23,6 +23,8 @@ type Service struct {
 	mu      sync.Mutex
 	prompts map[string]Prompt
 	used    map[string]map[string]bool
+	seen    map[string]map[string]bool
+	resume  map[string]string
 	swap    map[string]bool
 	active  map[string]bool
 	gen     map[string]uint64
@@ -47,6 +49,8 @@ func NewService(op target) *Service {
 		store:   &store{},
 		prompts: map[string]Prompt{},
 		used:    map[string]map[string]bool{},
+		seen:    map[string]map[string]bool{},
+		resume:  map[string]string{},
 		swap:    map[string]bool{},
 		active:  map[string]bool{},
 		gen:     map[string]uint64{},
@@ -127,6 +131,8 @@ func (s *Service) track(req Prompt) uint64 {
 	s.seq++
 	s.prompts[req.SessionID] = req
 	s.used[req.SessionID] = map[string]bool{ref(req.Model): true}
+	s.seen[req.SessionID] = map[string]bool{}
+	delete(s.resume, req.SessionID)
 	s.swap[req.SessionID] = false
 	s.active[req.SessionID] = false
 	s.gen[req.SessionID] = s.seq
@@ -151,17 +157,17 @@ func (s *Service) handle(ctx context.Context, evt event) {
 	//slog.Info("event session", "event", evt)
 	if evt.Type == "message.updated" {
 		info, ok := evt.Properties["info"].(map[string]any)
-		if !ok || val(info["role"]) != "assistant" || strings.ToLower(val(info["finish"])) != "other" {
+		if !ok || val(info["role"]) != "assistant" {
 			return
 		}
-		id := sid(info)
-		s.mu.Lock()
-		active := s.active[id]
-		s.mu.Unlock()
-		if !active {
+		finish := strings.ToLower(val(info["finish"]))
+		if finish == "stop" {
+			s.reset(info)
 			return
 		}
-		s.fail(ctx, id, "model ended with finish reason other", false)
+		if finish == "other" {
+			s.again(ctx, info)
+		}
 		return
 	}
 
@@ -215,6 +221,7 @@ func (s *Service) fail(ctx context.Context, sessionID string, msg string, cut bo
 
 	cfg, err := s.Get()
 	if err != nil {
+		slog.Warn("model chain config read failed", "session", sessionID, "error", err)
 		return
 	}
 
@@ -232,21 +239,18 @@ func (s *Service) fail(ctx context.Context, sessionID string, msg string, cut bo
 	}
 	model, ok := next(cfg.Chain, used)
 	if !ok {
+		s.swap[sessionID] = true
 		s.mu.Unlock()
 		slog.Warn("model chain fallback exhausted", "session", sessionID, "error", msg)
+		go func() {
+			if err := s.abort(ctx, req); err != nil {
+				slog.Warn("model chain abort failed", "session", sessionID, "error", err)
+			}
+			s.drop(sessionID, gen)
+		}()
 		return
 	}
-	out := Prompt{
-		WorkspacePath: req.WorkspacePath,
-		SessionID:     req.SessionID,
-		Agent:         req.Agent,
-		Model:         model,
-		Variant:       req.Variant,
-		Parts: []map[string]any{{
-			"type": "text",
-			"text": "继续【模型异常, 切换新模型继续, 当前模型是 " + ref(model) + "】",
-		}},
-	}
+	out := follow(req, model)
 	s.swap[sessionID] = true
 	s.used[sessionID][ref(model)] = true
 	s.prompts[sessionID] = out
@@ -267,6 +271,65 @@ func (s *Service) fail(ctx context.Context, sessionID string, msg string, cut bo
 			slog.Warn("model chain fallback continue failed", "session", sessionID, "model", ref(model), "error", err)
 		}
 	}()
+}
+
+func (s *Service) again(ctx context.Context, info map[string]any) {
+	id := sid(info)
+	mid := val(info["id"])
+	if id == "" || mid == "" {
+		return
+	}
+
+	s.mu.Lock()
+	req, ok := s.prompts[id]
+	if !ok || !s.active[id] || s.swap[id] || !same(info, req.Model) {
+		s.mu.Unlock()
+		return
+	}
+	seen := s.seen[id]
+	if seen == nil {
+		seen = map[string]bool{}
+		s.seen[id] = seen
+	}
+	if seen[mid] {
+		s.mu.Unlock()
+		return
+	}
+	seen[mid] = true
+	model := ref(req.Model)
+	if s.resume[id] == model {
+		s.mu.Unlock()
+		s.fail(ctx, id, "model ended with finish reason other after recovery", false)
+		return
+	}
+	out := follow(req, req.Model)
+	gen := s.gen[id]
+	s.resume[id] = model
+	s.swap[id] = true
+	s.prompts[id] = out
+	s.mu.Unlock()
+
+	go func() {
+		slog.Info("model chain retry current", "session", id, "model", model, "prompt", out)
+		if err := s.post(ctx, out, req.Model); err != nil {
+			s.drop(id, gen)
+			slog.Warn("model chain recovery failed", "session", id, "model", model, "error", err)
+		}
+	}()
+}
+
+func (s *Service) reset(info map[string]any) {
+	id := sid(info)
+	if s == nil || id == "" {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	req, ok := s.prompts[id]
+	if !ok || !same(info, req.Model) {
+		return
+	}
+	delete(s.resume, id)
 }
 
 func (s *Service) ready(id string) {
@@ -296,6 +359,8 @@ func (s *Service) idle(id string) {
 	}
 	delete(s.prompts, id)
 	delete(s.used, id)
+	delete(s.seen, id)
+	delete(s.resume, id)
 	delete(s.swap, id)
 	delete(s.active, id)
 	delete(s.gen, id)
@@ -312,6 +377,8 @@ func (s *Service) drop(id string, gen uint64) {
 	}
 	delete(s.prompts, id)
 	delete(s.used, id)
+	delete(s.seen, id)
+	delete(s.resume, id)
 	delete(s.swap, id)
 	delete(s.active, id)
 	delete(s.gen, id)
@@ -414,6 +481,29 @@ func pick(chain []Model, model Model) Model {
 	return chain[0]
 }
 
+func follow(req Prompt, model Model) Prompt {
+	return Prompt{
+		WorkspacePath: req.WorkspacePath,
+		SessionID:     req.SessionID,
+		Agent:         req.Agent,
+		Model:         model,
+		Variant:       req.Variant,
+		Parts: []map[string]any{{
+			"type": "text",
+			"text": "继续【模型异常中断, 请基于现有会话继续, 当前模型是 " + ref(model) + "】",
+		}},
+	}
+}
+
+func same(info map[string]any, model Model) bool {
+	provider := val(info["providerID"])
+	id := val(info["modelID"])
+	if provider == "" && id == "" {
+		return true
+	}
+	return provider == model.ProviderID && id == model.ModelID
+}
+
 func next(chain []Model, used map[string]bool) (Model, bool) {
 	for _, model := range chain {
 		if used[ref(model)] {
@@ -479,7 +569,7 @@ func retry(state map[string]any) bool {
 	if val(state["type"]) != "retry" {
 		return false
 	}
-	return attempt(state["attempt"]) == 3
+	return attempt(state["attempt"]) >= 3
 }
 
 func attempt(v any) int {
