@@ -71,3 +71,36 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 3: 修复审查状态与面板一致性
+
+**Date**: 2026-07-29
+**Task**: 修复审查状态与面板一致性
+**Branch**: `2026070703`
+
+### Summary
+
+按 workspace/session 查询并展示审查记录，恢复 paused/cancelled 工作流轮次，统一 warning-only 为通过并完成三包测试、类型检查与构建。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e78f44fda` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
