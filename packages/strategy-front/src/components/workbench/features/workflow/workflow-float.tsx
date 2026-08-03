@@ -1,12 +1,28 @@
 import { Activity, CheckCircle2, Circle, CircleAlert, LoaderCircle, PanelRightOpen, PauseCircle, X } from "lucide-react"
 import { useMemo, useState } from "react"
 import { bind } from "@/lib/session-workflow"
+import { truncateString } from "@/lib/utils"
 import { view } from "@/lib/workflow-view"
 import { useAppSelector } from "@/store"
+import type { WorkbenchReview } from "@/store/workbench-slice"
 import common from "../../styles/session/session-common.module.css"
 import css from "../../styles/workflow/workflow-float.module.css"
 
 type State = "pending" | "running" | "paused" | "done" | "error"
+
+function short(value: string, size = 110) {
+  return truncateString(value.replace(/\s+/g, " ").trim(), size)
+}
+
+function reviewSummary(review?: WorkbenchReview) {
+  if (!review) return "正在核对需求、策略实现和风险控制。"
+  const total = review.items.length
+  const bad = review.items.filter((item) => item.status !== "passed").length
+  if (review.state === "passed") return `审查通过，${total} 项检查全部通过。`
+  if (review.state === "failed") return `发现 ${bad} 项待处理检查，需修复后重审。`
+  if (review.state === "error") return "审查结果异常，请重新发起审查。"
+  return "审查正在进行中。"
+}
 
 function Icon(props: { state: State }) {
   if (props.state === "running") return <LoaderCircle size={15} className={common.spin} />
@@ -56,22 +72,25 @@ export function WorkflowFloat() {
           : "正在回测"
   const detail = paused
     ? "当前阶段已保留，等待继续。"
-    : row.error || row.summary || (active ? "策略工作流正在按顺序执行。" : "策略工作流已经结束。")
+    : review
+      ? reviewSummary(review)
+      : short(row.error || row.summary || (active ? "策略工作流正在按顺序执行。" : "策略工作流已经结束。"))
   const steps = [
     row.reviewEnabled
       ? {
           key: "review",
           title: `策略审查${row.reviewRound ? ` · 第 ${row.reviewRound} 轮` : ""}`,
           detail:
-            review?.summary ||
-            (flow.review === "done"
+            review
+              ? reviewSummary(review)
+              : flow.review === "done"
               ? "审查已通过。"
               : flow.review === "paused"
                 ? "审查已暂停，等待继续。"
               : flow.review === "pending"
                 ? "等待自动审查启动。"
-                : row.summary || row.error || "正在核对需求、策略实现和风险控制。"),
-          meta: review?.reviewId || "",
+                : short(row.summary || row.error || "正在核对需求、策略实现和风险控制。"),
+          meta: "",
           state: flow.review,
         }
       : null,
@@ -86,7 +105,7 @@ export function WorkflowFloat() {
                 ? "调试已暂停，等待继续。"
               : flow.debug === "done"
                 ? "启动、存活状态和增量日志检查已通过。"
-                : row.summary || row.error || "正在启动策略并检查新增运行日志。",
+                : short(row.summary || row.error || "正在启动策略并检查新增运行日志。"),
           meta: row.debugId,
           state: flow.debug,
         }
@@ -105,7 +124,7 @@ export function WorkflowFloat() {
               ? "等待前序阶段通过后启动。"
               : flow.backtest === "paused"
                 ? "回测已暂停，等待继续。"
-              : row.summary || row.error || "正在创建回测任务。",
+              : short(row.summary || row.error || "正在创建回测任务。"),
           meta: backtest?.btId || row.backtestId,
           state: flow.backtest,
         }
@@ -148,7 +167,7 @@ export function WorkflowFloat() {
                 {progress.map((event) => (
                   <div key={event.id} className={css.event}>
                     <span>{event.title || event.kind}</span>
-                    <p>{event.detail || "已完成"}</p>
+                    <p title={event.detail || undefined}>{short(event.detail || "已完成", 90)}</p>
                   </div>
                 ))}
               </div>

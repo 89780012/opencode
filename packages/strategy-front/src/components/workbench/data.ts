@@ -26,6 +26,7 @@ export interface ReviewRecord {
   round: number
   status: ReviewStatus
   time: string
+  summary?: string
   steps: Step[]
   suggestions: string[]
 }

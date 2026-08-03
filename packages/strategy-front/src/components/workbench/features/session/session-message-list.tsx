@@ -18,6 +18,7 @@ import { hidden, task } from "@/lib/session-review"
 import { retry } from "@/lib/session-status"
 import { bind } from "@/lib/session-workflow"
 import { ext, output, payload } from "@/lib/session-tool"
+import { truncateString } from "@/lib/utils"
 import { fallback, terminal, view } from "@/lib/workflow-view"
 import { selectSessionParts, useAppSelector } from "@/store"
 import type { ChatAssistantMessage, ChatMessageInfo, ChatPart, ChatStatus, ChatToolPart } from "@/types/chat"
@@ -96,7 +97,7 @@ function shown(part: ChatPart) {
   return part.type !== "step-start" && part.type !== "step-finish" && !(part.type === "text" && part.ignored)
 }
 
-export function entries(messages: ChatMessageInfo[], parts: Record<string, ChatPart[]>, ids: string[]) {
+function entries(messages: ChatMessageInfo[], parts: Record<string, ChatPart[]>, ids: string[]) {
   const rows = bind(messages, parts, ids)
   const flows = Object.keys(rows)
   const list = messages.reduce<Entry[]>((list, info) => {
@@ -173,6 +174,7 @@ function Fold(props: {
 }) {
   const [open, setOpen] = useState(props.initial ?? false)
   const state = props.state ?? "done"
+  const meta = props.meta ? truncateString(props.meta, 24) : ""
 
   return (
     <div className={`${css.fold} ${css[`fold_${state}`]} ${props.line === false ? css.foldPlain : ""}`}>
@@ -187,7 +189,11 @@ function Fold(props: {
           )}
           <span className={css.foldlabel}>{props.title}</span>
         </span>
-        {props.meta ? <span className={css.foldmeta}>{props.meta}</span> : null}
+        {props.meta ? (
+          <span className={css.foldmeta} title={meta === props.meta ? undefined : props.meta}>
+            {meta}
+          </span>
+        ) : null}
         <ChevronDown size={14} className={`${css.chevron} ${open ? css.chevronon : ""}`} />
       </button>
       {open ? <div className={css.foldbody}>{props.children}</div> : null}
@@ -578,6 +584,7 @@ const Group = memo(function Group(props: { infos: ChatAssistantMessage[]; onOpen
 type ResultState = "done" | "error" | "neutral"
 
 function Result(props: { title: string; detail: string; state: ResultState; meta?: string; children?: ReactNode }) {
+  const detail = truncateString(props.detail.replace(/\s+/g, " ").trim(), 140)
   return (
     <article className={`${css.msg} ${css.ai} ${css.group} ${css.phaseOutput}`} aria-live="polite">
       <div className={css.avatar}>
@@ -597,7 +604,7 @@ function Result(props: { title: string; detail: string; state: ResultState; meta
             </span>
             <span className={css.outputCopy}>
               <strong>{props.title}</strong>
-              <span>{props.detail}</span>
+              <span title={detail === props.detail ? undefined : props.detail}>{detail}</span>
             </span>
             {props.meta ? <code className={css.outputMeta}>{props.meta}</code> : null}
           </div>

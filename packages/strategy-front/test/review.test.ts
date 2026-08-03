@@ -225,8 +225,8 @@ describe("workbench review", () => {
       worktreePath: "workspace-a",
       reviewId: "review-a",
       sessionId: "session-a",
-      state: "passed",
-      summary: "passed with suggestions",
+      state: "failed",
+      summary: "failed with warnings",
       items: [{ name: "risk", status: "warning", detail: "risk found" }],
       suggestions: [],
       updatedAt: 100,
@@ -238,7 +238,7 @@ describe("workbench review", () => {
     })
     const mismatch = parse({
       workspacePath: "workspace-a",
-      state: "failed",
+      state: "passed",
       summary: "mismatch",
       items: [{ name: "risk", status: "warning", detail: "risk found" }],
     })
@@ -257,7 +257,7 @@ describe("workbench review", () => {
 
     expect(valid?.reviewId).toBe("review-a")
     expect(valid?.sessionId).toBe("session-a")
-    expect(valid?.state).toBe("passed")
+    expect(valid?.state).toBe("failed")
     expect(empty?.state).toBe("error")
     expect(mismatch?.state).toBe("error")
     expect(blank?.state).toBe("error")

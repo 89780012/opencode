@@ -161,6 +161,19 @@
   font-weight: 500;
 }
 
+.summary {
+  margin: 0 0 0.45rem;
+  padding: 0.45rem 0.55rem;
+  border-left: 2px solid #cbd5e1;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 0.74rem;
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .step {
   display: grid;
   gap: 0.25rem;
@@ -196,6 +209,7 @@
 }
 
 .stepmain {
+  flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
@@ -228,10 +242,14 @@
 }
 
 .stepmain strong {
+  min-width: 0;
   color: #0f172a;
   font-size: 0.78rem;
   font-weight: 500;
   line-height: 1.45;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .stepicon {

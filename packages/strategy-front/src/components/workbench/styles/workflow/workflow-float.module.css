@@ -1,9 +1,12 @@
 .root {
   position: absolute;
   z-index: 30;
+  top: 0.75rem;
   bottom: 7.5rem;
   right: 0.8rem;
-  max-height: calc(100% - 6.3rem);
+  display: flex;
+  align-items: flex-end;
+  max-height: none;
   font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
 }
 
@@ -40,9 +43,10 @@
 }
 
 .panel {
-  width: calc(100vw - 2rem);
-  max-width: 23rem;
-  max-height: calc(100vh - 6rem);
+  width: 26rem;
+  max-width: calc(100vw - 2rem);
+  max-height: 100%;
+  box-sizing: border-box;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -63,12 +67,20 @@
   background: #f8fafc;
 }
 
+.head .action {
+  margin-left: 0.5rem;
+}
+
 .title {
   min-width: 0;
   display: flex;
   align-items: center;
   gap: 0.42rem;
   color: #172033;
+}
+
+.title > * + * {
+  margin-left: 0.42rem;
 }
 
 .title strong {
@@ -120,14 +132,17 @@
 .body {
   min-height: 0;
   overflow: auto;
-  padding: 0.75rem 0.85rem 0.85rem;
+  padding: 0.9rem 1rem 1rem;
 }
 
 .summary {
   margin: 0;
+  border-left: 3px solid #93c5fd;
+  background: #f8fafc;
   color: #475569;
-  font-size: 0.75rem;
-  line-height: 1.55;
+  font-size: 0.8rem;
+  line-height: 1.65;
+  padding: 0.5rem 0.65rem;
   overflow-wrap: anywhere;
 }
 
@@ -181,14 +196,14 @@
 
 .copy strong {
   color: #172033;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   line-height: 1.4;
 }
 
 .copy span {
   color: #64748b;
-  font-size: 0.7rem;
-  line-height: 1.5;
+  font-size: 0.76rem;
+  line-height: 1.6;
   overflow-wrap: anywhere;
 }
 
@@ -212,7 +227,7 @@
 
 .events > strong {
   color: #475569;
-  font-size: 0.68rem;
+  font-size: 0.74rem;
 }
 
 .event {
@@ -221,8 +236,8 @@
   grid-template-columns: minmax(5.5rem, 0.4fr) minmax(0, 1fr);
   gap: 0.5rem;
   color: #64748b;
-  font-size: 0.68rem;
-  line-height: 1.45;
+  font-size: 0.74rem;
+  line-height: 1.55;
 }
 
 .event span,
@@ -239,13 +254,14 @@
 
 @media (max-width: 920px) {
   .root {
+    top: 0.55rem;
     bottom: 5.2rem;
     right: 0.55rem;
   }
 
   .panel {
-    width: calc(100vw - 1.1rem);
+    width: 24rem;
     max-width: 21rem;
-    max-height: calc(100vh - 5.2rem);
+    max-height: 100%;
   }
 }

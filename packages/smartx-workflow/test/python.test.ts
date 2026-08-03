@@ -120,7 +120,7 @@ describe("SmartX Python runtime", () => {
     expect(asks).toEqual(["smartx_python"])
   })
 
-  test("rejects unsafe or ambiguous Python file input before resolving the interpreter", async () => {
+  test("validates Python file shape without enforcing a worktree boundary", async () => {
     const dir = await home()
     const outside = path.join(path.dirname(dir), "outside.py")
     await Bun.write(outside, "print('outside')\n")
@@ -132,19 +132,20 @@ describe("SmartX Python runtime", () => {
         found = true
         return process.execPath
       },
+      cmd: (_bin, _args, file) => [process.execPath, "-e", "console.log(process.argv[1])", "--", file ?? ""],
     })
     const ctx = context(ctrl.signal, [], [], "smartx-helper", undefined, dir)
 
     await expect(
       run.execute({ description: "ambiguous", code: "print(1)", file: "note.txt" }, ctx),
     ).rejects.toThrow("exactly one")
-    await expect(run.execute({ description: "outside", file: "../outside.py" }, ctx)).rejects.toThrow("inside the active worktree")
+    await expect(run.execute({ description: "outside", file: "../outside.py" }, ctx)).resolves.toContain("outside.py")
     await expect(run.execute({ description: "extension", file: "note.txt" }, ctx)).rejects.toThrow(".py extension")
-    await expect(run.execute({ description: "absolute", file: outside }, ctx)).rejects.toThrow("relative")
+    await expect(run.execute({ description: "absolute", file: outside }, ctx)).resolves.toContain("outside.py")
     const link = path.join(dir, "linked.py")
     const linked = await symlink(outside, link).then(() => true).catch(() => false)
-    if (linked) await expect(run.execute({ description: "link", file: "linked.py" }, ctx)).rejects.toThrow("inside the active worktree")
-    expect(found).toBe(false)
+    if (linked) await expect(run.execute({ description: "link", file: "linked.py" }, ctx)).resolves.toContain("outside.py")
+    expect(found).toBe(true)
   })
 
   test("detects ambient Python shell launches without blocking ordinary text commands", () => {

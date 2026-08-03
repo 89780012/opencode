@@ -1744,6 +1744,10 @@ func reviewState(list []ReviewItem) string {
 			state = "failed"
 			continue
 		}
+		if item.Status == "warning" {
+			state = "failed"
+			continue
+		}
 		if item.Status == "running" && state == "passed" {
 			state = "running"
 		}

@@ -44,9 +44,9 @@ function item(value: unknown): WorkbenchReviewItem | null {
 function aggregate(items: WorkbenchReviewItem[]): WorkbenchReview["state"] {
   if (!items.length) return "error"
   if (items.some((item) => item.status === "error")) return "error"
-  if (items.some((item) => item.status === "failed")) return "failed"
+  if (items.some((item) => item.status === "failed" || item.status === "warning")) return "failed"
   if (items.some((item) => item.status === "running")) return "running"
-  if (items.every((item) => item.status === "passed" || item.status === "warning")) return "passed"
+  if (items.every((item) => item.status === "passed")) return "passed"
   return "error"
 }
 

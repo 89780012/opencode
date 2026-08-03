@@ -182,7 +182,7 @@ const state = view({ ...input, baseline: cfg.workflow.baseline })
 | reviewer 返回空报告 | review pending | 注入“未返回审查报告”，由主 agent 保存 error；不得伪造 passed |
 | reviewer 完成后插件在 MCP 保存前重启 | 恢复 review pending | 从同 workflowId 的最新 completed task 消息恢复，不把 run 直接标记失败 |
 | 上下文压缩后延迟保存第 3 轮 failed 审查 | `review_exhausted` | after hook 以远端第 3 轮快照推进，不得用本地第 2 轮写回 fixing 或收到 `400` |
-| 第 3 轮仅含 passed/warning | 进入下一阶段或 done/passed | 保留建议，不进入 fixing/review_exhausted |
+| 第 3 轮含 warning | `review_exhausted` | warning 按未通过聚合，不得进入调试或回测 |
 | 仅启用自动调试或自动回测 | 右侧 workflow 面板 | 无 synthetic 消息时在悬浮面板渲染过程数据，主会话只在 done/error 后补终态结果 |
 | SSE 重连时服务端已 idle | 前端 idle | 重连后重新查询 session status，不保留旧 busy |
 | 用户打断活动流程且阶段同时推进 | abort 与原子 `paused` 并行 | abort 不等待 workflow HTTP；服务端保留真实阶段和恢复点；停止本地回测 worker，已提交的远端回测可能继续运行 |
@@ -211,7 +211,7 @@ const state = view({ ...input, baseline: cfg.workflow.baseline })
 - service：workflow 创建幂等、session 隔离、阶段单调、第三轮终态、快速 backtest 终态对账、running backtest 同 ID 重试、start 前 debug claim、requestKey/cursor 迁移与隐藏、日志游标和 fatal 分类。
 - workflow：dirty 才触发、事件已知和重启恢复的子会话都不触发、三个阶段顺序、审查后单 transform 续跑、关闭阶段跳过、baseline 关闭仍保存 review、第三轮停止且第 4 轮 reviewer 在执行前被拒绝、fixing 写入保留当前 code revision、自动 MCP 参数覆盖和手工 start/logs 透传。
 - idle：无既有 run 的 dirty stop 能创建并只调度一个 reviewer；其他 session 和三个开关全关均不创建；reviewer 普通中文报告进入 pending，主 agent 保存成功前 run 保持 running；fixing 重启从同 session 持久化审查恢复。
-- review 恢复：本地缓存为第 2 轮、服务端为第 3 轮时保存 failed，断言只发出 `review/review_exhausted/reviewRound=3`；另测 warning-only 保存为 passed 并继续下一阶段。
+- review 恢复：本地缓存为第 2 轮、服务端为第 3 轮时保存 failed，断言只发出 `review/review_exhausted/reviewRound=3`；另测 warning-only 聚合为 failed，第一、二轮进入 fixing，第三轮进入 review_exhausted。
 - frontend：解析 fail-closed、scope 隔离、同 ID revision 单调、不同 ID updatedAt 单调、迟到 HTTP/空快照不覆盖 Socket、刷新恢复、done 中性分类，以及同 workflowId 多轮消息聚合和 synthetic 提示隐藏。
 - frontend：无 synthetic 消息的 debug/backtest workflow 仍渲染右侧悬浮面板；面板展示审查轮次/摘要、debug ID、backtest ID/进度，主会话不显示 requested/running 卡且只补 done/error 终态结果；SSE 重连后重新读取 session status。
 - pause/resume：活动 workflow 更新为 paused 后发送 session idle，断言不再 dispatch 或调用 MCP；精确“继续”和暂停后重新调用当前人工阶段均恢复同一 Run，非精确继续文案不恢复；兼容 cancelled 恢复，回测暂停不落 failed，恢复后保持 single-flight。

@@ -190,7 +190,8 @@ export function useWorkbench(setRight?: (open: boolean) => void) {
           detail: part.detail,
           suggestion: part.suggestion,
         })),
-        suggestions: [item.summary, ...item.suggestions].filter((tip) => tip),
+        summary: item.summary,
+        suggestions: item.suggestions,
       }))
     const back = runs.find((item) => item.id === state.backtestActive) ?? runs[0] ?? null
     const active = activeBacktest(runs)

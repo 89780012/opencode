@@ -372,7 +372,7 @@ running 与 terminal 保存使用同一结构：
 - workflow 使用 reviewer 的 tool call ID 生成 `reviewId`，使用 hook 上下文注入 `sessionId/workspacePath/worktreePath`；不得信任模型填写的身份字段。
 - reviewer 真正启动前先持久化 `running`；远程保存成功后才消费 review request。并发启动必须先占用 session 级运行锁，保存失败时释放锁并保留 request。
 - reviewer 只需返回普通中文审查报告；主 agent 负责转换为 terminal MCP 参数。workflow 不解析 reviewer JSON、不用关键词强制判定结论，也不得在 MCP 保存成功前推进 run。
-- terminal 状态严格按所有 items 聚合：`error > failed > running > passed`。terminal 不允许 `running` item；其余 `passed + warning` 组合保存为 `passed`，但 warning 条目、detail、suggestion 和 suggestions 必须完整保留。
+- terminal 状态严格按所有 items 聚合：`error > failed/warning > running > passed`。terminal 不允许 `running` item；只有全部 item 都是 `passed` 才能保存为 `passed`，任一 `warning` 必须聚合为 `failed` 并进入修复流程。
 - terminal MCP 参数中的 `summary`、`items`、`items[].name`、`items[].detail` 必须非空；未知 item status 和总体 state/items 不一致必须拒绝。reviewer 空输出或无明确结论时，主 agent 必须保存为 `error`，不得猜测为通过。
 - 同一稳定 `reviewId` 只允许 `running -> terminal`。完全相同的重复请求幂等返回原记录；terminal 不得被修改，也不得回退到 running。
 - review row 与对应 progress event 必须在同一 SQLite 事务提交；提交成功后才广播。`review.start/done/error` 只写入触发审查的 `sessionId`。
@@ -396,7 +396,7 @@ running 与 terminal 保存使用同一结构：
 | reviewer 输出为空或无明确结论 | 主 agent 保存 `error` | 不得由 workflow 猜测 passed/failed |
 | `review.get` 携带 sessionId | workspace/session 列表 | 忽略 worktree 差异，只返回目标 session |
 | `review.get.error` 匹配当前关联 ID | 查询结束 | 清理 loading/request，允许重试 |
-| items 仅含 passed/warning | terminal `passed` | warning 与建议继续展示，不进入 fixing |
+| items 含 warning 且无 error | terminal `failed` | 保留 warning 与建议并进入 fixing，不得继续后续阶段 |
 | paused/cancelled Run 再次提交审查 | 恢复同一 Run | 保留 workflow ID 和 reviewRound，下一轮继续递增 |
 | 相同 reviewId 的完全相同 running/terminal 重试 | 成功 | 返回原记录，不新增 progress |
 | terminal 后再修改或回退 running | 参数错误 | 保留原 terminal |
@@ -405,16 +405,16 @@ running 与 terminal 保存使用同一结构：
 
 ### 5. Good / Base / Bad Cases
 
-- Good：同一 `reviewId` 依次保存 running 和含 warning 的 passed；数据库只有一条 review、两条生命周期 progress，前端保留建议且随后触发 final baseline。
+- Good：同一 `reviewId` 依次保存 running 和全量 passed；数据库只有一条 review、两条生命周期 progress，随后触发 final baseline。
 - Base：两个 session 同时审查并乱序完成；各自 pending、progress、当前记录和历史只更新自己的 session，即使某条记录的 worktree 为 `/` 仍可见。
 - Bad：前端要求 `worktreePath === workspacePath`、切换 session 后继续展示其他 session 历史，或暂停后创建新 Run；这些行为会分别造成空面板、串轮次和三轮限制重置。
 
 ### 6. 必需测试
 
-- workflow：覆盖 running 保存失败不消费 request、并发 reviewer 只启动一次、普通中文/Markdown/空报告进入 pending、跨 session pending 隔离、paused/cancelled 恢复同 Run 且轮次递增、warning-only 通过、failed 修复、第三轮限制和 passed 后 final 可达。
+- workflow：覆盖 running 保存失败不消费 request、并发 reviewer 只启动一次、普通中文/Markdown/空报告进入 pending、跨 session pending 隔离、paused/cancelled 恢复同 Run 且轮次递增、warning-only 进入 fixing、failed 修复、第三轮限制和全量 passed 后 final 可达。
 - 服务与存储：覆盖旧表增量迁移可重复执行、稳定 ID 幂等、terminal 不可变、双会话乱序、session 优先查询、无 session 的 worktree 兼容查询、warning-only 聚合、session 归属、review/progress 故障回滚和提交后广播。
 - WebSocket/API/MCP：覆盖关联 ID、未知入站事件不广播、断线迟到 reply 不 panic、URL/body session 错配、workspace/session 错配和 `reviewId/sessionId` schema 映射。
-- 前端：覆盖 HTTP 返回后的防重、旧闭包与 workspace/session 切换、同 ID 乱序合并、双 session pending 配对、`worktreePath="/"` 接收、活动 session 历史隔离、查询错误收口、warning-only 通过和非法数据 fail-closed。
+- 前端：覆盖 HTTP 返回后的防重、旧闭包与 workspace/session 切换、同 ID 乱序合并、双 session pending 配对、`worktreePath="/"` 接收、活动 session 历史隔离、查询错误收口、warning-only 未通过和非法数据 fail-closed。
 - 自动流程展示：覆盖 workflow metadata 识别、synthetic 用户消息隐藏但 assistant/reviewer 输出保留、右侧悬浮面板展开收起、手工 reviewer 不被误聚合，以及终态错误文案来自 workflow 状态。
 - 变更后从各包目录运行 `bun test`、`bun typecheck`、相关文件 ESLint、`bun run build`、`go test ./...`、`go build ./...` 和 `go vet ./...`；race 测试受当前 Go/Windows 工具链能力约束。
 

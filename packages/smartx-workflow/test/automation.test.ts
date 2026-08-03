@@ -197,7 +197,7 @@ describe("automatic workflow idle driver", () => {
     expect(dispatches).toEqual([])
   })
 
-  test("passes a delayed third-round report containing only warnings", async () => {
+  test("exhausts a delayed third-round report containing warnings", async () => {
     const scope = "f:/repo\x00f:/repo\x00s1"
     const pending = new Map<string, Pending>([
       [
@@ -264,8 +264,8 @@ describe("automatic workflow idle driver", () => {
     )
 
     expect(updates).toHaveLength(1)
-    expect(updates[0]).toMatchObject({ stage: "done", state: "passed", reviewRound: 3 })
-    expect(current).toMatchObject({ stage: "done", state: "passed", reviewRound: 3 })
+    expect(updates[0]).toMatchObject({ stage: "review", state: "review_exhausted", reviewRound: 3 })
+    expect(current).toMatchObject({ stage: "review", state: "review_exhausted", reviewRound: 3 })
     expect(fixes.has(scope)).toBe(false)
   })
 
@@ -283,6 +283,32 @@ describe("automatic workflow idle driver", () => {
         { args: { subagent_type: "strategy-reviewer" } },
       ),
     ).rejects.toThrow("review limit reached")
+  })
+
+  test("moves a fixing review through dispatching before the reviewer runs", async () => {
+    const scope = "f:/repo\x00f:/repo\x00s1"
+    const updates: string[] = []
+    let current = run({ state: "fixing", reviewRound: 1 })
+    const hooks = build(ctx(), {
+      parent: async () => false,
+      reviewRequests: new Set([scope]),
+      workflow: async () => ({ baseline: false, review: true, debug: false, backtest: false }),
+      loadRun: async () => current,
+      updateRun: async (input) => {
+        updates.push(input.state)
+        current = { ...current, ...input, revision: current.revision + 1, updatedAt: Date.now() }
+        return current
+      },
+      saveReview: async () => {},
+    })
+
+    await hooks["tool.execute.before"]?.(
+      { sessionID: "s1", tool: "task", callID: "review-2" },
+      { args: { subagent_type: "strategy-reviewer" } },
+    )
+
+    expect(updates).toEqual(["dispatching", "running"])
+    expect(current).toMatchObject({ stage: "review", state: "running", reviewRound: 2 })
   })
 
   test("counts a new manual review chain from one after the previous workflow stops", async () => {
@@ -408,7 +434,7 @@ describe("automatic workflow idle driver", () => {
     }
   })
 
-  test("passes a warning-only reviewer report after the main agent saves it", async () => {
+  test("keeps a warning-only reviewer report out of passed state", async () => {
     let current = run({ state: "dispatching", debugEnabled: false, backtestEnabled: false })
     const calls: string[] = []
     const dispatches: string[] = []
@@ -471,14 +497,42 @@ describe("automatic workflow idle driver", () => {
       { title: "", output: "{}", metadata: {} },
     )
 
-    expect(current).toMatchObject({ stage: "done", state: "passed", reviewRound: 1 })
+    expect(current).toMatchObject({ stage: "review", state: "fixing", reviewRound: 1 })
     expect(pending.has("f:/repo\x00f:/repo\x00s1")).toBe(false)
 
     await hooks.event?.({
       event: { type: "session.status", properties: { sessionID: "s1", status: { type: "idle" } } },
     } as never)
 
-    expect(dispatches).toEqual([])
+    expect(dispatches).toEqual(["fix"])
+  })
+
+  test("does not create a new run for a paused or cancelled dirty workflow without an explicit request", async () => {
+    for (const state of ["paused", "cancelled"] as const) {
+      const starts: RunStart[] = []
+      const dirt = new Map([
+        [
+          "f:/repo\x00f:/repo",
+          { state: "dirty" as const, updated: Date.now(), revision: 2, owner: "s1", reason: "edit" },
+        ],
+      ])
+      const hooks = build(ctx(), {
+        parent: async () => false,
+        dirtyStates: dirt,
+        workflow: async () => ({ baseline: false, review: true, debug: true, backtest: true }),
+        loadRun: async () => run({ state, codeRevision: "1" }),
+        startRun: async (input) => {
+          starts.push(input)
+          return run(input)
+        },
+      })
+
+      await hooks.event?.({
+        event: { type: "session.status", properties: { sessionID: "s1", status: { type: "idle" } } },
+      } as never)
+
+      expect(starts).toEqual([])
+    }
   })
 
   test("dispatches one reviewer and lets the main agent save its plain text report", async () => {

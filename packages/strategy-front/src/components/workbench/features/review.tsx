@@ -1,5 +1,6 @@
 import { ChevronDown, ClipboardCheck, Clock3, History, RefreshCw, X } from "lucide-react"
 import { useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react"
+import { truncateString } from "@/lib/utils"
 import type { Step } from "../data"
 import { useWorkbench } from "../hooks/use-workbench"
 import { badge, lead, stepText, text, tone } from "../lib"
@@ -47,7 +48,9 @@ function Advice(props: { tips: string[] }) {
   return (
     <ol className={css.advice}>
       {props.tips.map((tip, idx) => (
-        <li key={`${idx}-${tip}`}>{tip}</li>
+        <li key={`${idx}-${tip}`} title={tip}>
+          {truncateString(tip.replace(/\s+/g, " ").trim(), 140)}
+        </li>
       ))}
     </ol>
   )
@@ -152,6 +155,11 @@ export function Review(props: {
                       <p className={css.status}>
                         第 {app.last.round} 轮 / {lead(app.last.status)} {text(app.last.status)}
                       </p>
+                      {app.last.summary ? (
+                        <p className={css.summary} title={app.last.summary}>
+                          {truncateString(app.last.summary.replace(/\s+/g, " ").trim(), 150)}
+                        </p>
+                      ) : null}
                       {app.last.steps.map((item) => (
                         <Row key={item.text} item={item} />
                       ))}
@@ -174,6 +182,11 @@ export function Review(props: {
                       <p className={css.status}>
                         第 {hist.round} 轮 / {lead(hist.status)} {text(hist.status)}
                       </p>
+                      {hist.summary ? (
+                        <p className={css.summary} title={hist.summary}>
+                          {truncateString(hist.summary.replace(/\s+/g, " ").trim(), 150)}
+                        </p>
+                      ) : null}
                       {hist.steps.map((item) => (
                         <Row key={item.text} item={item} />
                       ))}

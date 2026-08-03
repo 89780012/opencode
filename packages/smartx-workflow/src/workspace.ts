@@ -220,7 +220,7 @@ function aggregate(input: unknown) {
   })
   if (list.some((status) => !["passed", "warning", "failed", "error"].includes(status))) return "" as const
   if (list.includes("error")) return "error" as const
-  if (list.includes("failed")) return "failed" as const
+  if (list.includes("failed") || list.includes("warning")) return "failed" as const
   return "passed" as const
 }
 
@@ -1034,6 +1034,9 @@ export function createWorkspace(opt: Opt) {
             if (run.reviewRound >= limit) throw new Error("SmartX workflow review limit reached for this run.")
             // 当前轮次加一，并限制在最大轮次内。
             const round = Math.min(run.reviewRound + 1, limit)
+            // 修复完成后的复审必须先声明调度占用，再进入运行态，与服务端状态机保持一致。
+            if (run.state === "fixing")
+              run = await change(opt, run, { stage: "review", state: "dispatching", reviewRound: run.reviewRound })
             // [自动审查 11/15] reviewer 真正执行前进入 running，并把 reviewRound 加一。
             // 持久化 running，表示 reviewer 已由主会话真正接手。
             await change(opt, run, { stage: "review", state: "running", reviewRound: round })
@@ -1358,12 +1361,16 @@ export function createWorkspace(opt: Opt) {
           if (active?.stage === "review") {
             // [自动审查 15/15] 根据保存结果进入 passed、fixing、review_exhausted 或 failed。
             // 通过后选择 debug/backtest/done 的下一启用阶段。
-            if (done)
-              await change(opt, active, {
-                ...nextStage(active),
+            if (done) {
+              // 服务端状态机要求先保存审查终态，再进入后续阶段。
+              const passed = await change(opt, active, {
+                stage: "review",
+                state: "passed",
                 reviewRound: attempt,
                 summary: String(args.summary),
               })
+              await change(opt, passed, nextStage(passed))
+            }
             // 未通过但仍有剩余轮次，进入 fixing 等待主 agent 修改代码。
             if (!done && state === "failed" && attempt < limit)
               await change(opt, active, {

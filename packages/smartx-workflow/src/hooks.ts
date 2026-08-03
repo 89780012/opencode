@@ -44,7 +44,7 @@ import { ambient, python } from "./python.js"
 import { revision } from "./life.js"
 
 const pythonPolicy =
-  "In a SmartX workspace, run all Python through smartx_python. Use code for inline source or file for a workspace-relative .py script; do not invoke Python, package managers, or virtual environments through Bash."
+  "In a SmartX workspace, run all Python through smartx_python. Use code for inline source or file for a .py script path; do not invoke Python, package managers, or virtual environments through Bash."
 
 function recover(input: Record<string, unknown>, run: Run, workspace: string, worktree: string): Fix | undefined {
   if (input.sessionId !== run.sessionId || input.state !== "failed" || typeof input.summary !== "string") return
@@ -511,10 +511,11 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
       const fresh = !!code && ref !== manual?.revision
       // owner 防止另一个主会话的 idle 接管本会话产生的源码 revision。
       const own = dirt?.owner
+      const hold = run?.state === "paused" || run?.state === "cancelled"
       // 没有活动 Run，或上一条 Run 已终止时，尝试为新的源码 revision 创建 Run。
       if (
         // 活动 Run 必须继续复用；只有缺失或终态 Run 才允许创建下一条。
-        (!run || workflowStopped(run)) &&
+        (!run || (workflowStopped(run) && (!hold || !!manual))) &&
         // 三个阶段全关时不为新 revision 创建 Run。
         hasEnabledStage &&
         // 自动 Run 需要源码 revision；人工阶段请求可以使用稳定的 manual revision。
@@ -701,7 +702,7 @@ export function build(ctx: PluginInput, dep: Dep = {}): Hooks {
     "tool.execute.before": async (input, output) => {
       /** 工具执行前绑定可信上下文并记录阶段启动状态。 */
       if (input.tool === "bash" && ambient(output.args))
-        throw new Error("SmartX Python must run through smartx_python. Use code or a workspace-relative .py file.")
+        throw new Error("SmartX Python must run through smartx_python. Use code or a .py file path.")
       await workspaceFlow.before(input, output, await getWorkflowAutomation(input.sessionID))
     },
     "tool.execute.after": async (input, output) => {

@@ -1,7 +1,7 @@
 ﻿import { describe, expect, test } from "bun:test"
 import type { ToolContext } from "@opencode-ai/plugin"
 import { build } from "../src/hooks.js"
-import { disabled, loadRemote, loadWorkflowRemote } from "../src/remote.js"
+import { disabled, loadRemote, loadWorkflowRemote, updateRunRemote } from "../src/remote.js"
 import { backtest, debug, kind, python } from "../src/tool.js"
 import {
   analyze,
@@ -242,6 +242,29 @@ describe("smartx workspace analysis", () => {
       expect(await loadWorkflowRemote("http://localhost:4096")).toEqual(disabled)
       globalThis.fetch = (async () => new Response("", { status: 500 })) satisfies typeof fetch
       expect(await loadWorkflowRemote("http://localhost:4096")).toEqual(disabled)
+    } finally {
+      globalThis.fetch = prev
+    }
+  })
+
+  test("includes the service response when a workflow update fails", async () => {
+    const prev = globalThis.fetch
+    try {
+      globalThis.fetch = (async () =>
+        Response.json(
+          { code: 400, msg: "invalid input: invalid workflow transition", data: null },
+          { status: 400 },
+        )) satisfies typeof fetch
+
+      await expect(
+        updateRunRemote("http://localhost:4096", {
+          id: "workflow-1",
+          workspacePath: "f:/repo",
+          sessionId: "s1",
+          stage: "review",
+          state: "running",
+        }),
+      ).rejects.toThrow("invalid workflow transition")
     } finally {
       globalThis.fetch = prev
     }

@@ -170,20 +170,14 @@ export function ambient(input: unknown) {
   return value.split(/&&|\|\||[;&|\n]/).some(command)
 }
 
-async function source(input: { code?: string; file?: string }, ctx: Pick<ToolContext, "directory" | "worktree">) {
+async function source(input: { code?: string; file?: string }, ctx: Pick<ToolContext, "directory">) {
   const code = input.code?.trim() ? input.code : undefined
   const file = input.file?.trim()
   if (!!code === !!file) throw new Error("SmartX Python requires exactly one of code or file.")
   if (code) return { code } satisfies Source
   if (!file) throw new Error("SmartX Python requires exactly one of code or file.")
-  if (path.isAbsolute(file)) throw new Error("SmartX Python file must be relative to the active worktree.")
-
-  const root = await realpath(ctx.worktree).catch(() => "")
   const target = await realpath(path.resolve(ctx.directory, file)).catch(() => "")
-  if (!root || !target) throw new Error("SmartX Python file was not found in the active worktree.")
-  const rel = path.relative(root, target)
-  if (!rel || rel === ".." || rel.startsWith(".." + path.sep) || path.isAbsolute(rel))
-    throw new Error("SmartX Python file must stay inside the active worktree.")
+  if (!target) throw new Error("SmartX Python file was not found.")
   const info = await stat(target).catch(() => undefined)
   if (!info?.isFile()) throw new Error("SmartX Python file must be a regular file.")
   if (path.extname(target).toLowerCase() !== ".py") throw new Error("SmartX Python file must use the .py extension.")
@@ -224,7 +218,7 @@ async function drain(stream: ReadableStream<Uint8Array>, append: (value: string)
 export function python(opt: Opt = {}) {
   return tool({
     description:
-      "Run Python code or a workspace-relative .py file with the CPython bundled under SMART_HOME. Use this instead of shell Python commands. Packages are never installed at runtime.",
+      "Run Python code or a .py file with the CPython bundled under SMART_HOME. Use this instead of shell Python commands. Packages are never installed at runtime.",
     args: {
       description: tool.schema.string().trim().min(1).max(200).describe("Short description shown in the session"),
       code: tool.schema.string().max(200_000).optional().describe("Complete Python source code"),
@@ -234,7 +228,7 @@ export function python(opt: Opt = {}) {
         .min(1)
         .max(4_096)
         .optional()
-        .describe("Workspace-relative .py file to execute"),
+        .describe("Relative or absolute .py file to execute"),
       args: tool.schema.array(tool.schema.string().max(4_096)).max(64).optional().describe("Values exposed as sys.argv[1:]"),
       timeout: tool.schema
         .number()

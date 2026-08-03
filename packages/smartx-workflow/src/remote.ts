@@ -97,7 +97,10 @@ export async function updateRunRemote(service: string, input: RunUpdate) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   })
-  if (!resp.ok) throw new Error(`update workflow failed: ${resp.status}`)
+  if (!resp.ok) {
+    const text = (await resp.text()).trim()
+    throw new Error(`update workflow failed: ${resp.status}${text ? `: ${text.slice(0, 500)}` : ""}`)
+  }
   const body = (await resp.json()) as { data?: Run }
   if (!body.data) throw new Error("update workflow returned no data")
   return body.data
